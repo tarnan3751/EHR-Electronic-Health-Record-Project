@@ -105,13 +105,20 @@ unavailable, with the reason transcript_not_english, and the transcript kept as 
 nothing from it. Too few is fewer than two thirds (ENGLISH_AT_LEAST) of the transcript's words English, a passage
 marked unclear's words among them (english_share()): a line above his "mostly", set by the coordinator as the more
 protective reading, since the one such recording measured fell only just under one half, and a refusal keeps the
-transcript while a wrong offer can mislead. A word is English when SCOWL's lists hold it (englishwords.py: an ordinary dictionary's
-English, American, British and Canadian words), when it is a drug name (drugnames.py) or a word of an orderable's or an
-allergen's name (catalog.py), a clinical abbreviation or a unit the checks read (in this module and translation.py),
-or when it holds a digit (a number, or a code said with one: "A1c", "SpO2"); a possessive is its word's. A name no list
-holds isn't, so a short dictation more than a third of whose words are such names is refused ("Seen by Dr Okonkwo
-with Mrs Okafor.", 4 of 7). It holds at any length: a dictation of one word offers nothing
-if that word isn't English. A recorded visit's window, checked with a scope, is never refused so.
+transcript while a wrong offer can mislead. A word is English when SCOWL's lists hold it (englishwords.WORDS: an
+ordinary dictionary's English, American, British and Canadian words) or the reference data's diagnoses do
+(englishwords.CLINICAL: every ICD-10-CM description's words of four letters or more, "cellulitis", "dysuria",
+"lymphadenopathy"), when it is a drug name (drugnames.py) or a word of an orderable's or an allergen's name
+(catalog.py), a clinical abbreviation or a unit the checks read (in this module and translation.py), a standard
+abbreviation of a history and a physical examination or a title (EXAM_ABBREVIATIONS: "HEENT", "NKDA", "Dr"), or when
+it holds a digit (a number, or a code said with one: "A1c", "SpO2"); a possessive is its word's; and a word made of
+English words is too: "non" and one of WORD_PART letters or more ("nontender"), or two of WORD_PART letters or more each
+("echocardiogram", "gastroesophageal"). It holds at any length: a dictation of one word offers nothing if that word
+isn't English. So a short English dictation more than a third of whose words no source holds is refused, its transcript
+kept as plain text: a name ("Okonkwo."), an exam word ("Normocephalic, atraumatic.", "Hepatosplenomegaly noted."), a
+British term ("Bibasal crackles."). And Spanish that reads as English drug names, digits or a clinical word both
+languages spell alike ("Dolor abdominal con urticaria y prurito.", 4 of 6) reaches the checks below, which still ground
+every value in the transcript. A recorded visit's window, checked with a scope, is never refused so.
 
 Every value and source is first NFKC-normalized with Unicode format characters (such as a zero-width space) removed,
 and every check reads the cleaned text. The checks, each with the reason code recorded when it fails:
@@ -799,15 +806,37 @@ class NotEnglish(StructuringFailed):
 SPOKEN_WORD = re.compile(r"\w+(?:['’]\w+)*")
 
 
+# The standard abbreviations of a history and a physical examination, of the commonest orders and of titles, as
+# English dictation says them ("HEENT", "PERRLA", "NKDA", "Dr"), counted as English beside the clinical abbreviations
+# translation.py keeps, which its checks read for their own purpose. None is a word of Spanish: "HA" (headache), "YO"
+# (years old) and "POS" are left out for that.
+EXAM_ABBREVIATIONS = frozenset(
+    """HEENT PERRL PERRLA EOM EOMI NCAT ATNC RRR CTA CTAB NTND NT ND NABS BS NAD WNL WDWN NKDA NKA ROS HPI PMH PSH FH SH
+    CC JVD LAD ROM DTR DTRS CN MAE CVAT LLE RLE LUE RUE BLE BUE LLQ RLQ LUQ RUQ SOB DOE PND CP HX DX TX RX SX FX PT
+    PTS NEG HLD OA RA BMP CMP BNP TTE TEE CXR UA LFT LFTS PTT ABG VBG KUB EEG EMG PFT PFTS WKS HRS DR MR MRS MS""".split()
+)
+WORD_PART = 4  # the fewest letters of each English word a word made of two is read as
+
+
 @functools.cache
 def _english_words() -> frozenset[str]:
     """The words english_share() counts as English (see the module's header), read the first time a dictation's are
     counted. The clinical abbreviations are translation.py's, which imports this module, so it is imported here."""
     from . import translation
 
-    abbreviations = translation.CLINICAL_ABBREVIATIONS | translation.NOT_ABBREVIATIONS
-    return (englishwords.WORDS | drugnames.NAMES | _names("order")[2] | _names("allergen")[2] | MEASURES
-            | frozenset(UNIT_SPELLINGS) | frozenset(abbreviation.casefold() for abbreviation in abbreviations))
+    abbreviations = translation.CLINICAL_ABBREVIATIONS | translation.NOT_ABBREVIATIONS | EXAM_ABBREVIATIONS
+    return (englishwords.WORDS | englishwords.CLINICAL | drugnames.NAMES | _names("order")[2] | _names("allergen")[2]
+            | MEASURES | frozenset(UNIT_SPELLINGS) | frozenset(abbreviation.casefold() for abbreviation in abbreviations))
+
+
+def _is_english(word: str, known: frozenset[str]) -> bool:
+    """One word (in lower case), as english_share() counts it (see the module's header)."""
+    if any(c.isdigit() for c in word) or word in known or word.removesuffix("'s") in known:
+        return True
+    if word.startswith("non") and len(word) - 3 >= WORD_PART and word[3:] in known:  # "nontender"
+        return True
+    # Two English words of WORD_PART letters or more each ("echocardiogram", "gastroesophageal").
+    return any(word[:i] in known and word[i:] in known for i in range(WORD_PART, len(word) - WORD_PART + 1))
 
 
 def english_share(text: str) -> float | None:
@@ -816,8 +845,7 @@ def english_share(text: str) -> float | None:
     if not words:
         return None
     known = _english_words()
-    return sum(any(c.isdigit() for c in word) or word in known or word.removesuffix("'s") in known
-               for word in words) / len(words)
+    return sum(_is_english(word, known) for word in words) / len(words)
 
 
 def too_little_english(text: str) -> bool:

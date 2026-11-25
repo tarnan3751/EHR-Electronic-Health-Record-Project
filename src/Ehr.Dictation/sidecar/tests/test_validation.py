@@ -1538,9 +1538,10 @@ def test_a_dictation_mostly_not_english_words_offers_no_field_and_no_proposal():
     "BP 142/88, SpO2 97%, A1c 7.1, COPD, patient's lisinopril 10 mg, 120 mmHg.",
     # However short.
     "Stable.",
-    # At the line, two words in three, and over it, with names no list holds.
+    # At the line, two words in three, and over it, with names no list holds; a title is English.
     "Okafor seen today.",
     "Follow up with Dr Nwachukwu and Dr Okonkwo.",
+    "Seen by Dr Okonkwo with Mrs Okafor.",
 ])
 def test_english_is_checked_however_much_else_it_holds_and_however_short(said):
     assert english_share(said) >= ENGLISH_AT_LEAST == 2 / 3
@@ -1550,14 +1551,69 @@ def test_english_is_checked_however_much_else_it_holds_and_however_short(said):
 @pytest.mark.parametrize(("said", "share"), [
     ("Paciente.", 0.0),
     # A name no list holds isn't English: a short dictation more than a third of whose words are such names is refused,
-    # under the line though over one half, what the line costs.
-    ("Seen with Mrs Okafor and Mr Nwachukwu.", 3 / 7),
-    ("Seen by Dr Okonkwo with Mrs Okafor.", 4 / 7),
+    # a lone name among them.
+    ("Okonkwo.", 0.0),
+    ("Okafor and Nwachukwu seen.", 0.5),
 ])
 def test_a_short_dictation_with_too_few_english_words_is_refused_too(said, share):
     assert english_share(said) == pytest.approx(share)
     with pytest.raises(NotEnglish):
         check(EMPTY, [], transcript(said))
+
+
+# The review of the last round: a short English dictation made of clinical words, offered. Its words are the reference
+# data's diagnoses' (ICD-10-CM), the standard exam abbreviations, and words made of English ones ("non" and one, or two
+# of four letters or more).
+@pytest.mark.parametrize("said", [
+    "Assessment: hyperlipidemia.",
+    "Lymphadenopathy, cervical.",
+    "Osteoporosis, hypothyroidism.",
+    "Impression: erythematous urticarial plaques.",
+    "NKDA. HEENT unremarkable, PERRLA, EOMI.",
+    "Abdomen nontender, nondistended.",
+    "Plan: echocardiogram.",
+    "Gastroesophageal reflux disease.",
+])
+def test_a_short_dictation_of_clinical_words_is_offered(said):
+    assert english_share(said) >= ENGLISH_AT_LEAST
+    assert set(check(EMPTY, [], transcript(said)).fields) == set(FIELDS)
+
+
+# Spanish with the same clinical words in it, refused at the line.
+@pytest.mark.parametrize("said", [
+    "Paciente con celulitis en la pierna.",
+    "Hipertensión arterial e hipotiroidismo.",
+    "Linfadenopatía cervical sin fiebre.",
+    "Toma metformina y enalapril.",
+])
+def test_spanish_with_clinical_words_in_it_is_refused(said):
+    assert english_share(said) == pytest.approx(0.5)
+    with pytest.raises(NotEnglish):
+        check(EMPTY, [], transcript(said))
+
+
+@pytest.mark.parametrize(("said", "share"), [
+    # Exam words no allowed source holds (the rule's known limit): a short dictation of them is refused, its transcript
+    # kept as plain text.
+    ("Normocephalic, atraumatic.", 0.0),
+    ("Hepatosplenomegaly noted.", 0.5),
+])
+def test_a_limit_a_short_dictation_of_exam_words_no_list_holds_is_refused(said, share):
+    assert english_share(said) == pytest.approx(share)
+    with pytest.raises(NotEnglish):
+        check(EMPTY, [], transcript(said))
+
+
+# A known limit: Spanish that reads as English drug names, digits or a clinical word both languages share reaches the
+# English checks, which still ground every value in the transcript.
+@pytest.mark.parametrize(("said", "share"), [
+    ("Continuar lisinopril, metformin, atorvastatin y aspirin.", 5 / 6),
+    ("Peso 82 kg, TA 128/76, FC 70.", 7 / 8),
+    ("Dolor abdominal con urticaria y prurito.", 4 / 6),
+])
+def test_a_limit_spanish_that_reads_as_english_names_digits_or_shared_words_isnt_refused(said, share):
+    assert english_share(said) == pytest.approx(share)
+    assert set(check(EMPTY, [], transcript(said)).fields) == set(FIELDS)
 
 
 def test_a_dictation_with_no_words_isnt_refused_so():

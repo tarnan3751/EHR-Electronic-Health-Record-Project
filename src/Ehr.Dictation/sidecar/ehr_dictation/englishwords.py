@@ -1,8 +1,10 @@
 """The words the English checks count as English when they decide whether a dictation in English has
-too few English words (validation.py, english_share()): SCOWL's English, American, British and
-Canadian words, words with capitals and contractions up to size 50, release 2020.12.07, in lower
-case and without possessives. Written by src/Ehr.Dictation/write_english_words.py, which says what is
-left out and why; don't edit it. SCOWL's whole notice is LICENSE-SCOWL.md, beside this file.
+too few English words (validation.py, english_share()). WORDS, the base list: SCOWL's English,
+American, British and Canadian words, words with capitals and contractions up to size 50, release
+2020.12.07, in lower case and without possessives. CLINICAL: the words of 4 letters or more of
+every ICD-10-CM description in the reference data (public domain), in lower case. Written by
+src/Ehr.Dictation/write_english_words.py, which says what is left out and why; don't edit it. SCOWL's
+whole notice is LICENSE-SCOWL.md, beside this file.
 
 Copyright 2000-2018 by Kevin Atkinson
 
@@ -5901,5 +5903,666 @@ WORDS = frozenset(
     zoologists zoology zoom zoomed zooming zooms zoos zorn zoroaster zoroastrian zoroastrianism zoroastrianisms zr
     zsigmondy zucchini zucchinis zulu zulus zuni zwieback zworykin zygote zygotes zürich ångström éclair éclairs
     éclat élan émigré émigrés épée épées étude études
+    """.split()
+)
+
+
+CLINICAL = frozenset(
+    """
+    abandonment abcc abdomen abdominal abducent abductor ablation ablative able abnormal abnormalities abnormality
+    abortion abortus above abrasion abscedens abscess absence absent absolute absorption abuse abuser
+    acanthamebiasis acanthamebic acanthamoeba acantholytic acanthosis acariasis access accessory accident accidental
+    accidentally accidents accommodation accommodative accompanying accreta accretions acculturation acetabuli
+    acetabulum acetonuria achalasia achieved achilles achlorhydria achondrogenesis achondroplasia achromatopsia acid
+    acidemia acidosis acids aciduria acidurias acinar acinetobacter acne acoustic acquaintance acquired
+    acrodermatitis acromegaly acromial acromioclavicular acrophobia acth acting actinic actinomycetoma actinomycosis
+    actinomycotic action activated activating activation active activities activity acts acuta acute acyl adaptation
+    addiction addictive addisonian additives adductor adductus adem adenohypophyseal adenoiditis adenoids
+    adenomatous adenomyosis adenosine adenoviral adenovirus adequacy adequate adherent adhesion adhesions adhesive
+    adhesives adiposity adjustment administered administration administrative admission adnexa adolescence
+    adolescent adopted adoption adoptive adrenal adrenergic adrenocortical adrenogenital adrenoleukodystrophy
+    adrenomedullary adrenomyeloneuropathy adrenoreceptor adult adultcare adults advanced adverse advice aerial
+    aerobic aerobics aerosol aeruginosa aesthetic affect affected affecting affective afibrinogenemia aflatoxin
+    african after aftercare against agalactia agencies agenesis agent agents aggressive agitation agnosia agonists
+    agoraphobia agranulocytosis agricultural agriculture aicardi ainhum airbag aircraft airgun airplane airport
+    airway akari akathisia alagille alba albinism albuginea albumin alcohol alcoholic alcoholism alcohols
+    aldosteronism aldrich alexander alexia algae algoneurodystrophy alighting alimentary aliphatic alkali alkalis
+    alkalosis alkenes alkylating alleged allergens allergic allergy allescheriasis allied alligator allodermis
+    allograft alloimmune alone alopecia alpers alpha alphafetoprotein alpine alport alps alte alteration altered
+    alternating altitude aluminosis aluminum alveolar alveolitis alveolus alzheimer amaurosis ambient amblyopia
+    ambulance ambulatory amebiasis amebic ameboma amenorrhea american amines amino aminobutyric aminoderivatives
+    aminoglycosides aminophenol amkd amnesia amnestic amnions amniotic amount amphetamines amphibian amphibians
+    ampulla amputation amusement amyelia amyloid amyloidosis amyotrophic amyotrophy anabolic anaerobes anagen anal
+    analeptics analgesia analgesic analgesics analogs analogues anaphylactic anaphylaxis anaplasmosis anaplastic
+    anarthria anastomosis anatomical anca ancylostomiasis anderson androgen androgenic androgens androphobia
+    anejaculatory anemia anemias anemone anencephaly anesthesia anesthesiology anesthetic anesthetics anetoderma
+    aneurysm aneurysmal aneurysms angelman anger angiitis angina angiodysplasia angioid angioimmunoblastic
+    angioneurotic angiopathy angioplasty angiosarcoma angiostrongyliasis angiotensin angle angular anhedonia
+    anhidrosis anhidrotic anhydrase anhydrotic animal animals animate anisakiasis aniseikonia anisocoria
+    anisometropia ankle ankyloglossia ankylosing ankylosis annular annulare annulus anoctamin anodontia anogenital
+    anomalies anomalous anomaly anonychia anonymous anophthalmos anorectal anorexia anosmia anosognosia another
+    anovulation anoxia anoxic antacids antagonist antagonists antecedent antenatal antepartum anterior anterograde
+    anthelminthics anthrax anti antiallergic antiandrogens antiarteriosclerotic antiasthmatics antibiotic
+    antibiotics antibodies antibody anticholinergics anticholinesterase anticoagulant anticoagulants anticonvulsants
+    antidepressants antidiabetic antidiarrheal antidiuretic antidotes antidysrhythmic antiemetic antiepileptic
+    antiepileptics antiestrogens antifungal antigen antigonadotrophins antihyperlipidemic antihypertensive
+    antimalarials antimetabolite antimicrobial antimuscarinics antimycobacterial antineoplastic antineutrophilic
+    antiparasitic antiparasitics antiparkinsonism antipersonnel antiphospholipid antiplatelets antiprotozoal
+    antipruritics antipsychotics antipyretic antipyretics antirheumatic antirheumatics antisocial antithrombotic
+    antithrombotics antithyroid antitrypsin antitumor antitussives antivaricose antivenin antiviral antrum ants
+    anuria anus anxiety anxiolytic anxiolytics aorta aortic aortitis aortocoronary aortopulmonary apartment apathy
+    apds aphagia aphakia aphakic aphasia aphonia aphthae apical aplasia aplasias aplastic apnea apocrine apol
+    apophyseal apparatus apparel apparent appearance appendage appendages appendicitis appendico appendicular
+    appendix appetite appliance appliances applicable application applied apraxia aqueduct aqueous arachnophobia
+    arch arcuate arcus area areas areata arenaviral areola areolar argentous argininemia arginosuccinic argyll
+    arhinencephaly arising armed arms arnold aromatase aromatic around arousal arousals arrest arrested arrhythmia
+    arrhythmias arrhythmogenic arrival arsenic arterial arteries arterioles arteriopathy arteriosus arteriovenous
+    arteritis artery arthralgia arthritis arthrodesis arthrogryposis arthropathic arthropathies arthropathy
+    arthropod arthropods arthroscopic arthus articular articulation artificial artillery arts aryepiglottic asbestos
+    ascariasis ascending ascent ascites ascorbic aseptic asian aspect asperger aspergillosis asphyxia asphyxiation
+    aspirated aspiration aspirator aspirin asplenia assault assist assistance assisted associated association asthma
+    asthmaticus astigmatism astringents astrovirus asymmetric asymmetry asymptomatic ataxia ataxias ataxic
+    atelectasis atheroembolism atherosclerosis atherosclerotic athetoid athletic athletics atlanto atlantoaxial
+    atmospheric atopic atresia atrial atrioventricular atrium atrophic atrophicae atrophicans atrophicus atrophies
+    atrophoderma atrophy attachment attack attacks attempt attempted attention attic atticoantral attitude attr
+    attrition atypical audio audiological auditory aura aural aureus auricle auricular australian australis
+    authority autism autistic autoantibodies autograft autoimmune autoinflammatory autologous automatic automobile
+    autonomic autosensitization autosomal autosomes auxiliary available avalanche aversion avium avoid avoidant
+    avulsion awaiting awareness away awkward axial axilla axillary axonal azoospermia babesia babesiosis baby
+    bacillus back background bacteremia bacteria bacterial bacteriuria bacteroides bagassosis baked baker baking
+    balance balanced balanic balanitis balanoposthitis balantidiasis balcony balkan ball balloon balo bancrofti band
+    bandemia bands bank barbae barbiturates bardet barefoot bariatric bark barn barotrauma barr barracks barre
+    barrett barth bartholin barton bartonellosis bartter basal base baseball based basic basilar basketball
+    basophilia bath bather bathing bathroom bathtub baton batteries battery baumannii bauxite bayonet beach bead
+    bearing beat beau because beck becker bedroom bees before behalf behavior behavioral behcet behind being belief
+    bell belly below bence benign bennett bent benzene benzodiazepines benzothiadiazides beriberi berloque berries
+    berylliosis beryllium besnier best beta betting between bezoar biceps bicipital bicondylar bicornate bicuspid
+    bicycle biedl bifascicular bifida bifurcation bigeminy bike bilateral bile biliary bilious bilirubin biliuria
+    bimalleolar binary binding binge binocular biochemical biogenesis biologic biological biologically biomechanical
+    biotin biotinidase biovar bipolar bird birds birth births bisexual bisphosphonates bite biting bitot bitten
+    biventricular bizarre black bladder blades blast blastic blasting blastomycosis blastomycotic blasts bleb
+    bleeding blepharitis blepharochalasis blepharoconjunctivitis blepharophimosis blepharospasm blighted blind
+    blindness blister blizzard block blockers blocking blood bloodstream blue blunt board boarder boarding boat
+    bockhart bodies bodily body boiler bomb bomber bone bones bony boogie border borderline bordetella born borne
+    boss boston both bottle bottom bottomed botulism bouchard boutonniere bovine bowel bowing bowling bowman boxing
+    boydii brachial bradycardia brain brainstem branch branched branches branchial brass brawl brawny brazilian brca
+    break breakdown breaks breast breasts breath breathing breech bridge bridges brief brill brim broad broken
+    bromhidrosis bronchiectasis bronchiolitis bronchitis bronchomalacia bronchopneumonia bronchopulmonary
+    bronchospasm bronchus brother brow brown brucella brucellosis brugada brugia bruising bruxism bubonic buccal
+    bucket budd buerger buggy building bulbar bulbous bulimia bulking bullet bullets bullosa bullous bumped bundle
+    bungee bunion bunionette buried burkitt burn burning burns bursa bursal bursitis bursopathies bursopathy burst
+    business buttock button butyrophenone buzzi bypass byssinosis bystander cable cachexia cacna cadmium cafe
+    cafeteria caffeine cage caisson calcaneal calcaneofibular calcaneovalgus calcaneovarus calcaneus calcerous
+    calcific calcification calcifications calcified calcineurin calcinosis calcitonin calcium calculi calculous
+    calculus calf calicivirus california calisthenics callosities callosum caloric calorie calories calpain calve
+    camp campsite campylobacter canal canaliculi canaliculitis canavan cancer candidal candidiasis canis
+    cannabinoids cannabinosis cannabis cannot canoe canoeing canthus cantonensis capillariasis capillaries capillary
+    capitate capitis capsular capsulati capsule capsulitis caput carbamate carbapenem carbohydrate carbon carbonic
+    carboxylase carbuncle carcinoembryonic carcinoid carcinoma carcinomas cardia cardiac cardio cardiogenic
+    cardiomegaly cardiomyopathies cardiomyopathy cardiopulmonary cardiorespiratory cardiothoracic cardiovascular
+    carditis care caregiver caregiving caries carinatum carnitine carotid carpal carpometacarpal carpus carried
+    carrier cart cartilage cartilagenous caruncle castleman cataclysmic catalase cataplexy cataract catatonic
+    catecholaminergic category caterpillars catheter catheterization cauda caught cauliflower causalgia causality
+    cause causes causing cava cave cavernosum cavities cavity cavus cecoureterocele cecum ceiling celiac cell cells
+    cellular cellularity cellulitis cellulocutaneous cement center centipedes central centrally centric centrifugal
+    centrifugum centrilobular centronuclear cephalgias cephalhematoma cephalosporins cercarial cerebellar cerebellum
+    cerebral cerebrospinal cerebrovascular cerebrum cereus ceroid certain certificate cerumen cervical cervicalgia
+    cervicitis cervicobrachial cervicocranial cervicofacial cervicogenic cervicothoracic cervix cesarean cessation
+    cestode chaffeensis chagas chain chair chalazion chalcosis chamber chambers chancroid change changes channel
+    characterized charcot charge checking checkpoint chediak cheek cheerleading cheilitis chelating chemical
+    chemicals chemistry chemotherapy chest chewing chiari chiasm chicken chiefly chignon chikungunya chilblains
+    child childbirth childcare childhood children chills chimera chimeric chin chip chlamydia chlamydial chloasma
+    chloramphenicol chlorine chlorofluorocarbons chloroform choanal choking cholangitis cholecystectomy
+    cholecystitis choledochal cholelithiasis choleperitonitis cholera cholerae cholestasis cholestatic cholesteatoma
+    cholesteatosis cholesterol cholesterolosis cholinergic cholinergics chondritis chondrocalcinosis chondrocostal
+    chondrodysplasia chondrodystrophy chondroectodermal chondrolysis chondromalacia chondrosternal chordae chordee
+    chorea chorioamnionitis choriomeningitis chorionic chorions chorioretinal chorioretinitis chorioretinopathy
+    choroid choroidal choroideremia christian chromhidrosis chromium chromoabnormalities chromomycosis chromosomal
+    chromosome chromosomes chronic chronica chronicus churg chylous chyluria cicatricial cigarette cigarettes
+    ciguatera ciliary cinema circadian circuit circulating circulation circulatory circumcision circumflex
+    circumstances circumstantial circumvallate cirrhosis citrate citrullinated citrullinemia city civatte civil
+    civilian class classic classical classified classmates claudication claustrophobia clavicle claw clawfoot
+    clawhand clean cleaning clear cleats cleft clicking cliff climacteric climbing clinical clitoris cloaca cloacal
+    cloacogenic clonic clonorchiasis closed closing clostridioides clostridium closure clothing clotting cloudy
+    cloverleaf club clubbing clubfoot clubhand cluster clutton coagulants coagulation coalworker coarctation coaster
+    cobra cocaine coccidioidomycosis coccyx cochlear cognitive coin coital cold coli colic colitis collagenosis
+    collagenous collapse collapsed collateral collecting college colles colliding collision coloboma colon
+    colonization color colorado colorectal colostomy column coma combat combination combinations combine combined
+    combustion commands commercial comminuted commissure common communicable communicating communication comparison
+    compartment compensatory complaint complement complete completed complex complicated complicating complication
+    complications component compound compounds compression compressions compromised compulsive computer
+    concentration concentric conception concern concerning concerns concretions concussion condensans condition
+    conditioner conditioning conditions conduct conducted conduction conductive condylar condyle condyloma confined
+    confinement confirm confirmed conflagration conflagrations conflict confused confusional congeners congenita
+    congenital congestion congestive conglobata congo conjoined conjugate conjunctiva conjunctival conjunctivitis
+    conjunctivochalasis conn connection connections connective conorii consanguinity conscious consciousness
+    consequences conservation constant constipation constituents constitutional constriction constrictive
+    construction consult consulting contact contagiosum containing contaminants contaminated content contents
+    context contiguous continent continua continuing continuity continuous contour contraception contraceptive
+    contraceptives contracted contraction contractions contracture contraindication contralateral contrast control
+    controlled contusion conus conventional convergence conversation conversion converted converting conveyance
+    conviction convulsions cooking coop coordination copper coracohumeral coracoid coral cord cords cori cornea
+    corneal corns cornual coronal coronary coronavirus coronoid corporis corporo corpus correct corrected
+    correspondence corridor corrosion corrosions corrosive cortex cortical corticobasal cosmetic cosmetics
+    costovertebral cough counseling counselors count counterpulsation country course court courthouse courtyard
+    cousin coverage covid cowden cowpox coxa coxsackievirus cpvt crab cracked craft cramp cramps cranial
+    craniofacial craniopharyngeal craniorachischisis craniosynostosis crash crashing created crepitant crescentic
+    crest creutzfeldt crigler crime crimean criminal crisis critical crocheting crocodile crohn cross crossing
+    crosti croup crowd crowding cruciate cruris crushed crushing crustaceans crying cryoglobulinemia cryopyrin
+    cryptococcosis cryptogenic cryptosporidiosis crystal crystallina crystalline ctnnb cuboid cuff culbertsoni
+    cultural cuneiform curb current currently curvature curve cushing custody cutanea cutaneous cutem cutis cutter
+    cyanide cyanides cyanosis cyanotic cycle cyclic cyclical cyclin cyclist cyclitis cycloparaffins cyclophoria
+    cyclosporiasis cyclothymic cyclotropia cylinder cyst cystectomy cystic cystica cysticercosis cystinosis
+    cystinuria cystitis cystocele cystoid cystostomy cysts cytokine cytologic cytological cytomegaloviral
+    cytomegalovirus cytopenia cytoplasmic cytotoxic dacryoadenitis dacryocystitis dacryolith dacryops dactylitis
+    dagger daily dairy damage dancing dander danlos dark date dates daycare days deaf deafness deaminase death
+    debility decalvans decarboxylase decellularized decision decline decompression decreased deep defecation defect
+    defective defects deferens defiant defibrillator defibrination deficiencies deficiency deficient deficit
+    deficits defined deformans deformations deformed deforming deformities deformity degenerated degeneration
+    degenerations degenerative degradation degree dehiscence dehydration dehydrogenase delay delayed delays deletion
+    deletions delirium delivered delivery delta deltoid delusional delusions dementia demodex demoralization
+    demulcents demyelinating demyelination dendritic dengue dens dense density dental dentin dentofacial department
+    dependence dependency dependent depersonalization depleted depletion deployment depolarization deposit
+    deposition deposits depressants depressed depression depressive deprivation depth derailment derangement
+    derangements derealization derivatives dermatitis dermato dermatoarthritis dermatochalasis dermatographic
+    dermatologic dermatomyositis dermatophytoses dermatophytosis dermatopolymyositis dermatoses dermatosis derrick
+    descemet descemetocele descended descending descent desensitization desert designated desire desmoid
+    desquamative destruction detachment detachments detail detergents determination determine detonation
+    detransition deuteranomaly development developmental deviated deviation devic device devices dextrocardia
+    diabetes diabetic diagnosis diagnostic dialysis diamniotic diamond diaper diaphragm diaphragmatic diaphyseal
+    diarrhea diastematomyelia diastolic diastrophic dicentric dichloromethane dichorionic dicroceliasis diet dietary
+    dietetic diethylstilbestrol dietz dieulafoy different differentiated difficile difficult difficulties difficulty
+    diffuse digestants digestive digging digital diisocyanate dilatation dilated dilation dilution diminished dimple
+    dining dioxide diphtheria diphtheritic diphyllobothriasis diplacusis diplegia diplegic diploma diplopia
+    dipylidiasis direct dirt disabilities disability disablement disappearance disaster disc discarded discharge
+    discitis discogenic discoid discomfort discontinuity discord discordant discrepancy discrimination disease
+    diseases disinhibited disintegrative dislocation disorder disorders disorganized disorientation displaced
+    displacement disproportion disruption disruptive dissecans dissection disseminated dissociated dissociation
+    dissociative distal distance distant distension distortions distress disturbance disturbances disulfide
+    diuretics diutinum divergens diverticulitis diverticulosis diverticulum diving divorce dizziness dmac dock
+    documented dolichocephaly dolphin dome domestic dominant done donor dormitory dorsal dorsalgia dorsalis
+    dorsopathies dorsopathy dosage double doubling down downhill dracunculiasis drain drainage draining drains
+    dravet drawn dressers dressing dressler dribbling drilling drills drinking drinks drip driver driveway driving
+    drop drowning drug drugs drum drusen dsap dual duane duboisii duchenne duck duct ducts ductus duffy duncani dune
+    duodenal duodenitis duodenum duplication duplications dupuytren dura dural duration during dust dusts dyes
+    dynamic dynamite dysarthria dysautonomia dysenteriae dysentery dyserythropoietic dysferlin dysfunction
+    dysfunctions dysgenesis dyshidrosis dyshormogenetic dyskinesia dyslexia dysmenorrhea dysmorphic dysmorphism
+    dysostosis dyspareunia dyspepsia dysphagia dysphasia dysphonia dysphoric dysplasia dysplasias dyspnea
+    dysreflexia dysregulation dysthymic dystocia dystonia dystrophica dystrophies dystrophy dysuria early ears earth
+    earthquake eastern eaten eating eaton ebola ebstein ecchymoses eccrine echinococcosis echinococcus
+    echoencephalogram echovirus eclampsia ecmo economic ecstasy ectasia ectodermal ectopic ectropion eczema
+    eczematoid eczematous edema edentulous edge education educational effect effector effects efferent effluent
+    effluvium effusion eggs ehlers ehrlichia ehrlichiosis eisenmenger ejaculation ejaculatory elasticum elastosis
+    elbow elderly elective electric electrical electro electrocardiogram electrocution electrode
+    electroencephalogram electrolyte electrolytic electromyogram electronic electroretinogram electroshock element
+    elementary elements elephantiasis elevated elevation elevator elevatum elimination elliptocytosis elongation
+    elsewhere eltor embankment embedded emboli embolic embolism embolus embryo embryonic emergency emetics
+    emollients emotional emotions emphysema employment empty emptying enabling enamel encephalitis encephalocele
+    encephalomyelitis encephalopathy enchondromatosis encopresis encounter encountering encysted endemic
+    endocapillary endocardial endocarditis endocardium endocervix endocrine endodontic endometrial endometriosis
+    endometritis endometrium endomyocardial endophthalmitis endoscopic endosseous endothelial endotracheal enemy
+    energy enforcement engine engines engorgement enlarged enlargement enophthalmos enpp entangled entanglement
+    enteric entering enteritis enterobacterales enterobiasis enterocele enterococcus enterocolitica enterocolitis
+    enterohemorrhagic enteroinvasive enteropathic enteropathogenic enteropathy enteroptosis enterostomy
+    enterotoxigenic enteroviral enterovirus enthesopathies enthesopathy entrance entrapment entropion entry enuresis
+    environment environmental enzyme enzymes eosinophilia eosinophilic epicondyle epicondylitis epicranial epidemic
+    epidermal epidermolysis epididymis epididymitis epididymo epidural epigastric epiglottis epiglottitis epilepsy
+    epileptic epilepticus epiphora epiphysis episcleral episcleritis episode episodes episodic epispadias epistaxis
+    epithelial epitheliopathy epithelium epstein equal equatorial equina equine equinovarus equipment erectile
+    erosion erosive errors eructation erupted eruption erysipelas erysipeloid erysipelothrix erythema erythematosus
+    erythematous erythrasma erythrocyte erythrocytosis erythroderma erythroid erythromelalgia erythropoietic esbl
+    escalator escherichia esophageal esophagitis esophagogastric esophagostomy esophagus esophoria esotropia
+    essences essential establishments esteem esters estrangement estrogen estrogens ethanol ethmoid ethmoidal
+    etiology eumycetoma european eustachian euthyroid evaluation evans evasiveness event events eversion evidence
+    evoked exacerbation exam examination examinations exanthem exanthema exanthematous excavatum except
+    exceptionally excess excessive excitation exclude excluding exclusion exclusively excoriation excoriee executive
+    exercise exercises exertion exertional exfoliation exfoliative exhaust exhaustion exhibitionism existing exit
+    exocervix exocrine exogenous exomphalos exophoria exophthalmos exostoses exostosis exotropia expectant expected
+    expectorants explanation explantation exploding exploitation explosion explosions explosive explosives exposed
+    exposure exposures expression expressive expulsive exstrophy extended extension extensor extent exterior externa
+    external externum extra extraarticular extracorporeal extraction extractor extradural extrahepatic
+    extraintestinal extramedullary extranodal extraocular extrapyramidal extrarenal extratesticular extravaginal
+    extravasation extreme extremely extremes extremities extremity extrinsic exudative eyeball eyelid eyelids eyes
+    fabry face facial faciale facies facilities facility facioscapulohumeral factitia factitial factitious factor
+    factors factory failed failure falciparum fald fall falling fallopian fallot falls false familial family fancier
+    fanconi farm farmer fascia fascial fascicular fasciculation fasciitis fascioliasis fasciolopsiasis fasting fatal
+    father fatigue fats fatty fear feared features febrile fecal feces feeding feeling feet feil felty female
+    femoral femur fentanyl fertility fertilization fertilized fertilizer fetal fetalis fetishism fetomaternal
+    fetopelvic fetus fetuses fever fevers fiberglass fibers fibrillation fibrinolysis fibroadenosis fibroblastic
+    fibroelastosis fibroglandular fibromatosis fibromuscular fibromyalgia fibroplasia fibrosclerosis fibrosing
+    fibrosis fibrosus fibrothorax fibrotic fibrous fibula field fifth fight figurate filamentary filariases
+    filariasis filled filtering financial finding findings finger fingers finishing fire firearm firearms fires
+    firework first fish fishing fissure fissured fistula fistulae fitting fixation fixed flaccid flag flail flames
+    flamethrower flammable flank flashbacks flat flatback flatulence flax flecks fleischer flexion flexneri flexor
+    flexural flexure flood floor floppy fluctuations fluency fluid fluids fluke fluoride fluorine fluoroquinolone
+    fluoroquinolones fluorosis flushing flutter flying focal fogo folate fold folds foliaceous folk follicle
+    follicular follicularis folliculitis follow following fontan food foodborne foods foot football foramen foramina
+    force forced forceps forces forearm foregut forehead foreign foreskin forest forestier form formaldehyde
+    formation former forming forms fossa foster found foundling fountain fournier fourth foveoschisis foxg fracture
+    fractured fractures fragile fragilis fragments fraumeni freckles free freeze frequency frequent friction
+    friderichsen friedreich friend friendly frisbee frog frogs from front frontal frontotemporal frostbite
+    frotteurism fructose fructosuria fruits fuchs fuels fugax fugue fukutin full fully fulminating fumes function
+    functional functioning functions fundus fungal fungicides fungoides furniture furuncle fused fusel fusion fussy
+    gadolinium gain gait galactorrhea galactose galactosemia galeazzi gallbladder gallery gallstone gambiense
+    gambling game games gamma gammaherpesviral gammopathy ganglia ganglion ganglionic ganglionitis gangliosidosis
+    gangosa gangrene gangrenosum garage garden gardening gaseous gases gasoline gastaut gastric gastrin gastritis
+    gastro gastroduodenitis gastroenteritis gastroenterology gastroenteropathy gastrointestinal gastrojejunal
+    gastroparesis gastroschisis gastrostomy gaucher gaze gender gene general generalized generally generator genes
+    genetic geniculate genital genitalia genitals genitourinary geographic george geotrichosis gerstmann gestation
+    gestational gestationis ghost gianotti giant giardiasis giddiness gierke gigantism gila gilbert gingiva gingival
+    gingivitis gingivostomatitis girdle given gland glanders glands glans glanzmann glare glasgow glass glaucoma
+    glaucomatous glenoid glider gliding global globe globulin glomerular glomerulonephritis glossitis glossodynia
+    glossopharyngeal glottis glucagon glucocorticoid glucocorticoids gluconeogenesis glucosaminoglycan glucose
+    glutamate glutaric glutathione gluteal gluten glycine glycogen glycogenosis glycols glycolytic glycoprotein
+    glycosides glycosuria gnathostomiasis goiter golf gonadotropin goniosynechiae gonococcal gonorrhea goose gottron
+    gout goutieres grade graft grafts grain gram grams grand grandchild grandparent granular granulation granuloma
+    granulomatosis granulomatous granulosus graphite grass gravid gravidarum gravis gravitation greases great
+    greater greenstick grey grief grilling grocery groin grooming gross ground group grover growth guardian guidance
+    guided guillain gulf gummata guttate gymnastics gynecological gynephobia gyrate habit habits haematobium hair
+    hairy halitosis hall hallervorden hallucinations hallucinogen hallucinogens hallux halogen halogenated hamartoma
+    hamate hammer hand handcrafts handgun handle hang hanging hantavirus harada harassment hard hardship harlequin
+    harm harmful harris hartnup harvester having hazardous hazards hcps head headache heads healed healing health
+    healthcare healthy hearing heart heartburn heat heating heatstroke heavy heberden heel heelies hefh height held
+    helicobacter helicopter hellp helmet helminthiases helminthiasis helping hemangioma hemarthrosis hematemesis
+    hematocolpos hematocrit hematogenous hematologic hematological hematoma hematometra hematopoietic hematosalpinx
+    hematospermia hematuria hemicrania hemifacial hemiparesis hemiplegia hemiplegic hemisphere hemispheric
+    hemochromatosis hemodialysis hemoglobin hemoglobinopathies hemoglobinuria hemolysis hemolytic hemopericardium
+    hemoperitoneum hemophagocytic hemophilia hemophilic hemophilus hemophthalmos hemopneumothorax hemoptysis
+    hemorrhage hemorrhages hemorrhagic hemorrhoidal hemorrhoids hemosiderosis hemostatic hemothorax heparin hepatic
+    hepatis hepatitis hepatoblastoma hepatocellular hepatomegaly hepatopulmonary hepatorenal hepatosplenic herbal
+    herbicides hereditary heredofamilial hermansky hermaphrodite hermaphroditism hernia herniation heroin herpes
+    herpesviral herpesvirus herpeticum herpetiformis hesitancy heterochromic heterogeneous heteronymous heterophoria
+    heterosexual heterotropia heterozygous hexamethylene hgsil hiatus hiccough hidden hidradenitis higashi high
+    highly highway hiking hill hindgut hippel hips hirschsprung hirsutism hirudiniasis histamine histidine
+    histidinemia histiocytic histiocytosis histocompatibility histological histoplasmosis history histrionic hitting
+    hoarding hockey hodgkin hoffman hofh hole holiday holoprosencephaly home homelessness homicidal homocystinuria
+    homologues homonymous homosexual homozygous hoof hook hookworm hordeolum horizontal hormonal hormone hormones
+    horn horner hornets horse horseback horseplay horseshoe hose hospital host hostilities hostility hotplate hour
+    hourglass hours house housed household housing hpfh hsct htlv human humanus humerus humidifier humor hungry
+    hunting huntington hurler hurricane hurst husband hutchinson hydantoin hydatidiform hydrarthrosis hydrocarbons
+    hydrocele hydrocephalic hydrocephalus hydrocephaly hydrogen hydromyelia hydronephrosis hydrops hydroureter
+    hydroxyapatite hydroxylysine hygiene hymen hymenal hymenolepiasis hyperactive hyperactivity hyperacusis
+    hyperaldosteronism hyperalimentation hyperammonemia hypercalcemia hypercalciuria hypercapnia hypercarotenemia
+    hypercementosis hyperchloremia hypercholesterolemia hyperchylomicronemia hyperemesis hyperemia hypereosinophilic
+    hyperesthesia hyperfunction hypergammaglobulinemia hyperglycemia hyperglycemic hyperglyceridemia hyperglycinemia
+    hyperhidrosis hyperimmunoglobulin hyperimmunoglobulinemia hyperkalemia hyperkeratosis hyperlipidemia
+    hypermagnesemia hypermetropia hypermobile hypermobility hypernasality hypernatremia hyperosmolality hyperosmolar
+    hyperosmolarity hyperostosis hyperoxaluria hyperparathyroidism hyperphenylalaninemias hyperpigmentation
+    hyperplasia hyperplastic hyperprolactinemia hypersecretion hypersensitivity hypersomnia hypersplenism
+    hyperstimulation hypertelorism hypertension hypertensive hyperthermia hyperthyroidism hypertonia hypertonic
+    hypertrichosis hypertrophic hypertrophy hyperuricemia hyperuricosuria hyperventilation hypervitaminosis hyphema
+    hypnic hypnotic hypnotics hypo hypoactive hypocalcemia hypochloremia hypochondriacal hypochondriasis
+    hypocitraturia hypodermic hypodontia hypoesthesia hypofunction hypogalactia hypogammaglobulinemia hypoglossal
+    hypoglycemia hypoglycemic hypogonadism hypogonadotropic hypoinsulinemia hypokalemia hypomagnesemia hypomanic
+    hypomyelination hyponasality hyponatremia hypoparathyroidism hypopharyngeal hypopharynx hypophosphatemia
+    hypophosphatemic hypopituitarism hypoplasia hypoplastic hypopyon hypospadias hyposplenism hypostatic hypotension
+    hypothalamic hypothermia hypothyroidism hypotonia hypotony hypoventilation hypovolemia hypovolemic hypoxemia
+    hypoxia hypoxic hysterectomy iatrogenic ichthyosiform ichthyosis icterohemorrhagica ideations identified
+    identity idiopathic igne ignition ihes iiia iiib iiic ileostomy ileum ileus iliac iliofemoral ilioischial
+    iliopubic iliotibial ilium illiteracy illness imaging imbalance imbricata iminostilbenes immaturity immediate
+    immediately immersion immobility immune immunity immunization immunodeficiencies immunodeficiency immunoglobulin
+    immunoglobulins immunologic immunological immunomodulator immunomodulators immunoproliferative immunoregulatory
+    immunostimulant immunosuppressants immunosuppression immunosuppressive immunotherapy impacted impaction impaired
+    impairment imperfecta imperforate impetiginization impetigo impingement implant implantable implantation
+    implanted implants imported imposed imprisonment improvised impulse impulsiveness inaccessibility inactive
+    inadequate inadvertent inanimate inappropriate inattentive inborn incarcerated incarceration incendiary
+    incidental incidents incipient incisional incline including inclusion income incompatibility incompatible
+    incompetence incompetent incomplete incomprehensible inconclusive incontinence incontinent incontinentia
+    incoordinate incorrect increased increta indeterminate index indication indigenous indirect individual
+    individually indoor induced induction induration industrial industries indwelling inertia inexplicable infancy
+    infant infantile infants infarction infarcts infected infection infections infectiosum infectious infective
+    infectives inferior infertility infestation infestations infiltrative inflamed inflammation inflammations
+    inflammatories inflammatory inflatable influenza influenzae infrapatellar infrared infrarenal infrasound
+    infratentorial infundibular infused infusion ingested ingrowing inguinal inguinale inhalant inhalation inhaled
+    inherited inhibitor inhibitors iniencephaly initial injectable injected injection injections injured injuries
+    injuring injury inlet inline inner innervation innocent innominate inorganic insect insecticides insecurity
+    insemination insensitivity inserted insertion insipidus insomnia inspissated instabilities instability
+    institution institutional instruction instructor instrument instrumental instruments insufficiency insufficient
+    insulin insurance intact intake integument intellectual intent intentional interactive interarch intercondylar
+    intercostal intercuspation interference interferon interior intermediate intermittent internal internally
+    internuclear internum interocclusal interphalangeal interruption intersex interstate interstitial intertrigo
+    intertrochanteric intervention intervertebral intestinal intestine intimate into intolerance intoxication
+    intoxications intra intraabdominal intraarticular intracapsular intracardiac intracellulare intracerebral
+    intracondylar intracranial intractable intraductal intraepithelial intrahepatic intramural intraocular
+    intraoperative intrapartum intrapelvic intraperitoneal intraretinal intrasphincteric intraspinal intrathoracic
+    intrauterine intravaginal intravascular intravenous intraventricular intrinsic introduce introduction introital
+    intubation intussusception invasive inversion inversus investigation involuntary involved involvement involving
+    iodine ionizing iridectomy iridocyclitis iridodialysis iridoschisis iris iron ironing irradiation irregular
+    irreversible irritability irritable irritant irritative ischemia ischemic ischiocapsular ischiorectal ischium
+    isochromosome isoimmunization isolated isomaltase isomerism isosporiasis isotopes isovaleric issue isthmocele
+    isthmus item jaccoud jadassohn jakob jammed janus japanese japonicum jaundice jaws jejunum jellyfish jewelry
+    johnson joint joints jones jugular jump jumping junction junctional jungle junin juvenile juxtapapillary
+    juxtarenal kabuki kaposi karyotype kaschin kawasaki kayak kayaking kayser kcnq kearns keloid kennedy keratinized
+    keratitis keratoconjunctivitis keratoconus keratoderma keratolytics keratomalacia keratopathy keratoplastics
+    keratosis kernicterus ketoacidosis ketone ketones ketotic keyboarding kick kidney kienbock kinase kissing
+    kitchen klebsiella kleefstra kleptomania klinefelter klippel klumpke knee knife knitting known knuckle koyanagi
+    krabbe kuru kwashiorkor kyasanur kyphoscoliotic kyphosis labia labial lability labium labor laboratory labrum
+    labyrinthine labyrinthitis laceration lacerations lack lacking lacrimal lacrimation lacrimogenic lacrosse lactam
+    lactamase lactase lactating lactation lactic lactose lacunar ladder lafora lagophthalmos lait lambdoid lambert
+    lambliasis lamellar lamp lamppost land landing landlord landscaping landslide langerhans language lanuginosa
+    laparoscopic large larger larva laryngeal laryngitis laryngocele laryngomalacia laryngopharyngitis
+    laryngotracheitis larynx laser lassa last lasting late latent later lateral latex lattice latum latus launch
+    laundry laurence lawn laws laxa laxatives layer layers lead leading leaflet leak leakage leaves leaving lefort
+    left legal legg legionnaires legs leigh leiomyoma leishmaniasis leisure lemli length lennox lens lenses
+    lentivirus lepromatous leprosy leptospirosis lequesne lesch lesion lesions less lesser letalis lethal letter
+    leucocoria leukemia leukemias leukemoid leukocyte leukocytes leukoderma leukodystrophy leukoencephalitis
+    leukoencephalopathy leukokeratosis leukoma leukomalacia leukonychia leukoplakia level levels levocardia lewy
+    lgsil lhes libido library license lichen lichenoid lichenoides life lifestyle lift lifting ligament ligaments
+    ligation ligature light lightning ligneous like limb limbar limbed limbs limit limitation limited lindau line
+    linear linens lines lingual linked lion lipid lipidemia lipodystrophy lipofuscinosis lipoid lipoidica
+    lipomatosis lipomatous lipoprotein lips liquid liquids listerial listeriosis literacy little live liveborn
+    livedoid liver living lizard lizards lmnb load lobar lobe lobes lobomycosis lobster lobular lobulated local
+    localization localized localizes location locked lodgers loeys loiasis long longitudinal longstanding loop loose
+    loosening lordosis loss louis louse lowe lower lumbago lumbar lumbosacral lump lunate lung lungs lupus luschka
+    luteum luxation lyell lying lyme lymph lymphadenitis lymphadenopathy lymphangioleiomyomatosis lymphangioma
+    lymphangitis lymphatic lymphedema lymphoblastic lymphocutaneous lymphocyte lymphocytic lymphocytopenia
+    lymphocytosis lymphogranuloma lymphohistiocytosis lymphoid lymphoma lymphomas lymphoproliferative lymphotrophic
+    lymphotropic lynch lysergide lysine lysis lysosomal lysosome macaw machine machinery machines machupo macleod
+    macrocephaly macrocheilia macrogenia macroglobulinemia macroglossia macrolides macrophthalmos macrosomia
+    macrostomia macrotia macula macular maculopathy madarosis made magendie magna magnesium magnetic magnum main
+    maintenance maisonneuve major majus malabsorption maladjustment malaise malar malaria malariae malayi male
+    malformation malformations malfunction malignancy malignant malingerer mallei malleolus mallet malnutrition
+    malocclusion malposition malpresentation malt maltreatment maltworker malunion mammalian mammals mammary
+    mammogram mammographic management mandible mandibular mandibulofacial manganese manhandling manhole manic
+    manifestation manifestations mansonelliasis mansoni mantle manubrial manubrium manuum maple marasmic marasmus
+    marburg marchiafava marching marfan margin marginal marginatum margins marine marked marker markers market
+    marrow martial masochism mass massive mast mastectomy mastication mastitis mastocytosis mastodynia mastoid
+    mastoidectomy mastoiditis mastopathy material materials maternal mathematics matter mature maturity mauclaire
+    maxilla maxillary maximum mcardle mcdermid means measles measurement measures meatal meats meatus mechanical
+    mechanism meckel meconium medetomidine media medial median mediastinal mediastinitis mediastinum mediated
+    medical medicament medicaments medication medicine medium medulla medullaris medullary megacolon megaesophagus
+    megakaryoblastic megalencephalic megalencephaly megaloblastic megaloureter megaureter megavitamin meibomian
+    meiotic melanin melanocytic melanoma melas melena melioidosis melitensis melkersson mellitus melting member
+    membrane membranes membranoproliferative membranous memory meniere meningeal meninges meningismus meningitis
+    meningococcal meningococcemia meningococci meningococcus meningoencephalitis meningomyelitis meniscus menopausal
+    menopause menstrual menstruation mental mention meralgia merchant mercury merkel merrf merzbacher mesangial
+    mesangiocapillary mesenteric mesenteritis mesh mesothelial mesothelioma mess metabolic metabolism metacarpal
+    metacarpophalangeal metachromatic metal metals metalworking metaphyseal metaplasia metapneumovirus metatarsal
+    metatarsalgia metatarsophalangeal metatarsus methadone methamphetamines methanogen methanol methemoglobinemia
+    methemoglobinemias methicillin methylenetetrahydrofolate methylglutaconic methylmalonic methylphenidate metopic
+    micheli micro microangiopathy microbiological microcalcification microcephaly microcheilia microcystoid
+    microdeletions microgenia microlight microlithiasis microperforate microphthalmos microscopic microstomia
+    microti microtia microvascular micturition midcarpal midcervical middle midfoot midgut midline migraine
+    migrainosus migrans mikity mild milestone milestones miliaria miliary military milk milker milking millipedes
+    mine mineral mineralocorticoids minimal minimally mining minor minus minutes miosis miotic mirabilis
+    misadventure misadventures misalignment miscellaneous misdirection mismatched misplaced missed misshapen missile
+    mites mitochondrial mitotic mitral mittelschmerz mixed mobile mobility mode moderate modification modulators
+    molar mold mole mollaret molluscum molybdenum moniliformis monitoring monkeypox monoamine monoamniotic
+    monoarthritis monoblastic monochorionic monoclonal monocular monocytic monocytosis monofixation mononeuritis
+    mononeuropathies mononeuropathy mononucleosis monoplegia monosomy monostotic monoxide monster monteggia months
+    mood moon mooren mopping morbid more morgagnian morganii morphea morphologic morphological morquio mortality
+    mosaicism mosquito most mother motion motor motorcycle motorized mottled mountain mouse mouth movement movements
+    movers movie moving mower moyamoya mpgn mtor mucinosa mucinosis mucocele mucocutaneous mucoid mucolipidosis
+    mucopolysaccharidoses mucopolysaccharidosis mucopurulent mucormycosis mucosa mucosal mucositis mucous mucus
+    mudslide multangular multi multifidus multifocal multiforme multigravida multilineage multilocularis
+    multinodular multiparity multiple multiplex multisystem multisystemic mumps munitions murmur murmurs muscle
+    muscles muscular musculocutaneous musculoskeletal museum mushroom mushrooms music mutation mutations mutilans
+    mutilation mutism myalgia myalgic myasthenia myasthenic mycetoma mycobacterial mycobacterium mycoplasma mycoses
+    mycosis mycotic mycotoxin mydriasis myelin myelinolysis myelitis myeloblastic myelodysplastic myelofibrosis
+    myeloid myeloma myelomonocytic myelopathies myelopathy myelophthisis myeloproliferative myelosuppressive myhre
+    myiasis myoadenylate myocardial myocarditis myoclonic myoclonus myogenic myoglobinuria myokymia myometrium
+    myoneural myopathies myopathy myopia myositis myotonia myotonic myotubular myringitis myringotomy myxedema
+    myxedematous naegleriasis nail nails najjar narcissistic narcolepsy narcotic narcotics narrow nasal nash
+    nasofrontal nasolacrimal nasopharyngeal nasopharyngitis nasopharynx native natural naturally nature nausea
+    navicular navicularis ndph near necatoriasis necessary neck necrobiosis necrolysis necrosis necrotizing need
+    needing needle negative neglect neighbors nelson nemaline neonatal neonatorum neoplasia neoplasm neoplasms
+    neoplastic neovascular neovascularization nephritic nephritis nephrogenic nephropathy nephroptosis nephrostomy
+    nephrotic nerve nerves nervosa nervous nervousness neural neuralgia neuralgic neuralgiform neuritis
+    neurocognitive neurodermatitis neurodevelopmental neuroendocrine neurofibromatosis neurogenic neuroleptic
+    neuroleptics neurologic neurological neuroma neuromuscular neuromyelitis neuromyopathy neuron neuronal
+    neuronitis neuropathic neuropathies neuropathy neurostimulation neurostimulator neurosyphilis neurotoxicity
+    neurotrophic neutropenia neutropenic neutrophilic neutrophils never nevi nevus newborn nezelof niacin nicotina
+    nicotine niemann night nightmare nightwear nigra nigricans nihss nile nipple nipples nitidus nitric
+    nitroderivatives nitrogen nitroglycerin nkhhc nocardiosis nocturia nocturnal node nodes nodosa nodosum nodular
+    nodularis nodule nodules noise nonadministration nonalcoholic nonautoimmune nonautologous nonbiological
+    nonbullous noncollision noncomitancies noncompliance nondiabetic nondisjunction nondisplaced nondominant
+    nondysenteric none nonembolic nonexudative nonfamilial nonfatal nonflaccid nonhemolytic nonhydatidiform
+    noninfectious noninfective noninflammatory nonionizing nonketotic nonmagnetic nonmedicinal nonmosaicism nonmotor
+    nonmotorized nonobliterative nonobstructing nonobstructive nonodontogenic nonopioid nonparalytic nonpneumonic
+    nonpowered nonprocreative nonprogressive nonproliferative nonpsychotic nonpurulent nonpyogenic nonrheumatic
+    nonruptured nonscarring nonspeaking nonspecific nonsteroidal nonsuicidal nonsuppurative nonsurgical nonthermal
+    nonthoracic nonthrombocytopenic nontoxic nontraffic nontraumatic nonunion nonvenereal nonvenomous norepinephrine
+    normal normally north norwalk nose nosocomial nostril notched noted novel noxious nsaid nstemi nuchae nuchal
+    nuclear nucleoside nucleotide null number numbers nummular nursemaid nursing nutrient nutritional nuts nyhan
+    nyong nystagmus obesity obeys object objects oblique obliterans obliterative obscuring observation obsessional
+    obsessive obstacle obstetric obstetrical obstructed obstructing obstruction obstructive obturator occipital
+    occipito occiput occlusal occlusion occlusive occulta occupant occupational occupying occurrence occurring
+    ocular oculocutaneous oculoglandular oculogram oculomandibular oculomotor oculopathy oddi odontogenic office
+    official ogilvie oils olecranon olfactory oligodendrocyte oligohydramnios oligomenorrhea oligospermia oliguria
+    olszewski omphalitis omsk onboard onchocerciasis oncovirus only onset onto onychogryphosis onycholysis oocyte
+    oophoritis opacities opacity open opening openings opera operated operating operation operational operations
+    ophiasis ophthalmia ophthalmic ophthalmological ophthalmoplegia ophthalmoplegic opiate opiates opioid opioids
+    opisthorchiasis opitz opium oppositional optic optica oral orange orbit orbital orbitopathy orbits orca orchard
+    orchitis organ organic organism organisms organizing organophosphate organs orgasm orgasmic orientation oriented
+    orifice origin originating ornithine orofacial oropharyngeal oropharynx oropouche orphanage orthodontic
+    orthopedic orthopnea orthopoxvirus orthostatic orthotopic osmolality osmotic osseointegration osseous ossicles
+    ossificans ossification osteitis osteo osteoarthritis osteoarthropathy osteochondral osteochondritis
+    osteochondrodysplasia osteochondrodysplasias osteochondropathies osteochondropathy osteochondrosis
+    osteodystrophy osteogenesis osteolysis osteomalacia osteomyelitis osteomyelofibrosis osteonecrosis osteopathy
+    osteopetrosis osteophyte osteoporosis otalgia other otherwise otitic otitis otological otorhinolaryngological
+    otorrhagia otorrhea otosclerosis ototoxic outcome outdoor outer outlet output outside oval ovale ovarian ovaries
+    ovary over overactive overactivity overboard overdose overexertion overfeeding overfill overflow overgrowth
+    overhanging overlap overlapping overload overpressure overprotection overturning overuse overweight ovulation
+    ovum oxazolidinediones oxidase oxidation oxides oxygen oxygenation oxytocic pacemaker packing pads page pain
+    painful paintball paints palate palati palindromic palliative pallor palm palmar palmaris palmitoyltransferase
+    palms palpable palpitations palsies palsy pancolitis pancreas pancreatic pancreatitis pancytopenia
+    panencephalitis panic panlobular panmyelosis panniculitis pannus panophthalmitis pansinusitis pansynostosis
+    panuveitis paper papillae papillary papilledema papillitis papillomata papillomavirus papovavirus papular
+    papules papulosquamous papyraceous parachutist paracoccidioidomycosis paradoxical parafollicularis paraganglia
+    parageusia paragonimiasis parahaemolyticus parainfluenza paralysis paralytic paramacular parametritis
+    parametrium paraneoplastic paranoid parapertussis parapharyngeal paraphilia paraphilias paraphimosis paraplegia
+    paraplegic parapoxvirus parapsoriasis pararenal parasitic parasitism parasomnia parastomal parastrongylus
+    parasympatholytics parasympathomimetics parathyroid paratyphoid paraurethral paravaccinia paravisceral parent
+    parental parents paresis paresthesia paresthetica parietal parieto park parking parkinson parkinsonism parkway
+    parosmia parotid paroxysmal parrot pars part partial partially participation partner parts party parvovirus
+    pasini passage passages passenger passive past pasteurellosis patch patella patellae patellar patellofemoral
+    patent paternity path pathogenic pathological pathology pathway pathways patient pattern patulous pauciarticular
+    paved paving paying peanuts pecked pectoris pectus peculiar pedal pedestrian pediatric pediatrician pedicle
+    pediculosis pediculus pedis pedophilia peliosis pelizaeus pellagra pellegrini pellet pellets pellizzari pelvic
+    pelvis pemphigoid pemphigus penetrans penetrating penetration penicillin penicillins penicillosis penile penis
+    penoscrotal peptic perceived percent percentile perception perceptions perceptual percreta percussion perforans
+    perforated perforating perforation perforations performance perfringens perfusion perianal periapical
+    periarthritis pericardial pericarditis pericardium perichondritis perifolliculitis perimenopausal perinatal
+    perineal perineocele perinephric perineum perineural periocular period periodic periodica periodontal
+    periodontitis periodontosis perioral periorbital periostitis peripapillary peripartum peripheral periprosthetic
+    periradicular peristalsis peritoneal peritoneum peritonitis peritonsillar periumbilic periumbilical periurethral
+    periventricular permanent peroneal peroxidase peroxisomal peroxisome perpetrator perpetrators persecution
+    persistence persistent persisting person personal personality personnel persons perthes pertussis pervasive
+    pesticide pesticides petroleum petrositis phagocytophilum phakomatoses phakomatosis phalanx phantom pharyngeal
+    pharyngitis pharyngoconjunctivitis pharyngoesophageal pharyngotonsillitis pharynx phase phelan phenol phenomenon
+    phenothiazine phenotype phenylketonuria pheomycotic phimosis phlebectasia phlebitis phlebothrombosis phlegmonous
+    phlyctenular phobia phobic phocomelia phonological phosphate phosphoinositide phosphorus phosphorylase
+    photoallergic photocontact photokeratitis phototoxic phrenic phthiriasis physeal physical physiologic
+    physiological piano pica pick picking piedra piercing pierini pigment pigmentary pigmentation pigmentations
+    pigmented pigmenti pigmentosum pilar pilaris pilates pillar pillow pills pilon pilonidal pinched pineal
+    pinguecula pingueculitis pinna pinta pipe pipes pisiform pits pituitary pityriasis place placed placenta
+    placental placentitis places placing placoid plagiocephaly plague plana planned planning planopilaris plant
+    plantar plantaris plants planus plaque plaques plasma plasmacytoma plasmacytosis plasminogen plasmodia
+    plasmodium plastic plastica plate plateau platelet platform played playground playing pleura pleural pleurisy
+    pleurodynia plexus plica plicated plug pluriglandular plus pneumatic pneumococcal pneumoconiosis pneumocystosis
+    pneumomediastinum pneumonia pneumoniae pneumonic pneumonitis pneumopericardium pneumothorax poikiloderma pointes
+    poisoning polar pole poliomyelitis pollen pollution polo poly polyangiitis polyarteritis polyarthritis
+    polyarthropathy polychondritis polyclonal polycystic polycythemia polydactyly polydipsia polyglandular
+    polyhydramnios polymorphic polymorphonuclear polymorphous polymyalgia polymyositis polyneuritis polyneuropathies
+    polyneuropathy polyorchism polyosteoarthritis polyostotic polyp polyphagia polyploidy polypoid polyposis polyps
+    polysyndactyly polytrichia polyuria pompe pompholyx pontiac pontine pool poor poorly popliteal porokeratosis
+    porphyria portal portion portions portuguese position positive post postauricular postcardiotomy
+    postcholecystectomy postcoital postconcussional postcricoid postdysenteric postencephalitic postepileptic
+    posterior posteruptive postgastric posthemorrhagic postherpetic posticum postimmunization postinfarction
+    postinfection postinfectious postinfective postinflammatory postlaminectomy postmastectomy postmastoidectomy
+    postmeningococcal postmenopausal postnasal postpartum postpolio postprocedural postradiation postrheumatic
+    postsurgical postthrombotic posttransfusion postural posture postures postvaccination postviral potential
+    potentially pots potter pouch pouchitis poverty powassan power powered prader pragmatic preauricular prebirth
+    precautions precerebral precipitate precipitous precocious precordial prediabetes predisposition predominant
+    predominantly preglaucoma pregnancies pregnancy pregnant premature prematurity premenopausal premenstrual
+    preoccupation preparation preparations prepatellar preprocedural prepuce presbycusis presbyopia prescription
+    presence present presentation presenting preservation pressure pressurized presymptomatic preterm prevesical
+    previa previous priapism primarily primary prime primigravida primus prior prison private problem problems
+    procedure procedures proceedings process processing procreation procreative proctitis producing product products
+    profile profound profunda progesterone progestogens program progressiva progressive projected projectile
+    prolapse prolapsed proliferation proliferations proliferative prolonged prolymphocytic prominent promyelocytic
+    propanol propeller properly property prophylactic prophylaxis propionate propionic prostate prostatectomy
+    prostatic prostatitis prostatocystitis prostatodynia prostatosis prosthesis prosthetic protanomaly protectants
+    protein proteinosis proteins proteinuria proteus prothrombin protozoa protozoal protrusio provider prowazekii
+    proximal prune prurigo pruritic pruritus pseudarthrosis pseudo pseudobulbar pseudocowpox pseudocoxalgia
+    pseudocyst pseudoexfoliation pseudofolliculitis pseudohermaphroditism pseudohole pseudohypoparathyroidism
+    pseudomallei pseudomembranous pseudomonas pseudopapilledema pseudopelade pseudopterygium pseudosarcomatous
+    pseudoxanthoma psittaci psittacines psoas psoriasis psoriatic psychiatric psychoactive psychodysleptics
+    psychological psychomotor psychophysical psychophysiologic psychosis psychosocial psychostimulants psychotic
+    psychotropic pten pterygium ptld ptosis pubertal puberty pubis public pubocervical puck puckering pudendal
+    pudlak puerperal puerperium pull pulled pulmonale pulmonary pulp pulpal pulpitis pulsatile pulsating pulse pump
+    punctata punctate punctum puncture pupil pupillary puppp pure purging purine purposes purpura purpuric pursuit
+    purulent push pushed pushing pustular pustulosis pyelitis pyelonephritis pyeloureteritis pyemic pylori pyloric
+    pylorospasm pylorus pyoderma pyogenic pyonephrosis pyothorax pyrazolone pyrexia pyridoxine pyriform pyrimidine
+    pyromania pyruvate pyuria quadra quadrachorionic quadrant quadrants quadriceps quadriplegia quadriplegic
+    quadruplet quadruplets qualitative quantitative quervain quills quinolones quintuplet quintuplets rabies raccoon
+    racquet radial radiation radiators radical radicular radiculomyelitis radiculopathy radioactive radiocarpal
+    radiodermatitis radiofrequency radiographic radiohumeral radiologic radiological radiotherapy radioulnar radius
+    radon rafting railroad rails railway raised raking ramp ramus range rapamycin rape rapid rapidly rappelling rash
+    rate rattlesnake raynaud rays reaction reactions reactive reactivity reading rearrangement rearrangements reason
+    reasons reattached rebound recent receptive receptor receptors recess recession recessive recipient recluse
+    reconstitution reconstructed reconstruction reconstructive recreation recreational recrudescent recruitment
+    rectal rectocele rectosigmoid rectosigmoiditis rectovaginal rectum rectus recurrent reduced reductase reduction
+    redundant refereeing reflex reflux reform refraction refractive refractory refrigerator refsum refusal regaining
+    regarding regimen region regional regions regular regulation regurgitated regurgitation rehabilitative
+    reinsertion reiter rejection relapse relapsing related relationship relative relaxants relaxation release relief
+    religious relocation remaining remediable remedies remedying remission remitting removal remove removed renal
+    render renovascular reovirus repair repeat repeated repetitive replaced replacement reported reproductive
+    reptiles requested research residence residential residing residual resistance resistant resolved resonance
+    resorption resources respirator respiratory responder response responsiveness rest restaurant restless
+    restlessness restoration restorative restraint restricted restricting restriction restrictive result resulting
+    results resuscitate resuscitation retained retardation retarded retention reticular reticulata reticuloid
+    retiform retina retinal retinopathy retinoschisis retracted retractile retraction retrobulbar retrograde
+    retrolental retromolar retroperitoneal retroperitoneum retropharyngeal retroversion retrovirus rett return
+    reuptake reversal reverse reversible reye rhabdomyolysis rhegmatogenous rhesus rheumatic rheumatica rheumatism
+    rheumatoid rhinitis rhinocerebral rhinophyma rhinosporidiosis rhinovirus rhizomelic rhodesiense rhomboid
+    rhomboidalis rhythm rhythmic riboflavin ribs rich richardson rickets rickettsia rickettsialpox rickettsii
+    rickettsioses rickettsiosis ridden rider ridge riding rieger rifampicins rifle rift right rigidity rigidus riley
+    ring rink rising risk ritual rivalry river road roadways robertson rocio rock rodent rodenticides rolando role
+    roller rolling roof room root roots rope rosacea rosea ross rotating rotation rotator rotaviral rough round
+    routine rowing rtpa rubber rubella ruber rubra rugby ruled rumination runaway running rupture ruptured russian
+    ruvalcaba saccadic sachs sacral sacrococcygeal sacroiliac sacroiliitis sacrum sacs saddle sadism sadomasochism
+    safety saginata sagittal sailboat salicylates saline saliva salivary salmonella salpingitis salpingo salt salter
+    salts same sampling sandflea sandfly sandhoff sanfilippo sanguinous saphenous sarcoglycan sarcoid sarcoidosis
+    sarcoma sarcomas sarcopenia sars satiety satisfactory saucepan sayre scabies scaffolding scalded scale scalp
+    scan scapegoating scaphoid scapula scapular scar scarlet scarring scars schedule scheduled scheie scheinker
+    schistosoma schistosomiasis schizoaffective schizoid schizophrenia schizophreniform schizotypal schmorl
+    scholastic school schooling schwannomatosis schweninger sciatic sciatica scid scissors sclera scleral sclerema
+    scleritis sclerodactyly scleroderma scleromalacia sclerosing sclerosis sclerosus scoliosis scombroid scooter
+    scorbutic score scorpion scotoma scratch scratched screening scrotal scroti scrotum seafood sealant sealpox
+    seasonal sebaceous seborrhea seborrheic second secondary secretion section sector secundum sedation sedative
+    sedimentation seed seeds seen segment segmental seizures selective selenium self selvagem semilunar seminal
+    senile senilis sennetsu sensation sensations sense senses sensitive sensitivity sensitization sensorineural
+    sensory separation sepsis septa septal septic septicemic septo septum sequard sequela sequelae sequestration
+    serms seroma seronegative serotonin serous serpiginosa serrata serrated serratia serum service services setting
+    seventh severe severely severity sewing sextuplets sexual sexually sezary shaft shaken shape shared shark sharp
+    shearing sheath shell shellfish sheltered shift shiga shigella shigellosis ship shipyard shock shoe shop short
+    shortening shortness shotgun shoulder shoveling shower showering shuddering shunt shunting shwachman
+    sialoadenitis sialolithiasis siberica sibling sicca sick sickle sickness side sided sideroblastic sideroblasts
+    sideropenic siderosis sidewalk sidewall sigmoid significance significant signs silent silica simian similar
+    simple simplex simulation simultaneous single sinking sinus sinuses sinusitis siphon sirs sister site sites situ
+    situational situs sixth size sjogren skate skateboard skateboarder skateboarding skater skates skating skeletal
+    skeleton skier skiing skillet skills skin skis skull slaughter sled sledder sledding sleep sleeping sleepwalking
+    slide slight slipped slipping slow slowness slurred small smaller smallpox smear smearing smell smith smoke
+    smoking smooth smothering snake sneezing snoring snorkeling snow snowboard snowboarder snowboarding snowmobile
+    soaps soccer social socioeconomic soemmering sofa soft softball soil solar soles solid solids solitary solium
+    solute solvent solvents somatic somatization somatoform some somnambulism somnolence sonnei sound sounds source
+    south space spacecraft spacing sparganosis spasm spasmodic spasmolytics spasms spastic spatial spatz special
+    species specific specified specimens spectacles spectator spectrum speech spermatic spermatocele sphenoid
+    sphenoidal spherocytosis spheroids spherophakia sphincter sphingolipidosis spider spina spinal spine spines
+    spiral spirillosis spiritual spirochetal splanchnic spleen splenic splenomegaly split splitting spondylitis
+    spondyloarthritis spondyloepiphyseal spondylolisthesis spondylolysis spondylopathies spondylopathy spondylosis
+    spontaneous sporotrichosis sport sports spot spots spotted spotting spousal spouse sprain spring springboard
+    sprue spur sputum squamous squash squirrel stabbing stability stable staff stage staining stairs stampede
+    standing stannosis staphylococcal staphylococci staphylococcus staphyloma starvation state stated states static
+    station stationary stature status stay steam steatocystoma steatohepatitis steatorrhea stec steele stem stemi
+    stenosis stent stents step stepbrother stepfather stepmother stepped stepping steps stepsister stereopsis
+    stereotyped sterile sterilization sternal sternoclavicular sternocleidomastoid sternomastoid sternum steroid
+    steroidal steroids stevens stick stieda stiff stiffness still stillbirth stillborn stimulant stimulation
+    stimulator stingray stock stoma stomach stomatitis stone stop storage store storm storms stove strabismic
+    strabismus strain straining strands strange strauss straussler streak streaks stream street streetcar
+    strengthening strenuous streptobacillosis streptococcal streptococci streptococcus stress stressful striae
+    striatonigral striatus stricture stridor strike striking string stripper stroke stroller stromal
+    strongyloidiasis struck structural structurally structure structures strychnine studies study stumbling stump
+    stung stupor styloid subacute subaortic subaponeurotic subarachnoid subareolar subcapsular subclasses subclavian
+    subclinical subcondylar subcorneal subcortical subcutaneous subdermal subdural suberosis subfoveal subglottic
+    subglottis subinvolution subitum subjective sublingual subluxation submandibular submersion submucous
+    subperiosteal subsegmental subsequent subserosal substance substances substitutes substitution subtrochanteric
+    subtype subway succedaneum succinimides sucked sucrase sudden suffocation suicidal suicide suis sulfatase
+    sulfide sulfonamides sulfur summer sunburn sunct sunlight sunstroke super superficial superior supermarket
+    supernumerary supersonic supervision supplemental supply support supported supporting suppressed suppression
+    suppurativa suppurative supraceliac supracondylar supraglottis supraglottitis supralevator supranuclear
+    suprapubic supratentorial supravalvular supraventricular supravesical surface surfacing surfactant surfing
+    surgery surgical surgically surrounding surveillance surviving susceptibility susceptible suspect suspected
+    suspiciousness suture sutures swallowed swan sweat sweet swelling swimmer swimming swing sword sylvatic sylvius
+    symblepharon symbolic sympathetic symphysis symptom symptomatic symptoms synapse synaptopathy syncope syncytial
+    syndactyly syndrome syndromes synechiae syngamiasis syngap synovial synovitis synovium syntaxin synthesis
+    synthetases synthetic syphilis syphilitic syringobulbia syringomyelia syrup system systemic systemically systems
+    systolic tabes tabetic tachycardia tachypnea tackle taenia taeniasis tags tail taipan takayasu take taken
+    takotsubo talc talipes tall talus tamponade tanapox tank tanning tarantula tarda target tarsal tarsometatarsal
+    tarsus taste teacher teachers team tear tearing technology teeth teething telangiectasia telangiectasis telogen
+    temperature temporal temporary temporomandibular tenderness tendineae tendinitis tendon tendons tenesmus tennis
+    teno tenonitis tenosynovitis tension tentorial term terminal termination terrain terrorism terrorist terrors
+    test testes testicle testicles testicular testing testis tetanus tetany tetrachloride tetrachloroethylene
+    tetracyclic tetracyclines tetralogy texture thalassemia thalassemias thallium than thanatophoric theater their
+    therapeutic therapist therapy thermal thiamine thickening thigh thiothixene third thirds thoracic
+    thoracoabdominal thoracogenic thoracolumbar thoracoscopic thoracotomy thorax thorns thoughts thread threat
+    threatened threatening three threshold thrive throat thrombasthenia thromboangiitis thrombocythemia
+    thrombocytopenia thrombocytopenic thrombocytosis thromboembolic thromboembolism thrombolytic thrombophilia
+    thrombophlebitis thrombosis thrombotic through thrown thumb thunderclap thunderstorms thymic thymus thyroid
+    thyroiditis thyrotoxic thyrotoxicosis tibia tibial tibiofibular tick tics tidal tietze tight time timori tinea
+    tinnitus tire tissue tissues titer toad toads toaster tobacco tobogganing todd toes toilet tolerance tone tongue
+    tonic tonsil tonsillar tonsillitis tonsils tool tools tooth tophaceous tophi tophus topical topically
+    topoisomerase tornado torpedo torsades torsion torticollis tortuosity tortuous torus total totalis touch
+    tourette towards toxic toxicum toxin toxins toxoplasma toxoplasmosis trachea tracheitis tracheo tracheobronchial
+    tracheoesophageal tracheomalacia tracheostomy trachoma track tract traction tracts trade traffic train training
+    trait trali tramadol trampolining transaminase transcobalamin transcondylar transcription transdermal
+    transection transepidermal transfer transformation transfused transfusion transfusions transient transit
+    transition transitional transitions transitory translational translocation translucency transmetacarpal
+    transmission transmitted transphalangeal transplant transplantation transplanted transport transportation
+    transporter transposition transsexualism transthyretin transverse transvestic transvestism trapezium trapezoid
+    trapped trauma traumatic traumatica travel treatment tree tremor trench triad trial triamniotic triatriatum
+    tributary triceps trichiasis trichinellosis trichloroethylene trichodermal trichomonal trichomoniasis
+    trichorionic trichorrhexis trichostrongyliasis trichotillomania trichuriasis tricuspid tricyclic trifascicular
+    trigeminal trigger trigone trigonitis trimalleolar trimester trimethylaminuria triplet triplets triploidy
+    tripping triquetrum trisomies trisomy tritanomaly trna trochanter trochanteric trochlear tropica tropical truck
+    true trunk trypanosomiasis tryptasemia tryptophan tsutsugamushi tubal tube tubercle tuberculin tuberculoid
+    tuberculoma tuberculosis tuberculous tuberosity tuberous tubes tubing tubotympanic tubular tubulo tularemia
+    tumor tumors tungiasis tunica tunnel turbinates turkey turner turtle twin twins twist tympanic tympanosclerosis
+    tympanum type types typhi typhoid typhus typical typing tyrosinase tyrosine tyrosinemia ulcer ulceration
+    ulcerative ulceroglandular ulcers ulerythematosa ulna ulnar ulnocarpal ulnohumeral ultralight ultrasonic
+    ultraviolet umbilical umbilicus umbrella unable unarmed unattainable unavailability unavailable uncertain
+    unciform uncomplicated uncongenial uncontrolled unconventional under underachievement underdevelopment
+    underdosing underfeeding underfill underground underimmunization underlying underwater underweight undescended
+    undetermined undifferentiated undue unemployment unequal unguium unhappiness unicornate unidentified unifocal
+    unilateral uninfected uninhibited unintended unintentional unisystemic unit universalis unknown unpowered
+    unqualified unrelated unrepairable unrestricted unsatisfactory unsheltered unspecified unstable unstageable
+    unsteadiness unusually unvaccinated unwanted upbringing upper urachus uranium urban urea uremia uremic ureter
+    ureteral ureteric ureteritis uretero ureterocele ureteropelvic ureterovesical ureters urethra urethral
+    urethritis urethrocele urethrorectal urge urgency urgent uric urinary urination urine urogenital urology
+    uropathy urticaria urticarial used usher using usually utensil uteri uterine utero uterosacral uterovaginal
+    uterus utilities utility uveitis uvula vaccinated vaccination vaccine vaccines vaccinia vacuum vacuuming vagina
+    vaginal vaginalis vaginally vaginismus vaginitis vagus valga valgus vallecula valley valve valves vanadium
+    vancomycin vanishing vaping vapors vara variable variant variants variations varicella varices varicose
+    varioliformis various varus vasa vascular vasculare vascularization vasculitis vasculopathies vasculopathy
+    vasectomy vasoconstriction vasocutaneous vasodilators vasomotor vasospasm vasospastic vater vault vegetables
+    vegetans vegetative vehicle vehicles vein veins velamentous velo vena venereal venereum venezuelan veno venom
+    venomous venosus venous ventilator ventouse ventral ventricle ventricles ventricular ventriculoarterial vera
+    verbal verbosity vermilion vernal versicolor versus vertebra vertebrae vertebral vertebro vertebrogenic vertical
+    vertiginous vertigo very vesical vesicant vesicle vesicles vesico vesicointestinal vesicostomy vesicoureteral
+    vesicovaginal vesicular vessel vessels vestibular vestibule vestibulitis vexas viability viable vibration
+    vibratory vibrio victim viii villonodular vincent violent viral virus viruses viscera visceral viscosity visible
+    vision visit visual visually visuospatial vitamin vitamins vitiligo vitreomacular vitreoretinal vitreous vitro
+    vivax vocal vogt voice void volar volcanic volleyball volume volunteer volvulus vomit vomiting voyeurism
+    vulgaris vulnificus vulva vulvae vulval vulvar vulvitis vulvodynia vulvovaginitis waiting wake waldenstrom
+    waldeyer walked walking wall wandering warfare warfarin warm wart warts washed wasps wasting water watercraft
+    waterhouse wave waves weakening weakness weapon weapons wear webbed webbing weber wedge weeks wegener weight
+    weightless weightlessness weights welchii welding welfare well wells werdnig wernicke west western wheelchair
+    wheeled wheezing whether while whipple white whole whom whooping wide widow wife wild wilderness willebrand
+    willi williams wilson window winds windsurfing wing wiring wiskott with withdrawal within without wood
+    woodworking words work workbench worker working workmates worries wound wrestling wrist written wrong wrongly
+    wuchereria xanthelasma xanthinuria xenogenic xeroderma xerophthalmic xerosis xiphoid xylazine yaba yacht yard
+    yatapoxvirus yaws yellow yersinia yersiniosis yoga young zellweger zero zika zinc zone zonular zoological
+    zoonotic zoster zygomatic zygomycoses zygomycosis
     """.split()
 )

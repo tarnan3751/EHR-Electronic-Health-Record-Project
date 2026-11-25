@@ -1,7 +1,8 @@
 """englishwords.py, the words the English checks count as English (validation.py, english_share()): what
 src/Ehr.Dictation/write_english_words.py takes from SCOWL's lists, shown on a small archive of its own (SCOWL itself is
-downloaded, so it isn't read here: the writer's --check does that), the committed list in the writer's form, and
-SCOWL's notice beside it."""
+downloaded, so it isn't read here: the writer's --check does that), the clinical words it takes from the reference
+data's diagnoses, checked against the repository's, the committed module in the writer's form, and SCOWL's notice
+beside it."""
 
 from __future__ import annotations
 
@@ -56,10 +57,31 @@ def test_the_writer_takes_the_lists_it_says_and_nothing_else():
     assert "Copyright 2000-2018 by Kevin Atkinson\n\nAnd the rest, verbatim.\n```" in made.notice(data)
 
 
+def test_the_clinical_words_are_every_diagnosis_word_of_four_letters_or_more():
+    sql = "\n".join([
+        "condition\ticd-10-cm\tL03.90\tCellulitis, unspecified\t\\N",
+        "condition\ticd-10-cm\tM65.4\tRadial styloid tenosynovitis [de Quervain]\t\\N",
+        "condition\ticd-10-cm\tA92.5\tZika virus disease\t\\N",
+        "allergen\trxnorm\t10109\tStreptomycin\tmedication",  # not a diagnosis
+    ])
+
+    assert writer().clinical(sql) == ["cellulitis", "disease", "quervain", "radial", "styloid", "tenosynovitis",
+                                      "unspecified", "virus", "zika"]
+
+
+def test_the_clinical_words_are_what_the_writer_reads_from_the_reference_data():
+    made = writer()
+    if not made.DIAGNOSES.is_file():
+        pytest.skip(f"{made.DIAGNOSES} isn't here (the sidecar's image has no db/reference)")
+    assert sorted(englishwords.CLINICAL) == made.clinical(made.DIAGNOSES.read_text(encoding="utf-8")), (
+        "englishwords.py's clinical words are out of date: uv run src/Ehr.Dictation/write_english_words.py")
+
+
 def test_the_committed_list_is_in_the_writers_form():
     made = writer()
 
-    assert made.TARGET.read_text(encoding="utf-8") == made.module(sorted(englishwords.WORDS)), (
+    assert made.TARGET.read_text(encoding="utf-8") == made.module(sorted(englishwords.WORDS),
+                                                                    sorted(englishwords.CLINICAL)), (
         "englishwords.py isn't what write_english_words.py writes: uv run src/Ehr.Dictation/write_english_words.py")
 
 

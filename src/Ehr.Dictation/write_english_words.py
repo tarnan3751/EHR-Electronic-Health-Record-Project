@@ -5,9 +5,11 @@
 """Writes src/Ehr.Dictation/sidecar/ehr_dictation/englishwords.py: the words the English checks count as English when
 they decide whether a dictation in English has too few English words (validation.py, english_share()), so a Spanish
 dictation recorded with English chosen offers nothing (the owner's ruling of 2026-11-25). And LICENSE-SCOWL.md beside
-it, the notice the lists ask to be shipped with them.
+it, the notice the lists ask to be shipped with them. Its two sources are named here and nowhere else: SCOWL, the base
+list of ordinary English (WORDS), and the reference data's diagnoses, its clinical words (CLINICAL). The base list can
+be swapped for another without touching the rule: change SOURCE, SHA256 and words() below, and write the module again.
 
-They come from SCOWL (Spell Checker Oriented Word Lists), Kevin Atkinson's, release 2020.12.07
+WORDS come from SCOWL (Spell Checker Oriented Word Lists), Kevin Atkinson's, release 2020.12.07
 (http://wordlist.aspell.net/), downloaded from SOURCE and checked against SHA256: its English, American, British and
 Canadian lists of words, of words with capitals and of contractions, up to size 50 (SIZE: the words of an ordinary
 dictionary, without the rarer ones a word of another language would match more often), in lower case. Not its
@@ -17,11 +19,20 @@ validation.py reads as the word. SCOWL's licence lets the lists be copied, chang
 module keeps Kevin Atkinson's, and LICENSE-SCOWL.md is SCOWL's copyright file whole, verbatim, as the lists it draws
 on ask. Nothing from a system dictionary.
 
+CLINICAL are the words of four letters or more of every ICD-10-CM description in db/reference/10-clinical-codes.sql
+(the fiscal year 2027 code set, published by the U.S. government, CDC/NCHS, for public use: docs/expansion/
+reference-data.md), in lower case: the conditions and findings a clinician names ("cellulitis", "dysuria",
+"hyperlipidemia", "lymphadenopathy", "erythematous"), which an ordinary dictionary lacks. Not its shorter words, which
+are abbreviations and the particles of eponyms ("de" of "de Quervain", "la" of "La Crosse"), as often a word of
+Spanish: an ordinary dictionary has the short English words. The drug names and the orderables' and allergens' words
+the checks count are the catalog's and drugnames.py's, read by validation.py itself.
+
     uv run src/Ehr.Dictation/write_english_words.py            # write both
     uv run src/Ehr.Dictation/write_english_words.py --check    # fail if either is out of date
     uv run src/Ehr.Dictation/write_english_words.py --source scowl-2020.12.07.tar.gz   # from a copy already here
 
-The download needs the internet; a sidecar test checks what this makes from a small archive of its own, offline.
+The download needs the internet; a sidecar test checks what this makes from a small archive of its own, and the
+clinical words against the reference data in the repository, offline.
 """
 
 from __future__ import annotations
@@ -29,6 +40,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import io
+import re
 import sys
 import tarfile
 import urllib.request
@@ -37,6 +49,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = REPO_ROOT / "src" / "Ehr.Dictation" / "sidecar" / "ehr_dictation"
 TARGET = PACKAGE / "englishwords.py"
+DIAGNOSES = REPO_ROOT / "db" / "reference" / "10-clinical-codes.sql"
+DIAGNOSIS = "condition\ticd-10-cm\t"
+CLINICAL_LETTERS = 4  # a clinical word's fewest letters
 NOTICE = PACKAGE / "LICENSE-SCOWL.md"
 RELEASE = "2020.12.07"
 SOURCE = f"https://downloads.sourceforge.net/project/wordlist/SCOWL/{RELEASE}/scowl-{RELEASE}.tar.gz"
@@ -98,27 +113,44 @@ def notice(data: bytes) -> str:
     ])
 
 
-def module(listed: list[str]) -> str:
-    lines = [
-        '"""The words the English checks count as English when they decide whether a dictation in English has',
-        "too few English words (validation.py, english_share()): SCOWL's English, American, British and",
-        f"Canadian words, words with capitals and contractions up to size {SIZE}, release {RELEASE}, in lower",
-        "case and without possessives. Written by src/Ehr.Dictation/write_english_words.py, which says what is",
-        "left out and why; don't edit it. SCOWL's whole notice is LICENSE-SCOWL.md, beside this file.",
-        "",
-        *ATKINSON.splitlines(),
-        '"""',
-        "",
-        "WORDS = frozenset(",
-        '    """',
-    ]
-    line = "   "
-    for word in listed:
+def clinical(sql: str) -> list[str]:
+    """The words of CLINICAL_LETTERS letters or more of every ICD-10-CM description, in lower case, sorted."""
+    found: set[str] = set()
+    for line in sql.splitlines():
+        if line.startswith(DIAGNOSIS):
+            found |= {word.casefold() for word in re.findall(r"[^\W\d_]+", line.split("\t")[3])
+                      if len(word) >= CLINICAL_LETTERS}
+    return sorted(found)
+
+
+def _listed(name: str, words: list[str]) -> list[str]:
+    lines, line = [f"{name} = frozenset(", '    """'], "   "
+    for word in words:
         if len(line) + 1 + len(word) > 116:
             lines.append(line)
             line = "   "
         line += " " + word
-    lines += [line, '    """.split()', ")", ""]
+    return [*lines, line, '    """.split()', ")", ""]
+
+
+def module(listed: list[str], clinical_words: list[str]) -> str:
+    lines = [
+        '"""The words the English checks count as English when they decide whether a dictation in English has',
+        "too few English words (validation.py, english_share()). WORDS, the base list: SCOWL's English,",
+        f"American, British and Canadian words, words with capitals and contractions up to size {SIZE}, release",
+        f"{RELEASE}, in lower case and without possessives. CLINICAL: the words of {CLINICAL_LETTERS} letters or more"
+        " of",
+        "every ICD-10-CM description in the reference data (public domain), in lower case. Written by",
+        "src/Ehr.Dictation/write_english_words.py, which says what is left out and why; don't edit it. SCOWL's",
+        "whole notice is LICENSE-SCOWL.md, beside this file.",
+        "",
+        *ATKINSON.splitlines(),
+        '"""',
+        "",
+        *_listed("WORDS", listed),
+        "",
+        *_listed("CLINICAL", clinical_words),
+    ]
     return "\n".join(lines)
 
 
@@ -129,7 +161,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", help="SCOWL's release archive, already downloaded")
     args = parser.parse_args(argv)
     data = archive(args.source)
-    expected = {TARGET: module(words(data)), NOTICE: notice(data)}
+    base, clinical_words = words(data), clinical(DIAGNOSES.read_text(encoding="utf-8"))
+    expected = {TARGET: module(base, clinical_words), NOTICE: notice(data)}
     if args.check:
         stale = [path.name for path, text in expected.items() if not path.is_file()
                  or path.read_text(encoding="utf-8") != text]
@@ -139,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     for path, text in expected.items():
         path.write_text(text, encoding="utf-8", newline="\n")
-    print(f"Wrote {len(words(data))} words to {TARGET}, and {NOTICE}.")
+    print(f"Wrote {len(base)} words and {len(clinical_words)} clinical words to {TARGET}, and {NOTICE}.")
     return 0
 
 
