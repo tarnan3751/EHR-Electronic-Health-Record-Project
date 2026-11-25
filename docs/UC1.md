@@ -191,7 +191,7 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - An interaction is known only if one of three sources has the pair. Whole classes are still thin (an ACE inhibitor with an angiotensin receptor blocker beyond lisinopril with losartan, for example): see `docs/expansion/reference-data.md`.
 - A DDInter warning links to DDInter's interaction checker, not to a page for the pair.
 - The reason for overriding is kept on the order and in the audit, but the chart doesn't show it beside the order yet.
-- A warning names a medication the patient takes even when it is marked sensitive: the clinician signing the order needs to know. What the order and its audit keep says only "a medication marked sensitive", since administrators can read an order's audit details.
+- A warning names a medication the patient takes even when it is marked sensitive: the clinician signing the order needs to know. What the order and its audit keep says only "a medication marked sensitive"; administrators, who could read an order's audit details until the expansion plan's step 18a, now see only the names of its fields there (`docs/UC12.md`).
 - An item with no drug code (the albuterol inhaler among the common items) can't be checked, and the form says only coded items are.
 - A warning that appears between opening the form and signing is caught by the database and shown; adding a medication at the same instant as an order is signed can slip past.
 - Doses, kidney function, age and pregnancy are not considered.

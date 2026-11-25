@@ -92,9 +92,9 @@ public class SensitiveAuditSecurityTests(MigratedDatabase database) : IClassFixt
         await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.medication_statements SET sensitive = true WHERE id = @id", ("id", id));
 
         Assert.Equal(["insert true hidden", "update true hidden"], await Accounts.QueryAsync(App, admin, Shown, ("row", id)));
-        // Unmarking the item later doesn't bring them back: what was hidden stays hidden.
+        // Unmarking the item later doesn't bring them back: what was hidden stays hidden, the unmarking's own event too.
         await Accounts.ExecuteAsync(App, clinician, "UPDATE ehr.medication_statements SET sensitive = false WHERE id = @id", ("id", id));
-        Assert.DoesNotContain(await Accounts.QueryAsync(App, admin, Shown, ("row", id)), row => row.Contains("sertraline", StringComparison.Ordinal));
+        Assert.Equal(["insert true hidden", "update true hidden", "update true hidden"], await Accounts.QueryAsync(App, admin, Shown, ("row", id)));
     }
 
     // Step 18a: what "the fields changed" are, for each kind of write, worked out from what the trigger stored, so the
