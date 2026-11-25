@@ -1297,6 +1297,54 @@
         border-radius: var(--radius-lg);
     }
 
+    /* Dialog: a native <dialog> opened modally, such as the warning before a session ends (step 18). It floats, so it
+       has the dialog's radius and shadow (docs/brand: Shape), on the raised surface, at most a form's width, with its
+       buttons in a row that wraps. No motion. */
+    .sc-dialog {
+        width: min(var(--width-form), calc(100vw - 2 * var(--space-4)));
+        padding: var(--space-6);
+        color: var(--ink);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-dialog);
+    }
+
+    .sc-dialog::backdrop {
+        background: color-mix(in srgb, var(--brand-navy) 55%, transparent);
+    }
+
+    .sc-dialog__title {
+        margin: 0 0 var(--space-3);
+        font-size: 20px;
+        line-height: 28px;
+    }
+
+    .sc-dialog p {
+        margin: 0 0 var(--space-3);
+    }
+
+    .sc-dialog__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        align-items: center;
+        margin-top: var(--space-4);
+    }
+
+    .sc-dialog__actions form {
+        margin: 0;
+    }
+
+    /* What takes a page's place when its session has ended (step 18): the notice, and the sign-in in a frame below it,
+       borderless, as tall as the sign-in's steps need. */
+    .sc-signed-out__frame {
+        display: block;
+        width: 100%;
+        height: 40rem;
+        border: 0;
+    }
+
     /* A plain list of record lines, one per row. A word too long for the line, such as an email address on a phone,
        wraps inside it. */
     .sc-list {

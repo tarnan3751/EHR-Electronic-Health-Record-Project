@@ -83,8 +83,11 @@ namespace Ehr.Web.Api.Dictation;
 //   400 bad_form_token, or bad_seq; or bad_language: the service refused the language a dictation was started in
 //   404 not_found: an unknown, expired or someone else's session
 //   409 out_of_order, stopped (a chunk after stop; a visit's says its recording was stopped), or not_stopped (a result
-//       before stop); for a visit (AmbientApi.cs), speakers_given (who each voice is, said already)
-//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds
+//       before stop); for a visit (AmbientApi.cs), speakers_given (who each voice is, said already); and, starting a
+//       dictation or a visit, sign_in_ending: the sign-in's 12-hour end (SessionTimes) comes before its longest
+//       recording could finish, so the clinician signs in again first (the expansion plan's step 18)
+//   413 too_large: the chunk, or the dictation's bytes; or too_long: the dictation is over its maxSeconds (3 minutes,
+//       or 2 in Spanish)
 //   415 unsupported_type: the body isn't audio/*
 //   422 not_audio: "The audio couldn't be decoded."; or unsupported_language: "That language isn't available for this
 //       recording."
@@ -200,10 +203,35 @@ public static partial class DictationApi
     }
 
     // English, always: the plain route and the desktop app's offline one (the expansion plan's step 17).
-    static Task<IResult> StartAsync(HttpContext context, DictationSidecar sidecar) =>
-        CallAsync<DictationSession>(context, sidecar, "start", HttpMethod.Post, "v1/sessions", Start(SpokenLanguage.English),
+    static async Task<IResult> StartAsync(HttpContext context, DictationSidecar sidecar) =>
+        await SignInEndsTooSoonAsync(context, ambient: false) ?? await CallAsync<DictationSession>(context, sidecar, "start", HttpMethod.Post, "v1/sessions", Start(SpokenLanguage.English),
             session => Results.Json(
                 session with { MaxChunkBytes = Math.Min(session.MaxChunkBytes, MaxChunkBytes) }, statusCode: StatusCodes.Status201Created));
+
+    // The longest a dictation and a visit record (the dictation service's limits, which its pinned start answers say:
+    // src/Ehr.Dictation/contract). A dictation in Spanish records 2 minutes at most (the expansion plan's step 17); the
+    // refusal below holds every dictation to English's 3, the longest any records.
+    public static readonly TimeSpan LongestDictation = TimeSpan.FromMinutes(3);
+
+    public static readonly TimeSpan LongestVisit = TimeSpan.FromMinutes(20);
+
+    // A sign-in's 12-hour end (SessionTimes) never cuts a recording off: a dictation or a visit starts only while the
+    // sign-in has left at least its longest recording, as Tahseen agreed on 24 November 2026. Otherwise the clinician
+    // signs in again first, which the page says in the API's words. Null when there is time.
+    static async Task<IResult?> SignInEndsTooSoonAsync(HttpContext context, bool ambient)
+    {
+        var needed = ambient ? LongestVisit : LongestDictation;
+        if (await SessionTimes.LeftAsync(context, AccountSchemes.Staff) is not { } left || left.UntilLongest >= needed.TotalSeconds)
+        {
+            return null;
+        }
+
+        var minutes = (left.UntilLongest + 59) / 60;
+        var ends = minutes <= 1 ? "in a minute" : $"in {minutes} minutes";
+        return Refuse(StatusCodes.Status409Conflict, "sign_in_ending", ambient
+            ? $"Sign in again first: a sign-in lasts at most 12 hours, and this one ends {ends}, too soon for a visit, which can record for 20 minutes. Sign out, sign in again, then start listening."
+            : $"Sign in again first: a sign-in lasts at most 12 hours, and this one ends {ends}, too soon for a dictation, which can record for 3 minutes. Sign out, sign in again, then dictate.");
+    }
 
     static Task<IResult> SendAudioAsync(string id, string? seq, HttpContext context, DictationSidecar sidecar) =>
         ForwardAudioAsync(id, seq, context, sidecar, ambient: false);

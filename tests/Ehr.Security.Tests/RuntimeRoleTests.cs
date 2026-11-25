@@ -46,6 +46,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "patient_assignments")] = ["SELECT"],
         [("ehr_app", "break_glass_accesses")] = ["SELECT", "INSERT"],
         [("ehr_read", "break_glass_accesses")] = ["SELECT"],
+        [("ehr_app", "emergency_access_reviews")] = ["SELECT", "INSERT"],
+        [("ehr_read", "emergency_access_reviews")] = ["SELECT"],
         // Chart lists: clinicians add and change entries, and nothing deletes one. Their history is the database's to write.
         [("ehr_app", "allergy_intolerances")] = ["SELECT", "INSERT", "UPDATE"],
         // Messages: sent by insert, never edited; marking one read is a column grant.

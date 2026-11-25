@@ -55,7 +55,7 @@ namespace Ehr.Bench;
 // app's own settings instead, as `dotnet run --project src/Ehr.Web` does, against a primary already seeded with as many
 // patients. Either way it creates a clinician of its own, with a random password nobody keeps, puts 100 of the seeded
 // patients on their panel, signs six orders for each of them and discontinues two (UC 1), so the chart it measures lists active orders,
-// signs in with password and authenticator code like a browser, and locks the account at the end. It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
+// signs in with password and authenticator code like a browser, and locks the account at the end; and an administrator of its own, the same way, to review emergency access (step 18). It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
 //
 // UC 2, off-site (Tahseen Arnan): then the same requests, in the same order, to the cloud app (OffSiteApp), reading as
 // ehr_read with its link to the on-prem app down, as in an on-site outage, with the same session. Each row's name starts
@@ -240,6 +240,10 @@ internal static partial class RenderBenchmark
                 // Download my record (step 13b) is measured for the seeded patient with the most entries too.
                 var (largestUserId, largestEmail, largestPassword, _) = await CreatePatientAccountAsync(app, LargestRecord(patients, portalPatient));
                 var largestSession = new CookieContainer();
+                // Reviewing emergency access (step 18): an administrator of the benchmark's own, signed in with their second
+                // factor, locked out at the end as the clinician is.
+                var (adminId, adminEmail, adminPassword, adminKey) = await CreateClinicianAsync(app, StaffRoles.Admin);
+                var adminSession = new CookieContainer();
                 try
                 {
                     using var portal = await PortalSignInAsync(app, portalSession, patientEmail, patientPassword);
@@ -280,6 +284,22 @@ internal static partial class RenderBenchmark
                         results.AddRange(await MeasureRecordAsync(largest, times, "", "the largest seeded record", page: false));
                     }
                     results.Add(await MeasureAsync(portal, times, "Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
+                    // Sessions (step 18): what a page asks while someone works on it, to keep their session and learn how
+                    // long it has, staff and portal.
+                    results.Add(await MeasureAsync(client, times, "Session keep-alive, staff", typing: false, () => "/session"));
+                    results.Add(await MeasureAsync(portal, times, "Session keep-alive, portal", typing: false, () => "/portal/session"));
+                    // Reviewing emergency access (step 18): the clinician's year of emergency accesses (FillPanelHistoryAsync),
+                    // half of them reviewed. The review page of any of them, and the audit page's list of those waiting. A
+                    // generator of its own.
+                    var accesses = await ReviewHalfAsync(database, adminId, clinicianId);
+                    using var admin = await SignInAsync(app, adminSession, adminEmail, adminPassword, adminKey, home: "/admin/staff");
+                    var accessRandom = new Random(20261127);
+                    if (accesses.Count > 0)
+                    {
+                        results.Add(await MeasureAsync(admin, times, "Emergency access review, an ended access", typing: false,
+                            () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
+                        results.Add(await MeasureAsync(admin, times, "Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
+                    }
 
                     // The review of a dictation (UC 13), in English and, since the expansion plan's step 17, in Spanish, each
                     // English sentence beside the Spanish it was translated from: staged on new drafts of the patients with
@@ -289,13 +309,14 @@ internal static partial class RenderBenchmark
                     {
                         Console.WriteLine("Off-site: not measured with --stack, which has no ehr_read login for the replica.");
                         Console.WriteLine("The lab's door: not measured with --stack, whose lab key is in the stack's .env alone.");
+                        Console.WriteLine("Emergency access review: not measured with --stack, whose emergency accesses are the stack's own.");
                         results.AddRange(await MeasureReviewsAsync(client, times, "", await StageReviewsAsync(app, clinicianId, noted)));
                     }
                     else
                     {
                         await SettleAsync(database);
                         var (offSite, reviewed) = await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills, forms, drafted, proposed, visits, () => StageReviewsAsync(app, clinicianId, noted));
+                            refills, forms, drafted, proposed, visits, adminSession, accesses, () => StageReviewsAsync(app, clinicianId, noted));
                         results.AddRange(offSite);
                         results.AddRange(await MeasureReviewsAsync(client, times, "", reviewed));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
@@ -306,6 +327,7 @@ internal static partial class RenderBenchmark
                 {
                     await LockOutPatientAsync(app, patientUserId);
                     await LockOutPatientAsync(app, largestUserId);
+                    await LockOutAsync(app, adminId);
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -481,6 +503,21 @@ internal static partial class RenderBenchmark
         ];
     }
 
+    // A session ends 15 minutes after its last request (step 18): each session given, which the run keeps for rows to come,
+    // asks for its session page once, unmeasured, so it isn't ended as idle while other rows run.
+    static async Task KeepAliveAsync(WebApplicationFactory<Program> app, params (CookieContainer Session, string Path)[] sessions)
+    {
+        foreach (var (session, path) in sessions)
+        {
+            using var client = app.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
+            using var response = await client.GetAsync(path);
+            if (!response.IsSuccessStatusCode || response.RequestMessage?.RequestUri?.AbsolutePath != path)
+            {
+                throw new InvalidOperationException($"Keeping a session at {path} answered {(int)response.StatusCode} at {response.RequestMessage?.RequestUri?.AbsolutePath}.");
+            }
+        }
+    }
+
     // What a clinician might have typed so far when looking for a diagnosis.
     static readonly string[] CodeSearches = ["typ", "ess", "anx", "ast", "hyp", "dia", "dep", "alc", "low", "mig"];
 
@@ -492,7 +529,8 @@ internal static partial class RenderBenchmark
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
         CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms,
-        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, List<Listened> visits, Func<Task<List<Reviewed>>> stageReviews)
+        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, List<Listened> visits, CookieContainer adminSession, List<Guid> accesses,
+        Func<Task<List<Reviewed>>> stageReviews)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -506,6 +544,8 @@ internal static partial class RenderBenchmark
             }
 
             using var client = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
+            // The sessions the rows below use last, kept from ending as idle while the rows before them run (step 18).
+            await KeepAliveAsync(cloud, (portalSession, "/portal/session"), (largestSession, "/portal/session"), (adminSession, "/session"));
             var results = await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
             results.AddRange(await MeasureScheduleAsync(client, times, "Off-site, ", panel, scheduleDay, appointments));
             // Pages that record more than one audit event (step 10c): a chart that has a signed note records the
@@ -553,6 +593,7 @@ internal static partial class RenderBenchmark
             results.AddRange(await MeasureVisitReviewsAsync(client, times, "Off-site, ", visits));
             // Pre-visit forms (step 13e): the clinician's pages, read from the cloud copy; asking says why it can't.
             results.AddRange(await MeasureFormsAsync(client, times, "Off-site, ", forms));
+            await KeepAliveAsync(cloud, (largestSession, "/portal/session"), (adminSession, "/session"));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, as a proxy", typing: false, () => "/portal/refills"));
@@ -574,6 +615,15 @@ internal static partial class RenderBenchmark
             using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
             results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
+            // Sessions and reviewing emergency access (step 18), with the same generator's draws as on-site: the review page
+            // read from the cloud copy, its form replaced by why it can't be marked reviewed.
+            results.Add(await MeasureAsync(client, times, "Off-site, Session keep-alive, staff", typing: false, () => "/session"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Session keep-alive, portal", typing: false, () => "/portal/session"));
+            using var admin = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(adminSession));
+            var accessRandom = new Random(20261127);
+            results.Add(await MeasureAsync(admin, times, "Off-site, Emergency access review, an ended access", typing: false,
+                () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
+            results.Add(await MeasureAsync(admin, times, "Off-site, Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
             // Last: the dictation reviews, staged now, after every row that reads those patients' drafts.
             var reviewed = await stageReviews();
             results.AddRange(await MeasureReviewsAsync(client, times, "Off-site, ", reviewed));
@@ -1043,13 +1093,13 @@ internal static partial class RenderBenchmark
         return true;
     }
 
-    static async Task<(Guid Id, string Email, string Password, string Key)> CreateClinicianAsync(BenchApp app)
+    static async Task<(Guid Id, string Email, string Password, string Key)> CreateClinicianAsync(BenchApp app, string role = StaffRoles.Clinician)
     {
         await using var scope = app.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
         var email = $"bench-{Guid.NewGuid():N}@example.test";
         var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
-        var user = new StaffUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = "Benchmark", Roles = [StaffRoles.Clinician] };
+        var user = new StaffUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = "Benchmark", Roles = [role] };
         Check(await users.CreateAsync(user, password));
         Check(await users.ResetAuthenticatorKeyAsync(user));
         var key = (await users.GetAuthenticatorKeyAsync(user))!;
@@ -2026,6 +2076,49 @@ internal static partial class RenderBenchmark
         await command.ExecuteNonQueryAsync();
     }
 
+    // Step 18: half the benchmark clinician's emergency accesses reviewed by the benchmark's administrator, every other one
+    // in the order they were granted, one in four of those "not appropriate", through the database's own rules: as the
+    // superuser, acting as the administrator, so the review's guard and its trigger run. The accesses, every one ended, in
+    // that order. In the benchmark's own database only: with --stack, none.
+    static async Task<List<Guid>> ReviewHalfAsync(MigratedDatabase? database, Guid adminId, Guid clinicianId)
+    {
+        if (database is null)
+        {
+            return [];
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using (var transaction = await connection.BeginTransactionAsync())
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                SELECT set_config('app.user_id', @admin::text, true);
+                INSERT INTO ehr.emergency_access_reviews (id, reviewer_id, reviewed_at, outcome, note)
+                SELECT b.id, @admin, now(), CASE WHEN b.n % 4 = 1 THEN 'not-appropriate' ELSE 'appropriate' END, 'Synthetic review note for the benchmark.'
+                FROM (SELECT id, row_number() OVER (ORDER BY granted_at, id) AS n FROM ehr.break_glass_accesses WHERE clinician_id = @clinician) b
+                WHERE b.n % 2 = 1;
+                ANALYZE ehr.emergency_access_reviews;
+                """, connection, transaction);
+            command.Parameters.AddWithValue("admin", adminId);
+            command.Parameters.AddWithValue("clinician", clinicianId);
+            await command.ExecuteNonQueryAsync();
+            await transaction.CommitAsync();
+        }
+
+        await using var accesses = new NpgsqlCommand(
+            "SELECT id FROM ehr.break_glass_accesses WHERE clinician_id = @clinician ORDER BY granted_at, id", connection);
+        accesses.Parameters.AddWithValue("clinician", clinicianId);
+        var ids = new List<Guid>();
+        await using var reader = await accesses.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            ids.Add(reader.GetGuid(0));
+        }
+
+        return ids;
+    }
+
     // Step 13c: a year of views of each record in the audit log, 26 minutes apart, beyond those the run's own pages make.
     // One in twenty is the clinician's read of the record; the rest are views of sensitive items, of a note, of a
     // summary marked sensitive, or by another portal account, and events that are no view at all (a sign-in, writes).
@@ -2071,14 +2164,14 @@ internal static partial class RenderBenchmark
 
     // Signs in as a browser does, password then authenticator code, and returns a client with the session's cookies, which
     // it keeps in the jar given, for the off-site app too.
-    static async Task<HttpClient> SignInAsync(BenchApp app, CookieContainer session, string email, string password, string key)
+    static async Task<HttpClient> SignInAsync(BenchApp app, CookieContainer session, string email, string password, string key, string home = "/patients")
     {
         var client = app.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
         using var codePage = await PostFormAsync(client, "/sign-in", await client.GetStringAsync("/sign-in"), ("Input.Email", email), ("Input.Password", password));
-        using var home = await PostFormAsync(client, "/sign-in/code", await codePage.Content.ReadAsStringAsync(), ("Code", Totp.Code(key)));
-        if (home.RequestMessage?.RequestUri?.AbsolutePath != "/patients")
+        using var landed = await PostFormAsync(client, "/sign-in/code", await codePage.Content.ReadAsStringAsync(), ("Code", Totp.Code(key)));
+        if (landed.RequestMessage?.RequestUri?.AbsolutePath != home)
         {
-            throw new InvalidOperationException($"Signing in ended at {home.RequestMessage?.RequestUri?.AbsolutePath}, not at /patients.");
+            throw new InvalidOperationException($"Signing in ended at {landed.RequestMessage?.RequestUri?.AbsolutePath}, not at {home}.");
         }
 
         return client;

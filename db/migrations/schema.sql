@@ -2407,3 +2407,26 @@ VALUES ('20261122182450_AmbientListening', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.emergency_access_reviews (
+    id uuid NOT NULL,
+    reviewer_id uuid NOT NULL,
+    reviewed_at timestamp with time zone NOT NULL,
+    outcome character varying(20) NOT NULL,
+    note character varying(500) NOT NULL,
+    CONSTRAINT pk_emergency_access_reviews PRIMARY KEY (id),
+    CONSTRAINT ck_emergency_access_reviews_note CHECK (char_length(note) BETWEEN 10 AND 500),
+    CONSTRAINT ck_emergency_access_reviews_outcome CHECK (outcome IN ('appropriate', 'not-appropriate')),
+    CONSTRAINT fk_emergency_access_reviews_break_glass_accesses_id FOREIGN KEY (id) REFERENCES ehr.break_glass_accesses (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_emergency_access_reviews_staff_users_reviewer_id FOREIGN KEY (reviewer_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_emergency_access_reviews_reviewer_id ON ehr.emergency_access_reviews (reviewer_id);
+
+CREATE INDEX ix_audit_events_break_glass ON ehr.audit_events (occurred_at DESC, id DESC) WHERE action = 'break_glass';
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261124201447_EmergencyAccessReviews', '10.0.13');
+
+COMMIT;
+

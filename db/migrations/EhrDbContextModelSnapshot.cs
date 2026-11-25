@@ -495,12 +495,57 @@ namespace Ehr.Migrations
                     b.HasIndex("ActorId", "OccurredAt")
                         .HasDatabaseName("ix_audit_events_actor_id_occurred_at");
 
+                    b.HasIndex("OccurredAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_audit_events_break_glass")
+                        .HasFilter("action = 'break_glass'");
+
                     b.HasIndex("PatientId", "OccurredAt")
                         .HasDatabaseName("ix_audit_events_patient_id_occurred_at");
 
                     b.ToTable("audit_events", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_audit_events_part", "part IS NULL OR action IN ('read', 'read_sensitive', 'download', 'download_sensitive') AND part IN ('chart', 'lists', 'orders', 'results', 'vitals', 'search', 'panel', 'schedule', 'inbox', 'appointments', 'home', 'conversations', 'access', 'visit-note', 'note-draft', 'offline', 'fhir', 'summaries', 'printable', 'download', 'views', 'refills', 'forms')");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Audit.EmergencyAccessReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid>("ReviewerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_emergency_access_reviews");
+
+                    b.HasIndex("ReviewerId")
+                        .HasDatabaseName("ix_emergency_access_reviews_reviewer_id");
+
+                    b.ToTable("emergency_access_reviews", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_emergency_access_reviews_note", "char_length(note) BETWEEN 10 AND 500");
+
+                            t.HasCheckConstraint("ck_emergency_access_reviews_outcome", "outcome IN ('appropriate', 'not-appropriate')");
                         });
                 });
 
@@ -3667,6 +3712,23 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Audit.EmergencyAccessReview", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.BreakGlassAccess", null)
+                        .WithOne()
+                        .HasForeignKey("Ehr.Data.Audit.EmergencyAccessReview", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emergency_access_reviews_break_glass_accesses_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emergency_access_reviews_staff_users_reviewer_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Forms.QuestionnaireRequest", b =>

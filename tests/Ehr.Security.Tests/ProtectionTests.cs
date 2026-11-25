@@ -87,6 +87,9 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         // The lab's key, as its hash, read only by the functions of the lab's door.
         ["lab_keys"] = Protection.Internal,
         ["audit_events"] = Protection.Restricted,
+        // An administrator's review of an emergency access (step 18): kept with the audit log, and like it restricted;
+        // the row is its own record, never changed.
+        ["emergency_access_reviews"] = Protection.Restricted,
     };
 
     [Fact]

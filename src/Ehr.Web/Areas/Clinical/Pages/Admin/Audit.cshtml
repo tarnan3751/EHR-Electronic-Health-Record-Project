@@ -1,11 +1,12 @@
 @page "/admin/audit"
 @using Ehr.Data.Audit
+@using Ehr.Domain.Audit
 @model AuditModel
 @{
     ViewData["Title"] = "Audit";
 }
 <h1>Audit</h1>
-<p class="sc-lede">Every view and change of patient information, and every sign-in, newest first. Emergency access is marked for review.</p>
+<p class="sc-lede">Every view and change of patient information, and every sign-in, newest first. Emergency access is marked for review until an administrator reviews it.</p>
 <form method="get" class="sc-filters">
     <div class="sc-field">
         <label asp-for="Action" class="sc-field__label">Action</label>
@@ -50,6 +51,15 @@
         <input asp-for="To" class="sc-field__input" type="date">
     </div>
     <label class="sc-check"><input asp-for="Flagged" type="checkbox"> Emergency access only</label>
+    @* Step 18: emergency accesses by their review. *@
+    <div class="sc-field">
+        <label asp-for="Review" class="sc-field__label">Review</label>
+        <select asp-for="Review" class="sc-field__input">
+            <option value="">Any</option>
+            <option value="@AuditReviewFilter.Waiting">Waiting for review</option>
+            <option value="@AuditReviewFilter.NotAppropriate">Not appropriate</option>
+        </select>
+    </div>
     <button class="sc-btn sc-btn--primary">Show</button>
 </form>
 @if (Model.Log.Events.Count == 0)
@@ -68,10 +78,27 @@ else
             <tbody>
                 @foreach (var e in Model.Log.Events)
                 {
-                    <tr class="@(e.Action == AuditActions.BreakGlass ? "sc-table__flagged" : null)">
+                    <tr class="@(e.Action == AuditActions.BreakGlass && !(e.RowId is { } reviewed && Model.Reviews.ContainsKey(reviewed)) ? "sc-table__flagged" : null)">
                         <td class="sc-table__mono">@e.OccurredAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
                         <td>@(e.ActorId is { } actor ? Model.Log.Actors.GetValueOrDefault(actor, actor.ToString()) : e.Source == AuditSources.Lab ? "Lab" : "System")</td>
-                        <td>@e.Action@if (e.Action == AuditActions.BreakGlass) {<text> <span class="sc-tag sc-tag--danger">Review</span></text>}</td>
+                        @* An emergency access: "Review" until reviewed, then "Reviewed" and, when so, "Not appropriate"; either way the
+                           way to its review (step 18). *@
+                        <td>@e.Action@if (e.Action == AuditActions.BreakGlass && e.RowId is { } access)
+                            {
+                                if (Model.Reviews.TryGetValue(access, out var review))
+                                {
+                                    <text> <span class="sc-tag">Reviewed</span></text>
+                                    if (review.Outcome == EmergencyAccessOutcomes.NotAppropriate)
+                                    {
+                                        <text> <span class="sc-tag sc-tag--danger">Not appropriate</span></text>
+                                    }
+                                }
+                                else
+                                {
+                                    <text> <span class="sc-tag sc-tag--danger">Review</span></text>
+                                }
+                                <text> <a asp-page="EmergencyAccess" asp-route-id="@access" data-review-link>Open the review</a></text>
+                            }</td>
                         @if (e.PatientId is { } patientId)
                         {
                             <td class="sc-table__id">@patientId</td>

@@ -33,6 +33,7 @@ public static partial class DictationApi
     {
         IdentifyReviewUser(context);
         context.Response.Headers.CacheControl = "no-store";
+        if (await SignInEndsTooSoonAsync(context, ambient: false) is { } tooSoon) return tooSoon;
         var cancel = context.RequestAborted;
         if (input.ReviewId == Guid.Empty || input.PatientId == Guid.Empty || input.DraftId == Guid.Empty)
             return ReviewAnswer(context, ReviewResult.Invalid("Supply a patient and a review request ID."));

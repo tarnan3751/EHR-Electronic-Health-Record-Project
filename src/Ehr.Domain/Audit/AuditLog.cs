@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Ehr.Domain.Audit;
 
 // The audit log as admins review it: the newest events first, narrowed by action, actor, patient, the part of the
-// record a read was for (step 13c2) or time, a page at a time. Row-level security hands an admin every event and anyone else none, so nothing here checks who asks. Actors
+// record a read was for (step 13c2), an emergency access's review (step 18) or time, a page at a time. Row-level security hands an admin every event and anyone else none, so nothing here checks who asks. Actors
 // are named from the account tables, which admins may read. Patients appear by ID only: an admin has no access to
 // patient data (db/policies/30-rls.sql), and asks a clinician when a review needs the name; the values a write changed,
 // which the trigger recorded, are the one place an admin sees any, and never those of a sensitive item: for such a write
@@ -25,6 +25,17 @@ public sealed class AuditLog(EhrDbContext db)
         if (filter.Part is { Length: > 0 })
         {
             events = events.Where(e => e.Part == filter.Part);
+        }
+
+        // Emergency accesses by their review (step 18): those waiting for one, or those reviewed as not appropriate.
+        if (filter.Review == AuditReviewFilter.Waiting)
+        {
+            events = events.Where(e => e.Action == AuditActions.BreakGlass && !db.EmergencyAccessReviews.Any(r => r.Id == e.RowId));
+        }
+        else if (filter.Review == AuditReviewFilter.NotAppropriate)
+        {
+            events = events.Where(e => e.Action == AuditActions.BreakGlass
+                && db.EmergencyAccessReviews.Any(r => r.Id == e.RowId && r.Outcome == EmergencyAccessOutcomes.NotAppropriate));
         }
 
         if (filter.ActorId is { } actor)
@@ -100,8 +111,18 @@ public sealed class AuditLog(EhrDbContext db)
 sealed record ShownDetails(Guid Id, string? Details);
 
 // What to show: one action or any; one staff or patient account or anyone; one patient or any; from a moment on;
-// before a moment (also how the next, older page is asked for); reads for one part of the record or any.
-public sealed record AuditFilter(string? Action, Guid? ActorId, Guid? PatientId, DateTimeOffset? From, DateTimeOffset? Before, string? Part = null);
+// before a moment (also how the next, older page is asked for); reads for one part of the record or any; emergency
+// accesses waiting for review or reviewed as not appropriate, or any event (AuditReviewFilter).
+public sealed record AuditFilter(string? Action, Guid? ActorId, Guid? PatientId, DateTimeOffset? From, DateTimeOffset? Before, string? Part = null,
+    string? Review = null);
+
+// The audit page's choice of emergency accesses by their review (step 18).
+public static class AuditReviewFilter
+{
+    public const string Waiting = "waiting";
+
+    public const string NotAppropriate = EmergencyAccessOutcomes.NotAppropriate;
+}
 
 // A page of events, newest first, the names of the accounts that acted, and whether older events remain.
 public sealed record AuditPage(IReadOnlyList<AuditEvent> Events, IReadOnlyDictionary<Guid, string> Actors, bool More);

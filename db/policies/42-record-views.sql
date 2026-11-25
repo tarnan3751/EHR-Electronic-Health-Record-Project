@@ -16,7 +16,8 @@ AS $$
         WHEN action = 'sent_to_lab' THEN 'lab-order'
         WHEN action = 'download' THEN 'download'
         WHEN action = 'download_sensitive' THEN 'download-sensitive'
-        WHEN table_name = 'audit_events' THEN 'views'
+        -- The log, and the administrators' reviews of emergency access that go with it (step 18).
+        WHEN table_name IN ('audit_events', 'emergency_access_reviews') THEN 'views'
         WHEN table_name = 'patients' THEN CASE WHEN action = 'read_sensitive' THEN 'record-sensitive' ELSE 'record' END
         WHEN table_name = 'visit_summaries' THEN 'summary'
         WHEN table_name IN ('message_threads', 'messages') THEN 'messages'

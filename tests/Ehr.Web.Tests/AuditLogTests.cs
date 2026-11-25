@@ -64,7 +64,7 @@ public class AuditLogTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Matches($"(?s)<td>read</td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td class=\"sc-table__id\">patients {patient}</td>\\s*<td class=\"sc-table__mono\">{part}</td>", html);
         }
 
-        Assert.Matches($"(?s)<td>break_glass <span[^>]*>Review</span></td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td[^>]*>[^<]*</td>\\s*<td class=\"sc-table__muted\">—</td>", html);
+        Assert.Matches($"(?s)<td>break_glass <span[^>]*>Review</span> <a[^>]*>Open the review</a></td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td[^>]*>[^<]*</td>\\s*<td class=\"sc-table__muted\">—</td>", html);
 
         var vitals = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}&Part={AuditParts.Vitals}", Cancel);
         Assert.Contains($"<td class=\"sc-table__mono\">{AuditParts.Vitals}</td>", vitals);

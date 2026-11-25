@@ -134,6 +134,9 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // Every view and change of patient information, and every sign-in. Append-only.
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
+    // The reviews of emergency accesses (step 18), one an access, by an administrator. Restricted, like the audit log.
+    public DbSet<EmergencyAccessReview> EmergencyAccessReviews => Set<EmergencyAccessReview>();
+
     // Every host and tool configures the context through here, so they agree on naming and on where
     // migrations live: the Ehr.Migrations project in db/migrations.
     public static void Configure(DbContextOptionsBuilder builder, string connectionString) =>

@@ -26,5 +26,11 @@ public sealed class AuditEventConfiguration : IEntityTypeConfiguration<AuditEven
         // Who looked at this patient; what did this person do.
         auditEvent.HasIndex(e => new { e.PatientId, e.OccurredAt });
         auditEvent.HasIndex(e => new { e.ActorId, e.OccurredAt });
+        // The emergency accesses, newest first, for the audit page's "Emergency access only" and its review filter (step
+        // 18): a few rows among the whole log, which the page would otherwise read through to find them.
+        auditEvent.HasIndex(e => new { e.OccurredAt, e.Id })
+            .IsDescending(true, true)
+            .HasFilter($"action = '{AuditActions.BreakGlass}'")
+            .HasDatabaseName("ix_audit_events_break_glass");
     }
 }

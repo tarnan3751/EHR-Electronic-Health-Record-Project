@@ -45,10 +45,12 @@ public class TC_UC23_06_Nfr12_KeyboardConsentFirst(WebApps apps) : IClassFixture
         page.PageError += (_, error) => errors.Add(error);
         await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
 
-        // Without the agreement ticked, the form asks for it, and nothing is asked of the server or the microphone.
+        // Without the agreement ticked, the form asks for it, and nothing is asked of the server or the microphone: nothing
+        // about the visit, that is. Every signed-in page asks its session page once as it loads (step 18), which says
+        // only how long the session has left.
         await AmbientBrowserTests.ConsentAsync(page, agreed: false);
         await page.WaitForTimeoutAsync(200);
-        Assert.Empty(await AmbientBrowserTests.EventsAsync(page));
+        Assert.DoesNotContain(await AmbientBrowserTests.EventsAsync(page), e => !e.Contains("GET /session", StringComparison.Ordinal));
 
         await page.FocusAsync("#ambient-agreed");
         await page.Keyboard.PressAsync("Space");
