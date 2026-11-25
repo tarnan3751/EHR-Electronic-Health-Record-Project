@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ehr.Migrations
 {
     [DbContext(typeof(EhrDbContext))]
-    [Migration("20261119072440_VitalCorrections")]
-    partial class VitalCorrections
+    [Migration("20261125021100_VitalReadings")]
+    partial class VitalReadings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -593,7 +593,7 @@ namespace Ehr.Migrations
 
                     b.ToTable("inbox_items", "ehr", t =>
                         {
-                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review')");
+                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum')");
 
                             t.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
                         });
@@ -1678,6 +1678,19 @@ namespace Ehr.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("sensitive");
 
+                    b.Property<DateTimeOffset?>("SensitiveChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sensitive_changed_at");
+
+                    b.Property<Guid?>("SensitiveMarkedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sensitive_marked_by");
+
+                    b.Property<string>("SensitiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("sensitive_reason");
+
                     b.Property<DateTimeOffset>("SignedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1699,6 +1712,9 @@ namespace Ehr.Migrations
                     b.HasIndex("DraftId")
                         .IsUnique()
                         .HasDatabaseName("ix_clinical_notes_draft_id");
+
+                    b.HasIndex("SensitiveMarkedBy")
+                        .HasDatabaseName("ix_clinical_notes_sensitive_marked_by");
 
                     b.HasIndex("SignerId")
                         .HasDatabaseName("ix_clinical_notes_signer_id");
@@ -1887,6 +1903,23 @@ namespace Ehr.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("sensitive");
 
+                    b.Property<DateTimeOffset?>("SensitiveChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sensitive_changed_at");
+
+                    b.Property<bool>("SensitiveInherited")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive_inherited");
+
+                    b.Property<Guid?>("SensitiveMarkedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sensitive_marked_by");
+
+                    b.Property<string>("SensitiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("sensitive_reason");
+
                     b.Property<DateTimeOffset>("SignedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1907,6 +1940,9 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_note_addenda_patient_id");
 
+                    b.HasIndex("SensitiveMarkedBy")
+                        .HasDatabaseName("ix_note_addenda_sensitive_marked_by");
+
                     b.HasIndex("NoteId", "PatientId")
                         .HasDatabaseName("ix_note_addenda_note_id_patient_id");
 
@@ -1915,6 +1951,8 @@ namespace Ehr.Migrations
 
                     b.ToTable("note_addenda", "ehr", t =>
                         {
+                            t.HasCheckConstraint("ck_note_addenda_inherited", "sensitive OR NOT sensitive_inherited");
+
                             t.HasCheckConstraint("ck_note_addenda_text", "text ~ '[^[:space:]]' AND char_length(text) <= 16000");
                         });
                 });
@@ -1983,6 +2021,10 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
 
+                    b.Property<Guid?>("ReadingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reading_id");
+
                     b.Property<decimal?>("ReferenceHigh")
                         .HasPrecision(12, 4)
                         .HasColumnType("numeric(12,4)")
@@ -2029,21 +2071,26 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "EffectiveAt")
                         .HasDatabaseName("ix_observations_patient_id_effective_at");
 
-                    b.HasIndex("PatientId", "Category", "Code", "EffectiveAt")
-                        .HasDatabaseName("ix_observations_patient_id_category_code_effective_at");
+                    b.HasIndex("ReadingId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_observations_reading")
+                        .HasFilter("reading_id IS NOT NULL");
 
-                    b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId")
+                    b.HasIndex("PatientId", "Code", "EffectiveAt")
                         .IsUnique()
                         .HasDatabaseName("ux_observations_vital_sign_once")
                         .HasFilter("category = 'vital-signs' AND status <> 'entered-in-error'");
 
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PatientId", "Code", "EffectiveAt", "EncounterId"), false);
+                    b.HasIndex("PatientId", "Category", "Code", "EffectiveAt")
+                        .HasDatabaseName("ix_observations_patient_id_category_code_effective_at");
 
                     b.ToTable("observations", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_observations_category", "category IN ('laboratory', 'vital-signs')");
 
                             t.HasCheckConstraint("ck_observations_entered_in_error", "(entered_in_error_reason IS NULL AND entered_in_error_by IS NULL AND entered_in_error_at IS NULL) OR status = 'entered-in-error'");
+
+                            t.HasCheckConstraint("ck_observations_reading", "(reading_id IS NOT NULL) = (category = 'vital-signs' AND code IS NOT NULL AND code IN ('8480-6', '8462-4'))");
 
                             t.HasCheckConstraint("ck_observations_reference_range", "reference_low <= reference_high");
 
@@ -3090,6 +3137,12 @@ namespace Ehr.Migrations
 
                     b.HasOne("Ehr.Data.Accounts.StaffUser", null)
                         .WithMany()
+                        .HasForeignKey("SensitiveMarkedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_clinical_notes_staff_users_sensitive_marked_by");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
                         .HasForeignKey("SignerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -3141,6 +3194,12 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_note_addenda_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("SensitiveMarkedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_note_addenda_staff_users_sensitive_marked_by");
 
                     b.HasOne("Ehr.Data.Patients.ClinicalNote", null)
                         .WithMany()

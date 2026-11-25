@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Ehr.Migrations
 {
     [DbContext(typeof(EhrDbContext))]
-    [Migration("20261121181613_RefillRequests")]
-    partial class RefillRequests
+    [Migration("20261125040400_AuditEventParts")]
+    partial class AuditEventParts
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -459,6 +459,11 @@ namespace Ehr.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_at");
 
+                    b.Property<string>("Part")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("part");
+
                     b.Property<Guid?>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
@@ -496,7 +501,10 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "OccurredAt")
                         .HasDatabaseName("ix_audit_events_patient_id_occurred_at");
 
-                    b.ToTable("audit_events", "ehr");
+                    b.ToTable("audit_events", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_audit_events_part", "part IS NULL OR action IN ('read', 'read_sensitive', 'download', 'download_sensitive') AND part IN ('chart', 'lists', 'orders', 'results', 'vitals', 'search', 'panel', 'schedule', 'inbox', 'appointments', 'home', 'conversations', 'access', 'visit-note', 'note-draft', 'offline', 'fhir', 'summaries', 'printable', 'download', 'views', 'refills', 'forms')");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.ChangeLogEntry", b =>
@@ -533,6 +541,178 @@ namespace Ehr.Migrations
                     b.ToTable("change_log", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Forms.QuestionnaireRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AppointmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_id");
+
+                    b.Property<Guid>("ClinicianId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id");
+
+                    b.Property<string>("Definition")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definition");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("QuestionnaireCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("questionnaire_code");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("RequestedBy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_requests");
+
+                    b.HasIndex("ClinicianId")
+                        .HasDatabaseName("ix_questionnaire_requests_clinician_id");
+
+                    b.HasIndex("QuestionnaireCode")
+                        .HasDatabaseName("ix_questionnaire_requests_questionnaire_code");
+
+                    b.HasIndex("RequestedBy")
+                        .HasDatabaseName("ix_questionnaire_requests_requested_by");
+
+                    b.HasIndex("AppointmentId", "QuestionnaireCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_requests_appointment_id_questionnaire_code");
+
+                    b.HasIndex("PatientId", "RequestedAt")
+                        .HasDatabaseName("ix_questionnaire_requests_patient_id_requested_at");
+
+                    b.ToTable("questionnaire_requests", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_questionnaire_requests_definition", "jsonb_typeof(definition) = 'object'");
+
+                            t.HasCheckConstraint("ck_questionnaire_requests_sensitive", "sensitive");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Forms.QuestionnaireResponse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Alert")
+                        .HasColumnType("boolean")
+                        .HasColumnName("alert");
+
+                    b.Property<DateTimeOffset>("AnsweredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("answered_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("AnsweredBy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("answered_by")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<string>("Answers")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answers");
+
+                    b.Property<string>("Band")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("band");
+
+                    b.Property<Guid>("ClinicianId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id");
+
+                    b.Property<bool>("FollowUp")
+                        .HasColumnType("boolean")
+                        .HasColumnName("follow_up");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<Guid?>("ProxyGrantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("proxy_grant_id");
+
+                    b.Property<string>("QuestionnaireCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("questionnaire_code");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<int?>("Score")
+                        .HasColumnType("integer")
+                        .HasColumnName("score");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
+                    b.HasKey("Id")
+                        .HasName("pk_questionnaire_responses");
+
+                    b.HasIndex("AnsweredBy")
+                        .HasDatabaseName("ix_questionnaire_responses_answered_by");
+
+                    b.HasIndex("ClinicianId")
+                        .HasDatabaseName("ix_questionnaire_responses_clinician_id");
+
+                    b.HasIndex("ProxyGrantId")
+                        .HasDatabaseName("ix_questionnaire_responses_proxy_grant_id");
+
+                    b.HasIndex("QuestionnaireCode")
+                        .HasDatabaseName("ix_questionnaire_responses_questionnaire_code");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_questionnaire_responses_request_id");
+
+                    b.HasIndex("PatientId", "AnsweredAt")
+                        .HasDatabaseName("ix_questionnaire_responses_patient_id_answered_at");
+
+                    b.ToTable("questionnaire_responses", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_questionnaire_responses_answers", "jsonb_typeof(answers) = 'object'");
+
+                            t.HasCheckConstraint("ck_questionnaire_responses_score", "score >= 0");
+
+                            t.HasCheckConstraint("ck_questionnaire_responses_sensitive", "sensitive");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Inbox.InboxItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -561,6 +741,10 @@ namespace Ehr.Migrations
                     b.Property<Guid>("RecipientId")
                         .HasColumnType("uuid")
                         .HasColumnName("recipient_id");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
 
                     b.Property<Guid?>("SourceId")
                         .HasColumnType("uuid")
@@ -593,7 +777,9 @@ namespace Ehr.Migrations
 
                     b.ToTable("inbox_items", "ehr", t =>
                         {
-                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn')");
+                            t.HasCheckConstraint("ck_inbox_items_form_alert_sensitive", "kind <> 'form-alert' OR sensitive");
+
+                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert')");
 
                             t.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
                         });
@@ -2240,6 +2426,9 @@ namespace Ehr.Migrations
                         .HasDatabaseName("ix_patient_assignments_patient_id_clinician_id")
                         .HasFilter("ended_at IS NULL");
 
+                    b.HasIndex(new[] { "PatientId", "ClinicianId" }, "History")
+                        .HasDatabaseName("ix_patient_assignments_history");
+
                     b.ToTable("patient_assignments", "ehr");
                 });
 
@@ -3173,6 +3362,88 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Forms.QuestionnaireRequest", b =>
+                {
+                    b.HasOne("Ehr.Data.Scheduling.Appointment", null)
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_requests_appointments_appointment_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_requests_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_requests_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Reference.Questionnaire", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionnaireCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_requests_questionnaires_questionnaire_code");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_requests_staff_users_requested_by");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Forms.QuestionnaireResponse", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.PatientUser", null)
+                        .WithMany()
+                        .HasForeignKey("AnsweredBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_responses_patient_users_answered_by");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_responses_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_responses_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Proxies.ProxyGrant", null)
+                        .WithMany()
+                        .HasForeignKey("ProxyGrantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_questionnaire_responses_proxy_grants_proxy_grant_id");
+
+                    b.HasOne("Ehr.Data.Reference.Questionnaire", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionnaireCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_responses_questionnaires_questionnaire_code");
+
+                    b.HasOne("Ehr.Data.Forms.QuestionnaireRequest", null)
+                        .WithOne()
+                        .HasForeignKey("Ehr.Data.Forms.QuestionnaireResponse", "RequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_questionnaire_responses_questionnaire_requests_request_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Inbox.InboxItem", b =>
