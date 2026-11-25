@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -23,7 +24,11 @@ public class FieldErrorTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("aria-invalid", asked);
         Assert.Matches("<span [^>]*id=\"Reason-error\"[^>]*></span>", asked);
 
-        Assert.Matches("<textarea [^>]*id=\"Reason\"[^>]*aria-invalid=\"true\"[^>]*aria-describedby=\"Reason-error\"", html);
+        // The field's own tag, whatever order its attributes come in. The message is added after any hint the page
+        // already names (FieldTagHelpers), so the reason's hint stays: "reason-hint Reason-error".
+        var field = Regex.Match(html, "<textarea [^>]*id=\"Reason\"[^>]*>").Value;
+        Assert.Contains("aria-invalid=\"true\"", field);
+        Assert.Matches("aria-describedby=\"(?:[^\"]+ )?Reason-error\"", field);
         Assert.Matches("<span [^>]*id=\"Reason-error\"[^>]*>Use at least 10 characters.</span>", html);
     }
 }
