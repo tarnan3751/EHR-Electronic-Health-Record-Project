@@ -1,4 +1,4 @@
-# UC 8 — Desktop sync
+# UC 8 — Sync the desktop app
 
 SwiftChart EHR · Sara Lelo · CS 3354 Software Engineering, Fall 2026
 

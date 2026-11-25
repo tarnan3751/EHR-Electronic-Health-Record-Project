@@ -17,7 +17,7 @@ namespace Ehr.Domain.Accounts;
 // then a token the app keeps and sends with every sync request; only its hash is stored. The account must have
 // finished its web setup first, since the authenticator is enrolled there, and must be a clinician: the desktop app
 // is for clinical work. A session ends when it expires, when the app signs out, or when the account's security stamp
-// changes, as at a password change. Every sign-in, refusal and sign-out goes in the audit log.
+// changes, as at a password change. Every sign-in, unlock, refusal and sign-out goes in the audit log.
 //
 // The token works for 12 hours after the sign-in that made it (SessionTimes.Longest), however busy, as a web sign-in
 // does (the expansion plan's step 19a): after that every request is refused, saying the sign-in has ended
@@ -98,6 +98,28 @@ public sealed class DesktopSessions(
         return new(session, user) { SignInEnded = session.CreatedAt + SessionTimes.Longest <= now };
     }
 
+    // The password the app's lock asks for (step 19a), checked for the account whose session it is, as the sign-in's
+    // password step checks it (StaffSignIn): a wrong one counts towards the account's lockout. The session was
+    // authenticated just before, so it is good and its account isn't locked out. Each unlock and each refusal is
+    // recorded, with the session's device.
+    public async Task<DesktopUnlockOutcome> UnlockAsync(Guid sessionId, string password, CancellationToken cancellationToken)
+    {
+        var session = await db.DesktopSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId, cancellationToken);
+        var user = (await users.FindByIdAsync(session.StaffUserId.ToString()))!;
+        if (!await users.CheckPasswordAsync(user, password))
+        {
+            await users.AccessFailedAsync(user);
+            audit.Record(AuditActions.SignInFailed, reason: "wrong password", actorId: user.Id, details: Details(session));
+            await db.SaveChangesAsync(cancellationToken);
+            return await users.IsLockedOutAsync(user) ? DesktopUnlockOutcome.LockedOut : DesktopUnlockOutcome.Refused;
+        }
+
+        await users.ResetAccessFailedCountAsync(user);
+        audit.Record(AuditActions.Unlock, actorId: user.Id, details: Details(session));
+        await db.SaveChangesAsync(cancellationToken);
+        return DesktopUnlockOutcome.Unlocked;
+    }
+
     // Ends the session, whoever holds the token. Nothing happens for a session that is over already.
     public async Task SignOutAsync(Guid sessionId, CancellationToken cancellationToken)
     {
@@ -136,7 +158,18 @@ public enum DesktopSignInOutcome
     NotAClinician,
 }
 
-// The outcome and, when signed in, the token the app keeps, until when it works, and whose it is.
+public enum DesktopUnlockOutcome
+{
+    Unlocked,
+
+    // A wrong password.
+    Refused,
+
+    // A wrong password, and the account is now locked out: its sessions are refused until the lockout ends.
+    LockedOut,
+}
+
+// The outcome and, when signed in, the token the app keeps, the session's 30-day end, and whose it is.
 public sealed record DesktopSignIn(DesktopSignInOutcome Outcome, string? Token = null, DateTimeOffset? ExpiresAt = null, string? DisplayName = null, Guid? ClinicianId = null);
 
 public sealed record DesktopSignedIn(DesktopSession Session, StaffUser User)

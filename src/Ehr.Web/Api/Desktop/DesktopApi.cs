@@ -20,6 +20,12 @@ namespace Ehr.Web.Api.Desktop;
 // its web setup or isn't a clinician. Each refusal says why. The token itself works for 12 hours: after that every
 // request with it gets a 401 saying the sign-in has ended (DesktopTokenHandler.SignInHeader), and the app signs in again.
 //
+// Unlock, POST /api/desktop/unlock with the token: the password the app's lock asks for (the expansion plan's step 19a),
+// for the token's own account; the request names none. 204 when it's right; 403 with the reason when it's wrong or the
+// account is now locked out, since the token itself was good (a 401 always means the token was refused). A wrong
+// password counts towards the account's lockout, as at sign-in, and is rate-limited with the sign-ins
+// (AccountRateLimits).
+//
 // Sign-out, POST /api/desktop/sign-out with the token: 204, and the token never works again.
 public static class DesktopApi
 {
@@ -27,6 +33,7 @@ public static class DesktopApi
     {
         var desktop = endpoints.MapGroup("/api/desktop").RequireAuthorization(EhrPolicies.Desktop);
         desktop.MapPost("/sign-in", SignInAsync).AllowAnonymous();
+        desktop.MapPost("/unlock", UnlockAsync);
         desktop.MapPost("/sign-out", SignOutAsync);
         desktop.MapPost("/offline-panel", OfflinePanelAsync);
         desktop.MapDraftSync();
@@ -104,6 +111,24 @@ public static class DesktopApi
 
     // A vital sign as the desktop app's contract carries it: a whole number.
     static short? Whole(decimal? value) => value is { } v ? (short)Math.Round(v) : null;
+
+    static async Task<IResult> UnlockAsync(UnlockRequest request, ClaimsPrincipal user, DesktopSessions sessions, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(request.Password))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["Enter the password."] });
+        }
+
+        // The policy has just authenticated the token, so its session is in the principal.
+        var outcome = await sessions.UnlockAsync(Guid.Parse(user.FindFirstValue(DesktopTokenHandler.SessionClaim)!), request.Password, cancellationToken);
+        return outcome switch
+        {
+            DesktopUnlockOutcome.Unlocked => Results.NoContent(),
+            DesktopUnlockOutcome.LockedOut => Results.Json(
+                new Refusal("This account is locked after too many failed attempts. Try again in 15 minutes."), statusCode: StatusCodes.Status403Forbidden),
+            _ => Results.Json(new Refusal("Wrong password."), statusCode: StatusCodes.Status403Forbidden),
+        };
+    }
 
     static async Task<IResult> SignOutAsync(ClaimsPrincipal user, DesktopSessions sessions, CancellationToken cancellationToken)
     {
