@@ -110,7 +110,7 @@ On the cloud server, the monitoring profile as the stack runs it (`infra/compose
 - `blackbox.yml`: every probe verifies against the stack's root (`ca_file: /certs/rootCA.pem`), and the off-site and portal probes name the stack's sites (`server_name`). On real sites remove both, so the system's roots verify the sites' certificates and each probe asks for the name in its address; left as they are, every site's probe fails and `SiteDown` fires from the first start.
 - `postgres-exporter`: the clinic's primary at its Tailscale name, verified against the clinic's database certificate authority.
 - `node-exporter` on each server reads the host's filesystems (the host's root mounted read-only, `--path.rootfs`), not the container's.
-- Prometheus and Alertmanager publish on the cloud server's 127.0.0.1 only. An administrator reaches them through SSH: `ssh -L 9090:127.0.0.1:9090 -L 9093:127.0.0.1:9093 <cloud server>`.
+- Prometheus and Alertmanager publish on the cloud server's 127.0.0.1 only. An administrator reaches them through SSH: `ssh -L 9090:127.0.0.1:9090 -L 9093:127.0.0.1:9093 <cloud server>`. Their `--web.external-url`, as in the stack, is those tunnelled addresses, so the links in an alert email open through the tunnel.
 - Alertmanager sends through the outside mail relay: `alertmanager.example.yml`, beside this file.
 
 ## Mail

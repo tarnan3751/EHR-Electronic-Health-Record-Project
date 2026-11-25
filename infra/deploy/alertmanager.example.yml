@@ -11,9 +11,11 @@ global:
   smtp_auth_password_file: /etc/alertmanager/relay-password
   smtp_require_tls: true
 
+# One email for each alert and each thing it is about (a site, an exporter), so a second site failing while the first
+# is already alerted is emailed after group_wait, not held for the first one's group_interval.
 route:
   receiver: administrators
-  group_by: [alertname]
+  group_by: [alertname, instance]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h

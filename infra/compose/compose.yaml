@@ -383,6 +383,8 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=15d
       - --storage.tsdb.retention.size=1GB
+      # Where its pages are reached, for the links in alert emails.
+      - --web.external-url=http://127.0.0.1:${PROMETHEUS_PORT:-9090}
     volumes:
       - ../monitoring:/etc/prometheus:ro
       - prometheus:/prometheus
@@ -397,6 +399,8 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+      # Where its pages are reached, for the links in its emails.
+      - --web.external-url=http://127.0.0.1:${ALERTMANAGER_PORT:-9093}
     volumes:
       - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager:/alertmanager
