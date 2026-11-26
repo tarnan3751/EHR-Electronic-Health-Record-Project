@@ -1,0 +1,19 @@
+@page "/not-found"
+@model NotFoundModel
+@{
+    ViewData["Title"] = "Page not found";
+}
+<h1>Page not found</h1>
+<p>There's nothing to show at this address.</p>
+@if (User.Identity?.IsAuthenticated != true)
+{
+    <p><a asp-page="SignIn">Sign in</a></p>
+}
+else if (User.IsInRole(StaffRoles.Clinician))
+{
+    <p><a asp-area="Clinical" asp-page="/Patients/Index">Back to my patients</a></p>
+}
+else
+{
+    <p><a href="/">Back to the start</a></p>
+}

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
@@ -53,6 +54,10 @@ public sealed class PatientSignIn(
             audit.Record(AuditActions.SignOut, patientId: patientId, actorId: id);
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        // Signing out only tells the browser to drop the cookie; the account read from it is still this request's. The
+        // rest of the request, the page that says "Signed out" included, is no longer signed in.
+        context.User = new ClaimsPrincipal(new ClaimsIdentity());
     }
 
     async Task RecordAsync(string action, PatientUser user, string? reason, CancellationToken cancellationToken)

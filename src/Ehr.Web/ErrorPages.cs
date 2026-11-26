@@ -1,4 +1,6 @@
 using Ehr.Domain.Accounts;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Ehr.Web;
 
@@ -6,8 +8,10 @@ namespace Ehr.Web;
 // loaded, or, for a form that changes something, the change may not have been saved, each with a way back (UC 3,
 // UC 4). A database error is the usual cause, often before the page's handler runs,
 // when its transaction can't start (DatabaseTransactionFilter), which is why this is middleware rather than part of the
-// pages. A chart that doesn't exist, a 404 from ChartModel or ReasonModel, says so too. The pages are fixed text: nothing
-// about the failure, the request or the patient goes on them, and the exception is logged, as any unhandled one is.
+// pages. A chart that doesn't exist, a 404 from ChartModel or ReasonModel, says so too; any other page at an address
+// with nothing there gets the site's not-found page, in the site's layout; and a form refused before its
+// handler ran, a 400, says it wasn't sent. The pages are fixed text: nothing about the failure, the request or the
+// patient goes on them, and the exception is logged, as any unhandled one is.
 //
 // Only a browser's page requests get these. The APIs keep their bare statuses, which the desktop app and the cloud app's
 // audit shipper read, and so does an htmx request, which request-errors.js answers; the FHIR API answers with its own
@@ -25,9 +29,20 @@ public static class ErrorPages
             }
 
             pages.UseStatusCodePages(context =>
-                context.HttpContext.Response.StatusCode == StatusCodes.Status404NotFound && IsChart(context.HttpContext.Request.Path)
-                    ? WritePageAsync(context.HttpContext, "Chart not loaded", "The chart couldn't be loaded: there is no patient with this ID.", "/patients", "Back to my patients")
-                    : Task.CompletedTask);
+            {
+                var request = context.HttpContext.Request;
+                var opened = HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method);
+                return context.HttpContext.Response.StatusCode switch
+                {
+                    StatusCodes.Status404NotFound when IsChart(request.Path) =>
+                        WritePageAsync(context.HttpContext, "Chart not loaded", "The chart couldn't be loaded: there is no patient with this ID.", "/patients", "Back to my patients"),
+                    StatusCodes.Status404NotFound => ShowNotFoundAsync(context),
+                    // A form refused before its handler ran, most often because its token was made for whoever was signed
+                    // in when the page was opened, and someone else has signed in or out in this browser since.
+                    StatusCodes.Status400BadRequest when !opened => WriteNotSentAsync(context.HttpContext),
+                    _ => Task.CompletedTask,
+                };
+            });
         });
 
     static bool IsPageRequest(HttpContext context) =>
@@ -37,11 +52,49 @@ public static class ErrorPages
     // A chart, or the reason it asks for: /patients/{id}, /patients/{id}/reason.
     static bool IsChart(PathString path) => path.StartsWithSegments("/patients", out var rest) && rest.Value is { Length: > 1 };
 
+    // An address with nothing there, or a page whose handler found nothing for this account, which looks the same: the
+    // site's own not-found page (Account/NotFound, in each area), in its layout. The address's own policy has run by
+    // now (with nothing there, the fallback's: someone not signed in was sent to sign in instead). The rest of the
+    // pipeline runs again with that page as the endpoint and the address unchanged, so the cookie read is the address's
+    // site's, the person is shown signed in as they were, and the 404 stays. The page runs as a GET (a HEAD stays one),
+    // so a form post that found nothing gets the same page as a link that did, and its token isn't checked again.
+    static async Task ShowNotFoundAsync(StatusCodeContext status)
+    {
+        var context = status.HttpContext;
+        var area = context.Request.Path.StartsWithSegments(AccountSchemes.PortalPath) ? "Portal" : "Clinical";
+        context.SetEndpoint(context.RequestServices.GetRequiredService<EndpointDataSource>().Endpoints.Single(endpoint =>
+            endpoint.Metadata.GetMetadata<PageActionDescriptor>() is { ViewEnginePath: NotFoundPage } page && page.AreaName == area));
+        context.Request.RouteValues = new RouteValueDictionary { ["area"] = area, ["page"] = NotFoundPage };
+        var method = context.Request.Method;
+        context.Request.Method = HttpMethods.IsHead(method) ? method : HttpMethods.Get;
+        try
+        {
+            await status.Next(context);
+        }
+        finally
+        {
+            context.Request.Method = method;
+        }
+    }
+
+    const string NotFoundPage = "/Account/NotFound";
+
+    // Where a page that failed leads back to: the portal's home, the clinician's patients, or the clinic's start.
+    static (string Link, string Text) Home(PathString path) =>
+        path.StartsWithSegments("/portal") ? ("/portal", "Back to the start")
+        : path.StartsWithSegments("/patients") ? ("/patients", "Back to my patients")
+        : ("/", "Back to the start");
+
+    static Task WriteNotSentAsync(HttpContext context)
+    {
+        var (home, homeText) = Home(context.Request.Path);
+        return WritePageAsync(context, "Not sent", "This form couldn't be sent, so nothing was changed. Open its page again and try once more.", home, homeText);
+    }
+
     static Task WriteFailureAsync(HttpContext context)
     {
         var path = context.Request.Path;
-        var home = path.StartsWithSegments("/portal") ? "/portal" : path.StartsWithSegments("/patients") ? "/patients" : "/";
-        var homeText = home == "/patients" ? "Back to my patients" : "Back to the start";
+        var (home, homeText) = Home(path);
         // A change that failed may still have been saved: its transaction can commit before something after it fails,
         // such as the on-prem app reading its WAL position for the cloud app (DatabaseTransactionFilter).
         if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))

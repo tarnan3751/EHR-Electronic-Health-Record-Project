@@ -17,7 +17,7 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Inbox/Index">Back to the inbox</a> · <a asp-page="Audit" asp-route-flagged="true">Emergency access in the audit log</a></p>
 </div>
-<h1>Emergency access @if (review is null) { <span class="sc-tag sc-tag--danger">Review</span> } else { <span class="sc-tag">Reviewed</span> }</h1>
+<h1>Emergency access @if (review is null) {<span class="sc-tag sc-tag--danger">Review</span>} else {<span class="sc-tag">Reviewed</span>}</h1>
 <p class="sc-lede">Check that the chart was needed. The patient is shown by ID: an administrator has no access to patient data, and nothing from the record is shown here.</p>
 @if (Model.Reviewed && review is not null)
 {

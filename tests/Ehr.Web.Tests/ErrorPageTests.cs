@@ -11,8 +11,8 @@ using static Ehr.Web.Tests.Browser;
 namespace Ehr.Web.Tests;
 
 // When a page fails (ErrorPages): the search and the chart say so in fixed words with a way back, and nothing about the
-// failure or the patient; the APIs and htmx requests keep their bare statuses; in Development the developer exception
-// page stays. A database error is made by revoking a privilege from the app's role. Only this class's own database sees
+// failure or the patient, as does a form refused for its token; the APIs and htmx requests keep their bare statuses; in
+// Development the developer exception page stays. A database error is made by revoking a privilege from the app's role. Only this class's own database sees
 // that: a class fixture is the class's alone, xunit runs a class's tests one at a time, and each test grants the
 // privilege back before it ends.
 public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
@@ -99,6 +99,36 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Contains("The chart couldn't be loaded: there is no patient with this ID.", html);
         Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+    }
+
+    // A form opened while one account was signed in and sent after another signed in, in this browser: its token is
+    // refused before the handler runs, and the page says so with a way back, rather than nothing. htmx's refusal stays
+    // bare, for request-errors.js.
+    [Fact]
+    public async Task A_form_sent_after_someone_else_signed_in_says_it_was_not_sent()
+    {
+        var first = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Dr. First Tab", StaffRoles.Clinician));
+        var token = Token(await first.Client.GetStringAsync(QuickTexts, Cancel));
+        var second = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Dr. Second Tab", StaffRoles.Clinician));
+        var shortcut = WebApps.NewShortcut();
+
+        using var refused = await second.Client.PostAsync($"{QuickTexts}?handler=Add", Form(("Shortcut", shortcut), ("Body", "Text"), ("__RequestVerificationToken", token)), Cancel);
+
+        var html = await refused.Content.ReadAsStringAsync(Cancel);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Contains("<title>Not sent</title>", html);
+        Assert.Contains("This form couldn't be sent, so nothing was changed. Open its page again and try once more.", html);
+        Assert.Contains("<a href=\"/\">Back to the start</a>", html);
+        Assert.Empty(await apps.RowsAsync(shortcut));
+
+        using var htmx = new HttpRequestMessage(HttpMethod.Post, $"{QuickTexts}?handler=Add")
+        {
+            Content = Form(("Shortcut", shortcut), ("Body", "Text"), ("__RequestVerificationToken", token)),
+        };
+        htmx.Headers.Add("HX-Request", "true");
+        using var bare = await second.Client.SendAsync(htmx, Cancel);
+        Assert.Equal(HttpStatusCode.BadRequest, bare.StatusCode);
+        Assert.Equal("", await bare.Content.ReadAsStringAsync(Cancel));
     }
 
     [Fact]

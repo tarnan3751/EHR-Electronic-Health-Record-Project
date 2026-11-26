@@ -74,4 +74,35 @@ public class LayoutTests(WebApps apps) : IClassFixture<WebApps>
             Assert.DoesNotContain("data-session-warning", signedOut);
         }
     }
+
+    // The page a sign-out answers with is the first page of nobody signed in: no app bar with the account and its sign-out
+    // button, and no session script left asking the server about a session that has ended. Off-site too, where the cloud
+    // app signs out itself.
+    [Theory]
+    [InlineData("on-site")]
+    [InlineData("off-site")]
+    public async Task The_signed_out_page_is_the_signed_out_layout(string site)
+    {
+        var app = site == "on-site" ? apps.OnPrem : apps.Cloud;
+        var clinician = await apps.CreateStaffAsync("Dr. Layout Leaving", Ehr.Data.Accounts.StaffRoles.Clinician);
+        var session = await SignInAsync(app, clinician);
+        var (portal, _) = await PortalResultsTests.SignInPatientAsync(apps, app, await apps.InsertPatientAsync("Synthetic", "Layoutleaving"));
+
+        using var staffSignedOut = await PostFormAsync(session.Client, "/sign-out", "/");
+        using var portalSignedOut = await PostFormAsync(portal, "/portal/sign-out", "/portal");
+
+        foreach (var (signedOut, signIn) in new[] { (staffSignedOut, "/sign-in"), (portalSignedOut, "/portal/sign-in") })
+        {
+            var html = await ReadAsync(signedOut);
+            Assert.Contains("<h1>Signed out</h1>", html);
+            Assert.Contains($"<a href=\"{signIn}\">Sign in again</a>", html);
+            Assert.DoesNotContain("sc-appbar", html);
+            Assert.DoesNotContain("/js/session.", html);
+            Assert.DoesNotContain("data-session-warning", html);
+        }
+
+        Assert.DoesNotContain("Dr. Layout Leaving", await staffSignedOut.Content.ReadAsStringAsync(Cancel));
+        // The account's email, which the portal's app bar shows (WebApps.NewEmail).
+        Assert.DoesNotContain("@example.test", await portalSignedOut.Content.ReadAsStringAsync(Cancel));
+    }
 }
