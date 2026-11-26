@@ -92,7 +92,8 @@ builder.Services.AddSingleton(site != Site.OnPrem
                 $"Set {CodeHasher.Setting} to a secret of at least {CodeHasher.MinimumKeyLength} characters. The app won't start without it: "
                 + "portal enrollment codes are stored as a hash keyed with it.")));
 
-// The anonymous account POSTs are limited per client address, and account emails per recipient (AccountRateLimits).
+// The account POSTs (the sign-ins, the portal's account forms, the desktop app's unlock and the staff passkeys page's)
+// are limited per client address, and account emails per recipient (AccountRateLimits).
 var rateLimits = builder.Configuration.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>() ?? new RateLimitOptions();
 builder.Services.AddAccountRateLimits(rateLimits,
     site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 } sharedKey ? AccountRateLimits.ForwardedProof(sharedKey) : null);

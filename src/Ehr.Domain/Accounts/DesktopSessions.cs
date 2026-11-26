@@ -6,8 +6,10 @@ using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Domain.Audit;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Ehr.Domain.Accounts;
 
@@ -15,10 +17,20 @@ namespace Ehr.Domain.Accounts;
 // then a token the app keeps and sends with every sync request; only its hash is stored. The account must have
 // finished its web setup first, since the authenticator is enrolled there, and must be a clinician: the desktop app
 // is for clinical work. A session ends when it expires, when the app signs out, or when the account's security stamp
-// changes, as at a password change. Every sign-in, refusal and sign-out goes in the audit log.
-public sealed class DesktopSessions(UserManager<StaffUser> users, StaffSignIn signIn, EhrDbContext db, AuditRecorder audit)
+// changes, as at a password change. Every sign-in, unlock, refusal and sign-out goes in the audit log.
+//
+// The token works for 12 hours after the sign-in that made it (SessionTimes.Longest), however busy, as a web sign-in
+// does (the expansion plan's step 19a): after that every request is refused, saying the sign-in has ended
+// (DesktopTokenHandler), and the app asks for both factors again. Lifetime is how long the app may open its offline
+// copy without a sign-in (the sign-in's OfflineAccess); revoking a session is unchanged. The clock is the Desktop
+// scheme's (its options' TimeProvider), which tests move on.
+public sealed class DesktopSessions(
+    UserManager<StaffUser> users, StaffSignIn signIn, EhrDbContext db, AuditRecorder audit,
+    IOptionsMonitor<AuthenticationSchemeOptions> schemes)
 {
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
+
+    DateTimeOffset Now => (schemes.Get(AccountSchemes.Desktop).TimeProvider ?? TimeProvider.System).GetUtcNow();
 
     public async Task<DesktopSignIn> SignInAsync(string email, string password, string code, string device, CancellationToken cancellationToken)
     {
@@ -45,7 +57,7 @@ public sealed class DesktopSessions(UserManager<StaffUser> users, StaffSignIn si
         }
 
         var token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
-        var now = DateTimeOffset.UtcNow;
+        var now = Now;
         var session = new DesktopSession
         {
             Id = Guid.CreateVersion7(),
@@ -63,11 +75,13 @@ public sealed class DesktopSessions(UserManager<StaffUser> users, StaffSignIn si
     }
 
     // The session behind a token and its account, or null when the session is over: no such token, expired, signed
-    // out, the account locked out or disabled, or its security stamp changed. Reads only, so the cloud app can do it.
+    // out, the account locked out or disabled, or its security stamp changed. A session good but for its sign-in being
+    // 12 hours old comes back with SignInEnded, and is good for nothing but saying so. Reads only, so the cloud app can
+    // do it.
     public async Task<DesktopSignedIn?> AuthenticateAsync(string token, CancellationToken cancellationToken)
     {
         var hash = Hash(token);
-        var now = DateTimeOffset.UtcNow;
+        var now = Now;
         var session = await db.DesktopSessions.AsNoTracking()
             .SingleOrDefaultAsync(s => s.TokenHash == hash && s.RevokedAt == null && s.ExpiresAt > now, cancellationToken);
         if (session is null)
@@ -81,7 +95,29 @@ public sealed class DesktopSessions(UserManager<StaffUser> users, StaffSignIn si
             return null;
         }
 
-        return new(session, user);
+        return new(session, user) { SignInEnded = session.CreatedAt + SessionTimes.Longest <= now };
+    }
+
+    // The password the app's lock asks for (step 19a), checked for the account whose session it is, as the sign-in's
+    // password step checks it (StaffSignIn): a wrong one counts towards the account's lockout. The session was
+    // authenticated just before, so it is good and its account isn't locked out. Each unlock and each refusal is
+    // recorded, with the session's device.
+    public async Task<DesktopUnlockOutcome> UnlockAsync(Guid sessionId, string password, CancellationToken cancellationToken)
+    {
+        var session = await db.DesktopSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId, cancellationToken);
+        var user = (await users.FindByIdAsync(session.StaffUserId.ToString()))!;
+        if (!await users.CheckPasswordAsync(user, password))
+        {
+            await users.AccessFailedAsync(user);
+            audit.Record(AuditActions.SignInFailed, reason: "wrong password", actorId: user.Id, details: Details(session));
+            await db.SaveChangesAsync(cancellationToken);
+            return await users.IsLockedOutAsync(user) ? DesktopUnlockOutcome.LockedOut : DesktopUnlockOutcome.Refused;
+        }
+
+        await users.ResetAccessFailedCountAsync(user);
+        audit.Record(AuditActions.Unlock, actorId: user.Id, details: Details(session));
+        await db.SaveChangesAsync(cancellationToken);
+        return DesktopUnlockOutcome.Unlocked;
     }
 
     // Ends the session, whoever holds the token. Nothing happens for a session that is over already.
@@ -94,7 +130,7 @@ public sealed class DesktopSessions(UserManager<StaffUser> users, StaffSignIn si
             return;
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = Now;
         await db.DesktopSessions.Where(s => s.Id == session.Id)
             .ExecuteUpdateAsync(set => set.SetProperty(s => s.RevokedAt, now), cancellationToken);
         audit.Record(AuditActions.SignOut, actorId: session.StaffUserId, details: Details(session));
@@ -122,7 +158,22 @@ public enum DesktopSignInOutcome
     NotAClinician,
 }
 
-// The outcome and, when signed in, the token the app keeps, until when it works, and whose it is.
+public enum DesktopUnlockOutcome
+{
+    Unlocked,
+
+    // A wrong password.
+    Refused,
+
+    // A wrong password, and the account is now locked out: its sessions are refused until the lockout ends.
+    LockedOut,
+}
+
+// The outcome and, when signed in, the token the app keeps, the session's 30-day end, and whose it is.
 public sealed record DesktopSignIn(DesktopSignInOutcome Outcome, string? Token = null, DateTimeOffset? ExpiresAt = null, string? DisplayName = null, Guid? ClinicianId = null);
 
-public sealed record DesktopSignedIn(DesktopSession Session, StaffUser User);
+public sealed record DesktopSignedIn(DesktopSession Session, StaffUser User)
+{
+    // The sign-in that made the session is SessionTimes.Longest old or more: the token is refused, saying so.
+    public bool SignInEnded { get; init; }
+}

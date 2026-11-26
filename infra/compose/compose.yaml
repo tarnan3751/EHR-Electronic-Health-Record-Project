@@ -54,6 +54,9 @@ services:
       REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:?set it in infra/compose/.env}
       BARMAN_PASSWORD: ${BARMAN_PASSWORD:?set it in infra/compose/.env}
       EHR_OWNER_PASSWORD: ${EHR_OWNER_PASSWORD:?set it in infra/compose/.env}
+      # Optional: the monitor role's password, for the monitoring profile (initdb/10-infra-roles.sh). Without it the role
+      # can't log in.
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD:-}
     entrypoint: ["/bin/sh", "/tls/tls.sh", "docker-entrypoint.sh"]
     command:
       - postgres
@@ -308,6 +311,8 @@ services:
       BARMAN_PASSWORD: ${BARMAN_PASSWORD:?set it in infra/compose/.env}
     volumes:
       - barman:/var/lib/barman
+      # Whether barman check passes and when the last base backup began, for the monitoring profile (entrypoint.sh).
+      - barman-metrics:/var/lib/barman-metrics
       # The root its connections to the primary verify the certificate against (barman/onprem.conf).
       - ./certs:/certs:ro
     # No ports and no listening services: Barman only ever connects out, to the primary.
@@ -370,6 +375,115 @@ services:
       wan:
         condition: service_healthy
 
+  # ---- Monitoring (opt-in: --profile monitoring) ---------------------------------------------
+
+  # Prometheus, which watches the sites, the clinic as the cloud reaches it, the primary's replication slots, the disk
+  # and Barman (infra/monitoring/prometheus.yml), and raises the alerts in infra/monitoring/alerts.yml. Its pages, and
+  # Alertmanager's, are on 127.0.0.1 only; the exporters publish nothing. See "Monitoring" in the README.
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.16.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=1GB
+      # Where its pages are reached, for the links in alert emails.
+      - --web.external-url=http://127.0.0.1:${PROMETHEUS_PORT:-9090}
+    volumes:
+      - ../monitoring:/etc/prometheus:ro
+      - prometheus:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    networks: [monitoring]
+
+  # Emails every alert to the administrators through the mail catcher (infra/monitoring/alertmanager.yml).
+  alertmanager:
+    profiles: [monitoring]
+    image: prom/alertmanager:v0.35.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      # Where its pages are reached, for the links in its emails.
+      - --web.external-url=http://127.0.0.1:${ALERTMANAGER_PORT:-9093}
+    volumes:
+      - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager:/alertmanager
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    networks: [monitoring, onprem]
+
+  # Asks each site for its sign-in page over HTTPS, verified against the stack's root alone, from the clinic's network
+  # and the cloud's (infra/monitoring/blackbox.yml). Its image would run it as root; it doesn't need to be.
+  blackbox:
+    profiles: [monitoring]
+    image: prom/blackbox-exporter:v0.29.1
+    user: nobody
+    command: ["--config.file=/etc/blackbox/blackbox.yml"]
+    volumes:
+      - ../monitoring/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+      - ./certs/rootCA.pem:/certs/rootCA.pem:ro
+    networks: [monitoring, onprem, cloud]
+
+  # Reads the primary's replication slots as the monitor role, over TLS verified against the stack's root: that one
+  # collector on, every other off, so nothing reads a table or a statement's text. It refuses to start without
+  # MONITOR_PASSWORD, which is optional here for the same reason as llama's key.
+  postgres-exporter:
+    profiles: [monitoring]
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    entrypoint:
+      - /bin/sh
+      - -c
+      - '[ -n "$${DATA_SOURCE_PASS}" ] || { echo "Set MONITOR_PASSWORD in infra/compose/.env" >&2; exit 1; }; exec /bin/postgres_exporter "$$@"'
+      - postgres_exporter
+    command:
+      - --disable-default-metrics
+      - --collector.replication_slots
+      - --no-collector.buffercache_summary
+      - --no-collector.database
+      - --no-collector.database_wraparound
+      - --no-collector.locks
+      - --no-collector.long_running_transactions
+      - --no-collector.postmaster
+      - --no-collector.process_idle
+      - --no-collector.replication
+      - --no-collector.roles
+      - --no-collector.settings
+      - --no-collector.stat_activity
+      - --no-collector.stat_activity_autovacuum
+      - --no-collector.stat_archiver
+      - --no-collector.stat_bgwriter
+      - --no-collector.stat_checkpointer
+      - --no-collector.stat_database
+      - --no-collector.stat_progress_vacuum
+      - --no-collector.stat_replication
+      - --no-collector.stat_statements
+      - --no-collector.stat_user_tables
+      - --no-collector.stat_wal_receiver
+      - --no-collector.statio_user_indexes
+      - --no-collector.statio_user_tables
+      - --no-collector.wal
+      - --no-collector.xlog_location
+    environment:
+      DATA_SOURCE_URI: onprem-db:5432/postgres?sslmode=verify-full&sslrootcert=/certs/rootCA.pem
+      DATA_SOURCE_USER: monitor
+      DATA_SOURCE_PASS: ${MONITOR_PASSWORD:-}
+    volumes:
+      - ./certs/rootCA.pem:/certs/rootCA.pem:ro
+    networks: [monitoring, onprem]
+    depends_on:
+      onprem-db:
+        condition: service_healthy
+
+  # The host's disks, memory and processors, and Barman's state from the file its loop writes (barman-metrics).
+  node-exporter:
+    profiles: [monitoring]
+    image: prom/node-exporter:v1.12.1
+    command: ["--collector.textfile.directory=/textfile"]
+    volumes:
+      - barman-metrics:/textfile:ro
+    networks: [monitoring]
+
 networks:
   onprem:
   cloud:
@@ -377,9 +491,14 @@ networks:
   # No route out: the models can't reach the internet.
   inference:
     internal: true
+  # Prometheus and what it scrapes, apart from the sites' networks.
+  monitoring:
 
 volumes:
   onprem-db:
   cloud-db:
   cloud-audit:
   barman:
+  barman-metrics:
+  prometheus:
+  alertmanager:

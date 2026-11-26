@@ -14,7 +14,7 @@
 <body class="sc-app sc-app--clinician">
   <!-- The app bar (docs/brand: AppBar, ConnectionStatus): whether changes can reach the clinic's server is always in
        view at the top right, as a dot and the words, with "Sync now" beside it. -->
-  <header class="sc-appbar sc-appbar--clinician">
+  <header id="app-bar" class="sc-appbar sc-appbar--clinician">
     <div class="sc-appbar__brand">
       <img class="sc-appbar__logo" src="img/swiftchart-lockup-reversed.png" alt="SwiftChart" width="105" height="24">
     </div>
@@ -27,7 +27,7 @@
       </span>
     </div>
   </header>
-  <main class="sc-page">
+  <main id="page" class="sc-page">
     <h1>Quick text</h1>
     <p class="sc-lede">Shared phrases, each inserted by typing its shortcut. Changes are saved on this computer first, then sent.</p>
 
@@ -36,9 +36,20 @@
       <p id="sync-problem" class="sc-notice sc-notice--warning" hidden></p>
     </section>
 
+    <!-- The sign-in's 12 hours are over and the lock opened with the password alone, since no server could complete a
+         sign-in (the expansion plan's step 19a): a sign-in with both factors is needed as soon as one can. -->
+    <section id="sign-in-needed" aria-label="Sign in again" hidden>
+      <p id="sign-in-needed-text" class="sc-notice sc-notice--warning" role="status"></p>
+      <div class="sc-actions">
+        <button type="button" id="sign-in-now" class="sc-btn">Sign in now</button>
+      </div>
+    </section>
+
     <form id="sign-in" class="sc-form" hidden>
       <h2>Sign in to sync</h2>
       <p>With your clinic account, and the code from your authenticator app or one of your recovery codes.</p>
+      <!-- Why the kept sign-in was forgotten as the app started, when it was (src-tauri/src/main.rs, starting_lock). -->
+      <p id="sign-in-notice" class="sc-notice sc-notice--warning" hidden></p>
       <div class="sc-field">
         <label class="sc-field__label" for="sign-in-email">Email</label>
         <input class="sc-field__input" id="sign-in-email" name="email" type="email" autocomplete="username" required>
@@ -60,6 +71,8 @@
     <section id="offline-charts" hidden>
       <h2>Offline charts</h2>
       <p class="sc-lede">Download up to 25 assigned charts while connected. Drafts and audio wait here until they can sync.</p>
+      <!-- When the charts were last downloaded: nothing refreshes them but Download my charts (the expansion plan's step 19a). -->
+      <p id="charts-updated" class="sc-status"></p>
       <div class="sc-actions">
         <button type="button" id="download-panel" class="sc-btn">Download my charts</button>
       </div>
@@ -118,5 +131,54 @@
 
     <ul id="quick-texts" class="sc-quicktexts"></ul>
   </main>
+
+  <!-- The lock (the expansion plan's step 19a). While it's up the body has desktop-locked: the app bar and the page are
+       inert and out of sight (app.js, app.css), kept exactly as they were, and this fills the window. Its words are set
+       by app.js from what the Rust side says (src-tauri/src/lock.rs). -->
+  <div id="lock" class="desktop-lock" role="dialog" aria-modal="true" aria-labelledby="lock-title" hidden>
+    <form id="lock-form" class="sc-form desktop-lock__form">
+      <p class="sc-brandmark">
+        <img class="sc-art--color" src="img/swiftchart-mark.svg" alt="SwiftChart" width="56" height="48">
+        <img class="sc-art--reversed" src="img/swiftchart-mark-reversed.svg" alt="SwiftChart" width="56" height="48">
+      </p>
+      <h1 id="lock-title">Locked</h1>
+      <p id="lock-why" class="sc-notice sc-notice--info"></p>
+      <p id="lock-how"></p>
+      <p id="lock-charts" class="sc-status" hidden></p>
+      <div class="sc-field">
+        <label class="sc-field__label" for="lock-password">Password</label>
+        <input class="sc-field__input" id="lock-password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="sc-field" id="lock-code-field" hidden>
+        <label class="sc-field__label" for="lock-code">Code</label>
+        <input class="sc-field__input sc-field__input--mono" id="lock-code" name="code" autocomplete="one-time-code">
+      </div>
+      <p id="lock-problem" class="sc-notice sc-notice--danger" role="alert" hidden></p>
+      <div class="sc-actions">
+        <button id="lock-submit" class="sc-btn sc-btn--primary">Unlock</button>
+      </div>
+      <p class="sc-muted">Signed in as <span id="lock-account"></span>. Someone else? Signing out closes the offline charts on
+        this computer, and anything typed here and not saved is lost.</p>
+      <div class="sc-actions">
+        <button type="button" id="lock-sign-out" class="sc-btn sc-btn--quiet">Sign out</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- The warning 2 minutes before the window locks: the web's session warning (docs/brand: Dialog), in words for a
+       lock, which keeps everything and isn't a sign-out. Escape stays, as on the web. -->
+  <dialog id="lock-warning" class="sc-dialog" role="alertdialog" aria-labelledby="lock-warning-title" aria-describedby="lock-warning-text">
+    <h2 class="sc-dialog__title" id="lock-warning-title">This window will lock soon</h2>
+    <div id="lock-warning-text">
+      <p id="lock-warning-idle">Nothing has been done here for a while. To keep patients' information safe, this window locks in <span data-countdown>2:00</span> unless you stay.</p>
+      <p id="lock-warning-last" hidden>A sign-in lasts at most 12 hours, and yours ends in <span data-countdown>2:00</span>. Then this window locks, and opens again with your password and the code from your authenticator app.</p>
+      <p>What you've typed stays, and sync carries on while it's locked.</p>
+    </div>
+    <div class="sc-dialog__actions">
+      <button type="button" id="lock-stay" class="sc-btn sc-btn--primary">Stay unlocked</button>
+      <button type="button" id="lock-keep-working" class="sc-btn sc-btn--primary" hidden>Keep working</button>
+      <button type="button" id="lock-now" class="sc-btn">Lock now</button>
+    </div>
+  </dialog>
 </body>
 </html>
