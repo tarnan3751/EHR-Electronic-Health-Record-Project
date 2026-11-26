@@ -320,7 +320,10 @@
             own.sending = false;
         }
 
-        if (own === state && own.stopping && own.queue.length === 0 && own.recorder?.state === "inactive") {
+        // Finished once the recorder has said so (its stop event, after its last chunk), not when its state turns
+        // "inactive", which it does as stop() returns, before that chunk: an answer arriving between the two would stop
+        // the visit, the last chunk would be refused as too late, and the visit lost.
+        if (own === state && own.stopping && own.queue.length === 0 && own.stopped) {
             finishRecording();
         }
     }
