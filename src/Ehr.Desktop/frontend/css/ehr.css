@@ -525,13 +525,6 @@
         margin: 0;
     }
 
-    .sc-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-3);
-        align-items: center;
-    }
-
     /* Button. One primary per view; a link that does a button's job takes the same classes. */
     .sc-btn {
         display: inline-flex;
@@ -701,8 +694,7 @@
     }
 
     /* What a label adds about its field: "(required)", "(optional)". */
-    .sc-field > label > span,
-    .sc-field__optional {
+    .sc-field > label > span {
         font-weight: 400;
         color: var(--ink-muted);
     }
@@ -772,13 +764,11 @@
         display: none;
     }
 
-    .sc-field--portal .sc-field__input,
     .sc-app--portal .sc-field__input {
         min-height: var(--control-height-portal);
         font-size: 18px;
     }
 
-    .sc-field--portal > label,
     .sc-app--portal .sc-field > label {
         font-size: 16px;
         line-height: 24px;
@@ -1095,12 +1085,6 @@
         vertical-align: middle;
     }
 
-    .sc-tag--brand {
-        background: var(--accent-soft);
-        border-color: var(--accent-ink);
-        color: var(--accent-ink);
-    }
-
     .sc-tag--info {
         background: var(--info-soft);
         border-color: var(--info);
@@ -1281,8 +1265,7 @@
         line-height: 24px;
     }
 
-    .sc-panel > h3,
-    .sc-panel__subtitle {
+    .sc-panel > h3 {
         margin: var(--space-4) 0 var(--space-2);
         font-family: var(--font-sans);
         font-size: 14px;
@@ -1464,10 +1447,6 @@
 
     .sc-table__flag {
         margin-top: var(--space-1);
-    }
-
-    .sc-table__nowrap {
-        white-space: nowrap;
     }
 
     .sc-table tr.sc-table__flagged td {
@@ -1666,12 +1645,6 @@
         height: 8px;
         border-radius: var(--radius-full);
         background: var(--danger);
-    }
-
-    .sc-transcript__time {
-        font-family: var(--font-mono);
-        font-size: 13px;
-        font-weight: 500;
     }
 
     .sc-transcript__body {
