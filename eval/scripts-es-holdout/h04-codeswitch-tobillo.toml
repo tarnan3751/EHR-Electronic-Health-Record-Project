@@ -1,0 +1,57 @@
+id = "h04-codeswitch-tobillo"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "dates", "sides", "severity", "negation", "code-switching"]
+dates = []
+drugs = []
+drugs_en = []
+negated = ["edema"]
+affirmed = ["mild tenderness"]
+text = """
+Paciente de [[29|veintinueve]] años que viene por un check-up después de un esguince de tobillo izquierdo hace
+[[3|tres]] semanas. Dice que el swelling ya bajó pero todavía le duele al correr. No ha tomado nada para el dolor. En
+la exploración, tobillo izquierdo sin edema, con dolor leve a la palpación del ligamento lateral. Rango de movimiento
+completo. Impresión: esguince de tobillo izquierdo en resolución. Plan: ejercicios de rehabilitación en casa. Puede
+volver a correr de forma progresiva. Usar una tobillera para hacer deporte. Follow-up en [[4|cuatro]] semanas si
+persiste el dolor.
+"""
+
+[[gold.subjective]]
+spanish = ["Paciente de 29 años que viene por un check-up después de un esguince de tobillo izquierdo hace 3 semanas."]
+english = "29-year-old patient coming for a check-up after a left ankle sprain 3 weeks ago."
+
+[[gold.subjective]]
+spanish = ["Dice que el swelling ya bajó pero todavía le duele al correr."]
+english = "Says the swelling has gone down but it still hurts when running."
+
+[[gold.subjective]]
+spanish = ["No ha tomado nada para el dolor."]
+english = "Has not taken anything for the pain."
+
+[[gold.objective]]
+spanish = ["tobillo izquierdo sin edema, con dolor leve a la palpación del ligamento lateral."]
+english = "Left ankle without edema, with mild tenderness on palpation of the lateral ligament."
+
+[[gold.objective]]
+spanish = ["Rango de movimiento completo."]
+english = "Full range of motion."
+
+[[gold.assessment]]
+spanish = ["esguince de tobillo izquierdo en resolución."]
+english = "Left ankle sprain, resolving."
+
+[[gold.plan]]
+spanish = ["ejercicios de rehabilitación en casa."]
+english = "Home rehabilitation exercises."
+
+[[gold.plan]]
+spanish = ["Puede volver a correr de forma progresiva."]
+english = "May gradually return to running."
+
+[[gold.plan]]
+spanish = ["Usar una tobillera para hacer deporte."]
+english = "Use an ankle brace for sports."
+
+[[gold.plan]]
+spanish = ["Follow-up en 4 semanas si persiste el dolor."]
+english = "Follow-up in 4 weeks if the pain persists."

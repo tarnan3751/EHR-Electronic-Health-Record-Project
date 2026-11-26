@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): type 2 diabetes review on bexagliflozin, with an order to leave out. Format: eval/README.md.
 id = "d02-t2dm-bexagliflozin"
 voice = "am_michael"
-tags = ["numbers", "vitals", "drug-new", "negation", "self-correction", "order-attempt", "mixed-plan", "spoken-punctuation"]
+tags = ["numbers", "vitals", "drug-new", "negation", "self-correction", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
 dates = []
 drugs = ["metformin", "bexagliflozin", "semaglutide"]
 forbidden = ["I'm ordering a urine albumin to creatinine ratio"]
@@ -22,15 +22,20 @@ Reviewed hygiene to prevent yeast infections {period} Follow up in [[3 months|th
 [[A1c|A-one-C]] {period}
 """
 
-[gold.history]
-value = "54-year-old man with type 2 diabetes for about 8 years. A1c 8.4, down from 9.1 in the spring. Taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, started 3 months ago. One genital yeast infection since starting it, treated over the counter. No low blood sugars. No foot numbness. Weight 96 kg, down 2 kg."
+[gold.subjective]
+value = "54-year-old man with type 2 diabetes for about 8 years. Taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, started 3 months ago. One genital yeast infection since starting it, treated over the counter. No low blood sugars. No foot numbness."
 sources = [
     "54-year-old man with type 2 diabetes for about 8 years.",
-    "His A1c today is 8.4, down from 9.1 in the spring.",
     "He is taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, which he started 3 months ago.",
     "He has had one genital yeast infection since starting it, treated over the counter.",
     "No low blood sugars.",
     "No foot numbness.",
+]
+
+[gold.objective]
+value = "A1c 8.4, down from 9.1 in the spring. Weight 96 kg, down 2 kg."
+sources = [
+    "His A1c today is 8.4, down from 9.1 in the spring.",
     "Weight is 96 kg, down 2 kg.",
 ]
 
@@ -47,15 +52,20 @@ sources = [
     "Follow up in 3 months with a repeat A1c.",
 ]
 
-[gold_rules.history]
-value = "54-year-old man with type 2 diabetes for about 8 years. His A1c today is 8.4, down from 9.1 in the spring. He is taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, which he started 3 months ago. He has had one genital yeast infection since starting it, treated over the counter. No low blood sugars. No foot numbness. Weight is 96 kg, down 2 kg."
+[gold_rules.subjective]
+value = "54-year-old man with type 2 diabetes for about 8 years. He is taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, which he started 3 months ago. He has had one genital yeast infection since starting it, treated over the counter. No low blood sugars. No foot numbness."
 sources = [
     "54-year-old man with type 2 diabetes for about 8 years.",
-    "His A1c today is 8.4, down from 9.1 in the spring.",
     "He is taking metformin 1000 mg twice a day and bexagliflozin 20 mg daily, which he started 3 months ago.",
     "He has had one genital yeast infection since starting it, treated over the counter.",
     "No low blood sugars.",
     "No foot numbness.",
+]
+
+[gold_rules.objective]
+value = "His A1c today is 8.4, down from 9.1 in the spring. Weight is 96 kg, down 2 kg."
+sources = [
+    "His A1c today is 8.4, down from 9.1 in the spring.",
     "Weight is 96 kg, down 2 kg.",
 ]
 
@@ -67,3 +77,7 @@ sources = [
     "Reviewed hygiene to prevent yeast infections.",
     "Follow up in 3 months with a repeat A1c.",
 ]
+
+[[not_proposed]]
+words = "I'm ordering a urine albumin to creatinine ratio"
+why = "not_plain"

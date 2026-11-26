@@ -1,0 +1,107 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "result",
+  "status": 200,
+  "body": {
+    "transcript": {
+      "text": "Tos seca desde hace 3 d\u00edas. Niega fiebre. Pido una radiograf\u00eda de t\u00f3rax.",
+      "final": true,
+      "segments": [
+        {
+          "start": 0,
+          "end": 72,
+          "startMs": 0,
+          "endMs": 4000,
+          "final": true,
+          "unclear": null
+        }
+      ]
+    },
+    "sorting": "done",
+    "reason": null,
+    "fields": {
+      "subjective": {
+        "status": "pending",
+        "value": "Dry cough for 3 days. Denies fever.",
+        "sources": [
+          {
+            "start": 0,
+            "end": 26
+          },
+          {
+            "start": 28,
+            "end": 40
+          }
+        ],
+        "statements": [
+          {
+            "start": 0,
+            "end": 21,
+            "sources": [
+              {
+                "start": 0,
+                "end": 26
+              }
+            ]
+          },
+          {
+            "start": 22,
+            "end": 35,
+            "sources": [
+              {
+                "start": 28,
+                "end": 40
+              }
+            ]
+          }
+        ],
+        "warnings": []
+      },
+      "objective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "assessment": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "plan": {
+        "status": "empty",
+        "reasons": [
+          "order_or_allergy_change"
+        ]
+      }
+    },
+    "notCarriedOver": [
+      {
+        "reason": "order",
+        "start": 42,
+        "end": 71
+      }
+    ],
+    "proposals": [],
+    "provenance": {
+      "speech": {
+        "repository": "openai/whisper-large-v3-turbo",
+        "commit": "41f01f3fe87f28c78e2fbf8b568835947dd65ed9",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "language": {
+        "repository": "IFM/K2-Horizon-7B-GGUF",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "K2-Horizon-7B-Q4_K_M.gguf",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "llamaServer": "b11669-620d2225",
+      "prompt": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "schema": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "structuring": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "code": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "spokenLanguage": "es"
+  }
+}

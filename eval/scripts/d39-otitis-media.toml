@@ -13,7 +13,11 @@ infection before the spring we will refer him to the ear nose and throat team to
 to nursery when the fever settles and he is eating normally again
 """
 
-[gold.history]
+[gold.subjective]
+value = ""
+sources = []
+
+[gold.objective]
 value = ""
 sources = []
 

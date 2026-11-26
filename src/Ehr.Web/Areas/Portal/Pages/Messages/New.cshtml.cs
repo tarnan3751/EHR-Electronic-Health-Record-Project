@@ -39,8 +39,8 @@ public class NewModel(PortalSubject subject, SecureMessages messages) : PageMode
 
     // The results page posts the subject here, so it stays out of the address. Nothing is saved: the form comes back
     // with the subject filled in, for the patient to write the message and send it. The subject is the patient's to
-    // change, like any they type, and is cut to the length a subject may have.
-    // A proxy whose grant doesn't include messages is sent to the page that says so, as from the form itself.
+    // change, like any they type, and is cut to the length a subject may have. A proxy whose grant doesn't include
+    // messages (FR-19) is sent to the page that says so, as from the form itself.
     public IActionResult OnPostAbout()
     {
         Response.Headers.CacheControl = "no-store";

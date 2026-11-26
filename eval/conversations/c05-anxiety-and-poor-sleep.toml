@@ -1,0 +1,254 @@
+id = "c05-anxiety-and-poor-sleep"
+speakers = 2
+voices = { clinician = "hf_alpha", patient = "bm_lewis" }
+tags = ["small-talk", "refill-request", "question-no", "negation", "numbers", "backchannel", "order-spoken"]
+noise = ["babble"]
+dates = []
+drugs = ["sertraline"]
+denied = ["panic attacks", "racing heart", "chest pain", "thoughts of harming yourself"]
+requests = ["Can you refill my sertraline"]
+forbidden = ["I'll sort that out before you go"]
+
+[[turns]]
+role = "clinician"
+text = "Good morning. Come in and have a seat. Did you get caught in that shower?"
+
+[[turns]]
+role = "patient"
+text = "Only the end of it. I keep a brolly in the car for exactly this reason."
+
+[[turns]]
+role = "clinician"
+text = "Very wise. So, it's been about [[3 months|three months]] since I last saw you. How have things been?"
+
+[[turns]]
+role = "patient"
+text = "The anxiety is a lot better, honestly. The sertraline has really helped with that. It's the sleep that's the problem now."
+
+[[turns]]
+role = "clinician"
+text = "Okay. Tell me about the sleep."
+
+[[turns]]
+role = "patient"
+text = "It takes me ages to drop off. I lie there going over everything from work. Then I wake up at about [[3|three]] in the morning, and I can't get back to sleep."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. How long has that been going on?"
+
+[[turns]]
+role = "patient"
+text = "About [[6 weeks|six weeks]] now. It started when we got a new manager at work, and everything changed."
+
+[[turns]]
+role = "clinician"
+text = "What's changed at work?"
+
+[[turns]]
+role = "patient"
+text = "Longer hours, mostly. I'm often answering emails at [[10|ten]] at night, and then my head's still buzzing when I go to bed."
+
+[[turns]]
+role = "clinician"
+text = "That would keep anyone awake. How many hours of sleep are you getting?"
+
+[[turns]]
+role = "patient"
+text = "Most nights I get [[4 or 5 hours|four or five hours]]. On a really good night, maybe [[6|six]]."
+gap = 0.8
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. Do you nap during the day?"
+
+[[turns]]
+role = "patient"
+text = "No, I don't nap. I'm too busy at work for that."
+
+[[turns]]
+role = "clinician"
+text = "What about coffee, tea, energy drinks?"
+
+[[turns]]
+role = "patient"
+text = "[[2|Two]] coffees in the morning, and that's it. I stopped drinking coffee after lunch a while ago."
+
+[[turns]]
+role = "clinician"
+text = "And alcohol?"
+
+[[turns]]
+role = "patient"
+text = "A glass of wine with dinner at the weekend. Not during the week."
+
+[[turns]]
+role = "clinician"
+text = "Do you use your phone when you're in bed?"
+
+[[turns]]
+role = "patient"
+text = "Guilty. I scroll the news until I feel tired, which is usually after midnight."
+gap = 1.0
+
+[[turns]]
+role = "clinician"
+text = "Okay. Are you having any panic attacks?"
+
+[[turns]]
+role = "patient"
+text = "No, not since the spring."
+
+[[turns]]
+role = "clinician"
+text = "Any racing heart or chest pain?"
+
+[[turns]]
+role = "patient"
+text = "No, nothing like that."
+overlap = 0.3
+
+[[turns]]
+role = "clinician"
+text = "How is your mood? Do you still enjoy things?"
+
+[[turns]]
+role = "patient"
+text = "My mood is fine. I still play football with my mates on Wednesdays, and I enjoy that."
+
+[[turns]]
+role = "clinician"
+text = "Are you still the goalkeeper?"
+
+[[turns]]
+role = "patient"
+text = "Still in goal. My knees prefer it, and I get to shout at everyone."
+overlap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Good. I ask everyone this. Have you had any thoughts of harming yourself?"
+
+[[turns]]
+role = "patient"
+text = "No. Never."
+gap = 0.4
+
+[[turns]]
+role = "clinician"
+text = "Thank you. And you're still taking the sertraline every morning?"
+
+[[turns]]
+role = "patient"
+text = "Every morning, [[50 mg|fifty milligrams]]. I haven't missed any."
+
+[[turns]]
+role = "clinician"
+text = "Good."
+
+[[turns]]
+role = "patient"
+text = "Oh, that reminds me. Can you refill my sertraline? I'm down to my last few tablets."
+
+[[turns]]
+role = "clinician"
+text = "Yes, of course. I'll sort that out before you go."
+
+[[turns]]
+role = "clinician"
+text = "I've got your questionnaire from the waiting room. Your anxiety score today is [[6|six]], down from [[14|fourteen]] at your last visit. Your blood pressure today is [[124/80|one twenty-four over eighty]]."
+gap = 1.5
+
+[[turns]]
+role = "clinician"
+text = "So, your anxiety is much better on the sertraline. The sleep problem started with the stress at work, and the late nights on your phone aren't helping."
+gap = 0.8
+
+[[turns]]
+role = "patient"
+text = "So do I need a sleeping tablet?"
+
+[[turns]]
+role = "clinician"
+text = "I don't want to start a sleeping tablet yet. They can be habit forming, and I think we can fix this another way. Your body clock likes a steady routine, and a bright screen late at night keeps your brain switched on."
+
+[[turns]]
+role = "patient"
+text = "Okay. What do you suggest?"
+
+[[turns]]
+role = "clinician"
+text = "Get up at the same time every day, even at the weekend. Put the phone away an hour before bed. If you can't sleep after [[20 minutes|twenty minutes]], get up and read somewhere else until you feel sleepy."
+
+[[turns]]
+role = "patient"
+text = "Mm-hm."
+
+[[turns]]
+role = "clinician"
+text = "Keep the coffee to the morning. Continue the sertraline [[50 mg|fifty milligrams]] every morning. Come back in [[4 weeks|four weeks]], and we'll see how the sleep is."
+
+[[turns]]
+role = "patient"
+text = "I'll give it a go. Right, I'd better get back before my manager notices I'm gone."
+
+[[turns]]
+role = "clinician"
+text = "Good luck with that. And enjoy the football on Wednesday."
+
+[[turns]]
+role = "patient"
+text = "Thanks. See you in [[4 weeks|four weeks]]."
+
+[gold.subjective]
+value = "The anxiety is a lot better. The sertraline has really helped with that. It's the sleep that's the problem now. It takes me ages to drop off. I lie there going over everything from work. Then I wake up at about 3 in the morning, and I can't get back to sleep. About 6 weeks now. It started when we got a new manager at work, and everything changed. Longer hours, mostly. I'm often answering emails at 10 at night, and then my head's still buzzing when I go to bed. Most nights I get 4 or 5 hours. On a really good night, maybe 6. I don't nap. 2 coffees in the morning, and that's it. I stopped drinking coffee after lunch a while ago. A glass of wine with dinner at the weekend. Not during the week. I scroll the news until I feel tired, which is usually after midnight. My mood is fine. I still play football with my mates on Wednesdays, and I enjoy that. Every morning, 50 mg. I haven't missed any."
+sources = [
+    "The anxiety is a lot better",
+    "The sertraline has really helped with that",
+    "It's the sleep that's the problem now",
+    "It takes me ages to drop off",
+    "I lie there going over everything from work",
+    "Then I wake up at about 3 in the morning, and I can't get back to sleep",
+    "About 6 weeks now",
+    "It started when we got a new manager at work, and everything changed",
+    "Longer hours, mostly",
+    "I'm often answering emails at 10 at night, and then my head's still buzzing when I go to bed",
+    "Most nights I get 4 or 5 hours",
+    "On a really good night, maybe 6",
+    "I don't nap",
+    "2 coffees in the morning, and that's it",
+    "I stopped drinking coffee after lunch a while ago",
+    "A glass of wine with dinner at the weekend",
+    "Not during the week",
+    "I scroll the news until I feel tired, which is usually after midnight",
+    "My mood is fine",
+    "I still play football with my mates on Wednesdays, and I enjoy that",
+    "Every morning, 50 mg",
+    "I haven't missed any",
+]
+
+[gold.objective]
+value = "Your anxiety score today is 6, down from 14 at your last visit. Your blood pressure today is 124/80."
+sources = [
+    "Your anxiety score today is 6, down from 14 at your last visit",
+    "Your blood pressure today is 124/80",
+]
+
+[gold.assessment]
+value = "Your anxiety is much better on the sertraline. The sleep problem started with the stress at work, and the late nights on your phone aren't helping."
+sources = [
+    "your anxiety is much better on the sertraline",
+    "The sleep problem started with the stress at work, and the late nights on your phone aren't helping",
+]
+
+[gold.plan]
+value = "I don't want to start a sleeping tablet yet. Get up at the same time every day, even at the weekend. Put the phone away an hour before bed. If you can't sleep after 20 minutes, get up and read somewhere else until you feel sleepy. Keep the coffee to the morning. Continue the sertraline 50 mg every morning. Come back in 4 weeks, and we'll see how the sleep is."
+sources = [
+    "I don't want to start a sleeping tablet yet",
+    "Get up at the same time every day, even at the weekend",
+    "Put the phone away an hour before bed",
+    "If you can't sleep after 20 minutes, get up and read somewhere else until you feel sleepy",
+    "Keep the coffee to the morning",
+    "Continue the sertraline 50 mg every morning",
+    "Come back in 4 weeks, and we'll see how the sleep is",
+]

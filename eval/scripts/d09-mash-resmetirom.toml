@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): hepatology clinic starting resmetirom for MASH, with an order to leave out. Format: eval/README.md.
 id = "d09-mash-resmetirom"
 voice = "af_heart"
-tags = ["long", "vitals", "numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
+tags = ["long", "vitals", "numbers", "drug-new", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
 dates = []
 drugs = ["metformin", "semaglutide", "lisinopril", "rosuvastatin", "resmetirom"]
 forbidden = ["order a hepatitis B surface antibody"]
@@ -31,17 +31,23 @@ in [[3 months|three months]] and elastography again in a year {period} Return to
 [[3 months|three months]] {period}
 """
 
-[gold.history]
-value = "58-year-old man referred with metabolic dysfunction associated steatohepatitis. Type 2 diabetes, high blood pressure and obesity. Liver biopsy in the summer: steatohepatitis with stage F2 fibrosis. Drinks alcohol rarely, about one beer a month. No jaundice, no confusion, no swelling of the abdomen, no bleeding. Medications: metformin, semaglutide 1 mg weekly, lisinopril, rosuvastatin 40 mg. Lost 7 kg since starting semaglutide. No gallbladder problems; thyroid function normal in the summer. Weight 104 kg, BMI 34, blood pressure 128/78. No stigmata of chronic liver disease; liver edge not palpable. ALT 64, AST 48, platelets 212, albumin 4.2. Liver stiffness 9.6 kPa on elastography."
+[gold.subjective]
+value = "58-year-old man referred with metabolic dysfunction associated steatohepatitis. Type 2 diabetes, high blood pressure and obesity. Drinks alcohol rarely, about one beer a month. No jaundice, no confusion, no swelling of the abdomen, no bleeding. Medications: metformin, semaglutide 1 mg weekly, lisinopril, rosuvastatin 40 mg. Lost 7 kg since starting semaglutide. No gallbladder problems."
 sources = [
     "this is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis.",
     "He has type 2 diabetes, high blood pressure and obesity.",
-    "A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis.",
     "He drinks alcohol rarely, maybe one beer a month.",
     "No jaundice, no confusion, no swelling of the abdomen and no bleeding.",
     "His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg.",
     "He has lost 7 kg since starting semaglutide.",
-    "No gallbladder problems, and his thyroid function was normal in the summer.",
+    "No gallbladder problems",
+]
+
+[gold.objective]
+value = "Liver biopsy in the summer: steatohepatitis with stage F2 fibrosis. Thyroid function normal in the summer. Weight 104 kg, BMI 34, blood pressure 128/78. No stigmata of chronic liver disease; liver edge not palpable. ALT 64, AST 48, platelets 212, albumin 4.2. Liver stiffness 9.6 kPa on elastography."
+sources = [
+    "A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis.",
+    "his thyroid function was normal in the summer.",
     "weight 104 kg, BMI 34, blood pressure 128/78.",
     "No stigmata of chronic liver disease.",
     "Liver edge not palpable.",
@@ -67,20 +73,30 @@ sources = [
     "Return to clinic in 3 months.",
 ]
 
-[gold_rules.history]
-value = "This is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis. He has type 2 diabetes, high blood pressure and obesity. A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis. He drinks alcohol rarely, maybe one beer a month. No jaundice, no confusion, no swelling of the abdomen and no bleeding. His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg. He has lost 7 kg since starting semaglutide. No gallbladder problems, and his thyroid function was normal in the summer. Weight 104 kg, BMI 34, blood pressure 128/78. No stigmata of chronic liver disease. Liver edge not palpable. Labs from last week show ALT 64, AST 48, platelets 212 and albumin 4.2. Elastography gave a liver stiffness of 9.6 kPa."
+[gold_rules.subjective]
+value = "This is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis. He has type 2 diabetes, high blood pressure and obesity. He drinks alcohol rarely, maybe one beer a month. No jaundice, no confusion, no swelling of the abdomen and no bleeding. His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg. He has lost 7 kg since starting semaglutide. No gallbladder problems."
 sources = [
     "this is a 58-year-old man referred with metabolic dysfunction associated steatohepatitis.",
     "He has type 2 diabetes, high blood pressure and obesity.",
-    "A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis.",
     "He drinks alcohol rarely, maybe one beer a month.",
     "No jaundice, no confusion, no swelling of the abdomen and no bleeding.",
     "His medications are metformin, semaglutide 1 mg weekly, lisinopril and rosuvastatin 40 mg.",
     "He has lost 7 kg since starting semaglutide.",
-    "No gallbladder problems, and his thyroid function was normal in the summer.",
+    "No gallbladder problems",
+]
+
+[gold_rules.objective]
+value = "A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis. His thyroid function was normal in the summer. Weight 104 kg, BMI 34, blood pressure 128/78. No stigmata of chronic liver disease. Liver edge not palpable. Labs from last week show ALT 64, AST 48, platelets 212 and albumin 4.2. Elastography gave a liver stiffness of 9.6 kPa."
+sources = [
+    "A liver biopsy in the summer showed steatohepatitis with stage F2 fibrosis.",
+    "his thyroid function was normal in the summer.",
     "weight 104 kg, BMI 34, blood pressure 128/78.",
     "No stigmata of chronic liver disease.",
     "Liver edge not palpable.",
     "Labs from last week show ALT 64, AST 48, platelets 212 and albumin 4.2.",
     "Elastography gave a liver stiffness of 9.6 kPa.",
 ]
+
+[[not_proposed]]
+words = "order a hepatitis B surface antibody"
+why = "names_no_item"

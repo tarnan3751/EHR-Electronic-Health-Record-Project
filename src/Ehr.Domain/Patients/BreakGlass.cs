@@ -7,10 +7,11 @@ using Microsoft.EntityFrameworkCore;
 namespace Ehr.Domain.Patients;
 
 // Emergency access. Every clinician may open every chart, but a chart off their panel asks for a reason first. The
-// reason is recorded twice in one transaction: as a break_glass audit event, which is what admins review, and as a
-// BreakGlassAccess row that lets this clinician back into the chart for Duration without asking again. This is the
-// app's gate, not the database's: row-level security lets clinicians read every patient, as the team decided, and the
-// audit log is the control. A patient on the clinician's panel never needs it (PatientAssignments).
+// reason is recorded twice in one transaction: as a break_glass audit event, and as a BreakGlassAccess row that lets
+// this clinician back into the chart for Duration without asking again, which the database puts in the administrators'
+// inboxes to review (db/policies/72-emergency-access-review.sql, step 18). This is the app's gate, not the database's:
+// row-level security lets clinicians read every patient, as the team decided, and the audit log is the control. A
+// patient on the clinician's panel never needs it (PatientAssignments).
 public sealed class BreakGlass(EhrDbContext db, UserContext user, AuditRecorder audit)
 {
     public static readonly TimeSpan Duration = TimeSpan.FromHours(4);

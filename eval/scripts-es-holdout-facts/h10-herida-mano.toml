@@ -1,0 +1,55 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Hombre de 38 años, cocinero, que se cortó la palma de la mano derecha con un cuchillo hace 2 horas."
+items = [{ of = "age", number = "38" }, { of = "hand", aka = ["palm"], side = "right", duration = "2 hours" }]
+
+# The hand he uses, not the hand he cut.
+[[facts]]
+said = "Es diestro."
+items = [{ of = "right-handed", aka = ["right handed"] }]
+
+[[facts]]
+said = "Última vacuna del tétanos en 2014."
+items = [{ of = "tetanus vaccine", aka = ["tetanus", "tetanus shot"], date = "2014" }]
+
+[[facts]]
+said = "Sin alergias conocidas."
+items = [{ of = "allergies", aka = ["known allergies"], negated = true }]
+
+[[facts]]
+said = "Herida limpia de 3 cm en la palma derecha, sin cuerpos extraños."
+items = [{ of = "wound", aka = ["laceration", "cut"], number = "3 cm" }, { of = "palm", side = "right" }, { of = "foreign bodies", aka = ["foreign body"], negated = true }]
+
+[[facts]]
+said = "Mueve bien todos los dedos y la sensibilidad es normal."
+items = [{ of = "sensation", polarity = "normal" }]
+
+[[facts]]
+said = "herida incisa de la palma derecha sin lesión tendinosa."
+items = [{ of = "palm", side = "right" }, { of = "tendon injury", aka = ["tendon involvement", "tendon damage"], negated = true }]
+
+[[facts]]
+said = "se lava con suero y se anestesia con lidocaína al 1 %."
+items = [{ of = "lidocaine", number = "1%" }]
+
+[[facts]]
+said = "Se cierra con 4 puntos."
+items = [{ of = "sutures", aka = ["stitches"], number = "4" }]
+
+[[facts]]
+said = "Refuerzo de la antitetánica hoy."
+items = [{ of = "tetanus booster", aka = ["tetanus", "tetanus vaccine"], date = "today" }]
+
+[[facts]]
+said = "Mantener la herida seca 48 horas."
+items = [{ of = "wound", duration = "48 hours" }]
+
+[[facts]]
+said = "No hacen falta antibióticos."
+items = [{ of = "antibiotics", negated = true }]
+
+[[facts]]
+said = "Retirar los puntos en 10 días."
+items = [{ of = "sutures", aka = ["stitches"], duration = "10 days" }]

@@ -18,10 +18,13 @@
 --   Update by the tables' owner: only the sensitivity, which ehr.follow_refill_medication keeps the medication's.
 --   Update by the apps: the one answer, once, by someone signed in, and nothing else moves. Its sensitivity is never
 --     theirs to change.
---     Approved, by naming the order signed for it: an active medication order of this patient, signed in this
---       transaction by the clinician answering, for the product that was asked for (the order's catalog item is the
---       RxNorm code the medication had when asked: another strength, form, salt or route is a new order, not a
---       renewal), which the chart's entry must still have: a clinician may change an entry's code
+--     Approved, by naming the order signed for it: an active medication order of this patient, signed now by the
+--       clinician answering (signed_at >= now(): since this transaction began, which is the order it signed, or one the
+--       same clinician signed for the same patient in another transaction of theirs committed since then), not one that
+--       decides a dictation's proposal (D7 of the expansion plan's step 15: an order answers a refill request or decides
+--       a proposal, never both; 55-ai-review.sql holds the other way), for the product that was asked for (the order's
+--       catalog item is the RxNorm code the medication had when asked: another strength, form, salt or route is a new
+--       order, not a renewal), which the chart's entry must still have: a clinician may change an entry's code
 --       (65-chart-lists.sql), and a request asked for before the change is then only declined; the medication still
 --       active, and locked until the transaction ends, so stopping it waits for the approval or the approval sees it
 --       stopped. The database copies what was ordered.
@@ -35,6 +38,15 @@
 -- ClinicalOrders runs first): this trigger runs only once the request's row is locked, too late to take them first,
 -- and its own FOR SHARE below finds the medication's row locked already. Asking takes the advisory lock alone, and the
 -- key-share lock its foreign key takes doesn't wait for an update of the medication's sensitivity or status.
+-- Approving takes the order's advisory lock ('ehr.orders:' and its ID) after the request's row, before it looks for a
+-- proposal naming the order, as deciding a proposal does before it looks for a request naming it (55-ai-review.sql): of
+-- two transactions linking one order, the second waits for the first and then sees what it wrote. In the app nothing
+-- that holds it waits for a medication's lock, a request's row, a proposal's row or a patient's row: an approval takes
+-- it after those, and a proposal's decision takes it as the last thing it does; and the care-team lock, which an
+-- approval takes after it, has no holder that takes an order's lock. So the app's transactions close no circle on it.
+-- A transaction written otherwise can: one that decides a proposal with an order and then signs another for the same
+-- patient (locking the patient's row), against one that signs (locking that row) and then approves with that order.
+-- PostgreSQL aborts one of the two (40P01), and no order is linked wrongly.
 -- Last comes a patient's care-team lock (an advisory lock on 'ehr.refill_care_team:' and the patient's ID), which
 -- whatever writes the patient's refill items takes before it reads: asking, once its request is inserted, after the
 -- medication's advisory lock, and answering, after the request's row (ehr.deliver_refill_request); a clinician joining
@@ -144,6 +156,11 @@ BEGIN
         END IF;
         IF ordered.catalog_code IS DISTINCT FROM medication.code THEN
             RAISE EXCEPTION 'A refill renews the same medication product' USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_same_medication';
+        END IF;
+        PERFORM pg_advisory_xact_lock(hashtextextended('ehr.orders:' || NEW.order_id::text, 0));
+        IF EXISTS (SELECT 1 FROM ehr.ai_chart_proposals p WHERE p.order_id = NEW.order_id) THEN
+            RAISE EXCEPTION 'An order that decides a dictation''s proposal answers no refill request'
+                USING ERRCODE = '23514', CONSTRAINT = 'refill_requests_order_proposal';
         END IF;
 
         NEW.status := 'completed';

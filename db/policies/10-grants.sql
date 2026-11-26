@@ -59,6 +59,12 @@ GRANT SELECT ON ehr.patient_assignments TO ehr_read;
 GRANT SELECT, INSERT ON ehr.break_glass_accesses TO ehr_app;
 GRANT SELECT ON ehr.break_glass_accesses TO ehr_read;
 
+-- An administrator's review of an emergency access (step 18). Restricted, like the audit log: row-level security
+-- follows, and no write-audit trigger, since the row is its own record. Added once, never changed: no UPDATE and no
+-- DELETE. The cloud app reads them, for the audit page, and forwards a review to the clinic's server.
+GRANT SELECT, INSERT ON ehr.emergency_access_reviews TO ehr_app;
+GRANT SELECT ON ehr.emergency_access_reviews TO ehr_read;
+
 -- The rest of the chart: allergies, medications, diagnoses (conditions) and visits (encounters). PHI, like patients:
 -- row-level security and the write-audit trigger follow. The on-prem app reads them as ehr_app, the cloud app as
 -- ehr_read. Clinicians add and change allergies, medications and diagnoses, and mark them inactive: INSERT and UPDATE
@@ -77,10 +83,11 @@ GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
 
 -- The rest of the reference data, none of it about a patient: what a result or vital sign is and this clinic's range
 -- for it, which results an order produces, the PHQ-9 and GAD-7 questionnaires, what each drug product is made of, the
--- classes its ingredients belong to and which of those cross-react, and known interactions between ingredients. Read
--- by both apps; nothing at runtime changes any of it. Its rows are db/reference's generated SQL.
+-- classes its ingredients belong to and which of those cross-react, known interactions between ingredients, and the
+-- visit types a note is written for with what to cover in each section (step 14). Read by both apps; nothing at
+-- runtime changes any of it. Its rows are db/reference's SQL.
 GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
-    ehr.drug_class_cross_reactions, ehr.drug_interactions, ehr.vital_reference_ranges TO ehr_app, ehr_read;
+    ehr.drug_class_cross_reactions, ehr.drug_interactions, ehr.vital_reference_ranges, ehr.note_templates TO ehr_app, ehr_read;
 
 -- Test results and vital signs (observations). PHI, like the chart: row-level security and the write-audit trigger
 -- follow. A clinician files the results of a lab order, or records vital signs: INSERT, which a trigger holds to a
@@ -205,5 +212,23 @@ GRANT UPDATE (done_at) ON ehr.inbox_items TO ehr_app;
 -- UC 13: private, auditable proposals and decisions; replica reads use identical forced ownership RLS.
 GRANT SELECT, INSERT, UPDATE ON ehr.ai_note_reviews, ehr.ai_field_proposals TO ehr_app;
 GRANT SELECT ON ehr.ai_note_reviews, ehr.ai_field_proposals TO ehr_read;
+
+-- The expansion plan's step 15: the orders and allergies to add a dictation proposes, staged with their review and
+-- decided once. The decision is a column grant on its three columns; who and when are the database's, and what each
+-- decision needs is 55-ai-review.sql's. Never DELETE.
+GRANT SELECT, INSERT ON ehr.ai_chart_proposals TO ehr_app;
+GRANT UPDATE (state, order_id, allergy_id) ON ehr.ai_chart_proposals TO ehr_app;
+GRANT SELECT ON ehr.ai_chart_proposals TO ehr_read;
+
+-- Ambient listening (step 16): a clinician's consent to record a visit, and a conversation's transcript while its review
+-- is open. PHI: row-level security and the write-audit trigger follow (56-ambient-listening.sql has the rules). A consent
+-- is a record: INSERT, never changed or deleted. A transcript is written as its review is staged, never changed, and
+-- deleted as it is finished: DELETE, which the guard allows only then (the purge after 7 days is its owner's function).
+-- The cloud app may see that a transcript exists, to know a review's proposals are to be decided at the clinic, but
+-- never read one: no SELECT on the transcript column.
+GRANT SELECT, INSERT ON ehr.ambient_consents TO ehr_app;
+GRANT SELECT ON ehr.ambient_consents TO ehr_read;
+GRANT SELECT, INSERT, DELETE ON ehr.ambient_transcripts TO ehr_app;
+GRANT SELECT (id, patient_id, sensitive, created_at) ON ehr.ambient_transcripts TO ehr_read;
 
 COMMIT;

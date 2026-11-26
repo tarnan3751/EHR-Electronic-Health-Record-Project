@@ -1,0 +1,69 @@
+id = "h10-herida-mano"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "units", "dates", "sides", "negation", "short"]
+dates = []
+drugs = ["lidocaína"]
+drugs_en = ["lidocaine"]
+negated = ["foreign bodies", "tendon injury"]
+text = """
+Hombre de [[38|treinta y ocho]] años, cocinero, que se cortó la palma de la mano derecha con un cuchillo hace
+[[2|dos]] horas. Es diestro. Última vacuna del tétanos en [[2014|dos mil catorce]]. Sin alergias conocidas. Herida
+limpia de [[3 cm|tres centímetros]] en la palma derecha, sin cuerpos extraños. Mueve bien todos los dedos y la
+sensibilidad es normal. Impresión: herida incisa de la palma derecha sin lesión tendinosa. Plan: se lava con suero y
+se anestesia con lidocaína al [[1 %|uno por ciento]]. Se cierra con [[4|cuatro]] puntos. Refuerzo de la antitetánica
+hoy. Mantener la herida seca [[48|cuarenta y ocho]] horas. No hacen falta antibióticos. Retirar los puntos en
+[[10|diez]] días.
+"""
+
+[[gold.subjective]]
+spanish = ["Hombre de 38 años, cocinero, que se cortó la palma de la mano derecha con un cuchillo hace 2 horas."]
+english = "38-year-old man, a cook, who cut the palm of his right hand with a knife 2 hours ago."
+
+[[gold.subjective]]
+spanish = ["Es diestro."]
+english = "He is right-handed."
+
+[[gold.subjective]]
+spanish = ["Última vacuna del tétanos en 2014."]
+english = "Last tetanus vaccine in 2014."
+
+[[gold.subjective]]
+spanish = ["Sin alergias conocidas."]
+english = "No known allergies."
+
+[[gold.objective]]
+spanish = ["Herida limpia de 3 cm en la palma derecha, sin cuerpos extraños."]
+english = "Clean 3 cm wound on the right palm, no foreign bodies."
+
+[[gold.objective]]
+spanish = ["Mueve bien todos los dedos y la sensibilidad es normal."]
+english = "Moves all fingers well and sensation is normal."
+
+[[gold.assessment]]
+spanish = ["herida incisa de la palma derecha sin lesión tendinosa."]
+english = "Incised wound of the right palm without tendon injury."
+
+[[gold.plan]]
+spanish = ["se lava con suero y se anestesia con lidocaína al 1 %."]
+english = "Irrigated with saline and anesthetized with lidocaine 1%."
+
+[[gold.plan]]
+spanish = ["Se cierra con 4 puntos."]
+english = "Closed with 4 sutures."
+
+[[gold.plan]]
+spanish = ["Refuerzo de la antitetánica hoy."]
+english = "Tetanus booster today."
+
+[[gold.plan]]
+spanish = ["Mantener la herida seca 48 horas."]
+english = "Keep the wound dry for 48 hours."
+
+[[gold.plan]]
+spanish = ["No hacen falta antibióticos."]
+english = "No antibiotics needed."
+
+[[gold.plan]]
+spanish = ["Retirar los puntos en 10 días."]
+english = "Remove the sutures in 10 days."

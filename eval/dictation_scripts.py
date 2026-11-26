@@ -39,7 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
-FIELDS = ("history", "assessment", "plan")
+FIELDS = ("subjective", "objective", "assessment", "plan")
 
 # Spoken punctuation: the mark it is written as, and the pause after it when read aloud.
 PUNCTUATION = {
@@ -53,8 +53,13 @@ PUNCTUATION = {
 
 MARKUP = re.compile(r"\{([^{}]*)\}|\[\[([^\[\]|]*)\|([^\[\]|]*)\]\]")
 WORD = re.compile(r"[A-Za-z]+(?:['-][A-Za-z]+)*")
-KEYS = {"id", "voice", "tags", "noise", "dates", "drugs", "forbidden", "retracted", "text", "gold", "gold_rules"}
+KEYS = {
+    "id", "voice", "tags", "noise", "dates", "drugs", "forbidden", "retracted", "proposals", "not_proposed", "text", "gold",
+    "gold_rules",
+}  # fmt: skip
 REQUIRED = {"id", "voice", "tags", "dates", "drugs", "text", "gold"}
+# What a dictation may propose (the expansion plan's step 15): an order, and an allergy to add.
+PROPOSAL_KINDS = ("order", "allergy_addition")
 
 
 class ScriptError(ValueError):
@@ -65,6 +70,26 @@ class ScriptError(ValueError):
 class Gold:
     value: str
     sources: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Proposal:
+    """An order, or an allergy to add, the clinician dictates plainly, which the dictation should propose: its kind, its
+    words (one of the script's forbidden passages), and the item they name, as the display text writes it, or nothing
+    when they name it only by referring back ("call that in to his usual pharmacy")."""
+
+    kind: str
+    words: str
+    item: str
+
+
+@dataclass(frozen=True)
+class NotProposed:
+    """Words in the display text the dictation must not propose, and why: the rule of the sidecar's checks that holds
+    them back (HELD_BACK in validation.py), or not_an_instruction when the checks don't list them at all."""
+
+    words: str
+    why: str
 
 
 @dataclass(frozen=True)
@@ -84,6 +109,8 @@ class Script:
     # the clinical gold (gold) doesn't follow them, and the clinical gold where it does. rules_fields names the former.
     gold_rules: dict[str, Gold]
     rules_fields: tuple[str, ...] = ()
+    proposals: tuple[Proposal, ...] = ()
+    not_proposed: tuple[NotProposed, ...] = ()
 
     @property
     def spoken(self) -> str:
@@ -174,6 +201,26 @@ def load_script(path: Path) -> Script:
         if not isinstance(data[key], str) or not data[key].strip():
             raise ScriptError(f"{path.name}: {key} must be a non-empty string")
 
+    def table(key: str, names: tuple[str, ...]) -> list[dict]:
+        rows = data.get(key, [])
+        if not isinstance(rows, list) or not all(
+            isinstance(row, dict) and set(row) == set(names) and all(isinstance(row[n], str) for n in names) for row in rows
+        ):
+            raise ScriptError(f"{path.name}: each of {key} must have {', '.join(names)} (strings)")
+        return rows
+
+    forbidden = {item.lower() for item in strings("forbidden")}
+    proposals = tuple(Proposal(**row) for row in table("proposals", ("kind", "words", "item")))
+    for proposal in proposals:
+        if proposal.kind not in PROPOSAL_KINDS or proposal.words.lower() not in forbidden:
+            raise ScriptError(f"{path.name}: a proposal's kind must be one of {', '.join(PROPOSAL_KINDS)} and its words "
+                              f"one of the forbidden passages: {proposal.words!r}")
+        if proposal.item.lower() not in proposal.words.lower():
+            raise ScriptError(f"{path.name}: a proposal's item must be in its words: {proposal.item!r}")
+    not_proposed = tuple(NotProposed(**row) for row in table("not_proposed", ("words", "why")))
+    if any(not row.words or not row.why for row in not_proposed):
+        raise ScriptError(f"{path.name}: each of not_proposed must have words and why")
+
     script = Script(
         id=data["id"],
         voice=data["voice"],
@@ -188,6 +235,8 @@ def load_script(path: Path) -> Script:
         path=path,
         gold_rules=gold_rules,
         rules_fields=rules_fields,
+        proposals=proposals,
+        not_proposed=not_proposed,
     )
     try:
         spoken_text(script.text)

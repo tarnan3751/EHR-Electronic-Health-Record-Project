@@ -1,0 +1,71 @@
+# recall: plain instructions a clinician would plainly mean
+Order a CBC, a BMP and a lipid panel.
+Order a CBC, BMP, and lipid panel.
+Order a chest x-ray, PA and lateral.
+Order a CBC, stat.
+Refill her lisinopril 10 mg daily, 90 day supply.
+Order a CBC to check for anemia.
+Order a CBC to check her hemoglobin.
+Order a TSH to rule out hypothyroidism.
+Order an MRI to evaluate for a tear.
+Refill her albuterol inhaler as needed for wheeze.
+Order a CBC because I think she may be anemic.
+Order a lipid panel since she is fasting.
+Order an x-ray of the left knee that she injured.
+Order a CBC for the patient.
+Order a urine culture before starting antibiotics.
+Order a CBC; she looks pale.
+Prescribe amoxicillin 875 mg twice daily for 10 days, no refills.
+Prescribe amoxicillin 875 mg twice daily for 10 days with no refills.
+Order a CBC and I will call her with the results.
+Order a CBC so we can monitor her counts.
+Order a hemoglobin A1c which is due.
+Order an A1c, it is due.
+Order a CBC and continue iron.
+Add penicillin to her allergies, rash.
+Add penicillin to her allergy list, reaction hives.
+Add amoxicillin to her allergies because she got hives.
+Add an allergy to penicillin with hives as the reaction.
+Add penicillin to her allergies with hives as the reaction.
+Add codeine to her allergy list as an intolerance.
+She is allergic to penicillin, please add it to her allergies.
+Order a CBC. That's it.
+Order a CBC. That is all.
+Order a CBC. That's everything.
+Order a CBC. That's the plan.
+Refill her lisinopril. She agrees with that.
+Order an MRI of the right knee. She is fine with that.
+Order a CBC. Thanks.
+Order an MRI of the lumbar spine. Thank you.
+Refill her lisinopril for one year.
+Refill her lisinopril for a year.
+Order a lipid panel to be drawn fasting.
+Order a lipid panel to be drawn in the morning.
+Order a CBC with differential and a CMP.
+Order a CBC with diff.
+Order a mammogram, she is due.
+Order a screening colonoscopy, she is 50.
+Continue lisinopril and refill it.
+Continue the omeprazole and refill the omeprazole.
+Stop the metformin and order an A1c.
+Order an A1c and see her back in three months.
+Order a CBC and follow up in two weeks.
+Order a CBC and have her return in two weeks.
+Order a CBC and recheck in a week.
+Refill the lisinopril and the amlodipine.
+Okay, and order a CBC.
+So, order a CBC.
+Next, order a CBC.
+Lastly, refill her lisinopril.
+Order a CBC today please.
+I'd like to order a CBC.
+We need to order a CBC.
+Let's go ahead and order a CBC.
+Let's also order a CBC.
+Can you order a CBC please.
+I want to order a CBC.
+I'm ordering a CBC.
+We're ordering a CBC today.
+Will order a CBC.
+Plan to order a CBC.
+Plan is to order a CBC.

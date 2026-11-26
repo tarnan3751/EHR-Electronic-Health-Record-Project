@@ -47,7 +47,7 @@ public class TC_UC14_10_AddendumOffSite(WebApps apps) : IClassFixture<WebApps>
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<Ehr.Web.CloudAudit.CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Client(apps.CloudCutOff, session.Jar);
         var readOnly = await cutOff.GetStringAsync(NotePath(patient, note), Cancel);
-        Assert.Contains(History, readOnly);
+        Assert.Contains(Subjective, readOnly);
         Assert.Contains("Synthetic addendum signed off-site.", readOnly);
         Assert.Contains("An addendum can't be signed until the clinic's server is back.", readOnly);
         Assert.DoesNotContain("data-add-addendum", readOnly);

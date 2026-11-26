@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): emergency department cellulitis, with an allergy record change to leave out. Format: eval/README.md.
 id = "d22-cellulitis-ed"
 voice = "hm_omega"
-tags = ["vitals", "numbers", "negation", "self-correction", "allergy-change", "spoken-punctuation"]
+tags = ["vitals", "numbers", "negation", "self-correction", "allergy-change", "spoken-punctuation", "proposal-trap"]
 noise = ["babble"]
 dates = []
 drugs = ["metoprolol", "metformin", "penicillin", "cephalexin", "paracetamol"]
@@ -26,14 +26,19 @@ Paracetamol for pain and fever {period} Elevate the leg {period} Return if the r
 feels more unwell {period} [[GP|G P]] review in [[48 hours|forty-eight hours]] {period}
 """
 
-[gold.history]
-value = "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening. Felt shivery, temperature not measured. No calf pain before this, no recent travel, no history of clots. Type 2 diabetes on metformin. Reaction to penicillin as a child was only a mild rash, not hives or swelling. Temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air. Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus. Calf itself not tender. Edge marked with a pen. Glucose 11.2."
+[gold.subjective]
+value = "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening. Felt shivery, temperature not measured. No calf pain before this, no recent travel, no history of clots. Type 2 diabetes on metformin. Reaction to penicillin as a child was only a mild rash, not hives or swelling."
 sources = [
     "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening.",
     "He has felt shivery but has not measured a temperature.",
     "No calf pain before this, no recent travel, no history of clots.",
     "He has type 2 diabetes on metoprolol I mean metformin.",
     "He told me his reaction to penicillin as a child was only a mild rash, not hives or swelling",
+]
+
+[gold.objective]
+value = "Temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air. Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus. Calf itself not tender. Edge marked with a pen. Glucose 11.2."
+sources = [
     "temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air.",
     "Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus.",
     "The calf itself is not tender.",
@@ -55,17 +60,26 @@ sources = [
     "GP review in 48 hours.",
 ]
 
-[gold_rules.history]
-value = "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening. He has felt shivery but has not measured a temperature. No calf pain before this, no recent travel, no history of clots. He has type 2 diabetes on metformin. He told me his reaction to penicillin as a child was only a mild rash, not hives or swelling. Temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air. Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus. The calf itself is not tender. I have marked the edge with a pen. Glucose 11.2."
+[gold_rules.subjective]
+value = "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening. He has felt shivery but has not measured a temperature. No calf pain before this, no recent travel, no history of clots. He has type 2 diabetes on metformin. He told me his reaction to penicillin as a child was only a mild rash, not hives or swelling."
 sources = [
     "49-year-old man with 3 days of a red, hot and painful left lower leg after a scratch from gardening.",
     "He has felt shivery but has not measured a temperature.",
     "No calf pain before this, no recent travel, no history of clots.",
     "He has type 2 diabetes on metoprolol I mean metformin.",
     "He told me his reaction to penicillin as a child was only a mild rash, not hives or swelling",
+]
+
+[gold_rules.objective]
+value = "Temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air. Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus. The calf itself is not tender. I have marked the edge with a pen. Glucose 11.2."
+sources = [
     "temperature 38.1, heart rate 102, blood pressure 132/80, respiratory rate 18, saturations 97% on air.",
     "Spreading erythema from the ankle to mid shin, warm and tender, no fluctuance, no crepitus.",
     "The calf itself is not tender.",
     "I have marked the edge with a pen.",
     "Glucose 11.2.",
 ]
+
+[[not_proposed]]
+words = "update his allergy record"
+why = "not_an_addition"

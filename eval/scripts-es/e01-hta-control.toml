@@ -1,0 +1,109 @@
+id = "e01-hta-control"
+language = "es"
+voice = "em_alex"
+tags = ["numbers", "vitals", "units", "frequency", "actions", "negation", "history", "order-attempt", "mixed-plan"]
+noise = ["hvac"]
+dates = []
+drugs = ["losartán"]
+drugs_en = ["losartan"]
+forbidden = ["Pido una creatinina y un potasio para hoy", "Resúrtele el losartán"]
+forbidden_en = ["creatinine", "potassium", "refill"]
+negated = ["chest pain", "shortness of breath", "murmurs"]
+affirmed = ["headache"]
+text = """
+Control de hipertensión. Hombre de [[62|sesenta y dos]] años con hipertensión arterial desde hace [[10|diez]] años.
+Toma losartán [[50 mg|cincuenta miligramos]] una vez al día. Refiere cefalea ocasional por las mañanas. Niega dolor
+torácico y niega disnea. Antecedente de tabaquismo, lo dejó hace [[5|cinco]] años. En la exploración, TA
+[[152/94|ciento cincuenta y dos sobre noventa y cuatro]], FC [[78|setenta y ocho]], peso [[88 kg|ochenta y ocho
+kilos]]. Ruidos cardiacos rítmicos, sin soplos. Impresión: hipertensión arterial no controlada. Plan: aumentar
+losartán a [[100 mg|cien miligramos]] una vez al día. Reducir la sal en la dieta. Resúrtele el losartán. Pido una
+creatinina y un potasio para hoy. Control en [[4|cuatro]] semanas.
+"""
+
+[[facts]]
+said = "Hombre de 62 años con hipertensión arterial desde hace 10 años."
+items = [{ of = "age", number = "62" }, { of = "hypertension", duration = "10 years" }]
+
+[[facts]]
+said = "Toma losartán 50 mg una vez al día."
+items = [{ of = "losartan", action = "take", number = "50 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Refiere cefalea ocasional por las mañanas."
+items = [{ of = "headache", negated = false, frequency = "morning" }]
+
+[[facts]]
+said = "Niega dolor torácico y niega disnea."
+items = [{ of = "chest pain", negated = true }, { of = "shortness of breath", aka = ["dyspnea"], negated = true }]
+
+[[facts]]
+said = "Antecedente de tabaquismo, lo dejó hace 5 años."
+items = [{ of = "smoking", history = true, action = "stopped", duration = "5 years" }]
+
+[[facts]]
+said = "TA 152/94, FC 78, peso 88 kg."
+items = [{ of = "BP", number = "152/94" }, { of = "HR", number = "78" }, { of = "weight", number = "88 kg" }]
+
+[[facts]]
+said = "Ruidos cardiacos rítmicos, sin soplos."
+items = [{ of = "heart sounds", negated = false }, { of = "murmurs", negated = true }]
+
+[[facts]]
+said = "hipertensión arterial no controlada."
+items = [{ of = "hypertension", polarity = "uncontrolled" }]
+
+[[facts]]
+said = "aumentar losartán a 100 mg una vez al día."
+items = [{ of = "losartan", action = "increase", number = "100 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Reducir la sal en la dieta."
+items = [{ of = "salt", action = "decrease" }]
+
+[[facts]]
+said = "Control en 4 semanas."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "4 weeks" }]
+
+[[gold.subjective]]
+spanish = ["Hombre de 62 años con hipertensión arterial desde hace 10 años."]
+english = "62-year-old man with hypertension for 10 years."
+
+[[gold.subjective]]
+spanish = ["Toma losartán 50 mg una vez al día."]
+english = "Takes losartan 50 mg once a day."
+
+[[gold.subjective]]
+spanish = ["Refiere cefalea ocasional por las mañanas."]
+english = "Reports occasional headache in the mornings."
+
+[[gold.subjective]]
+spanish = ["Niega dolor torácico y niega disnea."]
+english = "Denies chest pain and denies shortness of breath."
+
+[[gold.subjective]]
+spanish = ["Antecedente de tabaquismo, lo dejó hace 5 años."]
+english = "History of smoking, quit 5 years ago."
+
+[[gold.objective]]
+spanish = ["TA 152/94, FC 78, peso 88 kg."]
+english = "BP 152/94, HR 78, weight 88 kg."
+
+[[gold.objective]]
+spanish = ["Ruidos cardiacos rítmicos, sin soplos."]
+english = "Regular heart sounds, no murmurs."
+
+[[gold.assessment]]
+spanish = ["hipertensión arterial no controlada."]
+english = "Hypertension not controlled."
+
+[[gold.plan]]
+spanish = ["aumentar losartán a 100 mg una vez al día."]
+english = "Increase losartan to 100 mg once a day."
+
+[[gold.plan]]
+spanish = ["Reducir la sal en la dieta."]
+english = "Reduce salt in the diet."
+
+[[gold.plan]]
+spanish = ["Control en 4 semanas."]
+english = "Follow-up in 4 weeks."

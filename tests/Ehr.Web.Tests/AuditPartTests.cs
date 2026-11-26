@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,7 +10,9 @@ using Ehr.Domain.Audit;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.Areas.Portal.Pages;
 using Ehr.Web.CloudAudit;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
@@ -73,6 +76,7 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("clinic", "/patients/{0}/messages/new", "patients conversations")]
     [InlineData("clinic", "/patients/{0}/proxies", "patients access")]
     [InlineData("clinic", "/patients/{0}/dictate", "patients note-draft")]
+    [InlineData("clinic", "/patients/{0}/listen", "patients note-draft")]
     [InlineData("clinic", "/patients", "patients panel")]
     [InlineData("clinic", "/patients?name=Parted", "patients search")]
     [InlineData("clinic", "/fhir/Patient/{0}", "patients fhir")]
@@ -102,7 +106,7 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
     // The reads of the pages and APIs that need something of the patient's first: an order's results, an appointment's
     // page, the FHIR API's searches of entries, a signed note's sensitivity and addendum pages, the dictation API starting a
-    // note, and the desktop app's draft sync. One row each, so a wrong part on any one of them turns its own row red.
+    // note, the desktop app's draft sync, and a draft's editor and the vital signs it offers (step 14). One row each, so a wrong part on any one of them turns its own row red.
     [Theory]
     [InlineData("order results", "patients results")]
     [InlineData("appointment", "patients appointments")]
@@ -115,6 +119,13 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("desktop draft sync", "clinical_drafts note-draft")]
     [InlineData("refill review", "patients refills")]
     [InlineData("refill order form", "patients refills")]
+    [InlineData("note editor", "clinical_drafts note-draft", "patients note-draft")]
+    [InlineData("note vital signs", "patients vitals")]
+    [InlineData("dictation review", "ai_chart_proposals note-draft", "ai_field_proposals note-draft", "ai_note_reviews note-draft", "clinical_drafts note-draft", "patients note-draft")]
+    [InlineData("proposed order form", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "patients orders")]
+    [InlineData("proposed allergy form", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "patients lists")]
+    [InlineData("note editor with proposals", "ai_chart_proposals note-draft", "ai_note_reviews note-draft", "clinical_drafts note-draft", "patients note-draft")]
+    [InlineData("signed note with proposals", "ai_chart_proposals visit-note", "ai_note_reviews visit-note", "clinical_notes visit-note", "patients visit-note")]
     public async Task Each_api_and_page_that_needs_an_entry_records_its_part(string what, params string[] reads)
     {
         var (clinician, session, patient) = await PatientAsync();
@@ -163,6 +174,31 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
                 var refill = await RefillRequestTests.RequestIdAsync(apps, patient.Patient);
                 var refillPath = what == "refill review" ? RefillRequestTests.ReviewPath(patient.Patient, refill) : RefillRequestTests.ApprovePath(patient.Patient, refill);
                 request = () => session.Client.GetAsync(refillPath, Cancel);
+                break;
+            case "dictation review" or "proposed order form" or "proposed allergy form" or "note editor with proposals":
+                // Step 15: what a dictation proposes, read on its review, on the forms opened from it, and on its note.
+                var dictated = await DictationProposalTests.DictateAsync(apps, session, patient.Patient);
+                var proposed = what switch
+                {
+                    "dictation review" => dictated.ReviewPath,
+                    "proposed order form" => DictationProposalTests.OrderFormPath(patient.Patient, dictated.Order),
+                    "proposed allergy form" => DictationProposalTests.AllergyFormPath(patient.Patient, dictated.Allergy),
+                    _ => $"{chart}/notes/drafts/{dictated.Draft}",
+                };
+                request = () => session.Client.GetAsync(proposed, Cancel);
+                break;
+            case "signed note with proposals":
+                var signedNote = await DictationProposalTests.SignNoteAsync(apps, await DictationProposalTests.DictateAsync(apps, session, patient.Patient));
+                request = () => session.Client.GetAsync(signedNote, Cancel);
+                break;
+            case "note editor" or "note vital signs":
+                // A draft's editor, and the vital signs it offers for Objective when asked (step 14).
+                using (var created = await PostFormAsync(session.Client, $"{chart}?handler=NewNote", chart))
+                {
+                    var editor = PathOf(created) + (what == "note vital signs" ? "?handler=Vitals" : "");
+                    request = () => session.Client.GetAsync(editor, Cancel);
+                }
+
                 break;
             default:
                 var desktop = CreateClient(apps.OnPrem);
@@ -354,6 +390,108 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         await using var count = new NpgsqlCommand("SELECT count(*) FROM ehr.audit_events WHERE patient_id = ANY(@patients) AND part = 'panel'", connection);
         count.Parameters.AddWithValue("patients", patients.Select(p => p.Item1).ToArray());
         Assert.Equal(100L, await count.ExecuteScalarAsync(Cancel));
+    }
+
+    // A page's reads through several of the PHI reader's calls, recorded together (the expansion plan's step 16): every
+    // event held until the reads return, nothing in the unit of work, then all written in the page's transaction; and
+    // nothing at all when the reads throw.
+    [Fact]
+    public async Task A_pages_reads_recorded_together_are_written_when_they_return()
+    {
+        using var scope = apps.OnPrem.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<Ehr.Data.EhrDbContext>();
+        var audit = scope.ServiceProvider.GetRequiredService<AuditRecorder>();
+        Guid[] patients = [Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()];
+
+        await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => audit.TogetherAsync<bool>(() =>
+        {
+            audit.Record(AuditActions.Read, patients[0], "patients", patients[0], part: AuditParts.NoteDraft);
+            throw new InvalidOperationException("Synthetic: the page failed after a read.");
+        }, Cancel));
+        var unsaved = await audit.TogetherAsync(async () =>
+        {
+            audit.Record(AuditActions.Read, patients[1], "patients", patients[1], part: AuditParts.NoteDraft);
+            await audit.RecordReadsAsync("ai_field_proposals", AuditParts.NoteDraft, [(patients[2], Guid.CreateVersion7()), (patients[2], Guid.CreateVersion7())], Cancel);
+            return db.ChangeTracker.Entries<AuditEvent>().Count();
+        }, Cancel);
+
+        Assert.Equal(0, unsaved);
+        Assert.Empty(db.ChangeTracker.Entries<AuditEvent>());
+        await transaction.CommitAsync(Cancel);
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var count = new NpgsqlCommand(
+            "SELECT patient_id, count(*) FROM ehr.audit_events WHERE patient_id = ANY(@patients) GROUP BY patient_id", connection);
+        count.Parameters.AddWithValue("patients", patients);
+        var recorded = new Dictionary<Guid, long>();
+        await using (var reader = await count.ExecuteReaderAsync(Cancel))
+        {
+            while (await reader.ReadAsync(Cancel)) recorded[reader.GetGuid(0)] = reader.GetInt64(1);
+        }
+
+        Assert.Equal(new Dictionary<Guid, long> { [patients[1]] = 1, [patients[2]] = 2 }, recorded);
+    }
+
+    // The review of a recorded visit records every read it makes (the patient, the review, the draft, the transcript
+    // and each proposal) together, in one statement: none of them is left for the unit of work, which would write each
+    // in a statement of its own; and it reads the transcript in the query that reads its review, one round trip fewer
+    // (step 16, for its render time).
+    [Fact]
+    public async Task The_review_of_a_visit_records_its_reads_together()
+    {
+        apps.Dictation.Reset();
+        var d = await AmbientFlows.DraftAsync(apps);
+        var saves = new AuditSaves();
+        await using var counted = apps.OnPrem.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.ConfigureDbContext<Ehr.Data.EhrDbContext>(options => options.AddInterceptors(saves))));
+        var session = await SignInAsync(counted, await apps.ClinicianAsync());
+        var since = DateTimeOffset.UtcNow;
+        var signedIn = saves.Count;
+
+        using var page = await session.Client.GetAsync(d.ReviewUrl, Cancel);
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Equal(signedIn, saves.Count);
+        var read = Assert.Single(saves.Transcripts);
+        Assert.Contains("ai_note_reviews", read, StringComparison.Ordinal);
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var reads = new NpgsqlCommand("""
+            SELECT table_name || ' ' || count(*) FROM ehr.audit_events
+            WHERE patient_id = @patient AND action = 'read' AND occurred_at >= @since GROUP BY table_name ORDER BY table_name
+            """, connection);
+        reads.Parameters.AddWithValue("patient", d.Listening.Patient);
+        reads.Parameters.AddWithValue("since", since);
+        var recorded = new List<string>();
+        await using (var reader = await reads.ExecuteReaderAsync(Cancel))
+        {
+            while (await reader.ReadAsync(Cancel)) recorded.Add(reader.GetString(0));
+        }
+
+        Assert.Equal(["ai_field_proposals 4", "ai_note_reviews 1", "ambient_transcripts 1", "clinical_drafts 1", "patients 1"], recorded);
+    }
+
+    sealed class AuditSaves : DbCommandInterceptor
+    {
+        int count;
+
+        public int Count => count;
+
+        // The queries that read a visit's transcript.
+        public System.Collections.Concurrent.ConcurrentQueue<string> Transcripts { get; } = new();
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO ehr.audit_events", StringComparison.Ordinal)) Interlocked.Increment(ref count);
+            else if (command.CommandText.Contains("ambient_transcripts", StringComparison.Ordinal)) Transcripts.Enqueue(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("INSERT INTO ehr.audit_events", StringComparison.Ordinal)) Interlocked.Increment(ref count);
+            return ValueTask.FromResult(result);
+        }
     }
 
     // The parts are one list wherever they are kept: the code's (AuditParts), the database's check, the cloud app's

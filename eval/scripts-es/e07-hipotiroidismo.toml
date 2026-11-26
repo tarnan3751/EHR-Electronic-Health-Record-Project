@@ -1,0 +1,99 @@
+id = "e07-hipotiroidismo"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "dates", "decimal-comma", "units", "frequency", "history", "negation", "actions", "drug-name-differs", "allergy-change"]
+dates = ["2026-03-03"]
+drugs = ["levotiroxina", "penicilina"]
+drugs_en = ["levothyroxine", "penicillin"]
+negated = ["palpitations"]
+affirmed = ["fatigue", "weight gain"]
+forbidden = ["Quítale la alergia a la penicilina"]
+forbidden_en = ["penicillin"]
+text = """
+Mujer de [[51|cincuenta y un]] años con hipotiroidismo. Antecedente de tiroidectomía total en [[2019|dos mil
+diecinueve]] por bocio. Toma levotiroxina [[50 microgramos|cincuenta microgramos]] al día en ayunas. Refiere
+cansancio y aumento de peso. Niega palpitaciones. Analítica del [[3 de marzo de 2026|tres de marzo de dos mil
+veintiséis]]: TSH [[6,2|seis coma dos]]. Peso [[71 kg|setenta y un kilos]]. Impresión: hipotiroidismo con dosis
+insuficiente de levotiroxina. Plan: aumentar levotiroxina a [[75 microgramos|setenta y cinco microgramos]] al día en
+ayunas. Repetir TSH en [[6|seis]] semanas. Quítale la alergia a la penicilina.
+"""
+
+[[facts]]
+said = "Mujer de 51 años con hipotiroidismo."
+items = [{ of = "age", number = "51" }, { of = "hypothyroidism" }]
+
+[[facts]]
+said = "Antecedente de tiroidectomía total en 2019 por bocio."
+items = [{ of = "thyroidectomy", history = true, date = "2019" }, { of = "goiter" }]
+
+[[facts]]
+said = "Toma levotiroxina 50 microgramos al día en ayunas."
+items = [{ of = "levothyroxine", action = "take", number = "50 mcg", frequency = ["daily", "fasting"] }]
+
+[[facts]]
+said = "Refiere cansancio y aumento de peso."
+items = [{ of = "fatigue", aka = ["tiredness"], negated = false }, { of = "weight gain", negated = false }]
+
+[[facts]]
+said = "Niega palpitaciones."
+items = [{ of = "palpitations", negated = true }]
+
+[[facts]]
+said = "Analítica del 3 de marzo de 2026: TSH 6,2."
+items = [{ of = "TSH", number = "6.2", date = "March 3, 2026" }]
+
+[[facts]]
+said = "Peso 71 kg."
+items = [{ of = "weight", number = "71 kg" }]
+
+[[facts]]
+said = "hipotiroidismo con dosis insuficiente de levotiroxina."
+items = [{ of = "hypothyroidism" }, { of = "levothyroxine" }]
+
+[[facts]]
+said = "aumentar levotiroxina a 75 microgramos al día en ayunas."
+items = [{ of = "levothyroxine", action = "increase", number = "75 mcg", frequency = ["daily", "fasting"] }]
+
+[[facts]]
+said = "Repetir TSH en 6 semanas."
+items = [{ of = "TSH", duration = "6 weeks" }]
+
+[[gold.subjective]]
+spanish = ["Mujer de 51 años con hipotiroidismo."]
+english = "51-year-old woman with hypothyroidism."
+
+[[gold.subjective]]
+spanish = ["Antecedente de tiroidectomía total en 2019 por bocio."]
+english = "History of total thyroidectomy in 2019 for goiter."
+
+[[gold.subjective]]
+spanish = ["Toma levotiroxina 50 microgramos al día en ayunas."]
+english = "Takes levothyroxine 50 mcg daily, fasting."
+
+[[gold.subjective]]
+spanish = ["Refiere cansancio y aumento de peso."]
+english = "Reports fatigue and weight gain."
+
+[[gold.subjective]]
+spanish = ["Niega palpitaciones."]
+english = "Denies palpitations."
+
+[[gold.objective]]
+spanish = ["Analítica del 3 de marzo de 2026: TSH 6,2."]
+english = "Labs from March 3, 2026: TSH 6.2."
+
+[[gold.objective]]
+spanish = ["Peso 71 kg."]
+english = "Weight 71 kg."
+
+[[gold.assessment]]
+spanish = ["hipotiroidismo con dosis insuficiente de levotiroxina."]
+english = "Hypothyroidism with insufficient levothyroxine dose."
+
+[[gold.plan]]
+spanish = ["aumentar levotiroxina a 75 microgramos al día en ayunas."]
+english = "Increase levothyroxine to 75 mcg daily, fasting."
+
+[[gold.plan]]
+spanish = ["Repetir TSH en 6 semanas."]
+english = "Repeat TSH in 6 weeks."

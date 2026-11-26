@@ -42,6 +42,11 @@ public static class AuditActions
     // Emergency access to a patient outside the actor's normal access, with its stated reason.
     public const string BreakGlass = "break_glass";
 
+    // An emergency access the database couldn't put in the administrators' inboxes (step 18,
+    // db/policies/72-emergency-access-review.sql): recorded by the database with the access and the error's code only, and
+    // made up by the migration job's next run. The access itself was granted.
+    public const string ReviewItemsFailed = "review_items_failed";
+
     // The first admin account, created from configuration when there were no staff accounts.
     public const string BootstrapAdmin = "bootstrap_admin";
 
@@ -96,6 +101,6 @@ public static class AuditActions
         Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
         RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
-        RegistrationReplaced, ProxyAccountCreated, SentToLab,
+        RegistrationReplaced, ProxyAccountCreated, SentToLab, ReviewItemsFailed,
     ];
 }

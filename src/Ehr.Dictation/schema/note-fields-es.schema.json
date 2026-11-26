@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "The note fields K2 Horizon may propose from one transcript dictated in Spanish (FR-11, proposed FR-61), sent to llama-server as the response format (prompt.py strips $schema and $comment). The four fields of note-fields.schema.json, in English, with no field for orders or allergies (FR-14). The answer is one flat list of statements in the order the clinician said them, each the passages of the Spanish transcript it comes from, copied word for word, then the one field it belongs in, then their English translation, in that order, so the model quotes before it sorts and translates. One list, each statement tagged with its field, walks the dictation once, so no passage is repeated in another field; short quotes (two of 200 characters at most) and a short translation (240) keep a paragraph from being one statement. A field no statement is tagged with means the transcript said nothing for it. Each field's description is note-fields.schema.json's, word for word (a test checks). Changing this file needs line-by-line human review (AGENTS.md) and a new run of the Spanish test set (eval/README.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["statements"],
+  "properties": {
+    "statements": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["spanish", "field", "english"],
+        "properties": {
+          "spanish": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "type": "string", "maxLength": 200 } },
+          "field": {
+            "oneOf": [
+              { "const": "subjective", "description": "What the patient reports: the reason for the visit, the symptoms and their timing, the relevant past and family history, medications and allergies, and readings they took at home." },
+              { "const": "objective", "description": "What the clinician found: today's vital signs and examination findings, and the results the clinician has already reviewed (labs, ECG, imaging)." },
+              { "const": "assessment", "description": "The clinician's impression: diagnoses, differential diagnoses, and how each problem is doing." },
+              { "const": "plan", "description": "What the clinician says happens next: treatment, medication changes, tests, referrals, follow-up and advice." }
+            ]
+          },
+          "english": { "type": "string", "maxLength": 240 }
+        }
+      }
+    }
+  }
+}

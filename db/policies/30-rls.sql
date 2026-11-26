@@ -229,8 +229,9 @@ DROP POLICY IF EXISTS patient_assignments_patient_select ON ehr.patient_assignme
 CREATE POLICY patient_assignments_patient_select ON ehr.patient_assignments FOR SELECT
     USING (patient_id = (SELECT ehr.current_patient_id()));
 
--- Emergency access (PHI). A clinician records and reads their own; admins review it in the audit log, where the
--- break_glass event carries the same reason. Nothing updates or deletes (10-grants.sql).
+-- Emergency access (PHI). A clinician records and reads their own; admins review it (step 18) from the audit log, where
+-- the break_glass event carries the same reason, and through ehr.emergency_access_for_review
+-- (72-emergency-access-review.sql), never this table. Nothing updates or deletes (10-grants.sql).
 ALTER TABLE ehr.break_glass_accesses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.break_glass_accesses FORCE ROW LEVEL SECURITY;
 
@@ -242,9 +243,27 @@ DROP POLICY IF EXISTS break_glass_accesses_own_insert ON ehr.break_glass_accesse
 CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR INSERT
     WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
 -- For the tables' owner alone, which ehr.record_views runs as (42-record-views.sql): it marks a view made inside a
--- window, and returns no reason. No runtime role is or can become it.
+-- window, and returns no reason; and which the review's guard, its delivery and ehr.emergency_access_for_review run as
+-- (72-emergency-access-review.sql). No runtime role is or can become it.
 DROP POLICY IF EXISTS break_glass_accesses_owner_select ON ehr.break_glass_accesses;
 CREATE POLICY break_glass_accesses_owner_select ON ehr.break_glass_accesses FOR SELECT TO ehr_owner USING (true);
+
+-- Reviews of emergency accesses (step 18): restricted, like the audit log they belong with. An administrator reads
+-- every review and adds one as themselves; the guard (72-emergency-access-review.sql) holds the rest. Nobody else reads
+-- one: not the clinician whose access it was, not a patient, not someone signed out. Nothing changes or deletes one.
+ALTER TABLE ehr.emergency_access_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.emergency_access_reviews FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS emergency_access_reviews_admin_select ON ehr.emergency_access_reviews;
+CREATE POLICY emergency_access_reviews_admin_select ON ehr.emergency_access_reviews FOR SELECT
+    USING ((SELECT ehr.is_admin()));
+
+DROP POLICY IF EXISTS emergency_access_reviews_admin_insert ON ehr.emergency_access_reviews;
+CREATE POLICY emergency_access_reviews_admin_insert ON ehr.emergency_access_reviews FOR INSERT
+    WITH CHECK ((SELECT ehr.is_admin()) AND reviewer_id = (SELECT ehr.current_user_id()));
+-- For the tables' owner alone, which the sweep of waiting accesses runs as (72-emergency-access-review.sql).
+DROP POLICY IF EXISTS emergency_access_reviews_owner_select ON ehr.emergency_access_reviews;
+CREATE POLICY emergency_access_reviews_owner_select ON ehr.emergency_access_reviews FOR SELECT TO ehr_owner USING (true);
 
 -- The rest of the chart (PHI): allergies, medications, diagnoses and visits, each row one patient's. Clinicians read
 -- every patient's; a patient reads their own. A visit is inserted when a patient is checked in for an appointment
@@ -1004,3 +1023,50 @@ DROP POLICY IF EXISTS ai_field_proposals_own ON ehr.ai_field_proposals;
 CREATE POLICY ai_field_proposals_own ON ehr.ai_field_proposals FOR ALL
     USING ((SELECT ehr.is_clinician()) AND EXISTS (SELECT 1 FROM ehr.ai_note_reviews r
         WHERE r.id = ai_field_proposals.review_id AND r.patient_id = ai_field_proposals.patient_id));
+
+-- The expansion plan's step 15: the orders and allergies to add a dictation proposes are as private as its review.
+ALTER TABLE ehr.ai_chart_proposals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.ai_chart_proposals FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS ai_chart_proposals_own ON ehr.ai_chart_proposals;
+CREATE POLICY ai_chart_proposals_own ON ehr.ai_chart_proposals FOR ALL
+    USING ((SELECT ehr.is_clinician()) AND EXISTS (SELECT 1 FROM ehr.ai_note_reviews r
+        WHERE r.id = ai_chart_proposals.review_id AND r.patient_id = ai_chart_proposals.patient_id));
+
+-- Ambient listening (step 16): a clinician's consents to record a visit, and the transcript of a conversation while its
+-- review is open (56-ambient-listening.sql has their rules). A clinician confirms a consent as themselves, for a patient on
+-- their active panel, and sees only their own. A transcript is its review's: the review's clinician, of their own draft
+-- (the review's own policy, through the subquery). The cloud app can see that a transcript exists but not read it (a
+-- column grant, 10-grants.sql). Its owner reads and deletes transcripts only through ehr.purge_ambient_transcripts, the
+-- one way one goes while its review is open: the owner's two policies ask for app.ambient_purge to be 'open', which that
+-- function sets for its delete and clears before it returns, as the lab's door does with app.lab_door (above), and for
+-- the same reasons: they are the owner's alone, so a runtime role that sets it gains nothing, and outside the function
+-- the owner sees none. Admins, patients and nobody see none.
+ALTER TABLE ehr.ambient_consents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.ambient_consents FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS ambient_consents_own_select ON ehr.ambient_consents;
+CREATE POLICY ambient_consents_own_select ON ehr.ambient_consents FOR SELECT
+    USING ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
+DROP POLICY IF EXISTS ambient_consents_panel_insert ON ehr.ambient_consents;
+CREATE POLICY ambient_consents_panel_insert ON ehr.ambient_consents FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND clinician_id = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = ambient_consents.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+ALTER TABLE ehr.ambient_transcripts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.ambient_transcripts FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS ambient_transcripts_own ON ehr.ambient_transcripts;
+CREATE POLICY ambient_transcripts_own ON ehr.ambient_transcripts FOR ALL
+    USING ((SELECT ehr.is_clinician()) AND EXISTS (SELECT 1 FROM ehr.ai_note_reviews r
+        WHERE r.id = ambient_transcripts.id AND r.patient_id = ambient_transcripts.patient_id));
+DROP POLICY IF EXISTS ambient_transcripts_owner_select ON ehr.ambient_transcripts;
+CREATE POLICY ambient_transcripts_owner_select ON ehr.ambient_transcripts FOR SELECT TO ehr_owner
+    USING ((SELECT current_setting('app.ambient_purge', true)) = 'open');
+DROP POLICY IF EXISTS ambient_transcripts_owner_purge ON ehr.ambient_transcripts;
+CREATE POLICY ambient_transcripts_owner_purge ON ehr.ambient_transcripts FOR DELETE TO ehr_owner
+    USING ((SELECT current_setting('app.ambient_purge', true)) = 'open');

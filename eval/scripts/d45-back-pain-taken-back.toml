@@ -1,0 +1,63 @@
+# Dictation test script (synthetic): low back pain, with an order said with its reason (listed, not proposed), and an order and an allergy taken back just after they are said. Format: eval/README.md.
+id = "d45-back-pain-taken-back"
+voice = "am_michael"
+tags = [
+    "vitals", "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "spoken-punctuation",
+    "proposal", "proposal-trap",
+]
+dates = []
+drugs = ["ibuprofen", "codeine"]
+forbidden = ["order a CBC", "Order an MRI of the lumbar spine", "add codeine to his allergy list"]
+text = """
+This is a [[45-year-old|forty-five-year-old]] man with low back pain for [[3 weeks|three weeks]] after lifting
+boxes at work {period} The pain is worse when he bends {comma} with no leg weakness {comma} no numbness and no trouble
+with his bladder or bowels {period} Ibuprofen helps a little {period} He had nausea with codeine years ago {period}
+{new paragraph}
+On examination he has tenderness over the lower lumbar muscles {comma} straight leg raise is negative on both sides
+{comma} and power and reflexes are normal {period} Temperature [[36.8|thirty-six point eight]] {period}
+{new paragraph}
+Assessment {colon} mechanical low back pain without red flags {period} {new paragraph}
+Plan {colon} go ahead and order a CBC today because he has felt run down {period} Continue ibuprofen with food and
+start physiotherapy {period} Order an MRI of the lumbar spine {period} Actually no {comma} hold off on that until he
+has tried physiotherapy {period} Please add codeine to his allergy list {comma} sorry {comma} scratch that {comma}
+nausea is not an allergy {period}
+"""
+
+[gold.subjective]
+value = "A 45-year-old man with low back pain for 3 weeks after lifting boxes at work. The pain is worse when he bends, with no leg weakness, no numbness and no trouble with his bladder or bowels. Ibuprofen helps a little. He had nausea with codeine years ago."
+sources = [
+    "a 45-year-old man with low back pain for 3 weeks after lifting boxes at work.",
+    "The pain is worse when he bends, with no leg weakness, no numbness and no trouble with his bladder or bowels.",
+    "Ibuprofen helps a little.",
+    "He had nausea with codeine years ago.",
+]
+
+[gold.objective]
+value = "He has tenderness over the lower lumbar muscles, straight leg raise is negative on both sides, and power and reflexes are normal. Temperature 36.8."
+sources = [
+    "he has tenderness over the lower lumbar muscles, straight leg raise is negative on both sides, and power and reflexes are normal.",
+    "Temperature 36.8.",
+]
+
+[gold.assessment]
+value = "Mechanical low back pain without red flags."
+sources = ["mechanical low back pain without red flags."]
+
+[gold.plan]
+value = "Continue ibuprofen with food and start physiotherapy. Hold off on that until he has tried physiotherapy."
+sources = [
+    "Continue ibuprofen with food and start physiotherapy.",
+    "hold off on that until he has tried physiotherapy.",
+]
+
+[[not_proposed]]
+words = "order a CBC"
+why = "not_plain"
+
+[[not_proposed]]
+words = "Order an MRI of the lumbar spine"
+why = "taken_back"
+
+[[not_proposed]]
+words = "add codeine to his allergy list"
+why = "taken_back"

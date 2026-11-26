@@ -41,10 +41,10 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"data-dictation-api=\"{DictationApi.Path}\"", html);
         // The script, under its fingerprinted name (dictation.<hash>.js).
         Assert.Contains("/_content/Ehr.Design/js/dictation.", html);
-        Assert.Contains("Dictation supports English only", html);
+        Assert.Contains("Dictation supports English and Spanish", html);
         Assert.Contains("Nothing is saved", html);
         Assert.Contains("orders and allergy changes are never filled in from dictation", html);
-        foreach (var field in new[] { "history", "assessment", "plan" })
+        foreach (var field in new[] { "subjective", "objective", "assessment", "plan" })
         {
             Assert.Contains($"data-dictation-field=\"{field}\"", html);
         }
@@ -79,8 +79,8 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, stopped.StatusCode);
         var json = await JsonAsync(result);
         Assert.Equal("done", (string?)json["sorting"]);
-        Assert.Equal("pending", (string?)json["fields"]!["history"]!["status"]);
-        Assert.Equal("Cough for three days.", (string?)json["fields"]!["history"]!["value"]);
+        Assert.Equal("pending", (string?)json["fields"]!["subjective"]!["status"]);
+        Assert.Equal("Cough for three days.", (string?)json["fields"]!["subjective"]!["value"]);
         Assert.Equal("empty", (string?)json["fields"]!["plan"]!["status"]);
         Assert.Equal("order", (string?)json["notCarriedOver"]![0]!["reason"]);
         // The audio reached the service for this clinician, in the type the browser recorded.
@@ -107,6 +107,32 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         var json = await JsonAsync(stopped);
         Assert.Equal("unavailable", (string?)json["sorting"]);
         Assert.Equal(DictationResult.UnsortedMessage, (string?)json["message"]);
+        Assert.False(string.IsNullOrEmpty((string?)json["transcript"]!["text"]));
+    }
+
+    // A dictation in Spanish recorded with English chosen, too few English words (the expansion plan's step 17): the
+    // transcript comes back as plain text, with the service's reason and the app's own sentence, which points at the
+    // Spanish choice. The service's side is test_sessions.py's and test_validation.py's.
+    [Fact]
+    public async Task A_dictation_mostly_not_english_comes_back_unsorted_with_words_pointing_at_spanish()
+    {
+        service.Sorting = StubSorting.NotEnglish;
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Quinn", "Notenglish");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPrem, clinician);
+        var token = Token(await session.Client.GetStringAsync(DictatePath(patient), Cancel));
+
+        using var started = await SendAsync(session.Client, token, HttpMethod.Post, DictationApi.Path);
+        var id = (string)(await JsonAsync(started))["sessionId"]!;
+        using var chunk = await SendAsync(session.Client, token, HttpMethod.Post, $"{DictationApi.Path}/{id}/audio?seq=0", Audio([1, 2, 3]));
+        using var stopped = await SendAsync(session.Client, token, HttpMethod.Post, $"{DictationApi.Path}/{id}/stop");
+
+        var json = await JsonAsync(stopped);
+        Assert.Equal(("unavailable", "transcript_not_english"), ((string?)json["sorting"], (string?)json["reason"]));
+        Assert.Null(json["fields"]);
+        Assert.Equal(DictationResult.NotEnglishMessage, (string?)json["message"]);
+        Assert.Contains("If you dictated in Spanish, choose Spanish as the language", DictationResult.NotEnglishMessage);
         Assert.False(string.IsNullOrEmpty((string?)json["transcript"]!["text"]));
     }
 

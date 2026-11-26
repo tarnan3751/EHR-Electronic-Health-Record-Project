@@ -1,0 +1,9 @@
+@model (Guid DraftId, IReadOnlyList<Ehr.Data.Patients.AiChartProposal> Waiting, bool Signed)
+@* The expansion plan's step 15: the orders and allergies to add this note's dictations proposed that still wait for their
+   author's decision, on the note being written and, near its top, the signed note. They never hold up signing, unlike
+   the note's fields, and signing doesn't decide them: each is opened in its form, or dismissed, on its review. *@
+@if (Model.Waiting.Count > 0)
+{
+    var first = Model.Waiting[0];
+    <p class="sc-notice sc-notice--warning" data-waiting-proposals="@Model.Waiting.Count"><span class="sc-notice__state">Awaiting review:</span> @(Model.Waiting.Count == 1 ? "an order or allergy" : $"{Model.Waiting.Count} orders or allergies") proposed from dictation. <a asp-page="/Patients/Notes/Review" asp-area="Clinical" asp-route-patientId="@first.PatientId" asp-route-draftId="@Model.DraftId" asp-route-reviewId="@first.ReviewId">Review them</a>@(Model.Signed ? ": they can still be opened in their forms or dismissed." : ". Unlike the note's fields, they don't hold up signing.")</p>
+}

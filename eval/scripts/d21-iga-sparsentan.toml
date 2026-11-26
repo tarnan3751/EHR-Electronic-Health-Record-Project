@@ -30,17 +30,22 @@ creatinine in [[2 weeks|two weeks]] {period} Home blood pressure readings with a
 {period}
 """
 
-[gold.history]
-value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. On losartan 100 mg daily and dapagliflozin 10 mg daily. Protein to creatinine ratio still 1.4 g per gram; eGFR drifted from 68 to 59 over the year. Feels well. No visible blood in the urine since the first episode, no swelling, no rashes, no joint pains. Does not smoke, drinks very little. Father needed dialysis in his sixties; mother has high blood pressure. Works as a teacher and wants to keep working full time. Blood pressure 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8; ALT and AST normal."
+[gold.subjective]
+value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. On losartan 100 mg daily and dapagliflozin 10 mg daily. Feels well. No visible blood in the urine since the first episode, no swelling, no rashes, no joint pains. Does not smoke, drinks very little. Father needed dialysis in his sixties; mother has high blood pressure. Works as a teacher and wants to keep working full time."
 sources = [
     "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection.",
     "Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily.",
-    "Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year.",
     "He feels well.",
     "No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains.",
     "He does not smoke and drinks very little.",
     "His father needed dialysis in his sixties and his mother has high blood pressure.",
     "He works as a teacher and wants to keep working full time.",
+]
+
+[gold.objective]
+value = "Protein to creatinine ratio still 1.4 g per gram; eGFR drifted from 68 to 59 over the year. Blood pressure 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8; ALT and AST normal."
+sources = [
+    "Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year.",
     "Blood pressure today 136/84, pulse 70, weight 88 kg.",
     "No edema.",
     "Potassium 4.8, ALT and AST normal.",
@@ -65,17 +70,22 @@ sources = [
     "Clinic review in 6 weeks.",
 ]
 
-[gold_rules.history]
-value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily. Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year. He feels well. No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains. He does not smoke and drinks very little. His father needed dialysis in his sixties and his mother has high blood pressure. He works as a teacher and wants to keep working full time. Blood pressure today 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8, ALT and AST normal."
+[gold_rules.subjective]
+value = "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection. Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily. He feels well. No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains. He does not smoke and drinks very little. His father needed dialysis in his sixties and his mother has high blood pressure. He works as a teacher and wants to keep working full time."
 sources = [
     "41-year-old man with biopsy proven IgA nephropathy diagnosed 18 months ago after he noticed cola colored urine during a chest infection.",
     "Since then he has been on losartan 100 mg daily and dapagliflozin 10 mg daily.",
-    "Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year.",
     "He feels well.",
     "No visible blood in the urine since the first episode, no swelling, no rashes and no joint pains.",
     "He does not smoke and drinks very little.",
     "His father needed dialysis in his sixties and his mother has high blood pressure.",
     "He works as a teacher and wants to keep working full time.",
+]
+
+[gold_rules.objective]
+value = "Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year. Blood pressure today 136/84, pulse 70, weight 88 kg. No edema. Potassium 4.8, ALT and AST normal."
+sources = [
+    "Despite that his protein to creatinine ratio is still 1.4 g per gram, and his eGFR has drifted from 68 to 59 over the year.",
     "Blood pressure today 136/84, pulse 70, weight 88 kg.",
     "No edema.",
     "Potassium 4.8, ALT and AST normal.",

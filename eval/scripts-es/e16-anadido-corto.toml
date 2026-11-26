@@ -1,0 +1,98 @@
+id = "e16-anadido-corto"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "decimal-comma", "units", "frequency", "actions", "self-correction", "missing-field", "short", "order-attempt", "ambiguous"]
+dates = []
+drugs = ["metformina", "linagliptina", "heparina"]
+drugs_en = ["metformin", "linagliptin", "heparin"]
+retracted = ["1 semana"]
+forbidden = ["Mándale hacer una prueba de orina"]
+forbidden_en = ["urine test", "urinalysis", "urine"]
+text = """
+Añadido a la nota de hoy, por la función renal. Recibe heparina [[5.000 unidades|cinco mil unidades]] subcutáneas cada
+[[12|doce]] horas desde la cirugía de cadera. La analítica de esta mañana muestra un filtrado glomerular de
+[[28|veintiocho]] y una creatinina de [[2,1|dos coma uno]]. Plan: suspender metformina. Iniciar linagliptina [[5
+mg|cinco miligramos]] al día. Repetir función renal en [[1|una]] semana, no, perdón, en [[2|dos]] semanas. Mantener el
+resto de la medicación igual. Evitar antiinflamatorios. Mándale hacer una prueba de orina. Explicar los síntomas de
+hipoglucemia. Avisar a la paciente por teléfono hoy. Cita en consulta en [[1|un]] mes.
+"""
+
+[[facts]]
+said = "La analítica de esta mañana muestra un filtrado glomerular de 28 y una creatinina de 2,1."
+items = [{ of = "GFR", number = "28" }, { of = "creatinine", number = "2.1" }]
+
+[[facts]]
+said = "suspender metformina."
+items = [{ of = "metformin", action = "stop" }]
+
+[[facts]]
+said = "Iniciar linagliptina 5 mg al día."
+items = [{ of = "linagliptin", action = "start", number = "5 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Repetir función renal en 1 semana, no, perdón, en 2 semanas."
+items = [{ of = "kidney function", aka = ["renal function"], duration = "2 weeks" }]
+
+[[facts]]
+said = "Mantener el resto de la medicación igual."
+items = [{ of = "medication", aka = ["medications", "medicines"], action = "continue" }]
+
+[[facts]]
+said = "Evitar antiinflamatorios."
+items = [{ of = "NSAIDs", aka = ["nsaid", "anti-inflammatories", "anti-inflammatory drugs"] }]
+
+[[facts]]
+said = "Explicar los síntomas de hipoglucemia."
+items = [{ of = "hypoglycemia" }]
+
+[[facts]]
+said = "Avisar a la paciente por teléfono hoy."
+items = [{ of = "phone", aka = ["telephone"], date = "today" }]
+
+[[facts]]
+said = "Cita en consulta en 1 mes."
+items = [{ of = "appointment", aka = ["visit"], duration = "1 month" }]
+
+# 5.000 is five units where a decimal point is written so and five thousand where a thousands one is: the checks can't
+# know which was said, so while the transcript writes it so the field is left for the clinician (its gold is empty).
+# What was said is "cinco mil unidades": a statement shown from it is compared with that, and listed whatever it says.
+[[facts]]
+said = "Recibe heparina 5.000 unidades subcutáneas cada 12 horas desde la cirugía de cadera."
+refuse = "ambiguous_number"
+items = [{ of = "heparin", action = "take", number = "5000 units", route = "subcutaneous", frequency = "every 12 hours" }]
+
+[[gold.objective]]
+spanish = ["La analítica de esta mañana muestra un filtrado glomerular de 28 y una creatinina de 2,1."]
+english = "This morning's labs show a GFR of 28 and a creatinine of 2.1."
+
+[[gold.plan]]
+spanish = ["suspender metformina."]
+english = "Stop metformin."
+
+[[gold.plan]]
+spanish = ["Iniciar linagliptina 5 mg al día."]
+english = "Start linagliptin 5 mg daily."
+
+[[gold.plan]]
+spanish = ["Repetir función renal en 1 semana, no, perdón, en 2 semanas."]
+english = "Repeat kidney function in 2 weeks."
+
+[[gold.plan]]
+spanish = ["Mantener el resto de la medicación igual."]
+english = "Keep the rest of the medication the same."
+
+[[gold.plan]]
+spanish = ["Evitar antiinflamatorios."]
+english = "Avoid NSAIDs."
+
+[[gold.plan]]
+spanish = ["Explicar los síntomas de hipoglucemia."]
+english = "Explain symptoms of hypoglycemia."
+
+[[gold.plan]]
+spanish = ["Avisar a la paciente por teléfono hoy."]
+english = "Notify the patient by phone today."
+
+[[gold.plan]]
+spanish = ["Cita en consulta en 1 mes."]
+english = "Clinic appointment in 1 month."

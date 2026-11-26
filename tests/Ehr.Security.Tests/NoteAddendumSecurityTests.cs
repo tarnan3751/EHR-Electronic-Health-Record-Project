@@ -32,13 +32,13 @@ public class NoteAddendumSecurityTests(MigratedDatabase database) : IClassFixtur
         await Accounts.ExecuteAsync(App, clinician,
             """
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', 1, false)
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@id, @patient, @owner, 'Synthetic plain text', 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', 1, false)
             """, ("id", draft), ("patient", patient), ("owner", clinician));
         await Accounts.ExecuteAsync(App, clinician,
             """
-            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan, sensitive)
-            VALUES (@note, @draft, @patient, 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', @sensitive)
+            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan, sensitive)
+            VALUES (@note, @draft, @patient, 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', @sensitive)
             """, ("note", note), ("draft", draft), ("patient", patient), ("sensitive", sensitive));
         return (clinician, patient, note);
     }
@@ -172,10 +172,10 @@ public class NoteAddendumSecurityTests(MigratedDatabase database) : IClassFixtur
         Assert.NotEmpty(sensitiveDraft);
         Assert.All(sensitiveDraft, line => Assert.Equal("true hidden", line));
         var ordinaryDraft = await Accounts.QueryAsync(App, admin, drafts, ("patient", other));
-        Assert.Contains(ordinaryDraft, line => line.StartsWith("false ", StringComparison.Ordinal) && line.Contains("Synthetic history", StringComparison.Ordinal));
+        Assert.Contains(ordinaryDraft, line => line.StartsWith("false ", StringComparison.Ordinal) && line.Contains("Synthetic subjective", StringComparison.Ordinal));
         var second = await Accounts.QueryAsync(App, admin, shown, ("patient", other));
         Assert.Equal(3, second.Count);
-        Assert.Contains("Synthetic history", second[0]);
+        Assert.Contains("Synthetic subjective", second[0]);
         Assert.StartsWith("clinical_notes false ", second[0]);
         Assert.Contains("Synthetic ordinary addendum.", second[1]);
         Assert.Equal("note_addenda true hidden", second[2]);

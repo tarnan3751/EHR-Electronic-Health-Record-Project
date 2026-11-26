@@ -1,0 +1,86 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Mujer de 31 años, segundo embarazo, de 28 semanas."
+items = [{ of = "age", number = "31" }, { of = "pregnancy", aka = ["pregnant", "gestation"], duration = "28 weeks" }]
+
+[[facts]]
+said = "Fecha probable de parto: 16 de febrero de 2027."
+items = [{ of = "due date", aka = ["estimated due date", "delivery"], date = "February 16, 2027" }]
+
+[[facts]]
+said = "Antecedente de diabetes gestacional en el primer embarazo, que terminó en cesárea en 2023."
+items = [{ of = "gestational diabetes", history = true }, { of = "cesarean section", aka = ["cesarean", "c-section"], date = "2023" }]
+
+[[facts]]
+said = "Su madre tuvo preeclampsia."
+items = [{ of = "preeclampsia", who = "mother" }]
+
+[[facts]]
+said = "Niega sangrado, niega pérdida de líquido y niega contracciones."
+items = [{ of = "bleeding", negated = true }, { of = "fluid loss", aka = ["loss of fluid", "leaking fluid"], negated = true }, { of = "contractions", negated = true }]
+
+[[facts]]
+said = "Tiene cansancio y calambres en las piernas por las noches."
+items = [{ of = "fatigue", aka = ["tiredness"], negated = false }, { of = "leg cramps", aka = ["cramps"], negated = false, frequency = "night" }]
+
+[[facts]]
+said = "No tiene dolor de cabeza ni alteraciones visuales."
+items = [{ of = "headache", negated = true }, { of = "visual disturbances", aka = ["visual changes", "vision changes"], negated = true }]
+
+[[facts]]
+said = "Toma ácido fólico 400 microgramos al día."
+items = [{ of = "folic acid", action = "take", number = "400 mcg", frequency = "daily" }]
+
+[[facts]]
+said = "No fuma."
+items = [{ of = "smoking", negated = true }]
+
+[[facts]]
+said = "presión arterial 112/70, peso 72,5 kg, 1,5 kg más que hace 4 semanas."
+items = [{ of = "BP", number = "112/70" }, { of = "weight", number = ["72.5 kg", "1.5 kg"], duration = "4 weeks" }]
+
+[[facts]]
+said = "Altura uterina de 28 cm."
+items = [{ of = "fundal height", number = "28 cm" }]
+
+[[facts]]
+said = "Frecuencia cardiaca fetal de 146 latidos por minuto."
+items = [{ of = "fetal heart rate", number = "146" }]
+
+[[facts]]
+said = "Sin edema en las piernas."
+items = [{ of = "edema", negated = true }]
+
+[[facts]]
+said = "Analítica del 17 de noviembre de 2026: hemoglobina 10,4 g/dl, ferritina 9, glucosa a la hora de 128 mg/dl."
+items = [{ of = "hemoglobin", number = "10.4 g/dL", date = "November 17, 2026" }, { of = "ferritin", number = "9" }, { of = "glucose", number = "128 mg/dL" }]
+
+[[facts]]
+said = "embarazo de 28 semanas de curso normal."
+items = [{ of = "pregnancy", aka = ["pregnant", "gestation"], duration = "28 weeks", polarity = "normal" }]
+
+[[facts]]
+said = "Anemia leve, probablemente por falta de hierro."
+items = [{ of = "anemia", severity = "mild" }, { of = "iron deficiency", aka = ["iron"], doubt = true }]
+
+[[facts]]
+said = "Cribado de diabetes gestacional negativo."
+items = [{ of = "gestational diabetes" }, { of = "screening", aka = ["screen"], polarity = "negative" }]
+
+[[facts]]
+said = "iniciar sulfato ferroso 325 mg al día con zumo de naranja."
+items = [{ of = "ferrous sulfate", aka = ["iron"], action = "start", number = "325 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Continuar ácido fólico."
+items = [{ of = "folic acid", action = "continue" }]
+
+[[facts]]
+said = "Vacuna de la tosferina hoy."
+items = [{ of = "pertussis vaccine", aka = ["whooping cough vaccine", "Tdap"], date = "today" }]
+
+[[facts]]
+said = "Próximo control en 2 semanas."
+items = [{ of = "follow-up", aka = ["review", "recheck", "visit"], duration = "2 weeks" }]

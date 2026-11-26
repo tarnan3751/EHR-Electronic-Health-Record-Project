@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): gout on febuxostat, with an allergy change to leave out. Format: eval/README.md.
 id = "d16-gout-febuxostat"
 voice = "ef_dora"
-tags = ["numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation"]
+tags = ["numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation", "proposal", "proposal-trap"]
 noise = ["babble"]
 dates = []
 drugs = ["allopurinol", "febuxostat", "colchicine"]
@@ -25,8 +25,8 @@ Plan {colon} increase febuxostat to [[120 mg|one hundred twenty milligrams]] scr
 drinks {period}
 """
 
-[gold.history]
-value = "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee. Widespread rash with allopurinol in the spring that settled when it was stopped. On febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting febuxostat 2 months ago. No chest pain or shortness of breath. No history of heart disease. Small tophus on the right elbow, no joint swelling today. Uric acid 7.4, down from 9.2. Creatinine 1.0."
+[gold.subjective]
+value = "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee. Widespread rash with allopurinol in the spring that settled when it was stopped. On febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting febuxostat 2 months ago. No chest pain or shortness of breath. No history of heart disease."
 sources = [
     "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee.",
     "He had a widespread rash with allopurinol in the spring that settled when it was stopped",
@@ -34,6 +34,11 @@ sources = [
     "No flare since starting febuxostat 2 months ago.",
     "No chest pain or shortness of breath.",
     "No history of heart disease.",
+]
+
+[gold.objective]
+value = "Small tophus on the right elbow, no joint swelling today. Uric acid 7.4, down from 9.2. Creatinine 1.0."
+sources = [
     "Exam shows a small tophus on the right elbow, no joint swelling today.",
     "Uric acid is 7.4, down from 9.2.",
     "Creatinine 1.0.",
@@ -52,8 +57,8 @@ sources = [
     "Cut down on beer and sugary drinks.",
 ]
 
-[gold_rules.history]
-value = "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped. He is now on febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting febuxostat 2 months ago. No chest pain or shortness of breath. No history of heart disease. Exam shows a small tophus on the right elbow, no joint swelling today. Uric acid is 7.4, down from 9.2. Creatinine 1.0."
+[gold_rules.subjective]
+value = "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee. He had a widespread rash with allopurinol in the spring that settled when it was stopped. He is now on febuxostat 40 mg daily with colchicine 0.5 mg daily for prophylaxis. No flare since starting febuxostat 2 months ago. No chest pain or shortness of breath. No history of heart disease."
 sources = [
     "57-year-old man with tophaceous gout, 3 flares this year in the left big toe and right knee.",
     "He had a widespread rash with allopurinol in the spring that settled when it was stopped",
@@ -61,6 +66,11 @@ sources = [
     "No flare since starting febuxostat 2 months ago.",
     "No chest pain or shortness of breath.",
     "No history of heart disease.",
+]
+
+[gold_rules.objective]
+value = "Exam shows a small tophus on the right elbow, no joint swelling today. Uric acid is 7.4, down from 9.2. Creatinine 1.0."
+sources = [
     "Exam shows a small tophus on the right elbow, no joint swelling today.",
     "Uric acid is 7.4, down from 9.2.",
     "Creatinine 1.0.",
@@ -74,3 +84,7 @@ sources = [
     "Recheck uric acid in 4 weeks.",
     "Cut down on beer and sugary drinks.",
 ]
+
+[[not_proposed]]
+words = "add allopurinol to his allergy list"
+why = "not_plain"

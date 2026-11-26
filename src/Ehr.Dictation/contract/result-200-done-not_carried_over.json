@@ -4,28 +4,28 @@
   "status": 200,
   "body": {
     "transcript": {
-      "text": "Start metformin. Go ahead and order an A1c. Add sulfa to her allergy list. Start metformin. Go ahead and order an A1c. Add sulfa to her allergy list. Start metformin. Go ahead and order an A1c. Add sulfa to her allergy list.",
+      "text": "Start metformin. Go ahead and order a hemoglobin A1c. Add amoxicillin to her allergy list. Start metformin. Go ahead and order a hemoglobin A1c. Add amoxicillin to her allergy list. Start metformin. Go ahead and order a hemoglobin A1c. Add amoxicillin to her allergy list.",
       "final": true,
       "segments": [
         {
           "start": 0,
-          "end": 74,
+          "end": 90,
           "startMs": 0,
           "endMs": 2490,
           "final": true,
           "unclear": null
         },
         {
-          "start": 75,
-          "end": 149,
+          "start": 91,
+          "end": 181,
           "startMs": 2490,
           "endMs": 5490,
           "final": true,
           "unclear": "too_quiet"
         },
         {
-          "start": 150,
-          "end": 224,
+          "start": 182,
+          "end": 272,
           "startMs": 5490,
           "endMs": 10000,
           "final": true,
@@ -36,7 +36,13 @@
     "sorting": "done",
     "reason": null,
     "fields": {
-      "history": {
+      "subjective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "objective": {
         "status": "empty",
         "reasons": [
           "not_dictated"
@@ -64,32 +70,83 @@
       {
         "reason": "order",
         "start": 17,
-        "end": 42
+        "end": 52
       },
       {
         "reason": "allergy_change",
-        "start": 44,
-        "end": 73
+        "start": 54,
+        "end": 89
       },
       {
         "reason": "order",
-        "start": 92,
-        "end": 117
+        "start": 108,
+        "end": 143
       },
       {
         "reason": "allergy_change",
-        "start": 119,
-        "end": 148
+        "start": 145,
+        "end": 180
       },
       {
         "reason": "order",
-        "start": 167,
-        "end": 192
+        "start": 199,
+        "end": 234
       },
       {
         "reason": "allergy_change",
-        "start": 194,
-        "end": 223
+        "start": 236,
+        "end": 271
+      }
+    ],
+    "proposals": [
+      {
+        "kind": "order",
+        "start": 17,
+        "end": 52,
+        "warnings": [],
+        "heardAfter": {
+          "start": 54,
+          "end": 107
+        }
+      },
+      {
+        "kind": "allergy_addition",
+        "start": 54,
+        "end": 89,
+        "warnings": [
+          {
+            "code": "near_unclear_passage",
+            "start": 91,
+            "end": 181
+          }
+        ],
+        "heardAfter": {
+          "start": 91,
+          "end": 107
+        }
+      },
+      {
+        "kind": "order",
+        "start": 199,
+        "end": 234,
+        "warnings": [
+          {
+            "code": "near_unclear_passage",
+            "start": 91,
+            "end": 181
+          }
+        ],
+        "heardAfter": {
+          "start": 236,
+          "end": 272
+        }
+      },
+      {
+        "kind": "allergy_addition",
+        "start": 236,
+        "end": 271,
+        "warnings": [],
+        "heardAfter": null
       }
     ],
     "provenance": {

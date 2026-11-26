@@ -23,8 +23,8 @@ Plan {colon} continue the current dose {comma} increase fiber and fluids for the
 and [[30 mg|thirty milligrams]] twice daily {period}
 """
 
-[gold.history]
-value = "26-year-old man with schizophrenia, seen with his mother. Stopped risperidone in the summer because of weight gain and loss of libido. Started xanomeline and trospium 4 weeks ago, 50 mg and 20 mg twice daily, increased after a week to 100 mg and 20 mg twice daily. Takes it an hour before breakfast and before his evening meal. Some nausea and constipation, no vomiting. Voices quieter, sleeping better. Denies thoughts of harming himself or anyone else. No urinary problems. Mental state: calm and engaged, speech normal, no formal thought disorder, occasional voices in the background. Insight partial."
+[gold.subjective]
+value = "26-year-old man with schizophrenia, seen with his mother. Stopped risperidone in the summer because of weight gain and loss of libido. Started xanomeline and trospium 4 weeks ago, 50 mg and 20 mg twice daily, increased after a week to 100 mg and 20 mg twice daily. Takes it an hour before breakfast and before his evening meal. Some nausea and constipation, no vomiting. Voices quieter, sleeping better. Denies thoughts of harming himself or anyone else. No urinary problems."
 sources = [
     "26-year-old man with schizophrenia, seen with his mother.",
     "He stopped risperidone in the summer because of weight gain and loss of libido.",
@@ -34,6 +34,11 @@ sources = [
     "The voices are quieter and he is sleeping better.",
     "He denies thoughts of harming himself or anyone else.",
     "No urinary problems.",
+]
+
+[gold.objective]
+value = "Mental state: calm and engaged, speech normal, no formal thought disorder, occasional voices in the background. Insight partial."
+sources = [
     "Mental state: calm and engaged, speech normal, no formal thought disorder, he describes occasional voices in the background.",
     "Insight partial.",
 ]
@@ -46,8 +51,8 @@ sources = ["schizophrenia with a partial response to xanomeline trospium, tolera
 value = "Continue the current dose. Increase fiber and fluids for the constipation. Review in 4 weeks, when going up to 125 mg and 30 mg twice daily can be considered."
 sources = ["continue the current dose, increase fiber and fluids for the constipation, and review in 4 weeks, when we can consider going up to 125 mg and 30 mg twice daily."]
 
-[gold_rules.history]
-value = "26-year-old man with schizophrenia, seen with his mother. He stopped risperidone in the summer because of weight gain and loss of libido. 4 weeks ago we started xanomeline and trospium, 50 mg and 20 mg twice daily, and increased it after a week to 100 mg and 20 mg twice daily. He takes it an hour before breakfast and before his evening meal. He has had some nausea and constipation but no vomiting. The voices are quieter and he is sleeping better. He denies thoughts of harming himself or anyone else. No urinary problems. Mental state: calm and engaged, speech normal, no formal thought disorder, he describes occasional voices in the background. Insight partial."
+[gold_rules.subjective]
+value = "26-year-old man with schizophrenia, seen with his mother. He stopped risperidone in the summer because of weight gain and loss of libido. 4 weeks ago we started xanomeline and trospium, 50 mg and 20 mg twice daily, and increased it after a week to 100 mg and 20 mg twice daily. He takes it an hour before breakfast and before his evening meal. He has had some nausea and constipation but no vomiting. The voices are quieter and he is sleeping better. He denies thoughts of harming himself or anyone else. No urinary problems."
 sources = [
     "26-year-old man with schizophrenia, seen with his mother.",
     "He stopped risperidone in the summer because of weight gain and loss of libido.",
@@ -57,6 +62,11 @@ sources = [
     "The voices are quieter and he is sleeping better.",
     "He denies thoughts of harming himself or anyone else.",
     "No urinary problems.",
+]
+
+[gold_rules.objective]
+value = "Mental state: calm and engaged, speech normal, no formal thought disorder, he describes occasional voices in the background. Insight partial."
+sources = [
     "Mental state: calm and engaged, speech normal, no formal thought disorder, he describes occasional voices in the background.",
     "Insight partial.",
 ]

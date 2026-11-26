@@ -24,8 +24,8 @@ because of the pregnancy plans {period} No driving until [[12 months|twelve mont
 [[3 months|three months]] {period}
 """
 
-[gold.history]
-value = "31-year-old woman with focal epilepsy on levetiracetam 750 mg twice daily. Focal to bilateral tonic clonic seizures on August 19 and October 4, both after poor sleep. Irritable and low since starting levetiracetam, noticed by her partner too. No thoughts of self-harm. Not driving. Planning a pregnancy in the next year. Examination normal. MRI: small area of left hippocampal sclerosis. EEG: left temporal sharp waves."
+[gold.subjective]
+value = "31-year-old woman with focal epilepsy on levetiracetam 750 mg twice daily. Focal to bilateral tonic clonic seizures on August 19 and October 4, both after poor sleep. Irritable and low since starting levetiracetam, noticed by her partner too. No thoughts of self-harm. Not driving. Planning a pregnancy in the next year."
 sources = [
     "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily.",
     "She had a focal to bilateral tonic clonic seizure on August 19 and another on October 2 correction October 4, both after poor sleep.",
@@ -33,6 +33,11 @@ sources = [
     "No thoughts of self-harm.",
     "She is not driving.",
     "She is planning a pregnancy in the next year.",
+]
+
+[gold.objective]
+value = "Examination normal. MRI: small area of left hippocampal sclerosis. EEG: left temporal sharp waves."
+sources = [
     "Examination normal.",
     "MRI shows a small area of left hippocampal sclerosis.",
     "EEG showed left temporal sharp waves.",
@@ -52,8 +57,8 @@ sources = [
     "Review in 3 months.",
 ]
 
-[gold_rules.history]
-value = "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily. She had a focal to bilateral tonic clonic seizure on August 19 and another on October 4, both after poor sleep. Since the levetiracetam she has felt irritable and low and her partner has noticed it too. No thoughts of self-harm. She is not driving. She is planning a pregnancy in the next year. Examination normal. MRI shows a small area of left hippocampal sclerosis. EEG showed left temporal sharp waves."
+[gold_rules.subjective]
+value = "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily. She had a focal to bilateral tonic clonic seizure on August 19 and another on October 4, both after poor sleep. Since the levetiracetam she has felt irritable and low and her partner has noticed it too. No thoughts of self-harm. She is not driving. She is planning a pregnancy in the next year."
 sources = [
     "31-year-old woman with focal epilepsy, on levetiracetam 750 mg twice daily.",
     "She had a focal to bilateral tonic clonic seizure on August 19 and another on October 2 correction October 4, both after poor sleep.",
@@ -61,6 +66,11 @@ sources = [
     "No thoughts of self-harm.",
     "She is not driving.",
     "She is planning a pregnancy in the next year.",
+]
+
+[gold_rules.objective]
+value = "Examination normal. MRI shows a small area of left hippocampal sclerosis. EEG showed left temporal sharp waves."
+sources = [
     "Examination normal.",
     "MRI shows a small area of left hippocampal sclerosis.",
     "EEG showed left temporal sharp waves.",

@@ -17,14 +17,19 @@ his mood drops continue the scalp gel review in [[16 weeks|sixteen weeks]] and r
 stiffness gets worse
 """
 
-[gold.history]
-value = "38-year-old man with plaque psoriasis on the elbows, knees and scalp for about ten years. Calcipotriol and betamethasone gel helps the scalp, but the plaques on his legs keep coming back. Stiffness in his fingers in the mornings for about ten minutes. No swollen joints, no nail pitting. Does not want injections. About 8% of the body surface involved, PASI 10."
+[gold.subjective]
+value = "38-year-old man with plaque psoriasis on the elbows, knees and scalp for about ten years. Calcipotriol and betamethasone gel helps the scalp, but the plaques on his legs keep coming back. Stiffness in his fingers in the mornings for about ten minutes. No swollen joints, no nail pitting. Does not want injections."
 sources = [
     "38-year-old man with plaque psoriasis on the elbows knees and scalp for about ten years",
     "he has used calcipotriol and betamethasone gel which helps the scalp but the plaques on his legs keep coming back",
     "he also gets some stiffness in his fingers in the mornings for about ten minutes",
     "no swollen joints no nail pitting",
     "he does not want injections",
+]
+
+[gold.objective]
+value = "About 8% of the body surface involved, PASI 10."
+sources = [
     "about 8% of the body surface is involved",
     "PASI 12 no sorry PASI 10",
 ]

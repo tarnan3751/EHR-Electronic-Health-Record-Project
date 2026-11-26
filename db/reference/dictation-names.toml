@@ -1,0 +1,54 @@
+# Common names a clinician dictates for an item the reference data holds under another name (the expansion plan's step
+# 15.1): "penicillin" for penicillin G or V, "latex" for natural latex rubber, "CRP" for C reactive protein, "A1c" and
+# "HbA1c" for hemoglobin A1c. A name written as one word of letters and digits ("A1c") is the only such word a proposal
+# reads whole (validation.py's ONE_WORD); every other ("B12", "T4") keeps its digits apart.
+# Hand-written, unlike the rest of db/reference, and read by src/Ehr.Dictation/sidecar/generate_catalog.py alone, which
+# writes each name into the dictation's catalog (ehr_dictation/catalog.py) as a name of its own, of its kind only, so an
+# instruction said plainly with it can be proposed (validation.py, "plain"), and, as for any orderable, a long list of
+# orders that FR-14's rule cuts at its reach goes on over it ("... and an iron panel and CRP"), so no item of the list is
+# left in the note. Nothing else reads it: the migration job and the tests' database apply only *.sql, the order and
+# allergy forms search the reference data as before, and a proposal fills in nothing; the clinician still picks the item
+# on the empty form.
+#
+# Each entry: the name as said (name); what it names (kind): an orderable, for an order, or an allergen, for an
+# allergy to add; the items it stands for (codes), each of which must be in the reference data as that kind, or the
+# generator refuses it: an orderable by its code in the order catalog (20-order-catalog.sql's LOINC lab orders and
+# RxNorm clinical drugs, or a common item's SYN- code), an allergen as system:code in 10-clinical-codes.sql; and where
+# the name comes from (source). A name is a term of art: never a negation, a number word, a word of the closed
+# sentence's classes or a single letter (src/Ehr.Dictation/sidecar/tests/test_catalog.py refuses them), and never an
+# everyday word, which would make that word an item (the reviewer's to check).
+
+[[name]]
+name = "penicillin"
+kind = "allergen"
+codes = ["rxnorm:7980", "rxnorm:7984"]  # Penicillin G, Penicillin V
+source = """ICD-10-CM Z88.0, "Allergy status to penicillin" (10-clinical-codes.sql). RxNorm's prescribable release \
+names no penicillin of its own, only penicillin G and penicillin V, and the name stands for both."""
+
+[[name]]
+name = "latex"
+kind = "allergen"
+codes = ["unii:2LQ0UUW8IN"]  # Natural latex rubber
+source = """ICD-10-CM Z91.040, "Latex allergy status", and T65.81-, "Toxic effect of latex" (10-clinical-codes.sql)."""
+
+[[name]]
+name = "CRP"
+kind = "orderable"
+codes = ["1988-5"]  # C reactive protein [Mass/volume] in Serum or Plasma
+source = """LOINC 2.83, 1988-5: short name "CRP SerPl-mCnc", display name "CRP [Mass/Vol]", related name "CRP"; the \
+most ordered of LOINC's C reactive protein tests (common order rank 117; high-sensitivity 30522-7, a different test, \
+is 273)."""
+
+[[name]]
+name = "A1c"
+kind = "orderable"
+codes = ["SYN-LAB-005"]  # Hemoglobin A1c, the clinic's common item
+source = """The clinic's common item, "Hemoglobin A1c"; LOINC 2.83's related names for 4548-4 and 17856-6, "HbA1c" and \
+"Hgb A1c"."""
+
+[[name]]
+name = "HbA1c"
+kind = "orderable"
+codes = ["SYN-LAB-005"]  # Hemoglobin A1c, the clinic's common item
+source = """LOINC 2.83: "HbA1c" is the short name's first word ("HbA1c MFr Bld") and a related name of 4548-4 and \
+17856-6, Hemoglobin A1c/Hemoglobin.total in Blood."""

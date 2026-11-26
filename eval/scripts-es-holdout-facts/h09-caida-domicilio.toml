@@ -1,0 +1,71 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Mujer de 81 años que vive sola."
+items = [{ of = "age", number = "81" }]
+
+[[facts]]
+said = "Se cayó en el baño la noche del 20 de noviembre al levantarse a orinar."
+items = [{ of = "fell", aka = ["fall"], date = "November 20", frequency = "night" }]
+
+[[facts]]
+said = "Refiere que se mareó al ponerse de pie."
+items = [{ of = "dizzy", aka = ["dizziness", "lightheaded"], negated = false }]
+
+[[facts]]
+said = "No perdió el conocimiento y no se golpeó la cabeza."
+items = [{ of = "consciousness", aka = ["lose consciousness", "loss of consciousness"], negated = true }, { of = "head", negated = true }]
+
+[[facts]]
+said = "Desde entonces tiene dolor moderado en la muñeca izquierda."
+items = [{ of = "pain", negated = false, severity = "moderate" }, { of = "wrist", side = "left" }]
+
+[[facts]]
+said = "Toma zolpidem 10 mg y doxazosina 4 mg por la noche, y enalapril 20 mg por la mañana."
+items = [{ of = "zolpidem", action = "take", number = "10 mg", frequency = "night" }, { of = "doxazosin", number = "4 mg", frequency = "night" }, { of = "enalapril", number = "20 mg", frequency = "morning" }]
+
+# Her daughter is who says it; the patient is who has it.
+[[facts]]
+said = "Su hija dice que últimamente está más olvidadiza."
+items = [{ of = "forgetful", aka = ["forgetfulness", "memory"], negated = false }]
+
+[[facts]]
+said = "tensión arterial sentada 136/78 y de pie 108/62, FC 72."
+items = [{ of = "BP", number = ["136/78", "108/62"] }, { of = "HR", number = "72" }]
+
+[[facts]]
+said = "Hematoma en el antebrazo izquierdo."
+items = [{ of = "bruise", aka = ["hematoma"], negated = false }, { of = "forearm", side = "left" }]
+
+[[facts]]
+said = "Muñeca izquierda con dolor a la palpación, sin deformidad y con movilidad completa."
+items = [{ of = "wrist", side = "left" }, { of = "deformity", negated = true }]
+
+[[facts]]
+said = "caída por probable hipotensión ortostática, favorecida por la medicación."
+items = [{ of = "orthostatic hypotension", aka = ["postural hypotension"], doubt = true }]
+
+[[facts]]
+said = "Contusión de muñeca izquierda, a descartar fractura."
+items = [{ of = "wrist", side = "left" }, { of = "fracture", doubt = true }]
+
+[[facts]]
+said = "Posible deterioro cognitivo leve."
+items = [{ of = "cognitive impairment", aka = ["cognitive decline"], doubt = true, severity = "mild" }]
+
+[[facts]]
+said = "bajar el zolpidem a 5 mg por la noche durante 2 semanas y luego retirarlo."
+items = [{ of = "zolpidem", action = ["decrease", "stop"], number = "5 mg", frequency = "night", duration = "2 weeks" }]
+
+[[facts]]
+said = "Retirar la doxazosina."
+items = [{ of = "doxazosin", action = "stop" }]
+
+[[facts]]
+said = "Continuar enalapril 20 mg por la mañana."
+items = [{ of = "enalapril", action = "continue", number = "20 mg", frequency = "morning" }]
+
+[[facts]]
+said = "Nueva visita en 10 días."
+items = [{ of = "visit", aka = ["follow-up", "review", "recheck"], duration = "10 days" }]

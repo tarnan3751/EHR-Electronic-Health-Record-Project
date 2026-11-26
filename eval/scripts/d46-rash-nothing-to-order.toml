@@ -1,0 +1,70 @@
+# Dictation test script (synthetic): a rash after amoxicillin, whose plan says not to order, only to order if, to consider ordering and to have discussed ordering. Nothing is proposed. Format: eval/README.md.
+id = "d46-rash-nothing-to-order"
+voice = "bf_emma"
+tags = [
+    "vitals", "numbers", "negation", "order-attempt", "allergy-change", "mixed-plan", "spoken-punctuation",
+    "proposal-trap",
+]
+dates = []
+drugs = ["amoxicillin"]
+forbidden = [
+    "order a skin biopsy", "add amoxicillin to her allergy list", "ordering a thyroid panel", "ordering a sleep study",
+]
+text = """
+This is a [[29-year-old|twenty-nine-year-old]] woman seen for a rash on her trunk that started
+[[4 days|four days]] ago {period} She finished a course of amoxicillin for sinusitis last week {period} The rash is
+not itchy {comma} she has no fever {comma} no mouth sores and no joint pain {period} She has been sleeping poorly and
+feels tired {period} {new paragraph}
+On examination there are faint pink macules on the chest and back {comma} with no blistering and no mucosal
+involvement {period} Temperature [[36.9|thirty-six point nine]] {comma} heart rate [[72|seventy-two]] {period}
+{new paragraph}
+Assessment {colon} likely viral exanthem {comma} less likely a drug rash {period} {new paragraph}
+Plan {colon} there is no need to order a chest X-ray {period} I don't think we need to order a skin biopsy either
+{period} If the rash comes back after amoxicillin {comma} add amoxicillin to her allergy list {period} Consider
+ordering a thyroid panel for the tiredness {period} We discussed ordering a sleep study {comma} and she would rather
+wait {period} Moisturizer as needed {period}
+"""
+
+[gold.subjective]
+value = "A 29-year-old woman seen for a rash on her trunk that started 4 days ago. She finished a course of amoxicillin for sinusitis last week. The rash is not itchy, she has no fever, no mouth sores and no joint pain. She has been sleeping poorly and feels tired."
+sources = [
+    "a 29-year-old woman seen for a rash on her trunk that started 4 days ago.",
+    "She finished a course of amoxicillin for sinusitis last week.",
+    "The rash is not itchy, she has no fever, no mouth sores and no joint pain.",
+    "She has been sleeping poorly and feels tired.",
+]
+
+[gold.objective]
+value = "There are faint pink macules on the chest and back, with no blistering and no mucosal involvement. Temperature 36.9, heart rate 72."
+sources = [
+    "there are faint pink macules on the chest and back, with no blistering and no mucosal involvement.",
+    "Temperature 36.9, heart rate 72.",
+]
+
+[gold.assessment]
+value = "Likely viral exanthem, less likely a drug rash."
+sources = ["likely viral exanthem, less likely a drug rash."]
+
+[gold.plan]
+value = "There is no need to order a chest X-ray. Moisturizer as needed."
+sources = ["there is no need to order a chest X-ray.", "Moisturizer as needed."]
+
+[[not_proposed]]
+words = "order a chest X-ray"
+why = "not_an_instruction"
+
+[[not_proposed]]
+words = "order a skin biopsy"
+why = "negated"
+
+[[not_proposed]]
+words = "add amoxicillin to her allergy list"
+why = "hedged"
+
+[[not_proposed]]
+words = "ordering a thyroid panel"
+why = "hedged"
+
+[[not_proposed]]
+words = "ordering a sleep study"
+why = "hedged"

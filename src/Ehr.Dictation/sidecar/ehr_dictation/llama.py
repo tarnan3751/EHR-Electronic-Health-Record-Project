@@ -10,6 +10,11 @@ A request that wouldn't fit the context llama-server gives each request (its n_c
 counted by llama-server's own tokenizer plus the most the answer may take, is never sent: it would only be cut off. Nor
 is any request while llama-server doesn't say what that context is.
 
+For a transcript dictated in Spanish (prompt.load(language="es")) the answer is one list of statements, each its
+Spanish passages, its field and their English, which parse_statements() sorts into each field's statements for
+translation.py to check; the raw answer is kept on the proposal too, in memory only, so the eval can see the order the
+model wrote each statement's keys in.
+
 When the model can't answer, the session keeps its transcript and says the fields couldn't be sorted (UC 10): the
 reason is model_unavailable (no connection, an error, a refused key, the wrong model, no context size), model_timeout,
 model_output_invalid (an answer that isn't the schema's JSON, or one cut off at the token limit), or
@@ -44,6 +49,10 @@ class ModelOutputInvalid(StructuringFailed):
     reason = "model_output_invalid"
 
 
+class AnswerCutOff(ModelOutputInvalid):
+    """The answer reached the token limit before it ended: invalid, and for a visit's window, too long to draft whole."""
+
+
 class TranscriptTooLong(StructuringFailed):
     reason = "transcript_too_long"
 
@@ -54,11 +63,13 @@ TEMPLATE_TOKENS = 64
 
 @dataclass
 class Proposal:
-    """What the model proposed: each field's value and quoted sources, and any keys outside the schema."""
+    """What the model proposed: each field's value and quoted sources (for Spanish, its statements), and any keys
+    outside the schema."""
 
-    fields: dict[str, dict]
+    fields: dict[str, dict] | dict[str, list[dict]]
     unknown: list[str] = field(default_factory=list)
     timings: dict | None = None
+    content: str | None = None  # the answer as written, for a Spanish dictation only
 
 
 class LlamaServer:
@@ -105,6 +116,14 @@ class Structurer:
     def structuring(self) -> Structuring:
         return self._structuring
 
+    def using(self, structuring: Structuring) -> Structurer:
+        """The same llama-server, model file and time limit with another prompt: a conversation's (step 16)."""
+        return Structurer(self._llama, structuring, self._model_file, timeout=self._timeout)
+
+    async def tokens(self, text: str) -> int:
+        """How many tokens the text is to K2 Horizon, by llama-server's own tokenizer."""
+        return await self._llama.tokens(text)
+
     async def propose(self, transcript: str) -> Proposal:
         try:
             async with asyncio.timeout(self._timeout):
@@ -125,7 +144,10 @@ class Structurer:
         except (KeyError, IndexError, TypeError):
             raise ModelOutputInvalid("The answer has no message.") from None
         if choice.get("finish_reason") == "length":
-            raise ModelOutputInvalid("The answer was cut off at the token limit.")
+            raise AnswerCutOff("The answer was cut off at the token limit.")
+        if self._structuring.language == "es":
+            statements, unknown = parse_statements(content)
+            return Proposal(statements, unknown, answer.get("timings"), content)
         fields, unknown = parse_answer(content)
         return Proposal(fields, unknown, answer.get("timings"))
 
@@ -150,7 +172,7 @@ class Structurer:
 
 
 def parse_answer(content: object) -> tuple[dict[str, dict], list[str]]:
-    """The three fields, checked against the schema's shape, and the names of any other keys."""
+    """The four fields, checked against the schema's shape, and the names of any other keys."""
     try:
         data = json.loads(content) if isinstance(content, str) else None
     except json.JSONDecodeError:
@@ -170,3 +192,28 @@ def parse_answer(content: object) -> tuple[dict[str, dict], list[str]]:
             raise ModelOutputInvalid("The answer doesn't match the note schema.")
         fields[name] = {"value": proposed["value"], "sources": list(proposed["sources"])}
     return fields, [key for key in data if key not in FIELDS]
+
+
+def parse_statements(content: object) -> tuple[dict[str, list[dict]], list[str]]:
+    """A Spanish dictation's answer (note-fields-es.schema.json), one list of statements, each its Spanish passages,
+    its field and its English, checked against the schema's shape and sorted into the four fields' lists of statements,
+    each statement its Spanish passages, its English and its place in the answer ("order"), as translation.check()
+    takes them; and the names of any other keys."""
+    try:
+        data = json.loads(content) if isinstance(content, str) else None
+    except json.JSONDecodeError:
+        data = None
+    if not isinstance(data, dict):
+        raise ModelOutputInvalid("The answer isn't a JSON object.")
+
+    statements = data.get("statements")
+    if not isinstance(statements, list) or not all(
+        isinstance(s, dict) and isinstance(s.get("english"), str) and s.get("field") in FIELDS
+        and isinstance(s.get("spanish"), list) and all(isinstance(quote, str) for quote in s["spanish"])
+        for s in statements
+    ):
+        raise ModelOutputInvalid("The answer doesn't match the Spanish note schema.")
+    fields: dict[str, list[dict]] = {name: [] for name in FIELDS}
+    for order, s in enumerate(statements):
+        fields[s["field"]].append({"spanish": list(s["spanish"]), "english": s["english"], "order": order})
+    return fields, [key for key in data if key != "statements"]

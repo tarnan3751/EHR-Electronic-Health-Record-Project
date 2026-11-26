@@ -1,0 +1,50 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Hombre de 67 años."
+items = [{ of = "age", number = "67" }]
+
+[[facts]]
+said = "Toma metformina 850 mg dos veces al día, enalapril 10 mg al día y simvastatina 20 mg por la noche."
+items = [{ of = "metformin", action = "take", number = "850 mg", frequency = "twice daily" }, { of = "enalapril", number = "10 mg", frequency = "daily" }, { of = "simvastatin", number = "20 mg", frequency = "night" }]
+
+[[facts]]
+said = "Refiere tos seca desde que empezó el enalapril."
+items = [{ of = "cough", aka = ["dry cough"], negated = false }, { of = "enalapril", action = "started" }]
+
+[[facts]]
+said = "Niega dolor torácico."
+items = [{ of = "chest pain", negated = true }]
+
+[[facts]]
+said = "Hemoglobina glucosilada de 7,9 por ciento."
+items = [{ of = "A1c", number = "7.9%" }]
+
+[[facts]]
+said = "TA 134/80."
+items = [{ of = "BP", number = "134/80" }]
+
+[[facts]]
+said = "diabetes tipo 2 con control insuficiente."
+items = [{ of = "diabetes", number = "2" }]
+
+[[facts]]
+said = "Tos probablemente por el enalapril."
+items = [{ of = "cough", aka = ["dry cough"], doubt = true }, { of = "enalapril" }]
+
+[[facts]]
+said = "aumentar metformina a 1000 mg dos veces al día."
+items = [{ of = "metformin", action = "increase", number = "1000 mg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Suspender enalapril e iniciar losartán 50 mg al día."
+items = [{ of = "enalapril", action = "stop" }, { of = "losartan", action = "start", number = "50 mg", frequency = "daily" }]
+
+[[facts]]
+said = "Continuar simvastatina 20 mg por la noche."
+items = [{ of = "simvastatin", action = "continue", number = "20 mg", frequency = "night" }]
+
+[[facts]]
+said = "Control en 3 meses."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "3 months" }]

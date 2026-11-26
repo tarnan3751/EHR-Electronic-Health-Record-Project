@@ -1,0 +1,59 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Niño de 3 años que acude a urgencias por dolor en el oído derecho desde hace 2 días."
+items = [{ of = "age", number = "3" }, { of = "ear pain", aka = ["earache", "otalgia"], negated = false, side = "right", duration = "2 days" }]
+
+[[facts]]
+said = "La madre refiere fiebre de hasta 39,2 grados desde anoche."
+items = [{ of = "fever", negated = false, number = "39.2 degrees", date = "last night" }]
+
+[[facts]]
+said = "No ha vomitado y no le supura el oído."
+items = [{ of = "vomiting", aka = ["vomited"], negated = true }, { of = "ear discharge", aka = ["discharge", "otorrhea"], negated = true }]
+
+[[facts]]
+said = "Lleva una semana con mocos."
+items = [{ of = "runny nose", aka = ["nasal discharge", "rhinorrhea"], negated = false, duration = "1 week" }]
+
+[[facts]]
+said = "Es alérgico a la penicilina: a los 2 años le salió un sarpullido por todo el cuerpo."
+items = [{ of = "penicillin", polarity = "allergic" }, { of = "age", number = "2" }, { of = "rash", negated = false }]
+
+[[facts]]
+said = "peso 15 kg, temperatura 38,6 grados."
+items = [{ of = "weight", number = "15 kg" }, { of = "temperature", number = "38.6 degrees" }]
+
+[[facts]]
+said = "Tímpano derecho abombado y enrojecido."
+items = [{ of = "eardrum", aka = ["tympanic membrane"], side = "right" }]
+
+[[facts]]
+said = "Tímpano izquierdo normal."
+items = [{ of = "eardrum", aka = ["tympanic membrane"], side = "left", polarity = "normal" }]
+
+[[facts]]
+said = "Faringe sin exudado."
+items = [{ of = "exudate", negated = true }]
+
+[[facts]]
+said = "Auscultación pulmonar normal."
+items = [{ of = "lung auscultation", aka = ["lungs", "chest auscultation"], polarity = "normal" }]
+
+[[facts]]
+said = "otitis media aguda derecha."
+items = [{ of = "otitis media", aka = ["acute otitis media"], side = "right" }]
+
+[[facts]]
+said = "azitromicina 150 mg una vez al día durante 5 días, digo, durante 3 días."
+items = [{ of = "azithromycin", number = "150 mg", frequency = "daily", duration = "3 days" }]
+
+[[facts]]
+said = "Ibuprofeno en suspensión, 7,5 ml cada 8 horas si hay fiebre o dolor."
+items = [{ of = "ibuprofen", number = "7.5 ml", frequency = "every 8 hours" }]
+
+# A condition: fever and swelling are neither said nor denied here.
+[[facts]]
+said = "Se explica a la madre que vuelva si sigue con fiebre a las 48 horas o si aparece hinchazón detrás de la oreja."
+items = [{ of = "fever", duration = "48 hours" }, { of = "swelling" }]

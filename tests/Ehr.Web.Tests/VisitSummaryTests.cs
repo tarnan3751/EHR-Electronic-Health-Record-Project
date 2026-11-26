@@ -32,7 +32,7 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
     public const string NextSteps = "Rest, drink plenty of fluids, and call us if the cough lasts more than two weeks.";
 
     // A note's sections no summary or portal page may ever show: the note's own words.
-    public const string NoteHistory = "Synthetic history: dry cough, quartzwing pattern, nocturnal.";
+    public const string NoteSubjective = "Synthetic subjective: dry cough, quartzwing pattern, nocturnal.";
     public const string NoteAssessment = "Synthetic assessment: viral illness.";
     public const string NotePlan = "Synthetic plan: rest and follow-up.";
 
@@ -261,11 +261,11 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
             """
             SELECT set_config('app.user_id', @clinician::text, true);
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            SELECT d, @patient, @clinician, 'Synthetic plain text', 1, 'Synthetic history.', 'Synthetic assessment.', 'Synthetic plan.', 1, false
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            SELECT d, @patient, @clinician, 'Synthetic plain text', 1, 'Synthetic subjective.', 'Synthetic objective.', 'Synthetic assessment.', 'Synthetic plan.', 1, false
             FROM unnest(@drafts) AS d;
-            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan)
-            SELECT n.id, n.draft, @patient, 1, 'Synthetic history.', 'Synthetic assessment.', 'Synthetic plan.'
+            INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan)
+            SELECT n.id, n.draft, @patient, 1, 'Synthetic subjective.', 'Synthetic objective.', 'Synthetic assessment.', 'Synthetic plan.'
             FROM unnest(@notes, @drafts) AS n(id, draft);
             INSERT INTO ehr.visit_summaries (id, note_id, patient_id, talked_about, found, next_steps, sensitive)
             SELECT uuidv7(), n, @patient, @talked, @found, @next, false FROM unnest(@notes) AS n;

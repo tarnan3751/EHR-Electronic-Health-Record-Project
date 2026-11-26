@@ -61,10 +61,12 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
 
         var result = await ReadJsonAsync<DictationResult>(sorted);
         Assert.Equal(Sorting.Done, result.Sorting);
-        var history = Assert.IsType<PendingField>(result.Fields!.History);
-        Assert.Equal("Cough for three days.", history.Value);
-        Assert.Equal([new SourceSpan(0, 21)], history.Sources);
-        Assert.Empty(history.Warnings);
+        var subjective = Assert.IsType<PendingField>(result.Fields!.Subjective);
+        Assert.Equal("Cough for three days.", subjective.Value);
+        Assert.Equal([new SourceSpan(0, 21)], subjective.Sources);
+        Assert.Empty(subjective.Warnings);
+        Assert.IsType<EmptyField>(result.Fields.Objective);
+        Assert.Null(result.Fields.History);
         var assessment = Assert.IsType<PendingField>(result.Fields.Assessment);
         Assert.Equal("No fever.", assessment.Value);
         Assert.Equal([new SourceSpan(22, 31)], assessment.Sources);
@@ -319,7 +321,7 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("model_unavailable", (string?)json["reason"]);
         Assert.Equal("The fields couldn't be sorted, so the transcript is kept as plain text.", (string?)json["message"]);
         Assert.Equal("Cough for three days. No fever.", (string?)json["transcript"]!["text"]);
-        Assert.All(["history", "assessment", "plan"], field => Assert.Equal("empty", (string?)json["fields"]![field]!["status"]));
+        Assert.All(["subjective", "objective", "assessment", "plan"], field => Assert.Equal("empty", (string?)json["fields"]![field]!["status"]));
     }
 
     [Fact]
@@ -344,8 +346,9 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["final", "segments", "text"], Names(json["transcript"]!));
         Assert.Equal(["end", "endMs", "final", "start", "startMs", "unclear"], Names(json["transcript"]!["segments"]![0]!));
         Assert.Equal("too_noisy", (string?)json["transcript"]!["segments"]![2]!["unclear"]);
-        Assert.Equal(["sources", "status", "value", "warnings"], Names(json["fields"]!["history"]!));
-        Assert.Equal(["code", "end", "start"], Names(json["fields"]!["history"]!["warnings"]![0]!));
+        Assert.Equal(["assessment", "objective", "plan", "subjective"], Names(json["fields"]!));
+        Assert.Equal(["sources", "status", "value", "warnings"], Names(json["fields"]!["subjective"]!));
+        Assert.Equal(["code", "end", "start"], Names(json["fields"]!["subjective"]!["warnings"]![0]!));
         Assert.Equal(["reasons", "status"], Names(json["fields"]!["plan"]!));
         Assert.Equal("not_in_transcript", (string?)json["fields"]!["plan"]!["reasons"]![0]);
     }
@@ -498,6 +501,8 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, stopped.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
         Assert.Equal("stopped", await ErrorAsync(late));
+        // A dictation's words; a visit's recording says it was stopped (TC-UC23-04).
+        Assert.Equal("This dictation has stopped, so it takes no more audio.", (string?)(await JsonAsync(late))["message"]);
     }
 
     // Also TC-UC9-03 (FR-10): audio that can't be decoded is refused, 422. The primary test is the sidecar's test_sessions.py.
@@ -529,6 +534,9 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData(403, """{"error":"forbidden","detail":"wrong key"}""", 503, "unavailable")]
     [InlineData(500, """{"error":"internal","detail":"a stack trace"}""", 502, "bad_answer")]
     [InlineData(503, """{"error":"starting","detail":"loading the model"}""", 503, "unavailable")]
+    [InlineData(503, """{"error":"language_unavailable","detail":"no Whisper"}""", 503, "language_unavailable")]
+    [InlineData(400, """{"error":"bad_language","detail":"not en or es"}""", 400, "bad_language")]
+    [InlineData(400, """{"error":"bad_request","detail":"a code the API doesn't know"}""", 502, "bad_answer")]
     [InlineData(200, """{"transcript":"not the contract's shape"}""", 502, "bad_answer")]
     public async Task The_services_refusals_become_the_apis_own(int status, string body, int expected, string error)
     {
@@ -545,7 +553,7 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
 
     // Every answer the real service gives, pinned in src/Ehr.Dictation/contract by the service's own tests from its own
     // code, is read and passed on: none is refused as a bad answer, each keeps its status and code (a refused key is
-    // this API's 503), and a result keeps its sorting.
+    // this API's 503), and a result keeps its sorting. A visit's (the expansion plan's step 16) through its own routes.
     [Theory]
     [MemberData(nameof(ContractAnswers))]
     public async Task Every_answer_the_real_service_gives_is_read_and_passed_on(string name)
@@ -553,18 +561,12 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         var contract = JsonNode.Parse(await File.ReadAllTextAsync(ContractFile(name), Cancel))!;
         var status = (int)contract["status"]!;
         var body = contract["body"];
-        service.Answer = ((HttpStatusCode)status, body?.ToJsonString() ?? "");
-        var page = await OpenAsync(apps, apps.OnPrem);
+        var answer = ((HttpStatusCode)status, body?.ToJsonString() ?? "");
+        var route = (string?)contract["route"] ?? "";
 
-        using var response = (string?)contract["route"] switch
-        {
-            "start" => await SendAsync(page, HttpMethod.Post, Sessions),
-            "audio" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/audio?seq=0", Audio([1, 2, 3])),
-            "stop" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/stop"),
-            "result" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result"),
-            "cancel" => await SendAsync(page, HttpMethod.Delete, $"{Sessions}/{SomeSessionId}"),
-            var route => throw new InvalidOperationException($"{name}.json has a route this test doesn't know: {route}."),
-        };
+        using var response = route.EndsWith("-ambient", StringComparison.Ordinal)
+            ? await AskForAVisitAsync(route, answer)
+            : await AskAsync(name, route, answer);
 
         Assert.NotEqual(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(status == 401 ? 503 : status, (int)response.StatusCode);
@@ -583,7 +585,148 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal((string?)sorting, (string?)answered["sorting"]);
             Assert.Equal((string?)body["transcript"]!["text"], (string?)answered["transcript"]!["text"]);
+            if ((string?)body["reason"] == "model_busy")
+            {
+                Assert.Equal(DictationResult.BusyMessage, (string?)answered["message"]);
+            }
         }
+    }
+
+    async Task<HttpResponseMessage> AskAsync(string name, string route, (HttpStatusCode, string) answer)
+    {
+        service.Answer = answer;
+        var page = await OpenAsync(apps, apps.OnPrem);
+        return route switch
+        {
+            "start" => await SendAsync(page, HttpMethod.Post, Sessions),
+            "audio" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/audio?seq=0", Audio([1, 2, 3])),
+            "stop" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/stop"),
+            "result" => await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result"),
+            "cancel" => await SendAsync(page, HttpMethod.Delete, $"{Sessions}/{SomeSessionId}"),
+            _ => throw new InvalidOperationException($"{name}.json has a route this test doesn't know: {route}."),
+        };
+    }
+
+    // A visit's routes (AmbientApi.cs) take a visit the clinician is listening to, with its consent and binding, so the
+    // visit starts first and the pinned answer is set after; a start's is the answer to the start.
+    async Task<HttpResponseMessage> AskForAVisitAsync(string route, (HttpStatusCode, string) answer)
+    {
+        const string Listen = DictationApi.AmbientPath;
+        if (route == "start-ambient")
+        {
+            var (session, patient, token) = await AmbientFlows.OpenAsync(apps);
+            service.Answer = answer;
+            return await AmbientFlows.Post(session.Client, token, $"{Listen}/start", AmbientFlows.Consent(Guid.NewGuid(), patient));
+        }
+
+        if (route == "cancel-ambient")
+        {
+            var page = await OpenAsync(apps, apps.OnPrem);
+            service.Answer = answer;
+            return await SendAsync(page, HttpMethod.Delete, $"{Listen}/{SomeSessionId}");
+        }
+
+        var visit = await AmbientFlows.StartAsync(apps);
+        service.Answer = answer;
+        var path = $"{Listen}/{visit.SessionId}";
+        return route switch
+        {
+            "audio-ambient" => await AmbientFlows.Audio(visit, 0),
+            "stop-ambient" => await AmbientFlows.Post(visit.Session.Client, visit.Token, $"{path}/stop"),
+            "speakers-ambient" => await AmbientFlows.Post(visit.Session.Client, visit.Token, $"{path}/speakers",
+                new { speakers = new Dictionary<string, string> { ["1"] = "clinician", ["2"] = "patient" } }),
+            "result-ambient" => await AmbientFlows.Post(visit.Session.Client, visit.Token, $"{path}/result"),
+            _ => throw new InvalidOperationException($"A contract file has a route this test doesn't know: {route}."),
+        };
+    }
+
+    // An empty field's reason codes are one list in three places, so none drifts: the service's (validation.py's REASONS),
+    // the contract's (EmptyField.Codes, which a visit's are held to as it is staged), and the database's guard on a
+    // visit's stored result (db/policies/56-ambient-listening.sql).
+    [Fact]
+    public async Task An_empty_fields_reasons_are_the_services_own_codes_in_the_contract_and_the_database()
+    {
+        static List<string> Quoted(string text) => [.. System.Text.RegularExpressions.Regex.Matches(text, "\"([a-z_]+)\"").Select(m => m.Groups[1].Value)];
+        var service = await File.ReadAllTextAsync(RepositoryRoot.Combine("src/Ehr.Dictation/sidecar/ehr_dictation/validation.py"), Cancel);
+        var reasons = System.Text.RegularExpressions.Regex.Match(service, @"(?m)^REASONS = \((.*?)^\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(reasons.Success, "validation.py has no REASONS.");
+        Assert.Equal(Quoted(reasons.Groups[1].Value), EmptyField.Codes);
+
+        var policies = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/56-ambient-listening.sql"), Cancel);
+        var guarded = System.Text.RegularExpressions.Regex.Match(policies, @"WHERE r NOT IN \((.*?)\)\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(guarded.Success, "56-ambient-listening.sql holds no list of reasons.");
+        Assert.Equal(EmptyField.Codes, Quoted(guarded.Groups[1].Value));
+    }
+
+    // Why fields couldn't be sorted, in the contract (SortingFailure) and in the database's guard on a visit's stored
+    // result: the same list, so a reason the service adds can't be staged by one and refused by the other.
+    [Fact]
+    public async Task The_reasons_fields_couldnt_be_sorted_are_the_contracts_in_the_database_too()
+    {
+        var policies = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/56-ambient-listening.sql"), Cancel);
+        var guarded = System.Text.RegularExpressions.Regex.Match(policies, @"result -> 'reason' IN \((.*?)\)\)", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Assert.True(guarded.Success, "56-ambient-listening.sql holds no list of sorting failures.");
+        Assert.Equal(
+            Enum.GetValues<SortingFailure>().Select(reason => JsonSerializer.Serialize(reason).Trim('"')),
+            System.Text.RegularExpressions.Regex.Matches(guarded.Groups[1].Value, "\"([a-z_]+)\"").Select(m => m.Groups[1].Value));
+    }
+
+    // From a dictation in Spanish, a number that reads two ways ("5.000 unidades") is refused by the service, not warned
+    // of (step 17): a result still carrying an ambiguous_number warning is a bad answer, as any code the API doesn't know
+    // is, while "cada tercer día"'s ambiguous_frequency is still a warning the API passes on.
+    [Theory]
+    [InlineData("ambiguous_number", 502)]
+    [InlineData("ambiguous_frequency", 200)]
+    public async Task A_spanish_result_warning_of_a_number_that_reads_two_ways_is_a_bad_answer(string code, int expected)
+    {
+        var body = JsonNode.Parse(await File.ReadAllTextAsync(ContractFile("result-200-done-es"), Cancel))!["body"]!;
+        body["fields"]!["subjective"]!["warnings"] = new JsonArray(new JsonObject { ["code"] = code, ["start"] = 0, ["end"] = 3 });
+        service.Answer = (HttpStatusCode.OK, body.ToJsonString());
+        var page = await OpenAsync(apps, apps.OnPrem);
+
+        using var response = await SendAsync(page, HttpMethod.Post, $"{Sessions}/{SomeSessionId}/result");
+
+        Assert.Equal(expected, (int)response.StatusCode);
+        var answered = await JsonAsync(response);
+        if (expected == 502)
+        {
+            Assert.Equal("bad_answer", (string?)answered["error"]);
+        }
+        else
+        {
+            Assert.Equal(code, (string?)answered["fields"]!["subjective"]!["warnings"]![0]!["code"]);
+        }
+    }
+
+    // Steps 16 and 17 together: a visit is in English and a dictation, in either language, names no speakers. Staging
+    // takes the service's own answer of each kind, and refuses a visit's said to be in Spanish and a Spanish dictation's
+    // that names who spoke.
+    [Fact]
+    public async Task A_visit_said_to_be_in_spanish_or_a_spanish_dictation_naming_a_speaker_is_never_staged()
+    {
+        // As the API reads the service's answers (DictationApi.ServiceJson).
+        var json = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            AllowOutOfOrderMetadataProperties = true,
+            RespectNullableAnnotations = true,
+            RespectRequiredConstructorParameters = true,
+        };
+        async Task<JsonNode> BodyAsync(string name) => JsonNode.Parse(await File.ReadAllTextAsync(ContractFile(name), Cancel))!["body"]!;
+        DictationResult Read(JsonNode body) => body.Deserialize<DictationResult>(json)!;
+
+        // Drafted, and left undrafted with no field to hold a sentence the Spanish checks would want.
+        foreach (var name in new[] { "result-ambient-200-done", "result-ambient-200-unavailable-model_timeout" })
+        {
+            var visit = await BodyAsync(name);
+            Assert.NotNull(DictationApi.TrustedResult(Read(visit), ambient: true));
+            visit["spokenLanguage"] = "es";
+            Assert.Null(DictationApi.TrustedResult(Read(visit), ambient: true));
+        }
+
+        var spanish = await BodyAsync("result-200-done-es");
+        Assert.NotNull(DictationApi.TrustedResult(Read(spanish)));
+        spanish["transcript"]!["segments"]![0]!["speaker"] = "patient";
+        Assert.Null(DictationApi.TrustedResult(Read(spanish)));
     }
 
     public static TheoryData<string> ContractAnswers() =>

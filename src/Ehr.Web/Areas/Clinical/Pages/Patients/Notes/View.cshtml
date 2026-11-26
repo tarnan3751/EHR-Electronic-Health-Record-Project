@@ -31,6 +31,7 @@ else
 {
     <p class="sc-notice sc-notice--success" role="status">This note is signed and permanently saved to the clinical record.</p>
 }
+<partial name="_WaitingProposals" model="(Model.Note.DraftId, Model.WaitingProposals, true)" />
 @if (Model.Note.Sensitive)
 {
     <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive note:</span> your view of it is recorded.</p>
@@ -39,7 +40,7 @@ else
     <dt>Signing clinician</dt><dd>@Model.SignerName <small class="mono-id">(@Model.Note.SignerId)</small></dd>
     <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Clinic.Format(Model.Note.SignedAt, "yyyy-MM-dd HH:mm:ss")</time></dd>
 </dl>
-<partial name="_NoteContent" model="new NoteContent(Model.Note.History, Model.Note.Assessment, Model.Note.Plan)" />
+<partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
 @* Step 10b: the note's sensitivity can change after signing, with a reason; its text never does. *@
 @if (Model.Note.SensitiveReason is not null)
 {

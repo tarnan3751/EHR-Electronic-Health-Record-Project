@@ -22,6 +22,10 @@ public class ViewModel(PhiReader phi, PatientAssignments assignments, BreakGlass
 
     public IReadOnlyList<AiNoteReview> CompletedReviews { get; private set; } = [];
 
+    // The orders and allergies to add the note's dictations proposed that still wait for its author's decision (the
+    // expansion plan's step 15): signing the note didn't decide them.
+    public IReadOnlyList<AiChartProposal> WaitingProposals { get; private set; } = [];
+
     public ClinicalNote Note { get; private set; } = null!;
 
     public NoteAddenda Addenda { get; private set; } = null!;
@@ -66,6 +70,7 @@ public class ViewModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         SourcesSensitive = note.Sensitive || addenda.SensitiveHidden > 0 || addenda.Shown.Any(a => a.Sensitive);
         CompletedReviews = (await Phi.AiReviewsAsync(note.DraftId, AuditParts.VisitNote, HttpContext.RequestAborted))
             .Where(r => r.State == AiReviewStates.Completed).ToList();
+        WaitingProposals = await Phi.WaitingChartProposalsAsync([.. CompletedReviews.Select(r => r.Id)], AuditParts.VisitNote, HttpContext.RequestAborted);
         SignerName = await db.StaffUsers.Where(u => u.Id == note.SignerId).Select(u => u.DisplayName)
             .SingleAsync(HttpContext.RequestAborted);
         // Who marked what is sensitive after signing (step 10b), by name: so someone who can't unmark it knows whom to ask.

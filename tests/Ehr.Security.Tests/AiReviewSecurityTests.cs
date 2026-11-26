@@ -13,16 +13,16 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
     sealed record Review(Guid Actor, Guid Patient, Guid Draft, Guid Id, Guid Proposal);
     const string Result = """
-        {"sorting":"done","fields":{"history":{"status":"pending","value":"Synthetic proposal","sources":[{"start":0,"end":18}],"warnings":[]}}}
+        {"sorting":"done","fields":{"subjective":{"status":"pending","value":"Synthetic proposal","sources":[{"start":0,"end":18}],"warnings":[]}}}
         """;
     const string Stage = """
         UPDATE ehr.ai_note_reviews SET state = 'pending', result_json = @result::jsonb WHERE id = @review;
         INSERT INTO ehr.ai_field_proposals (id, review_id, patient_id, field, original_value, state)
-        VALUES (@proposal, @review, @patient, 'history', 'Synthetic proposal', 'pending');
+        VALUES (@proposal, @review, @patient, 'subjective', 'Synthetic proposal', 'pending');
         """;
     const string Sign = """
-        INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, history, assessment, plan, signer_id, signed_at)
-        VALUES (@note, @draft, @patient, 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', @actor, now())
+        INSERT INTO ehr.clinical_notes (id, draft_id, patient_id, draft_version, subjective, objective, assessment, plan, signer_id, signed_at)
+        VALUES (@note, @draft, @patient, 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', @actor, now())
         """;
 
     async Task<Review> RecordingAsync()
@@ -33,8 +33,8 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
         var row = new Review(actor, patient, Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7());
         await Accounts.ExecuteAsync(App, actor, """
             INSERT INTO ehr.clinical_drafts
-                (id, patient_id, clinician_id, body, version, history, assessment, plan, structured_version, has_unreviewed_proposals)
-            VALUES (@draft, @patient, @actor, 'Synthetic note', 1, 'Synthetic history', 'Synthetic assessment', 'Synthetic plan', 1, false);
+                (id, patient_id, clinician_id, body, version, subjective, objective, assessment, plan, structured_version, has_unreviewed_proposals)
+            VALUES (@draft, @patient, @actor, 'Synthetic note', 1, 'Synthetic subjective', 'Synthetic objective', 'Synthetic assessment', 'Synthetic plan', 1, false);
             INSERT INTO ehr.ai_note_reviews
                 (id, patient_id, draft_id, clinician_id, session_id, max_seconds, max_chunk_bytes, state, started_version, created_at)
             VALUES (@review, @patient, @draft, @actor, @session, 900, 100000, 'recording', 1, now());
@@ -57,6 +57,45 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
     {
         var error = await Assert.ThrowsAsync<PostgresException>(() => Execute(row, sql));
         Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+    }
+
+    // The expansion plan's step 14 (TC-UC10-08): proposals are staged for the note's four fields, Subjective and Objective
+    // as Assessment and Plan, and only for them, so a History, the first of the three fields before then, is refused even
+    // when the stored result names one. A History proposal staged before then is still decided, as any proposal is.
+    [Fact]
+    public async Task Only_the_four_fields_are_staged_and_a_history_staged_before_them_is_still_decided()
+    {
+        // Each of the four, as the app stages a result that proposes them all.
+        var four = await RecordingAsync();
+        await Accounts.ExecuteAsync(App, four.Actor,
+            """
+            UPDATE ehr.ai_note_reviews SET state = 'pending', result_json = @result::jsonb WHERE id = @review;
+            INSERT INTO ehr.ai_field_proposals (id, review_id, patient_id, field, original_value, state)
+            SELECT gen_random_uuid(), @review, @patient, f.key, f.value ->> 'value', 'pending' FROM jsonb_each(@result::jsonb -> 'fields') AS f;
+            """,
+            [.. Parameters(four).Where(parameter => parameter.Name != "result"), ("result", """
+                {"sorting":"done","fields":{
+                  "subjective":{"status":"pending","value":"Synthetic subjective proposal","sources":[{"start":0,"end":9}],"warnings":[]},
+                  "objective":{"status":"pending","value":"Synthetic objective proposal","sources":[{"start":10,"end":19}],"warnings":[]},
+                  "assessment":{"status":"pending","value":"Synthetic assessment proposal","sources":[{"start":20,"end":29}],"warnings":[]},
+                  "plan":{"status":"pending","value":"Synthetic plan proposal","sources":[{"start":30,"end":39}],"warnings":[]}}}
+                """)]);
+        Assert.Equal(["assessment", "objective", "plan", "subjective"],
+            await Query(four, "SELECT field FROM ehr.ai_field_proposals WHERE review_id = @review ORDER BY field"));
+
+        // A result and a proposal that name a History, matching each other: only the field's name is wrong.
+        var stageHistory = Stage.Replace("'subjective'", "'history'", StringComparison.Ordinal);
+        (string Name, object Value)[] WithHistory(Review review) =>
+            [.. Parameters(review).Where(parameter => parameter.Name != "result"), ("result", Result.Replace("\"subjective\"", "\"history\"", StringComparison.Ordinal))];
+        var row = await RecordingAsync();
+        var refused = await Assert.ThrowsAsync<PostgresException>(() => Accounts.ExecuteAsync(App, row.Actor, stageHistory, WithHistory(row)));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, refused.SqlState);
+        Assert.Equal(["0"], await Query(row, "SELECT count(*) FROM ehr.ai_field_proposals WHERE review_id = @review"));
+
+        var earlier = await RecordingAsync();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "SET LOCAL session_replication_role = replica;\n" + stageHistory, WithHistory(earlier));
+        await Execute(earlier, "UPDATE ehr.ai_field_proposals SET state = 'accepted', approved_value = original_value, decision_key = gen_random_uuid() WHERE id = @proposal");
+        Assert.Equal(["history accepted"], await Query(earlier, "SELECT field || ' ' || state FROM ehr.ai_field_proposals WHERE id = @proposal"));
     }
 
     [Fact]
@@ -197,6 +236,6 @@ public class AiReviewSecurityTests(MigratedDatabase database) : IClassFixture<Mi
         await Refused(row, Sign);
         await Execute(row, "UPDATE ehr.ai_note_reviews SET state = 'cancelled' WHERE id = @review");
         await Execute(row, Sign);
-        Assert.Equal(["Synthetic history"], await Query(row, "SELECT history FROM ehr.clinical_notes WHERE draft_id = @draft"));
+        Assert.Equal(["Synthetic subjective"], await Query(row, "SELECT subjective FROM ehr.clinical_notes WHERE draft_id = @draft"));
     }
 }

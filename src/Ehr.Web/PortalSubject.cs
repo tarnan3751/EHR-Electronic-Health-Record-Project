@@ -62,8 +62,8 @@ public static class ActingCookie
 // grant that is no longer the account's or no longer in force, it forgets the grant and sends the browser on, before
 // the handler reads anything: to the account's own record, which says so, or, for an account with no record of its
 // own, to the page that asks whose record. A session with no record to look at is sent to that page from everywhere
-// but Access. The account pages, the page that switches records and the page that asks run without these checks, so
-// there is always a way back; none of them reads a record.
+// but Access. The account pages, the page that switches records, the page that asks and the session's page
+// (Session, step 18) run without these checks, so there is always a way back; none of them reads a record.
 public sealed class PortalSubjectFilter(PhiReader phi, PortalSubject subject, UserContext user) : IAsyncPageFilter
 {
     // Where the layout finds the subject.
@@ -80,7 +80,7 @@ public sealed class PortalSubjectFilter(PhiReader phi, PortalSubject subject, Us
             subject.OwnPatientId = own;
             subject.Subject = own;
             var page = context.RouteData.Values["page"] as string ?? "";
-            var choosing = page.StartsWith("/Account/", StringComparison.Ordinal) || page is "/Acting" or "/Choose";
+            var choosing = page.StartsWith("/Account/", StringComparison.Ordinal) || page is "/Acting" or "/Choose" or "/Session";
             if (user.ActingGrant is { } grant && !choosing)
             {
                 if (await phi.ProxiedRecordAsync(grant, http.RequestAborted) is not { } record)

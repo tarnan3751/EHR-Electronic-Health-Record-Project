@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): atrial fibrillation on dronedarone, with an allergy change to leave out. Format: eval/README.md.
 id = "d11-afib-dronedarone"
 voice = "am_michael"
-tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation"]
+tags = ["vitals", "numbers", "drug-uncommon", "negation", "self-correction", "allergy-change", "spoken-punctuation", "proposal-trap"]
 noise = ["monitor"]
 dates = []
 drugs = ["apixaban", "dronedarone", "amiodarone"]
@@ -23,13 +23,18 @@ Plan {colon} continue apixaban and dronedarone {period} Liver tests and an [[ECG
 [[6 months|six months]] {period}
 """
 
-[gold.history]
-value = "68-year-old man with paroxysmal atrial fibrillation on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals. 2 short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. Amiodarone listed as an allergy, but the reaction was nausea years ago. Blood pressure 134/82, heart rate 64 and regular. ECG: sinus rhythm, QTc 448 milliseconds. Creatinine 1.1."
+[gold.subjective]
+value = "68-year-old man with paroxysmal atrial fibrillation on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals. 2 short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. Amiodarone listed as an allergy, but the reaction was nausea years ago."
 sources = [
     "68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals.",
     "He had 2 short episodes of palpitations last month, each lasting less than an hour.",
     "No bleeding, no syncope.",
     "His chart lists amiodarone as an allergy but that was just nausea years ago",
+]
+
+[gold.objective]
+value = "Blood pressure 134/82, heart rate 64 and regular. ECG: sinus rhythm, QTc 448 milliseconds. Creatinine 1.1."
+sources = [
     "Blood pressure 134/82, heart rate 64 and regular.",
     "ECG today shows sinus rhythm with a QTc of 468 no correction 448 milliseconds.",
     "Creatinine 1.1.",
@@ -51,15 +56,24 @@ sources = [
     "Follow up in 6 months.",
 ]
 
-[gold_rules.history]
-value = "Cardiology follow-up for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals. He had 2 short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago. Blood pressure 134/82, heart rate 64 and regular. ECG today shows sinus rhythm with a QTc of 448 milliseconds. Creatinine 1.1."
+[gold_rules.subjective]
+value = "Cardiology follow-up for paroxysmal atrial fibrillation. 68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals. He had 2 short episodes of palpitations last month, each lasting less than an hour. No bleeding, no syncope. His chart lists amiodarone as an allergy but that was just nausea years ago."
 sources = [
     "Cardiology follow-up for paroxysmal atrial fibrillation.",
     "68-year-old man on apixaban 5 mg twice daily and dronedarone 400 mg twice daily with meals.",
     "He had 2 short episodes of palpitations last month, each lasting less than an hour.",
     "No bleeding, no syncope.",
     "His chart lists amiodarone as an allergy but that was just nausea years ago",
+]
+
+[gold_rules.objective]
+value = "Blood pressure 134/82, heart rate 64 and regular. ECG today shows sinus rhythm with a QTc of 448 milliseconds. Creatinine 1.1."
+sources = [
     "Blood pressure 134/82, heart rate 64 and regular.",
     "ECG today shows sinus rhythm with a QTc of 468 no correction 448 milliseconds.",
     "Creatinine 1.1.",
 ]
+
+[[not_proposed]]
+words = "remove the amiodarone allergy"
+why = "not_an_addition"

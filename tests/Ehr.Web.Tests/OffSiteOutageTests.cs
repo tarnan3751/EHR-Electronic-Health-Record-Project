@@ -23,7 +23,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     static readonly (string Name, object Value)[] Note =
-        [("History", "Synthetic history: cough."), ("Assessment", "Synthetic assessment: viral."), ("Plan", "Synthetic plan: <rest>.")];
+        [("Subjective", "Synthetic subjective: cough."), ("Objective", "Synthetic objective: chest clear."), ("Assessment", "Synthetic assessment: viral."), ("Plan", "Synthetic plan: <rest>.")];
 
     [Fact]
     public async Task A_reason_that_cannot_be_saved_is_shown_again_to_copy()
@@ -125,7 +125,8 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         using var response = await PlainPostAsync(offSite, $"{path}?handler=Save", token, [("Version", 1), .. Note]);
 
         var html = await NotSavedAsync(response);
-        Assert.Contains("<label>History <textarea readonly rows=\"4\">\nSynthetic history: cough.</textarea></label>", html);
+        Assert.Contains("<label>Subjective <textarea readonly rows=\"4\">\nSynthetic subjective: cough.</textarea></label>", html);
+        Assert.Contains("<label>Objective <textarea readonly rows=\"4\">\nSynthetic objective: chest clear.</textarea></label>", html);
         Assert.Contains("<label>Assessment <textarea readonly rows=\"4\">\nSynthetic assessment: viral.</textarea></label>", html);
         Assert.Contains("<label>Plan <textarea readonly rows=\"4\">\nSynthetic plan: &lt;rest&gt;.</textarea></label>", html);
         Assert.DoesNotContain("Version", html);

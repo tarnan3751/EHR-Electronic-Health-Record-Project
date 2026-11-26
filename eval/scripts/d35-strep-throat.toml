@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): pediatric strep throat, with an allergy change to leave out, no spoken punctuation. Format: eval/README.md.
 id = "d35-strep-throat"
 voice = "ff_siwis"
-tags = ["vitals", "numbers", "negation", "allergy-change"]
+tags = ["vitals", "numbers", "negation", "allergy-change", "proposal-trap"]
 dates = []
 drugs = ["amoxicillin", "ibuprofen", "acetaminophen"]
 forbidden = ["take amoxicillin off her allergy list"]
@@ -16,16 +16,21 @@ allergy list strep pharyngitis amoxicillin [[50 mg/kg|fifty milligrams per kilog
 antibiotics and when the fever is gone
 """
 
-[gold.history]
-value = "8-year-old girl with sore throat and fever for 2 days and a headache. No cough, no runny nose. Stomach ache, eating less. Temperature 38.9, heart rate 112. Tonsils red and swollen with white exudate; tender lymph nodes at the front of the neck. Rapid strep test positive. Hives with amoxicillin when she was two were actually from a virus; the allergist cleared her last month."
+[gold.subjective]
+value = "8-year-old girl with sore throat and fever for 2 days and a headache. No cough, no runny nose. Stomach ache, eating less. Hives with amoxicillin when she was two were actually from a virus; the allergist cleared her last month."
 sources = [
     "8-year-old girl with sore throat and fever for 2 days and a headache",
     "no cough no runny nose",
     "she has had a stomach ache and is eating less",
+    "mom says the hives she had with amoxicillin when she was two were actually from a virus and the allergist cleared her last month",
+]
+
+[gold.objective]
+value = "Temperature 38.9, heart rate 112. Tonsils red and swollen with white exudate; tender lymph nodes at the front of the neck. Rapid strep test positive."
+sources = [
     "temperature 38.9 heart rate 112",
     "tonsils red and swollen with white exudate tender lymph nodes at the front of the neck",
     "rapid strep test positive",
-    "mom says the hives she had with amoxicillin when she was two were actually from a virus and the allergist cleared her last month",
 ]
 
 [gold.assessment]
@@ -40,14 +45,23 @@ sources = [
     "back to school after 12 hours of antibiotics and when the fever is gone",
 ]
 
-[gold_rules.history]
-value = "8-year-old girl with sore throat and fever for 2 days and a headache. No cough no runny nose. She has had a stomach ache and is eating less. Temperature 38.9 heart rate 112. Tonsils red and swollen with white exudate tender lymph nodes at the front of the neck. Rapid strep test positive. Mom says the hives she had with amoxicillin when she was two were actually from a virus and the allergist cleared her last month."
+[gold_rules.subjective]
+value = "8-year-old girl with sore throat and fever for 2 days and a headache. No cough no runny nose. She has had a stomach ache and is eating less. Mom says the hives she had with amoxicillin when she was two were actually from a virus and the allergist cleared her last month."
 sources = [
     "8-year-old girl with sore throat and fever for 2 days and a headache",
     "no cough no runny nose",
     "she has had a stomach ache and is eating less",
+    "mom says the hives she had with amoxicillin when she was two were actually from a virus and the allergist cleared her last month",
+]
+
+[gold_rules.objective]
+value = "Temperature 38.9 heart rate 112. Tonsils red and swollen with white exudate tender lymph nodes at the front of the neck. Rapid strep test positive."
+sources = [
     "temperature 38.9 heart rate 112",
     "tonsils red and swollen with white exudate tender lymph nodes at the front of the neck",
     "rapid strep test positive",
-    "mom says the hives she had with amoxicillin when she was two were actually from a virus and the allergist cleared her last month",
 ]
+
+[[not_proposed]]
+words = "take amoxicillin off her allergy list"
+why = "not_an_addition"

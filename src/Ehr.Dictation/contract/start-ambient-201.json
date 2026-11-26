@@ -1,0 +1,11 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "start-ambient",
+  "status": 201,
+  "body": {
+    "sessionId": "SESSION-ID-IN-THE-CONTRACT-FILES",
+    "mode": "ambient",
+    "maxSeconds": 1200,
+    "maxChunkBytes": 2097152
+  }
+}

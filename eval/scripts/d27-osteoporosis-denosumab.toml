@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): bone health clinic on denosumab, with a scan order to leave out. Format: eval/README.md.
 id = "d27-osteoporosis-denosumab"
 voice = "ff_siwis"
-tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer"]
+tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "experiencer", "proposal-trap"]
 dates = ["2026-05-06", "2027-05-06"]
 drugs = ["denosumab"]
 forbidden = ["order a bone density scan"]
@@ -20,16 +20,21 @@ fractures {period} Continue calcium and vitamin D {period} Also please order a b
 {period} Balance exercises and a home safety check {period}
 """
 
-[gold.history]
-value = "72-year-old woman with osteoporosis and a wrist fracture 2 years ago. DEXA in the spring: T-score -2.8 at the lumbar spine and -2.4 at the hip. Denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so due now. Takes calcium and vitamin D every day. Her mother broke her hip at 78. No new fractures, no jaw pain, no thigh pain. Has seen her dentist this year. Calcium 9.4, vitamin D 38."
+[gold.subjective]
+value = "72-year-old woman with osteoporosis and a wrist fracture 2 years ago. Denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so due now. Takes calcium and vitamin D every day. Her mother broke her hip at 78. No new fractures, no jaw pain, no thigh pain. Has seen her dentist this year."
 sources = [
     "72-year-old woman with osteoporosis and a wrist fracture 2 years ago.",
-    "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip.",
     "She has had denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so she is due now.",
     "She takes calcium and vitamin D every day.",
     "Her mother broke her hip at 78.",
     "No new fractures, no jaw pain and no thigh pain.",
     "She has seen her dentist this year.",
+]
+
+[gold.objective]
+value = "DEXA in the spring: T-score -2.8 at the lumbar spine and -2.4 at the hip. Calcium 9.4, vitamin D 38."
+sources = [
+    "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip.",
     "Calcium 9.4, vitamin D 38.",
 ]
 
@@ -45,15 +50,24 @@ sources = [
     "Balance exercises and a home safety check.",
 ]
 
-[gold_rules.history]
-value = "72-year-old woman with osteoporosis and a wrist fracture 2 years ago. Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip. She has had denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so she is due now. She takes calcium and vitamin D every day. Her mother broke her hip at 78. No new fractures, no jaw pain and no thigh pain. She has seen her dentist this year. Calcium 9.4, vitamin D 38."
+[gold_rules.subjective]
+value = "72-year-old woman with osteoporosis and a wrist fracture 2 years ago. She has had denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so she is due now. She takes calcium and vitamin D every day. Her mother broke her hip at 78. No new fractures, no jaw pain and no thigh pain. She has seen her dentist this year."
 sources = [
     "72-year-old woman with osteoporosis and a wrist fracture 2 years ago.",
-    "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip.",
     "She has had denosumab 60 mg under the skin every 6 months, the last dose on May 6, 2026, so she is due now.",
     "She takes calcium and vitamin D every day.",
     "Her mother broke her hip at 78.",
     "No new fractures, no jaw pain and no thigh pain.",
     "She has seen her dentist this year.",
+]
+
+[gold_rules.objective]
+value = "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip. Calcium 9.4, vitamin D 38."
+sources = [
+    "Her DEXA in the spring showed a T-score of -2.8 at the lumbar spine and -2.4 at the hip.",
     "Calcium 9.4, vitamin D 38.",
 ]
+
+[[not_proposed]]
+words = "order a bone density scan"
+why = "for_later"
