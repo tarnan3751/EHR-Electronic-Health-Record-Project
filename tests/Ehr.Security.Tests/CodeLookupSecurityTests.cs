@@ -137,21 +137,20 @@ public class CodeLookupSecurityTests(MigratedDatabase database) : IClassFixture<
         await AsSuperuserAsync("INSERT INTO ehr.patient_enrollments (id, patient_id, code_hash, issued_at, expires_at) VALUES (gen_random_uuid(), @patient, @hash, now() - interval '20 days', now() - interval '6 days')",
             ("patient", older), ("hash", Hash("expired")));
 
-        const string find = "SELECT patient_id::text FROM ehr.find_patient_enrollment(@hash, @legacy)";
+        // Nothing finds a code without using it up: the function that did is gone, for both runtime roles.
         foreach (var connection in new[] { App, Read })
         {
-            Assert.Equal([patient.ToString()], await Accounts.QueryAsync(connection, null, find, ("hash", keyed), ("legacy", Hash("nothing"))));
-            Assert.Equal([older.ToString()], await Accounts.QueryAsync(connection, null, find, ("hash", Hash("nothing")), ("legacy", legacy)));
-            Assert.Empty(await Accounts.QueryAsync(connection, null, find, ("hash", Hash("expired")), ("legacy", Hash("expired"))));
-            Assert.Empty(await Accounts.QueryAsync(connection, null, find, ("hash", Hash("unknown")), ("legacy", Hash("unknown"))));
-            Assert.Empty(await Accounts.QueryAsync(connection, null, "SELECT patient_id::text FROM ehr.find_patient_enrollment(NULL, NULL)"));
+            Assert.Equal(PostgresErrorCodes.UndefinedFunction, (await Assert.ThrowsAsync<PostgresException>(() => Accounts.QueryAsync(connection, null,
+                "SELECT patient_id::text FROM ehr.find_patient_enrollment(@hash, @legacy)", ("hash", keyed), ("legacy", keyed)))).SqlState);
         }
 
         const string redeem = "SELECT patient_id::text FROM ehr.redeem_patient_enrollment(@hash, @legacy)";
         await RefusedAsync(Read, null, redeem, ("hash", keyed), ("legacy", keyed));
+        Assert.Empty(await Accounts.QueryAsync(App, null, redeem, ("hash", Hash("expired")), ("legacy", Hash("expired"))));
+        Assert.Empty(await Accounts.QueryAsync(App, null, redeem, ("hash", Hash("unknown")), ("legacy", Hash("unknown"))));
+        Assert.Empty(await Accounts.QueryAsync(App, null, "SELECT patient_id::text FROM ehr.redeem_patient_enrollment(NULL, NULL)"));
         await Accounts.ExecuteAsync(App, null, "SELECT ehr.redeem_patient_enrollment(@hash, @legacy)", ("hash", keyed), ("legacy", keyed));
         Assert.Empty(await Accounts.QueryAsync(App, null, redeem, ("hash", keyed), ("legacy", keyed)));
-        Assert.Empty(await Accounts.QueryAsync(App, null, find, ("hash", keyed), ("legacy", keyed)));
-        Assert.Equal([older.ToString()], await Accounts.QueryAsync(App, null, find, ("hash", legacy), ("legacy", legacy)));
+        Assert.Equal([older.ToString()], await Accounts.QueryAsync(App, null, redeem, ("hash", Hash("nothing")), ("legacy", legacy)));
     }
 }
