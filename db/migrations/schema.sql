@@ -2461,3 +2461,41 @@ VALUES ('20261127090400_EmergencyAccessReviews', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.inbox_items DROP CONSTRAINT ck_inbox_items_kind;
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert', 'unrouted-result'));
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127100100_UnroutedResults', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE ehr.staff_user_passkeys (
+    credential_id bytea NOT NULL,
+    user_id uuid NOT NULL,
+    data jsonb NOT NULL,
+    CONSTRAINT pk_staff_user_passkeys PRIMARY KEY (credential_id),
+    CONSTRAINT fk_staff_user_passkeys_staff_users_user_id FOREIGN KEY (user_id) REFERENCES ehr.staff_users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX ix_staff_user_passkeys_user_id ON ehr.staff_user_passkeys (user_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127100200_StaffPasskeys', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE ehr.desktop_sessions ADD revoked_by uuid;
+
+CREATE INDEX ix_desktop_sessions_revoked_by ON ehr.desktop_sessions (revoked_by);
+
+ALTER TABLE ehr.desktop_sessions ADD CONSTRAINT fk_desktop_sessions_staff_users_revoked_by FOREIGN KEY (revoked_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127100300_DesktopSessionRevokedBy', '10.0.13');
+
+COMMIT;
+

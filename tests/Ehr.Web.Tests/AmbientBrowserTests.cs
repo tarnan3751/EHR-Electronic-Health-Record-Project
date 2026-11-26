@@ -9,12 +9,17 @@ namespace Ehr.Web.Tests;
 // window.__ambient, each time it asked for the microphone and each call it made and the answer, so the tests can say in
 // which order things happened. Each recorder's chunks say which recorder made them ("synthetic audio 2" for the second),
 // and, as a real recorder's, its last chunk and its stop come after stop() returns: later still while a test holds them
-// (window.__ambient.hold, then release()). In the browser tests' collection, for the reason AiReviewBrowserTests gives.
+// (window.__ambient.hold, then release()). A real recorder makes a chunk every five seconds; this one makes one every 60
+// ms, but only while no audio the page sent is still waiting for its answer (window.__ambient.uploading), so the page
+// never has more than its next chunk queued behind the one on its way, however slow the machine. Without that, a test's
+// few seconds made dozens of chunks, all to be sent one at a time before Stop could ask for the voices, which on a busy
+// machine outlasted a test's 30-second wait (TC-UC23-06's limit test). In the browser tests' collection, for the reason
+// AiReviewBrowserTests gives.
 [Collection(BrowserTests.Collection)]
 public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
 {
     internal const string FakeMicrophone = """
-        window.__ambient = { events: [], recorders: 0, hold: false, held: [], release() { this.held.splice(0).forEach((fire) => fire()); } };
+        window.__ambient = { events: [], recorders: 0, hold: false, held: [], uploading: 0, release() { this.held.splice(0).forEach((fire) => fire()); } };
         Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: async () => {
             window.__ambient.events.push('microphone');
             const track = { enabled: true, stopped: false, stop() { this.stopped = true; } };
@@ -24,17 +29,23 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         const fetched = window.fetch.bind(window);
         window.fetch = async (url, options) => {
             const call = `${options?.method ?? 'GET'} ${new URL(url, location.href).pathname}`;
+            const audio = call.endsWith('/audio');
             window.__ambient.events.push(`sent ${call}`);
-            const response = await fetched(url, options);
-            window.__ambient.events.push(`${call} ${response.status}`);
-            return response;
+            if (audio) window.__ambient.uploading++;
+            try {
+                const response = await fetched(url, options);
+                window.__ambient.events.push(`${call} ${response.status}`);
+                return response;
+            } finally {
+                if (audio) window.__ambient.uploading--;
+            }
         };
         window.MediaRecorder = class extends EventTarget {
             constructor() { super(); this.state = 'inactive'; this.mimeType = 'audio/webm'; this.number = ++window.__ambient.recorders; }
             chunk() { return new BlobEvent('dataavailable', { data: new Blob([`synthetic audio ${this.number}`], { type: this.mimeType }) }); }
             start() {
                 this.state = 'recording';
-                this.timer = setInterval(() => { if (this.state === 'recording') this.dispatchEvent(this.chunk()); }, 60);
+                this.timer = setInterval(() => { if (this.state === 'recording' && !window.__ambient.uploading) this.dispatchEvent(this.chunk()); }, 60);
             }
             pause() { this.state = 'paused'; }
             resume() { this.state = 'recording'; }
@@ -116,6 +127,55 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.False(await page.IsCheckedAsync("#ambient-agreed"));
         Assert.DoesNotContain("Recording", await page.TitleAsync(), StringComparison.Ordinal);
         Assert.DoesNotContain(apps.Dictation.Received, r => r.Method == "POST" && r.PathAndQuery.EndsWith("/stop", StringComparison.Ordinal));
+    }
+
+    // TC-UC23-02 in the browser (step 18a): a chunk on its way when the clinician discards. Held here until the discard has
+    // ended the session, it is answered that the listening has ended; that answer belongs to the listening discarded, so
+    // the status line still says it was discarded, not an error, and the next listening records and sends as any other.
+    // Before step 18a the late answer was taken as the next listening's, which ended it there and showed the error.
+    [Fact]
+    public async Task TC_UC23_02_an_answer_that_arrives_after_stop_and_discard_belongs_to_the_listening_discarded()
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+
+        // The next chunk's upload is held before it leaves the page.
+        await page.EvaluateAsync("""
+            const send = window.fetch;
+            window.__holdNext = true;
+            window.fetch = (url, options) => {
+                if (window.__holdNext && new URL(url, location.href).pathname.endsWith('/audio')) {
+                    window.__holdNext = false;
+                    return new Promise((resolve, reject) => { window.__heldUpload = () => send(url, options).then(resolve, reject); });
+                }
+                return send(url, options);
+            };
+            """);
+        await page.WaitForFunctionAsync("typeof window.__heldUpload === 'function'");
+        await AiReviewBrowserTests.TabToAsync(page, "[data-ambient-discard]");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.startsWith('DELETE ') && e.endsWith(' 204'))"
+            + " && window.__ambient.events.some(e => e.endsWith('/discard 200'))");
+        Assert.Equal("Discarded: nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
+
+        await page.EvaluateAsync("window.__heldUpload()");
+        await page.WaitForFunctionAsync(
+            "window.__ambient.events.slice(window.__ambient.events.findIndex(e => e.startsWith('DELETE '))).some(e => /\\/audio (404|409)$/.test(e))");
+        await page.WaitForTimeoutAsync(300);
+        Assert.Equal("Discarded: nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.DoesNotContain("sc-status--error", await page.GetAttributeAsync("[data-ambient-status]", "class") ?? "");
+        Assert.True(await page.IsVisibleAsync("[data-ambient-consent]"));
+
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.filter(e => e === 'microphone').length === 2");
+        await page.WaitForFunctionAsync(
+            "window.__ambient.events.slice(window.__ambient.events.lastIndexOf('microphone')).some(e => e.includes('/audio') && e.endsWith(' 200'))");
+        Assert.Equal("Listening: the visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
     }
 
     // Opens the Listen page in its own browser, with the fake microphone.
@@ -285,6 +345,61 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Single(said, s => s == "Listening stopped at its 20-minute limit. Transcribing the visit and telling its voices apart: "
             + "then say who each voice is to draft the note.");
         Assert.DoesNotContain("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
+    }
+
+    // TC-UC23-01 in the browser: Stop pressed while a chunk is on its way, its answer arriving before the recorder hands
+    // over its last chunk (a recorder does so after stop() returns: held here until the answer is in). The visit is
+    // stopped only once that last chunk has been sent, and its voices are shown. Before (found through step 19.2's CI, as
+    // the cause of the limit test's flakiness), the page took the recorder's "inactive" state for the end of the
+    // recording: it asked the service to stop on that answer, the last chunk was then refused as too late, and the page
+    // discarded the visit, saying "This visit's recording has already been stopped."
+    [Fact]
+    public async Task TC_UC23_01_stop_with_a_chunk_on_its_way_sends_the_last_chunk_before_the_visit_is_stopped()
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        var holdNext = 0;
+        var held = new TaskCompletionSource();
+        var answer = new TaskCompletionSource();
+        await page.RouteAsync(url => url.Contains("/audio?seq=", StringComparison.Ordinal), async route =>
+        {
+            if (Interlocked.Exchange(ref holdNext, 0) == 1)
+            {
+                held.TrySetResult();
+                await answer.Task;
+            }
+
+            await route.ContinueAsync();
+        });
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+
+        // The next chunk's upload held on its way, Stop pressed meanwhile, and the recorder's last chunk held too.
+        Interlocked.Exchange(ref holdNext, 1);
+        await held.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await page.EvaluateAsync("window.__ambient.hold = true");
+        await page.FocusAsync("[data-ambient-stop]");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("window.__ambient.held.length === 1");
+        answer.SetResult();
+        await page.WaitForFunctionAsync("window.__ambient.uploading === 0");
+        await page.WaitForTimeoutAsync(300);
+        var answered = (await EventsAsync(page)).Count(e => e.Contains("/audio ", StringComparison.Ordinal));
+
+        await page.EvaluateAsync("window.__ambient.release()");
+        await page.WaitForFunctionAsync($"window.__ambient.events.filter(e => e.includes('/audio ')).length > {answered}");
+
+        Assert.EndsWith(" 200", (await EventsAsync(page)).Last(e => e.Contains("/audio ", StringComparison.Ordinal)));
+        await page.WaitForSelectorAsync("[data-ambient-voice='2']");
+        Assert.DoesNotContain("already been stopped", await page.TextContentAsync("[data-ambient-status]"));
+        var events = await EventsAsync(page);
+        Assert.True(
+            Array.FindLastIndex(events, e => e.Contains("/audio ", StringComparison.Ordinal))
+                < Array.FindIndex(events, e => e.StartsWith("sent POST", StringComparison.Ordinal) && e.EndsWith("/stop", StringComparison.Ordinal)),
+            "The visit was stopped before its last chunk was sent.");
     }
 
     // TC-UC23-06 in the browser: three voices told apart under a consent for the patient and the clinician. The third can
@@ -562,6 +677,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
+    // The app bar's navigation is left out: on a narrow window it is a row of its own that scrolls sideways by itself
+    // (ehr.css), so a link past its edge, as a clinician's fifth since the passkeys page (step 19), is scrolled to, by a
+    // swipe or from the keyboard (app-bar.js), never a page wider than the window, which "scrolls" still checks.
     [Fact]
     public async Task TC_UC23_06_a_visits_review_fits_every_width_in_both_themes()
     {
@@ -573,7 +691,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         const string Layout = """
             () => {
                 const width = window.innerWidth;
-                const wide = [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > width + 1).map(e => e.tagName + '.' + e.className);
+                const wide = [...document.querySelectorAll('body *')].filter(e => !e.closest('.sc-appbar__nav') && e.getBoundingClientRect().right > width + 1).map(e => e.tagName + '.' + e.className);
                 const button = document.querySelector('[data-ambient-reject-all] button').getBoundingClientRect();
                 return { scrolls: document.documentElement.scrollWidth > width, wide, inside: button.right <= width };
             }

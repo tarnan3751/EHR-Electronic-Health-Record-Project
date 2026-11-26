@@ -70,7 +70,7 @@ public class TC_UC4_12_Nfr12_EntryKeyboardFirst(WebApps apps) : IClassFixture<We
         // The suggestions are the browser's own list (a datalist), which headless Chromium draws outside the page, where
         // Playwright's key presses don't reach: the arrow keys and Enter can't pick from it here. So the name is typed
         // in full once the list offers it, as a clinician may; picking with the arrows is checked by hand.
-        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("ControlOrMeta+A");
         await page.Keyboard.PressAsync("Backspace");
         await page.Keyboard.TypeAsync("essen");
         await page.WaitForFunctionAsync("[...document.querySelectorAll('#entry-codes option')].some(o => o.value === 'Essential (primary) hypertension')");

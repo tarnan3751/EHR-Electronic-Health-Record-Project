@@ -15,24 +15,39 @@ namespace Ehr.Web.Api.Desktop;
 // DesktopApiContract.cs. The cloud app forwards these posts to the on-prem app, which can write (Forwarding/).
 //
 // Sign-in, POST /api/desktop/sign-in: email, password, the authenticator code and the device's name. 200 with the
-// token, until when it works and the account's display name; 401 for a wrong email, password or code, or a locked
-// account; 403 for an account that hasn't finished its web setup or isn't a clinician. Each refusal says why.
+// token, the session's 30-day end, until which the app may open its offline copy (OfflineAccess), and the account's
+// display name; 401 for a wrong email, password or code, or a locked account; 403 for an account that hasn't finished
+// its web setup or isn't a clinician. Each refusal says why. The token itself works for 12 hours: after that every
+// request with it gets a 401 saying the sign-in has ended (DesktopTokenHandler.SignInHeader), and the app signs in again.
+//
+// Unlock, POST /api/desktop/unlock with the token: the password the app's lock asks for (the expansion plan's step 19a),
+// for the token's own account; the request names none. 204 when it's right; 403 with the reason when it's wrong or the
+// account is now locked out, since the token itself was good (a 401 always means the token was refused). A wrong
+// password counts towards the account's lockout, as at sign-in, and is rate-limited with the sign-ins
+// (AccountRateLimits).
 //
 // Sign-out, POST /api/desktop/sign-out with the token: 204, and the token never works again.
+//
+// The updates, and the minimum version below which the desktop's data is refused (the expansion plan's step 20), are
+// in DesktopUpdates.cs: sign-in, unlock and sign-out are never refused for the version.
 public static class DesktopApi
 {
     public static IEndpointRouteBuilder MapDesktopApi(this IEndpointRouteBuilder endpoints)
     {
         var desktop = endpoints.MapGroup("/api/desktop").RequireAuthorization(EhrPolicies.Desktop);
         desktop.MapPost("/sign-in", SignInAsync).AllowAnonymous();
+        desktop.MapPost("/unlock", UnlockAsync);
         desktop.MapPost("/sign-out", SignOutAsync);
-        desktop.MapPost("/offline-panel", OfflinePanelAsync);
-        desktop.MapDraftSync();
-        desktop.MapOfflineDictation();
+        desktop.MapDesktopUpdates();
+        // The desktop's data, refused to a build older than the minimum (DesktopVersionFilter).
+        var data = desktop.MapGroup("").AddEndpointFilter<DesktopVersionFilter>();
+        data.MapPost("/offline-panel", OfflinePanelAsync);
+        data.MapDraftSync();
+        data.MapOfflineDictation();
         return endpoints;
     }
 
-    static async Task<IResult> SignInAsync(SignInRequest request, DesktopSessions sessions, CancellationToken cancellationToken)
+    static async Task<IResult> SignInAsync(SignInRequest request, DesktopSessions sessions, EhrDbContext db, CancellationToken cancellationToken)
     {
         var missing = new Dictionary<string, string[]>();
         Require(missing, "email", request.Email);
@@ -44,7 +59,11 @@ public static class DesktopApi
         }
 
         var device = string.IsNullOrWhiteSpace(request.Device) ? "desktop" : request.Device.Trim();
+        // One transaction, for the account's hold once its password is checked (StaffSignIn.CheckPasswordAsync, steps
+        // 19.1 and 19.2). Not cancellable once done, as a page's (DatabaseTransactionFilter).
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var signIn = await sessions.SignInAsync(request.Email!, request.Password!, request.Code!, device, cancellationToken);
+        await transaction.CommitAsync(CancellationToken.None);
         return signIn.Outcome switch
         {
             DesktopSignInOutcome.SignedIn => Results.Ok(new SignInResponse(
@@ -102,6 +121,27 @@ public static class DesktopApi
 
     // A vital sign as the desktop app's contract carries it: a whole number.
     static short? Whole(decimal? value) => value is { } v ? (short)Math.Round(v) : null;
+
+    static async Task<IResult> UnlockAsync(UnlockRequest request, ClaimsPrincipal user, DesktopSessions sessions, EhrDbContext db, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(request.Password))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["Enter the password."] });
+        }
+
+        // The policy has just authenticated the token, so its session is in the principal. One transaction, for the
+        // account's hold once the password is checked, as at the sign-in (step 19.2).
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var outcome = await sessions.UnlockAsync(Guid.Parse(user.FindFirstValue(DesktopTokenHandler.SessionClaim)!), request.Password, cancellationToken);
+        await transaction.CommitAsync(CancellationToken.None);
+        return outcome switch
+        {
+            DesktopUnlockOutcome.Unlocked => Results.NoContent(),
+            DesktopUnlockOutcome.LockedOut => Results.Json(
+                new Refusal("This account is locked after too many failed attempts. Try again in 15 minutes."), statusCode: StatusCodes.Status403Forbidden),
+            _ => Results.Json(new Refusal("Wrong password."), statusCode: StatusCodes.Status403Forbidden),
+        };
+    }
 
     static async Task<IResult> SignOutAsync(ClaimsPrincipal user, DesktopSessions sessions, CancellationToken cancellationToken)
     {

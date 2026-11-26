@@ -180,7 +180,7 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - Results are numbers typed in for lab orders whose catalog item has result fields set up (12 items today, including the common panels). Other lab tests, imaging and referrals have no results page content yet. Nothing imports results; the simulated lab is step 12.
 - A filed result can't be corrected or withdrawn. A wrong value needs a new order.
 - The reference ranges are one range for each test, for adults, not by age or sex.
-- The inbox item goes to the clinician who signed the order, even if they have since left the patient's panel; any panel clinician can acknowledge from the chart. If the signer's account is disabled or no longer a clinician's, it goes to each clinician on the patient's panel instead.
+- The inbox item goes to the clinician who signed the order, even if they have since left the patient's panel; any panel clinician can acknowledge from the chart. If the signer's account is disabled or no longer a clinician's, it goes to each clinician on the patient's panel instead; and if there is none, to every administrator whose account isn't disabled, by patient ID alone, until a clinician acknowledges the results (the expansion plan's step 18a, `docs/UC15.md`).
 - The chart lists a patient's eight most relevant resulted orders (unacknowledged and abnormal first); there is no page of older ones yet.
 - The inbox looks at the oldest 500 waiting results when deciding which are abnormal.
 - Results are released to the portal as soon as they are filed, before anyone acknowledges them.
@@ -192,7 +192,7 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - An interaction is known only if one of three sources has the pair. Whole classes are still thin (an ACE inhibitor with an angiotensin receptor blocker beyond lisinopril with losartan, for example): see `docs/expansion/reference-data.md`.
 - A DDInter warning links to DDInter's interaction checker, not to a page for the pair.
 - The reason for overriding is kept on the order and in the audit, but the chart doesn't show it beside the order yet.
-- A warning names a medication the patient takes even when it is marked sensitive: the clinician signing the order needs to know. What the order and its audit keep says only "a medication marked sensitive", since administrators can read an order's audit details.
+- A warning names a medication the patient takes even when it is marked sensitive: the clinician signing the order needs to know. What the order and its audit keep says only "a medication marked sensitive"; administrators, who could read an order's audit details until the expansion plan's step 18a, now see only the names of its fields there (`docs/UC12.md`).
 - An item with no drug code (the albuterol inhaler among the common items) can't be checked, and the form says only coded items are.
 - A warning that appears between opening the form and signing is caught by the database and shown; adding a medication at the same instant as an order is signed can slip past.
 - Doses, kidney function, age and pregnancy are not considered.

@@ -38,6 +38,16 @@ GRANT SELECT ON ehr.staff_users, ehr.staff_user_claims, ehr.staff_user_logins, e
 GRANT SELECT, INSERT, UPDATE ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_logins, ehr.patient_user_tokens TO ehr_app;
 GRANT SELECT ON ehr.patient_users, ehr.patient_user_claims, ehr.patient_user_logins, ehr.patient_user_tokens TO ehr_read;
 
+-- Staff accounts' passkeys (the expansion plan's step 19; Accounts/StaffUserPasskey.cs), a second factor in place of the
+-- authenticator code. Internal, like the account tables: the code page reads them, and a sign-in updates a passkey's
+-- signature count, with nobody signed in yet. Added on the passkeys page (INSERT), its count kept at each use (UPDATE),
+-- and DELETE, the one account table with it, because the feature needs it: a staff member removes their own passkey,
+-- and an administrator's authenticator reset removes all of an account's; Identity's store removes a passkey by
+-- deleting its row. A passkey holds no secret, and every add, use and removal is an audit event the app records.
+-- Only the on-prem app writes them; the cloud app reads them for the code page and the list.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ehr.staff_user_passkeys TO ehr_app;
+GRANT SELECT ON ehr.staff_user_passkeys TO ehr_read;
+
 -- The desktop app's sessions, by token hash (Accounts/DesktopSession.cs). Internal, like the account tables: every
 -- sync request looks its session up before anyone is signed in; the cloud app does so against the replica. The on-prem
 -- app creates sessions and revokes them at sign-out (UPDATE). No DELETE.
@@ -117,8 +127,9 @@ GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 -- since nothing audits the audit. Append-only: no UPDATE and no DELETE for anyone at runtime. The write-audit
 -- trigger inserts as the table's owner; the app role inserts read and sign-in events.
 GRANT INSERT ON ehr.audit_events TO ehr_app;
--- Every column but details, which holds the values a write changed: admins get those through
--- ehr.shown_audit_details (40-audit.sql), which never gives a sensitive item's.
+-- Every column but details, which holds the values a write changed: through ehr.shown_audit_details (40-audit.sql)
+-- admins get an event's details only when it is about no patient, and of a write to patient data the names of the
+-- fields it changed, never a value (step 18a).
 GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, sensitive, part) ON ehr.audit_events TO ehr_app, ehr_read;
 
 GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;

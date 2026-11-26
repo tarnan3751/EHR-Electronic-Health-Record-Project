@@ -1,8 +1,9 @@
 # TC-UC4-06 — Records stay intact after an outage and a restore
 
 A manual test case, as in the SE document (section 7.3). It needs the running server stack with Barman's continuous
-backups and a point-in-time restore, which the test suite doesn't have, so it has no automated part. Its run is the
-restore drill recorded in `docs/UC2.md` ("Restore drill"). What an outage does to a write is checked automatically by
+backups and a point-in-time restore, which the test suite doesn't have, so the suite has no part of it. Its run is the
+restore drill recorded in `docs/UC2.md` ("Restore drill"), automated since the expansion plan's step 21 as
+`infra/compose/restore-drill.cs`, which CI's stack job runs on every push. What an outage does to a write is checked automatically by
 `TC_UC2_06_Nfr09_OneAuthoritativeCopy.cs`.
 
 | Field | Value |
@@ -30,5 +31,6 @@ restore drill recorded in `docs/UC2.md` ("Restore drill"). What an outage does t
 | Date | Stack | Result |
 |---|---|---|
 | 2026-11-15 | Local Compose stack, `main` at 86dc093 | **Pass.** The restore completed and every count matched: 50,000 patients, 92 audit events, 3 staff users, 2 patient users, 2 panel assignments, and the scratch table at 5 rows, without the 5 added later. The full table of counts is in `docs/UC2.md` ("Restore drill"). |
+| 2026-11-25 | Local Compose stack, the expansion plan's step 21 (no patients seeded) | **Pass,** by `infra/compose/restore-drill.cs` in 45 seconds: the restore completed to T, the row written before T was there and the one written after wasn't, and the count and checksum of the migrations (49), the codes (100,847), patients and audit events matched the primary's at T. CI's stack job runs it on every push. |
 
-**Status: Pass.** Not re-run in this change.
+**Status: Pass.**

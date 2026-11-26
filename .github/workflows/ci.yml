@@ -8,6 +8,18 @@ on:
     branches: ["**"]
   pull_request:
     branches: [main]
+  # A run started by hand can keep the desktop installers it builds (the desktop job). Every other run builds them and
+  # keeps nothing: the repository is public, and the owner decides whether a downloadable artifact counts as publishing.
+  workflow_dispatch:
+    inputs:
+      upload_installers:
+        description: Keep the desktop installers as this run's artifacts, for 7 days (anyone signed in to GitHub can download them)
+        type: boolean
+        default: false
+      desktop_version:
+        description: Build the desktop installers as this version (such as 0.2.1, to test an update), not Cargo.toml's
+        type: string
+        default: ""
 
 # Every job gets a read-only token unless it asks for more.
 permissions:
@@ -54,6 +66,11 @@ jobs:
       - name: Check the brand files
         run: dotnet run tools/brand/sync.cs -- --check
 
+      # The Tailscale access rules parse, name only what they define, and have a test for every opening
+      # (infra/tailscale/check.cs). Syntax only: they have never been applied to a tailnet.
+      - name: Check the Tailscale policy file
+        run: dotnet run infra/tailscale/check.cs
+
       - name: Test
         run: dotnet test --solution Ehr.slnx --configuration Release --no-build
 
@@ -68,6 +85,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # For the dotnet run scripts: the restore drill (restore-drill.cs) and the deployment's site check.
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
 
       # The one-time setup from infra/compose/README.md, with a self-signed certificate standing in for mkcert: one
       # certificate for the three sites and both databases, and, being self-signed, its own root for the database
@@ -86,12 +108,25 @@ jobs:
           docker compose config --quiet
           docker compose -f compose.yaml -f compose.nvidia.yaml config --quiet
           docker compose -f compose.yaml -f compose.backup-drill.yaml config --quiet
+          docker compose -f compose.yaml -f compose.desktop-updates.yaml config --quiet
+
+      # The monitoring profile's configuration, with the tools of the versions compose.yaml pins: Prometheus's, every
+      # alert held to its threshold and wait by its tests (infra/monitoring/alerts*.test.yml), Alertmanager's (the
+      # stack's, and the example for a real server's relay), and the probes'.
+      - name: Check the monitoring configuration
+        run: |
+          image() { docker compose --profile monitoring config --images "$1"; }
+          docker run --rm -v "$PWD/../monitoring:/m:ro" -w /m --entrypoint promtool "$(image prometheus)" check config prometheus.yml
+          docker run --rm -v "$PWD/../monitoring:/m:ro" -w /m --entrypoint promtool "$(image prometheus)" test rules alerts.test.yml alerts-backups.test.yml
+          docker run --rm -v "$PWD/..:/i:ro" --entrypoint amtool "$(image alertmanager)" check-config /i/monitoring/alertmanager.yml /i/deploy/alertmanager.example.yml
+          docker run --rm -v "$PWD/../monitoring:/m:ro" "$(image blackbox)" --config.file=/m/blackbox.yml --config.check
 
       - name: Build the images
         run: docker compose build
 
+      # With the monitoring profile, which an alert is checked through below.
       - name: Start the stack
-        run: docker compose up --detach --wait --wait-timeout 300
+        run: docker compose --profile monitoring up --detach --wait --wait-timeout 300
 
       # On-site through the LAN, then off-site and the portal through the simulated internet. Nothing is served
       # without signing in: the clinic's home sends an anonymous browser to its sign-in page, the sign-in pages load,
@@ -110,6 +145,15 @@ jobs:
           check ehr-remote.example.com:9443 /sign-in 200
           check portal.example.com:9443 /portal/sign-in 200
           check ehr.example.com:8443 "/api/sync/quick-texts?since=0" 401
+
+      # The deployment's site check (infra/deploy/check-sites.cs), as an administrator runs it after a deployment or an
+      # upgrade, here against the stack: every name connects to this runner, the stack's certificate is the root, and,
+      # since that certificate lasts a day, no number of days left is asked of it.
+      - name: The deployment's site check passes
+        run: >
+          dotnet run ../deploy/check-sites.cs --
+          --clinic https://ehr.example.com:8443 --remote https://ehr-remote.example.com:9443
+          --portal https://portal.example.com:9443 --ca certs/rootCA.pem --connect 127.0.0.1 --days 0
 
       # The lab's door (step 12). The .env copied from .env.example has a lab key, so the on-prem app opens the door,
       # the migration job stores the key's hash, and the lab service runs. With the key, the on-prem site hands over
@@ -167,6 +211,23 @@ jobs:
           [ "$(docker compose exec -T -u postgres cloud-db psql -Atc 'select pg_is_in_recovery()')" = t ]
           echo "cloud-db is a read-only standby"
 
+      # The apps' roles end a transaction left idle for a minute (db/policies/00-roles.sql). Role settings are catalog
+      # rows, so the replica has them too, for the cloud app's ehr_read.
+      - name: The apps' roles have their idle limit on both databases
+        run: |
+          query="select string_agg(r.rolname || ' ' || array_to_string(s.setconfig, ','), '; ' order by r.rolname)
+                 from pg_db_role_setting s join pg_roles r on r.oid = s.setrole where r.rolname in ('ehr_app', 'ehr_read')"
+          expected="ehr_app idle_in_transaction_session_timeout=60s; ehr_read idle_in_transaction_session_timeout=60s"
+          for db in onprem-db cloud-db; do
+            for _ in $(seq 15); do
+              settings=$(docker compose exec -T -u postgres "$db" psql -Atc "$query" || true)
+              [ "$settings" = "$expected" ] && break
+              sleep 2
+            done
+            echo "$db: $settings"
+            [ "$settings" = "$expected" ]
+          done
+
       # Barman's first base backup takes about a minute; `barman check` fails until it's done.
       - name: Backups are healthy
         run: |
@@ -179,6 +240,12 @@ jobs:
           done
           echo "$report"
           exit 1
+
+      # A point-in-time restore from those backups, as restore-drill.cs says: a row written before a chosen time is in
+      # the restored copy, one written after it isn't, and a few tables' counts and checksums are as they were then. It
+      # restores inside the Barman volume, into restore-db, and cleans up after itself.
+      - name: Restore drill
+        run: dotnet run restore-drill.cs
 
       # Old backups are deleted with the WAL before them (infra/barman). The clinic's policy is the one in force: a
       # 6-day recovery window, with a base backup every 23 hours. Then Barman is restarted with compose.backup-drill.yaml (a base
@@ -220,11 +287,41 @@ jobs:
             exit 1
           fi
 
+      # An alert end to end, as a clinic would get it: the replica stops, and within minutes the administrators have an
+      # email from Alertmanager in the mail catcher. Prometheus must first see the replica's slot active, and no such
+      # email may be there before. ReplicaNotStreaming waits 2 minutes (infra/monitoring/alerts.yml); with a scrape and
+      # Alertmanager's 30 seconds, the email is due about 3 minutes after the stop.
+      - name: An alert is emailed when the replica stops
+        run: |
+          query() { curl --silent --show-error --fail --get --data-urlencode "query=$1" http://127.0.0.1:9090/api/v1/query; }
+          emails() { curl --silent --show-error --fail --get --data-urlencode "query=subject:ReplicaNotStreaming" http://127.0.0.1:8025/api/v1/search; }
+          for _ in $(seq 60); do
+            active=$(query 'pg_replication_slots_slot_is_active{slot_name="cloud_replica"}' | jq -r '.data.result[0].value[1] // "none"')
+            [ "$active" = 1 ] && break
+            sleep 2
+          done
+          echo "The replica's slot, as Prometheus sees it: $active (1 is active)"
+          [ "$active" = 1 ]
+          [ "$(emails | jq '.messages_count')" = 0 ]
+          docker compose stop cloud-db
+          stopped=$(date +%s)
+          until [ "$(emails | jq '.messages_count')" != 0 ]; do
+            if [ "$(($(date +%s) - stopped))" -ge 300 ]; then
+              echo "No email within 5 minutes of the replica stopping"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "Emailed $(($(date +%s) - stopped)) s after the replica stopped:"
+          emails | jq -r '.messages[0] | "\(.Subject) to \([.To[].Address] | join(", "))"'
+          [ "$(emails | jq -r '[.messages[0].To[].Address] | join(",")')" = admins@example.com ]
+          docker compose start cloud-db
+
       - name: Show containers and logs
         if: failure()
         run: |
-          docker compose ps --all
-          docker compose logs --no-color
+          docker compose --profile monitoring ps --all
+          docker compose --profile monitoring logs --no-color
 
       - name: Tear down
         if: always()
@@ -285,6 +382,36 @@ jobs:
       # other UC 7 and UC 8 test cases (TC-UC7-01 to 04, TC-UC8-01, 02, 04 and 06); --show-output prints its times.
       - name: Test
         run: cargo test --locked --release -- --show-output
+
+      # The installers, unsigned (the expansion plan's step 20, docs/desktop-install.md): the .dmg on macOS, sealed ad
+      # hoc, and the NSIS setup on Windows. Built on every run, so both platforms are known to bundle; nothing signs an
+      # update here, and no key is ever given to CI. The CLI is cached with the toolchain after its first install.
+      - name: Install the Tauri CLI
+        run: cargo install tauri-cli --version 2.12.0 --locked
+
+      # A run started by hand may build them as another version, to test an update to it; the update's signature is
+      # made on the owner's Mac (docs/desktop-install.md), never here.
+      - name: Build the installer
+        shell: bash
+        env:
+          DESKTOP_VERSION: ${{ inputs.desktop_version }}
+        run: |
+          if [ -n "$DESKTOP_VERSION" ]; then
+            cargo tauri build --ci --config "{\"version\":\"$DESKTOP_VERSION\"}" -- --locked
+          else
+            cargo tauri build --ci -- --locked
+          fi
+
+      - name: Keep the installer
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SwiftChart-${{ runner.os }}
+          path: |
+            ${{ github.workspace }}/target/release/bundle/dmg/*.dmg
+            ${{ github.workspace }}/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 7
 
   dictation:
     name: Dictation

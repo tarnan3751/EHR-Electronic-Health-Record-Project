@@ -33,6 +33,11 @@
                     <td>@string.Join(", ", member.Roles)</td>
                     <td>@StaffModel.StatusOf(member)</td>
                     <td>
+                        @if (member.Roles.Contains(StaffRoles.Clinician))
+                        {
+                            @* Anyone's, their own included: the remote wipe for a lost laptop (DesktopSignIns). *@
+                            <a class="sc-btn sc-btn--compact" asp-page="/Admin/DesktopSignIns" asp-route-id="@member.Id">Desktop sign-ins</a>
+                        }
                         @if (member.Id != Model.CurrentUserId)
                         {
                             <div class="sc-actions">

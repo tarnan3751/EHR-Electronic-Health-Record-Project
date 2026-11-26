@@ -1,12 +1,14 @@
 //! What the app keeps in the OS credential store (the login Keychain on macOS, Credential Manager on Windows): the
 //! local database's key, 32 random bytes from the OS made on first launch, and the session from the last sign-in
-//! (sync.rs). Neither goes to disk beside the database.
+//! (sync.rs). Neither goes to disk beside the database. Both are kept under the app's identifier, as its data folder is
+//! (tauri.conf.json): renaming it starts the app empty (the expansion plan's step 20).
 
 use keyring_core::{Entry, Error};
 
 use crate::api::Session;
 
-const SERVICE: &str = "com.example.ehr";
+/// The app's identifier (tauri.conf.json), which names its entries in the credential store.
+pub const SERVICE: &str = "io.github.tarnan3751.swiftchart";
 const USER: &str = "local-database-key";
 const SESSION_USER: &str = "server-session";
 
@@ -39,6 +41,11 @@ pub fn load(database_exists: bool) -> Result<[u8; 32], String> {
     }
 }
 
+/// The entry that keeps the local database's key, in the store load() chose, for the remote wipe to delete (wipe.rs).
+pub fn key_entry() -> Result<Entry, String> {
+    Entry::new(SERVICE, USER).map_err(|error| format!("credential store: {error}"))
+}
+
 /// The entry that keeps the session, in the store load() chose.
 pub fn session_entry() -> Result<Entry, String> {
     Entry::new(SERVICE, SESSION_USER).map_err(|error| format!("credential store: {error}"))
@@ -56,7 +63,8 @@ pub fn save_session(entry: &Entry, session: &Session) -> Result<(), String> {
         .map_err(|error| format!("credential store: {error}"))
 }
 
-pub fn forget_session(entry: &Entry) -> Result<(), String> {
+/// Deletes the entry: the session at sign-out, or the key at the remote wipe. One that isn't there is deleted already.
+pub fn delete(entry: &Entry) -> Result<(), String> {
     match entry.delete_credential() {
         Ok(()) | Err(Error::NoEntry) => Ok(()),
         Err(error) => Err(format!("credential store: {error}")),
@@ -80,4 +88,15 @@ fn use_platform_store() -> keyring_core::Result<()> {
 fn use_platform_store() -> keyring_core::Result<()> {
     keyring_core::set_default_store(keyring_core::mock::Store::new()?);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    /// The credential store's entries are named by the app's identifier, as its data folder is: change both together.
+    #[test]
+    fn the_entries_are_named_by_the_apps_identifier() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config["identifier"], super::SERVICE);
+    }
 }

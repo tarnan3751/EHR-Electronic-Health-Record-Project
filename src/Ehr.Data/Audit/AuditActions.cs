@@ -39,6 +39,15 @@ public static class AuditActions
 
     public const string SignOut = "sign_out";
 
+    // The desktop app's lock opened with the account's password, checked by the server (the expansion plan's step 19a). A
+    // wrong one is recorded as SignInFailed, with the desktop session in its details.
+    public const string Unlock = "unlock";
+
+    // An administrator revoked every desktop sign-in of a staff account, so each computer holding one deletes what the
+    // desktop app keeps there the next time it reaches a server (the expansion plan's step 20). The account is the
+    // event's row; the details say how many sign-ins were revoked.
+    public const string DesktopRevoked = "desktop_revoked";
+
     // Emergency access to a patient outside the actor's normal access, with its stated reason.
     public const string BreakGlass = "break_glass";
 
@@ -70,6 +79,17 @@ public static class AuditActions
 
     public const string RecoveryCodeUsed = "recovery_code_used";
 
+    // A staff account's passkey (step 19) added by its owner, or removed by its owner or by an administrator's
+    // authenticator reset, each with the account and the passkey by a short hash of its credential's ID, never the name
+    // its owner gave it; or one refused as it was being added, with why (a wrong authenticator code, or a passkey that
+    // wasn't accepted). A sign-in with a passkey is a sign_in whose details name it the same way; a passkey refused at
+    // sign-in, a sign_in_failed, "passkey refused".
+    public const string PasskeyAdded = "passkey_added";
+
+    public const string PasskeyRemoved = "passkey_removed";
+
+    public const string PasskeyRefused = "passkey_refused";
+
     // An admin created a staff account and its setup link.
     public const string StaffInvited = "staff_invited";
 
@@ -98,9 +118,9 @@ public static class AuditActions
     // Every action, for the audit page's filter.
     public static readonly string[] All =
     [
-        Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
+        Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, Unlock, DesktopRevoked, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
-        RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
+        RecoveryCodeUsed, PasskeyAdded, PasskeyRemoved, PasskeyRefused, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
         RegistrationReplaced, ProxyAccountCreated, SentToLab, ReviewItemsFailed,
     ];
 }

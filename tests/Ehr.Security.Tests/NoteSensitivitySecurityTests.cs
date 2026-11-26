@@ -77,7 +77,7 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         var text = await AsSuperuserAsync("SELECT subjective || objective || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE id = @id", ("id", note));
         var logged = await AsSuperuserAsync("SELECT count(*)::text FROM ehr.change_log WHERE table_name = 'clinical_drafts' AND row_id = @id", ("id", draft));
         const string shown = """
-            SELECT e.table_name || ' ' || e.action || ' ' || e.sensitive || ' ' || CASE WHEN (SELECT d.details FROM ehr.shown_audit_details(ARRAY[e.id]) d) IS NULL THEN 'hidden' ELSE 'shown' END
+            SELECT e.table_name || ' ' || e.action || ' ' || e.sensitive || ' ' || CASE WHEN (SELECT d.id FROM ehr.shown_audit_details(ARRAY[e.id]) d) IS NULL THEN 'hidden' ELSE 'shown' END
             FROM ehr.audit_events e WHERE e.patient_id = @patient AND e.table_name IN ('clinical_drafts', 'clinical_notes', 'note_addenda') ORDER BY e.occurred_at, e.table_name
             """;
         Assert.All(await Accounts.QueryAsync(App, admin, shown, ("patient", patient)), line => Assert.EndsWith(" false shown", line));

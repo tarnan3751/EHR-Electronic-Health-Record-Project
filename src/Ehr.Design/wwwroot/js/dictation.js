@@ -280,29 +280,39 @@
 
     // Sends the waiting chunks in order, one at a time. On a failure worth retrying the chunks stay here and are sent
     // again later; the recording carries on meanwhile (UC 9: the connection drops).
+    // A run belongs to the dictation it started for (own): an answer that arrives once that one is cancelled, or once
+    // the page has gone on to a new one (cancelling ends with a fresh state), is dropped, never taken as the next one's
+    // (the expansion plan's step 18a). Between the checks and the next await, own is state.
     async function pump() {
-        if (state.sending || state.cancelled || state.ended || !state.session) {
+        const own = state;
+        if (own.sending || own.cancelled || own.ended || !own.session) {
             return;
         }
 
-        state.sending = true;
+        own.sending = true;
         try {
-            while (state.queue.length > 0 && !state.cancelled) {
-                const chunk = state.queue[0];
+            while (own.queue.length > 0 && !own.cancelled) {
+                const chunk = own.queue[0];
                 let response;
                 try {
-                    response = await call("POST", `/${state.session.sessionId}/audio?seq=${chunk.seq}`, chunk.blob, chunk.type);
+                    response = await call("POST", `/${own.session.sessionId}/audio?seq=${chunk.seq}`, chunk.blob, chunk.type);
                 } catch {
-                    pauseAndRetry();
+                    if (own === state) {
+                        pauseAndRetry();
+                    }
                     return;
                 }
 
-                if (state.cancelled) {
+                if (own !== state || own.cancelled) {
                     return;
                 }
 
                 if (response.ok) {
                     const received = await json(response);
+                    if (own !== state || own.cancelled) {
+                        return;
+                    }
+
                     state.queue.shift();
                     resumed();
                     renderTranscript(received.transcript);
@@ -311,6 +321,10 @@
                 }
 
                 const body = await json(response);
+                if (own !== state || own.cancelled) {
+                    return;
+                }
+
                 if (response.status === 409 && body.error === "out_of_order" && typeof body.expectedSeq === "number") {
                     // The API already has everything before expectedSeq: send from there.
                     state.queue = state.queue.filter((waiting) => waiting.seq >= body.expectedSeq);
@@ -357,10 +371,10 @@
                 return;
             }
         } finally {
-            state.sending = false;
+            own.sending = false;
         }
 
-        if (state.stopRequested && state.queue.length === 0) {
+        if (own === state && own.stopRequested && own.queue.length === 0) {
             finish();
         }
     }

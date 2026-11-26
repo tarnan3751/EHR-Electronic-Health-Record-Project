@@ -76,6 +76,9 @@ builder.Services.PostConfigure<SiteAddresses>(addresses =>
     addresses.ClinicalBaseUrl = siteAddresses.ClinicalBaseUrl;
     addresses.PortalBaseUrl = siteAddresses.PortalBaseUrl;
 });
+// Passkeys for staff (step 19), optional: the domain they are tied to and the staff sites' addresses, checked here, so a
+// deployment with a wrong one fails at startup, with what to set; with neither, outside Development, there are none.
+builder.Services.AddSingleton(PasskeySettings.Checked(builder.Configuration.GetSection(PasskeySettings.Section).Get<PasskeySettings>(), builder.Environment.IsDevelopment()));
 // Only the on-prem app hashes enrollment codes (the cloud app forwards those posts), so only it holds the key: the
 // cloud server has a copy of the codes' table, and the key beside it would undo what the key is for.
 builder.Services.AddSingleton(site != Site.OnPrem
@@ -89,13 +92,20 @@ builder.Services.AddSingleton(site != Site.OnPrem
                 $"Set {CodeHasher.Setting} to a secret of at least {CodeHasher.MinimumKeyLength} characters. The app won't start without it: "
                 + "portal enrollment codes are stored as a hash keyed with it.")));
 
-// The anonymous account POSTs are limited per client address, and account emails per recipient (AccountRateLimits).
+// The account POSTs (the sign-ins, the portal's account forms, the desktop app's unlock and the staff passkeys page's)
+// are limited per client address, and account emails per recipient (AccountRateLimits).
 var rateLimits = builder.Configuration.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>() ?? new RateLimitOptions();
 builder.Services.AddAccountRateLimits(rateLimits,
     site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 } sharedKey ? AccountRateLimits.ForwardedProof(sharedKey) : null);
 
 // The portal's emails: through the mail server in Ehr:Smtp when there is one, otherwise into the log, for development.
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.Section));
+// The desktop app's updates and the oldest build that may sync (Api/Desktop/DesktopUpdates.cs): a minimum that isn't a
+// version stops the app at start, rather than refuse every build.
+builder.Services.AddOptions<DesktopUpdateOptions>().Bind(builder.Configuration.GetSection(DesktopUpdateOptions.Section))
+    .Validate(desktop => string.IsNullOrWhiteSpace(desktop.MinimumVersion) || desktop.Minimum is not null,
+        "Ehr:Desktop:MinimumVersion must be a version, such as 0.2.1, or empty.")
+    .ValidateOnStart();
 // They go out from a queue in memory (QueuedEmailSender), so a response never waits for the mail server, and one
 // address gets only so many an hour (CappedEmailSender).
 var emailSender = builder.Configuration[$"{SmtpOptions.Section}:Host"] is { Length: > 0 } ? typeof(SmtpEmailSender) : typeof(LoggingEmailSender);
@@ -227,7 +237,8 @@ app.MapRazorPages().WithStaticAssets();
 // The desktop app signs in at /api/desktop and sends the session token it gets with every sync request. Both APIs
 // take the Desktop policy: a clinician's session token, and nothing else (Api/Desktop, Api/Sync).
 app.MapDesktopApi();
-app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop);
+// Both refuse the desktop's data to a build older than Ehr:Desktop:MinimumVersion (DesktopUpdates.cs, step 20).
+app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop).AddEndpointFilter<DesktopVersionFilter>();
 // The cloud app ships its audit events here, with the key both apps share. Without a key (an on-prem app run on its
 // own, as in "Running the apps") there's no cloud app and no door.
 if (site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 })

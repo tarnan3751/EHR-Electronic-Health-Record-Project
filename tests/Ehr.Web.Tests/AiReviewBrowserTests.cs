@@ -100,6 +100,54 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Fail("Keyboard could not reach " + selector);
     }
 
+    // The expansion plan's step 18a, the Dictate page's side of TC-UC23-02's race: a chunk on its way when the clinician
+    // cancels. Held here until the cancel has deleted the session, it is answered that the dictation has ended; that
+    // answer belongs to the dictation cancelled, so the page still says it was discarded, not an error, and the next
+    // dictation records and sends as any other. Recorded with the listening tests' fake recorder, which keeps making chunks.
+    [Fact]
+    public async Task An_answer_that_arrives_after_a_dictation_is_cancelled_belongs_to_the_dictation_cancelled()
+    {
+        var (patient, session) = await AccountAsync();
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await LaunchAsync(playwright);
+        await using var context = await AmbientBrowserTests.ContextAsync(browser, session);
+        var page = await context.NewPageAsync();
+        await page.GotoAsync($"{server.Url}/patients/{patient}/dictate");
+        await page.Keyboard.PressAsync("Alt+Shift+D");
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+
+        // The next chunk's upload is held before it leaves the page.
+        await page.EvaluateAsync("""
+            const send = window.fetch;
+            window.__holdNext = true;
+            window.fetch = (url, options) => {
+                if (window.__holdNext && new URL(url, location.href).pathname.endsWith('/audio')) {
+                    window.__holdNext = false;
+                    return new Promise((resolve, reject) => { window.__heldUpload = () => send(url, options).then(resolve, reject); });
+                }
+                return send(url, options);
+            };
+            """);
+        await page.WaitForFunctionAsync("typeof window.__heldUpload === 'function'");
+        await TabToAsync(page, "[data-dictation-cancel]");
+        await page.Keyboard.PressAsync("Enter");
+        const string Discarded = "Temporary dictation discarded. The manual draft was kept; no AI text was approved.";
+        await page.WaitForFunctionAsync("words => document.querySelector('[data-dictation-status]').textContent === words", Discarded);
+        Assert.Contains(await AmbientBrowserTests.EventsAsync(page), e => e.StartsWith("DELETE ", StringComparison.Ordinal) && e.EndsWith(" 204", StringComparison.Ordinal));
+
+        await page.EvaluateAsync("window.__heldUpload()");
+        await page.WaitForFunctionAsync(
+            "window.__ambient.events.slice(window.__ambient.events.findIndex(e => e.startsWith('DELETE '))).some(e => /\\/audio (404|409)$/.test(e))");
+        await page.WaitForTimeoutAsync(300);
+        Assert.Equal(Discarded, await page.TextContentAsync("[data-dictation-status]"));
+
+        await page.Keyboard.PressAsync("Alt+Shift+D");
+        await page.WaitForFunctionAsync("window.__ambient.events.filter(e => e === 'microphone').length === 2");
+        await page.WaitForFunctionAsync(
+            "window.__ambient.events.slice(window.__ambient.events.lastIndexOf('microphone')).some(e => e.includes('/audio') && e.endsWith(' 200'))");
+    }
+
     // TC-UC13-05 and TC-UC13-09 (the expansion plan's step 14), and TC-UC14-05 through dictation (NFR-12): with the
     // keyboard only, a dictation's four proposed fields are decided (Subjective and Objective accepted, Assessment
     // edited, Plan rejected), the review completed into the editor, the rest typed, and the note signed.

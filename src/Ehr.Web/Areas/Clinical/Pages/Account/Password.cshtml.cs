@@ -41,6 +41,8 @@ public class PasswordModel(StaffSignIn signIn) : PageModel
             return Page();
         }
 
+        // The new password changed the account's security stamp: the pending sign-in carries the new one (step 19.1).
+        await signIn.RestampAsync(HttpContext, user);
         return RedirectToPage(await signIn.NextStepAsync(user) == SignInStep.EnterCode ? "Code" : "Enroll", new { ReturnUrl });
     }
 }

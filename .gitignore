@@ -29,6 +29,7 @@ __pycache__/
 infra/compose/certs/*
 !infra/compose/certs/.gitkeep
 infra/compose/models/
+infra/compose/desktop-updates/
 infra/compose/test-accounts.json*
 
 # Model weights are downloaded during setup, never committed

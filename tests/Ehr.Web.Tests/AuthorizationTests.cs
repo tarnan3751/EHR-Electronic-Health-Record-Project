@@ -20,6 +20,8 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("/admin/staff", "/sign-in")]
     [InlineData("/session", "/sign-in")]
     [InlineData("/admin/emergency-access/00000000-0000-0000-0000-000000000001", "/sign-in")]
+    [InlineData("/admin/staff/00000000-0000-0000-0000-000000000001/desktop", "/sign-in")]
+    [InlineData("/passkeys", "/sign-in")]
     [InlineData("/portal", "/portal/sign-in")]
     [InlineData("/portal/session", "/portal/sign-in")]
     public async Task Anonymous_requests_are_sent_to_the_right_sign_in(string path, string signIn)
@@ -65,8 +67,12 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
     {
         var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
 
-        // The staff page, and an emergency access's review (step 18).
-        foreach (var path in new[] { "/admin/staff", "/admin/emergency-access/00000000-0000-0000-0000-000000000001" })
+        // The staff page, an emergency access's review (step 18), and a staff account's desktop sign-ins (step 20).
+        foreach (var path in new[]
+        {
+            "/admin/staff", "/admin/emergency-access/00000000-0000-0000-0000-000000000001",
+            "/admin/staff/00000000-0000-0000-0000-000000000001/desktop",
+        })
         {
             using var response = await Client(apps.OnPrem, session.Jar, followRedirects: false).GetAsync(path, Cancel);
 
@@ -85,10 +91,13 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
         using var patients = await client.GetAsync("/patients", Cancel);
         using var quickText = await client.GetAsync(QuickTexts, Cancel);
         using var staff = await client.GetAsync("/admin/staff", Cancel);
+        // Their own passkeys, as any staff account's (step 19).
+        using var passkeys = await client.GetAsync("/passkeys", Cancel);
 
         Assert.Equal("/denied", new Uri(Base, patients.Headers.Location!).AbsolutePath);
         Assert.Equal(HttpStatusCode.OK, quickText.StatusCode);
         Assert.Equal(HttpStatusCode.OK, staff.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, passkeys.StatusCode);
     }
 
     [Fact]

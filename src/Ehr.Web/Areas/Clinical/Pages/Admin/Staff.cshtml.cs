@@ -10,8 +10,8 @@ namespace Ehr.Web.Areas.Clinical.Pages.Admin;
 
 // Staff accounts, for admins: who there is, creating one, and looking after one. A new account gets a one-time setup
 // link, shown once, which the admin passes on; the person chooses their password with it and enrolls an authenticator
-// at their first sign-in. The same link serves a forgotten password; a lost phone gets the authenticator reset; and a
-// person who leaves has the account disabled. An admin does none of these to their own account. Nothing here is PHI.
+// at their first sign-in. The same link serves a forgotten password; a lost phone or device gets the authenticator
+// reset, which removes the account's passkeys too (step 19); and a person who leaves has the account disabled. An admin does none of these to their own account. A clinician's desktop sign-ins, their own included, are revoked from their own page (DesktopSignIns). Nothing here is PHI.
 public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) : PageModel
 {
     public IReadOnlyList<StaffUser> Staff { get; private set; } = [];
@@ -43,15 +43,21 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
 
     public Task<IActionResult> OnPostResetAuthenticatorAsync(Guid id) => ActOnAsync(id, async member =>
     {
-        await accounts.ResetAuthenticatorAsync(member, HttpContext.RequestAborted);
-        Message = $"{member.DisplayName} will set up an authenticator app again at their next sign-in.";
+        var passkeys = await accounts.ResetAuthenticatorAsync(member, HttpContext.RequestAborted);
+        Message = $"{member.DisplayName} will set up an authenticator app again at their next sign-in."
+            + (passkeys switch { 0 => "", 1 => " Their passkey was removed.", _ => $" Their {passkeys} passkeys were removed." });
         return null;
     });
 
     public Task<IActionResult> OnPostDisableAsync(Guid id) => ActOnAsync(id, async member =>
     {
         await accounts.DisableAsync(member, HttpContext.RequestAborted);
-        Message = $"{member.DisplayName} is disabled and can no longer sign in.";
+        // Disabling ends a clinician's desktop sign-ins but deletes nothing on their computers: revoking them does,
+        // before or after (DesktopSignIns, the expansion plan's step 20).
+        Message = $"{member.DisplayName} is disabled and can no longer sign in."
+            + (member.Roles.Contains(StaffRoles.Clinician)
+                ? " What SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked: revoke them now, since a sign-out on one of those computers in the meantime leaves it out of reach."
+                : "");
         return null;
     });
 

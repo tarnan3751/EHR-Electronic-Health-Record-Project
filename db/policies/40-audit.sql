@@ -8,6 +8,8 @@
 -- its owner may call it directly. Writes only ever happen on the primary, so the source is onprem, but for the writes
 -- the lab's door makes (the expansion plan's step 12, 76-lab.sql): no account is behind those, and their source is lab.
 -- A write to a sensitive item is marked as one, so the audit page shows that it changed and never its values (below).
+-- The values are kept here whatever an administrator is shown: since step 18a the audit page shows a change to patient
+-- data by the names of the fields it changed alone, never a value (ehr.shown_audit_details, below).
 
 CREATE OR REPLACE FUNCTION ehr.record_write() RETURNS trigger
     LANGUAGE plpgsql
@@ -123,28 +125,75 @@ CREATE OR REPLACE TRIGGER audit_events_guard
     BEFORE UPDATE ON ehr.audit_events
     FOR EACH ROW EXECUTE FUNCTION ehr.guard_audit_event();
 
--- What an admin may see of what a write changed. The runtime roles can't read audit_events.details (10-grants.sql):
--- the audit page asks here, for the events it lists. It answers only an admin, and never with the values of a
--- sensitive item, or of the lists' history rows, which copy those items: for those the page says that a sensitive
--- item changed, and who changed it, from the event's other columns. The full record stays in the table. Runs as its
--- owner, to read the column; its search_path is pinned, and only the runtime roles may call it.
-CREATE OR REPLACE FUNCTION ehr.shown_audit_details(event_ids uuid[]) RETURNS TABLE (id uuid, details jsonb)
+-- What an admin may see of an event's details. The runtime roles can't read audit_events.details (10-grants.sql): the
+-- audit page asks here, for the events it lists. It answers only an admin, and never for an event of a sensitive item,
+-- of the lists' history rows, which copy those items, or of patients' messages and refill requests: for those the page
+-- says what it can from the event's other columns.
+-- Since step 18a, no value of patient data at all ("The admin audit view shows who did what to which record, but no
+-- clinical text for any patient data, sensitive or not": Tahseen). An event is about patient data when it names a patient,
+-- or a table the write-audit trigger is on (below), which Ehr.Security.Tests holds to the tables decided PHI. For a
+-- write to one, `fields` names the columns it changed: for an update those whose value changed, for an insert those it
+-- gave a value, for a delete those that held one (stored under "deleteed", as the trigger has always spelled it), in byte order;
+-- the columns of the row only, never a key inside a JSON column. Two names are left out because their being set is
+-- itself a finding about the patient: an order's safety_warnings and safety_override_reason are set only when the patient
+-- has an allergy or a medication that weighs against what was ordered (60-orders.sql). An event about no patient, such as
+-- a desktop sign-in, keeps its `details` as recorded. Events written before step 18a are shown the same way: the names
+-- are worked out here from what is stored, which stays whole in the table. Runs as its owner, to read the column; its
+-- search_path is pinned, and only the runtime roles may call it. Its result changed shape in step 18a, which PostgreSQL
+-- can't replace in place: the older one is dropped first, in the same transaction, so no caller finds it missing.
+BEGIN;
+DO $drop$
+BEGIN
+    IF to_regprocedure('ehr.shown_audit_details(uuid[])') IS NOT NULL
+       AND pg_get_function_result(to_regprocedure('ehr.shown_audit_details(uuid[])')) <> 'TABLE(id uuid, details jsonb, fields text[])' THEN
+        DROP FUNCTION ehr.shown_audit_details(uuid[]);
+    END IF;
+END
+$drop$;
+CREATE OR REPLACE FUNCTION ehr.shown_audit_details(event_ids uuid[]) RETURNS TABLE (id uuid, details jsonb, fields text[])
     LANGUAGE sql
     STABLE
     SECURITY DEFINER
     SET search_path = pg_catalog, pg_temp
 AS $$
-    SELECT e.id, e.details
-    FROM ehr.audit_events e
-    WHERE e.id = ANY(event_ids) AND (SELECT ehr.is_admin()) AND NOT e.sensitive
-      -- Nor the text of what a patient and their care team wrote to each other.
-      AND e.table_name IS DISTINCT FROM 'chart_history' AND e.table_name IS DISTINCT FROM 'messages' AND e.table_name IS DISTINCT FROM 'message_threads'
-      -- Nor a refill request's (step 13d): the medication asked for, the patient's note and the care team's answer.
-      AND e.table_name IS DISTINCT FROM 'refill_requests'
-      AND e.details IS NOT NULL
+    WITH patient_tables AS (
+        SELECT c.relname::text AS name
+        FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+        WHERE c.relnamespace = 'ehr'::regnamespace AND t.tgfoid = 'ehr.record_write()'::regprocedure AND NOT t.tgisinternal
+    ),
+    shown AS (
+        SELECT e.id,
+               CASE WHEN NOT p.patient_data THEN e.details END AS details,
+               CASE WHEN p.patient_data THEN
+                   CASE WHEN e.action = 'update' AND jsonb_typeof(e.details) = 'object' THEN
+                            ARRAY(SELECT k FROM jsonb_object_keys(e.details) AS k
+                                  WHERE NOT (e.table_name = 'orders' AND k IN ('safety_warnings', 'safety_override_reason'))
+                                  ORDER BY k COLLATE "C")
+                        WHEN e.action IN ('insert', 'delete') AND jsonb_typeof(e.details -> (e.action || 'ed')) = 'object' THEN
+                            ARRAY(SELECT f.key FROM jsonb_each(e.details -> (e.action || 'ed')) AS f
+                                  WHERE jsonb_typeof(f.value) <> 'null'
+                                    AND NOT (e.table_name = 'orders' AND f.key IN ('safety_warnings', 'safety_override_reason'))
+                                  ORDER BY f.key COLLATE "C")
+                   END
+               END AS fields
+        FROM ehr.audit_events e
+        CROSS JOIN LATERAL (
+            -- EXISTS, never IN: an event with no table would make IN unknown, and NOT unknown shows nothing at all.
+            SELECT e.patient_id IS NOT NULL OR EXISTS (SELECT FROM patient_tables t WHERE t.name = e.table_name) AS patient_data
+        ) p
+        WHERE e.id = ANY(event_ids) AND (SELECT ehr.is_admin()) AND NOT e.sensitive
+          -- Nor the text of what a patient and their care team wrote to each other.
+          AND e.table_name IS DISTINCT FROM 'chart_history' AND e.table_name IS DISTINCT FROM 'messages' AND e.table_name IS DISTINCT FROM 'message_threads'
+          -- Nor a refill request's (step 13d): the medication asked for, the patient's note and the care team's answer.
+          AND e.table_name IS DISTINCT FROM 'refill_requests'
+          AND e.details IS NOT NULL
+    )
+    SELECT s.id, s.details, s.fields FROM shown s
+    WHERE s.details IS NOT NULL OR s.fields IS NOT NULL
 $$;
 REVOKE ALL ON FUNCTION ehr.shown_audit_details(uuid[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION ehr.shown_audit_details(uuid[]) TO ehr_app, ehr_read;
+COMMIT;
 
 -- Events written before an item was marked, or before this rule: marked now, on every pass, as 65-chart-lists.sql
 -- marks the diagnoses themselves. Forced row-level security hides the two lists' rows from this role, so it is lifted

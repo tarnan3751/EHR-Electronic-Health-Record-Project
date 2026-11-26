@@ -1,7 +1,12 @@
 using System.Net;
+using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Data.Patients;
+using Ehr.Domain.Audit;
+using Ehr.Domain.Phi;
+using Ehr.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
@@ -297,6 +302,39 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         }
 
         Assert.Equal(["no-known-allergy active"], await RowsAsync(apps, "allergy_intolerances", patient, "code || ' ' || clinical_status"));
+    }
+
+    // Who recorded "No known allergies" is read in the chart's patient statement: about a third of the seeded charts
+    // say "No known allergies", and the chart is the page nearest the render gate, so it costs no statement of its own
+    // (step 7a; VisitSummaryTests holds the same for the summary tag).
+    [Fact]
+    public async Task Who_recorded_no_known_allergies_costs_the_chart_no_statement_of_its_own()
+    {
+        var (clinician, patient, session) = await OnPanelAsync(apps, "Recorded by");
+        async Task<(int Commands, PatientChart Chart)> ChartAsync()
+        {
+            var commands = new PatientSearchQueryTests.CapturedCommands();
+            var user = new UserContext { UserId = clinician.Id };
+            var options = new DbContextOptionsBuilder<EhrDbContext>();
+            EhrDbContext.Configure(options, apps.Database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword));
+            options.AddInterceptors(new UserContextInterceptor(user), commands);
+            await using var db = new EhrDbContext(options.Options);
+            var reader = new PhiReader(db, new AuditRecorder(db, user, new AuditSource(AuditSources.OnPrem)), user);
+            await using var transaction = await db.Database.BeginTransactionAsync(Cancel);
+            var chart = (await reader.ChartAsync(patient, 5, AuditParts.Chart, Cancel))!;
+            await transaction.RollbackAsync(Cancel);
+            return (commands.Executed.Count, chart);
+        }
+
+        var (unasked, nothingRecorded) = await ChartAsync();
+        Assert.Null(nothingRecorded.NoKnownAllergiesRecordedBy);
+        using var recorded = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", $"/patients/{patient}");
+        Assert.Contains("Saved: no known allergies recorded for this patient.", Words(await ReadAsync(recorded)));
+
+        var (noneKnown, chart) = await ChartAsync();
+
+        Assert.Equal("Dr. Test", chart.NoKnownAllergiesRecordedBy);
+        Assert.Equal(unasked, noneKnown);
     }
 
     // A diagnosis sensitive by its code has its "Sensitive" box checked and fixed, with a hint that says why, and
