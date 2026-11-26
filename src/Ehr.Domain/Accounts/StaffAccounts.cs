@@ -9,10 +9,11 @@ namespace Ehr.Domain.Accounts;
 
 // Staff accounts, as an admin manages them: an account is created by invitation, without a password, and the person
 // chooses their password through a one-time setup link and enrolls an authenticator at their first sign-in. No
-// temporary passwords change hands. A forgotten password gets a new setup link, a lost phone a new authenticator
-// enrollment, and a person who leaves has their account disabled: locked out indefinitely, never deleted. Each of
-// those changes the account's security stamp, so its cookies and desktop sessions end. Every action is an audit event.
-public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db, AuditRecorder audit)
+// temporary passwords change hands. A forgotten password gets a new setup link, a lost phone or device a new
+// authenticator enrollment, with the account's passkeys removed (step 19), and a person who leaves has their account
+// disabled: locked out indefinitely, never deleted. Each of those changes the account's security stamp, so its cookies
+// and desktop sessions end. Every action is an audit event.
+public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db, AuditRecorder audit, StaffPasskeys passkeys)
 {
     public Task<List<StaffUser>> ListAsync(CancellationToken cancellationToken) =>
         db.StaffUsers.AsNoTracking().OrderBy(u => u.DisplayName).ThenBy(u => u.Id).ToListAsync(cancellationToken);
@@ -62,13 +63,22 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
         return new(IdentityResult.Success, user, token);
     }
 
-    // The account enrolls an authenticator app again at its next sign-in; the old app and recovery codes stop working.
-    public async Task ResetAuthenticatorAsync(StaffUser user, CancellationToken cancellationToken)
+    // The account enrolls an authenticator app again at its next sign-in; the old app, the recovery codes and every
+    // passkey stop working: a passkey is never left on an account without its authenticator, and a lost device may hold
+    // either. How many passkeys were removed, each recorded with the admin who removed it.
+    public async Task<int> ResetAuthenticatorAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        var removed = 0;
+        foreach (var passkey in await passkeys.ListAsync(user))
+        {
+            removed += await passkeys.RemoveAsync(user, passkey.CredentialId, cancellationToken) ? 1 : 0;
+        }
+
         await users.SetTwoFactorEnabledAsync(user, false);
         await users.ResetAuthenticatorKeyAsync(user);
         audit.Record(AuditActions.AuthenticatorReset, tableName: "staff_users", rowId: user.Id);
         await db.SaveChangesAsync(cancellationToken);
+        return removed;
     }
 
     // Disabled: locked out with no end, which sign-in and row-level security both refuse. Nothing is deleted.

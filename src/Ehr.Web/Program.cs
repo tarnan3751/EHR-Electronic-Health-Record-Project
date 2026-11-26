@@ -76,6 +76,9 @@ builder.Services.PostConfigure<SiteAddresses>(addresses =>
     addresses.ClinicalBaseUrl = siteAddresses.ClinicalBaseUrl;
     addresses.PortalBaseUrl = siteAddresses.PortalBaseUrl;
 });
+// Passkeys for staff (step 19), optional: the domain they are tied to and the staff sites' addresses, checked here, so a
+// deployment with a wrong one fails at startup, with what to set; with neither, outside Development, there are none.
+builder.Services.AddSingleton(PasskeySettings.Checked(builder.Configuration.GetSection(PasskeySettings.Section).Get<PasskeySettings>(), builder.Environment.IsDevelopment()));
 // Only the on-prem app hashes enrollment codes (the cloud app forwards those posts), so only it holds the key: the
 // cloud server has a copy of the codes' table, and the key beside it would undo what the key is for.
 builder.Services.AddSingleton(site != Site.OnPrem
@@ -89,8 +92,8 @@ builder.Services.AddSingleton(site != Site.OnPrem
                 $"Set {CodeHasher.Setting} to a secret of at least {CodeHasher.MinimumKeyLength} characters. The app won't start without it: "
                 + "portal enrollment codes are stored as a hash keyed with it.")));
 
-// The account POSTs (the sign-ins, the portal's account forms and the desktop app's unlock) are limited per client
-// address, and account emails per recipient (AccountRateLimits).
+// The account POSTs (the sign-ins, the portal's account forms, the desktop app's unlock and the staff passkeys page's)
+// are limited per client address, and account emails per recipient (AccountRateLimits).
 var rateLimits = builder.Configuration.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>() ?? new RateLimitOptions();
 builder.Services.AddAccountRateLimits(rateLimits,
     site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 } sharedKey ? AccountRateLimits.ForwardedProof(sharedKey) : null);

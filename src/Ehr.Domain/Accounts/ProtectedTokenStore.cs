@@ -14,13 +14,18 @@ namespace Ehr.Domain.Accounts;
 //
 // A value saved before this change is plain text and has no prefix. It is still read as it is, so nobody is locked out,
 // and it is encrypted the next time it is saved: a new authenticator enrollment, new recovery codes, or a redeemed code.
-public sealed class ProtectedTokenStore<TUser, TUserClaim, TUserLogin, TUserToken>(
+//
+// It is also the store of an account's passkeys (the expansion plan's step 19), TUserPasskey, which are saved as they
+// are: a passkey holds no secret. Only staff accounts have a passkey table (StaffUserPasskey); the patient store is
+// given Identity's own type, which the database doesn't map, so any passkey call on a patient account throws.
+public sealed class ProtectedTokenStore<TUser, TUserClaim, TUserLogin, TUserToken, TUserPasskey>(
     EhrDbContext context, IDataProtectionProvider dataProtection, IdentityErrorDescriber? describer = null)
-    : UserOnlyStore<TUser, EhrDbContext, Guid, TUserClaim, TUserLogin, TUserToken>(context, describer)
+    : UserOnlyStore<TUser, EhrDbContext, Guid, TUserClaim, TUserLogin, TUserToken, TUserPasskey>(context, describer)
     where TUser : IdentityUser<Guid>
     where TUserClaim : IdentityUserClaim<Guid>, new()
     where TUserLogin : IdentityUserLogin<Guid>, new()
     where TUserToken : IdentityUserToken<Guid>, new()
+    where TUserPasskey : IdentityUserPasskey<Guid>, new()
 {
     // The login provider UserStoreBase files its own tokens under (private there).
     const string IdentityProvider = "[AspNetUserStore]";

@@ -622,6 +622,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
     // TC-UC23-06 (NFR-12) in the browser: a visit's review fits a phone's width and a desktop's, in the light theme and the
     // dark, nothing wider than the window: its longest button, "Reject every proposal and delete the conversation", wraps.
+    // The app bar's navigation is left out: on a narrow window it is a row of its own that scrolls sideways by itself
+    // (ehr.css), so a link past its edge, as a clinician's fifth since the passkeys page (step 19), is scrolled to, by a
+    // swipe or from the keyboard (app-bar.js), never a page wider than the window, which "scrolls" still checks.
     [Fact]
     public async Task TC_UC23_06_a_visits_review_fits_every_width_in_both_themes()
     {
@@ -633,7 +636,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         const string Layout = """
             () => {
                 const width = window.innerWidth;
-                const wide = [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > width + 1).map(e => e.tagName + '.' + e.className);
+                const wide = [...document.querySelectorAll('body *')].filter(e => !e.closest('.sc-appbar__nav') && e.getBoundingClientRect().right > width + 1).map(e => e.tagName + '.' + e.className);
                 const button = document.querySelector('[data-ambient-reject-all] button').getBoundingClientRect();
                 return { scrolls: document.documentElement.scrollWidth > width, wide, inside: button.right <= width };
             }

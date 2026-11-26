@@ -101,6 +101,13 @@ public sealed class WebApps : IAsyncLifetime
     // The key enrollment codes are hashed with: both apps hold the same one.
     public const string EnrollmentKey = "tests-only-enrollment-code-key-0123456789";
 
+    // The passkeys' domain and the staff sites' addresses under it (step 19), as Ehr:Passkeys gives them.
+    public const string PasskeyDomain = "example.test";
+
+    public const string OnSiteOrigin = "https://ehr.example.test";
+
+    public const string OffSiteOrigin = "https://ehr-remote.example.test";
+
     // Each cloud app keeps its audit queue in its own folder under this one.
     public string CloudAuditRoot { get; } = Path.Combine(Path.GetTempPath(), $"ehr-cloud-audit-{Guid.NewGuid():N}");
 
@@ -488,6 +495,10 @@ public sealed class WebApps : IAsyncLifetime
                 .UseSetting("Ehr:Clinic:TimeZone", "UTC")
                 // Listening to a visit, off unless switched on: on here, for the tests of it (AmbientSwitchTests turn it off).
                 .UseSetting(Ehr.Web.Ambient.AmbientListening.Setting, "true")
+                // Passkeys (step 19), as the stack sets them: one parent domain, and the two staff sites under it.
+                .UseSetting("Ehr:Passkeys:Domain", PasskeyDomain)
+                .UseSetting("Ehr:Passkeys:Origins:0", OnSiteOrigin)
+                .UseSetting("Ehr:Passkeys:Origins:1", OffSiteOrigin)
                 .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")))
                 // Every test client has the same address, so the limits are out of reach (RateLimitTests lowers them).
                 .UseSetting("RateLimits:PermitLimit", "1000000")

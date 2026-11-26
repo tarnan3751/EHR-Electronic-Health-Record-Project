@@ -38,6 +38,9 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "patient_user_logins")] = ["SELECT"],
         [("ehr_app", "patient_user_tokens")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_read", "patient_user_tokens")] = ["SELECT"],
+        // Step 19: removing a passkey deletes its row (Runtime_roles_delete_only_where_a_feature_needs_it).
+        [("ehr_app", "staff_user_passkeys")] = ["SELECT", "INSERT", "UPDATE", "DELETE"],
+        [("ehr_read", "staff_user_passkeys")] = ["SELECT"],
         [("ehr_app", "desktop_sessions")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_read", "desktop_sessions")] = ["SELECT"],
         [("ehr_app", "patients")] = ["SELECT", "INSERT", "UPDATE"],
@@ -246,6 +249,24 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         await AssertExactPrivilegesAsync();
     }
 
+    // Runtime roles never get DELETE unless a feature needs it (AGENTS.md): a finished visit's transcript (step 16) and
+    // a removed passkey (step 19), both for the on-prem app's role, and nothing for the cloud app's.
+    [Fact]
+    public async Task Runtime_roles_delete_only_where_a_feature_needs_it()
+    {
+        var deletable = await QueryAsync(
+            """
+            SELECT r.role || ' ' || c.relname
+            FROM unnest(@roles) AS r(role)
+            JOIN pg_class c ON c.relnamespace = 'ehr'::regnamespace AND c.relkind IN ('r', 'p')
+            WHERE has_table_privilege(r.role, c.oid, 'DELETE')
+            """,
+            reader => reader.GetString(0),
+            ("roles", RuntimeRoles));
+
+        Assert.Equal(["ehr_app ambient_transcripts", "ehr_app staff_user_passkeys"], deletable.Order(StringComparer.Ordinal));
+    }
+
     [Fact]
     public async Task Applying_again_removes_privileges_granted_by_hand()
     {
@@ -269,6 +290,11 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "SELECT * FROM ehr.sync_operations")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.patients")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.staff_users")]
+    // Step 19: the cloud app reads passkeys and writes none; a passkey's count is kept by the on-prem app, after a
+    // sign-in it forwards there.
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.staff_user_passkeys (credential_id, user_id, data) VALUES ('\\x01', gen_random_uuid(), '{}')")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "UPDATE ehr.staff_user_passkeys SET data = '{}'")]
+    [InlineData("ehr_read", MigratedDatabase.ReadPassword, "DELETE FROM ehr.staff_user_passkeys")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "INSERT INTO ehr.allergy_intolerances (id, patient_id, display, clinical_status, recorded_at) VALUES (gen_random_uuid(), gen_random_uuid(), 'x', 'active', now())")]
     // Chart lists are added to and changed (ChartListSecurityTests), never deleted; their history and the reference
     // codes are never written at runtime.

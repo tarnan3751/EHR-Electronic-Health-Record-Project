@@ -408,6 +408,26 @@ namespace Ehr.Migrations
                     b.ToTable("staff_user_logins", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Accounts.StaffUserPasskey", b =>
+                {
+                    b.Property<byte[]>("CredentialId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("bytea")
+                        .HasColumnName("credential_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("CredentialId")
+                        .HasName("pk_staff_user_passkeys");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_staff_user_passkeys_user_id");
+
+                    b.ToTable("staff_user_passkeys", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Accounts.StaffUserToken", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -3711,6 +3731,59 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_staff_user_logins_staff_users_user_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Accounts.StaffUserPasskey", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_staff_user_passkeys_staff_users_user_id");
+
+                    b.OwnsOne("Microsoft.AspNetCore.Identity.IdentityPasskeyData", "Data", b1 =>
+                        {
+                            b1.Property<byte[]>("StaffUserPasskeyCredentialId");
+
+                            b1.Property<byte[]>("AttestationObject")
+                                .IsRequired();
+
+                            b1.Property<byte[]>("ClientDataJson")
+                                .IsRequired();
+
+                            b1.Property<DateTimeOffset>("CreatedAt");
+
+                            b1.Property<bool>("IsBackedUp");
+
+                            b1.Property<bool>("IsBackupEligible");
+
+                            b1.Property<bool>("IsUserVerified");
+
+                            b1.Property<string>("Name");
+
+                            b1.Property<byte[]>("PublicKey")
+                                .IsRequired();
+
+                            b1.Property<long>("SignCount");
+
+                            b1.PrimitiveCollection<string>("Transports");
+
+                            b1.HasKey("StaffUserPasskeyCredentialId");
+
+                            b1.ToTable("staff_user_passkeys", "ehr");
+
+                            b1
+                                .ToJson("data")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StaffUserPasskeyCredentialId")
+                                .HasConstraintName("fk_staff_user_passkeys_staff_user_passkeys_credential_id");
+                        });
+
+                    b.Navigation("Data")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Ehr.Data.Accounts.StaffUserToken", b =>

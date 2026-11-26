@@ -39,6 +39,25 @@ public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
     }
 
+    // Step 19's final review: adding a passkey checks an authenticator code, so the passkeys page's posts share the
+    // account posts' window, the sign-in's two among them, and over it get the same page.
+    [Fact]
+    public async Task The_passkeys_pages_posts_are_counted_with_the_account_posts()
+    {
+        await using var app = apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting("RateLimits:PermitLimit", "3"));
+        var account = await apps.CreateStaffAsync("Dr. Limited Passkeys", Ehr.Data.Accounts.StaffRoles.Clinician);
+        var session = await Browser.SignInAsync(app, account);
+        var token = Browser.Token(await session.Client.GetStringAsync(PasskeyFlows.PasskeysPage, Cancel));
+        (string, object)[] fields = [("name", "This Mac"), ("code", Ehr.Testing.Totp.WrongCode(account.AuthenticatorKey)), ("__RequestVerificationToken", token)];
+
+        using var third = await session.Client.PostAsync($"{PasskeyFlows.PasskeysPage}?handler=Options", Browser.Form(fields), Cancel);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, third.StatusCode);
+
+        using var refused = await session.Client.PostAsync($"{PasskeyFlows.PasskeysPage}?handler=Options", Browser.Form(fields), Cancel);
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.Contains("Too many attempts. Wait a few minutes and try again.", await refused.Content.ReadAsStringAsync(Cancel));
+    }
+
     // Step 12, the review's probe: nobody without the lab's key can make the lab's requests wait or fail. Keyless
     // requests to the door, from the clinic's network or the internet, share a small window of their own and earn only
     // 401s and then 429s; the lab's, with its key, are counted in their own. Through the cloud site nothing reaches the

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
@@ -10,11 +11,12 @@ using Microsoft.AspNetCore.Identity;
 namespace Ehr.Domain.Accounts;
 
 // A staff sign-in, step by step: the password; then whatever the account still owes (a new password for the
-// bootstrap admin, an authenticator for a new account); then the second factor; then the Staff cookie. Between steps
-// the account rides in the short-lived StaffPending cookie, never in a form field. Every outcome goes in the audit
-// log. Identity's SignInManager isn't used: its two-factor flow assumes one kind of account per application.
+// bootstrap admin, an authenticator for a new account); then the second factor, a code or, where the account has one,
+// a passkey (step 19, StaffPasskeys); then the Staff cookie. Between steps the account rides in the short-lived
+// StaffPending cookie, never in a form field. Every outcome goes in the audit log. Identity's SignInManager isn't used:
+// its two-factor flow assumes one kind of account per application.
 public sealed class StaffSignIn(
-    UserManager<StaffUser> users, IUserClaimsPrincipalFactory<StaffUser> principals, AuditRecorder audit, EhrDbContext db)
+    UserManager<StaffUser> users, IUserClaimsPrincipalFactory<StaffUser> principals, AuditRecorder audit, EhrDbContext db, StaffPasskeys passkeys)
 {
     public const int RecoveryCodes = 8;
 
@@ -45,10 +47,21 @@ public sealed class StaffSignIn(
         return new(PasswordOutcome.Ok, user);
     }
 
-    // Holds the account between steps, in the StaffPending cookie.
+    // Holds the account between steps, in the StaffPending cookie, with a value of its own for this password step, which
+    // a passkey's ceremony is bound to (PendingAsync).
     public Task HoldAsync(HttpContext context, StaffUser user) =>
         context.SignInAsync(AccountSchemes.StaffPending, new ClaimsPrincipal(
-            new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], AccountSchemes.StaffPending)));
+                new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], AccountSchemes.StaffPending)),
+            new AuthenticationProperties(new Dictionary<string, string?> { [PendingItem] = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)) }));
+
+    // This password step, as its StaffPending cookie has it, or null without one.
+    public static async Task<string?> PendingAsync(HttpContext context)
+    {
+        var pending = await context.AuthenticateAsync(AccountSchemes.StaffPending);
+        return pending.Succeeded && pending.Properties!.Items.TryGetValue(PendingItem, out var value) ? value : null;
+    }
+
+    const string PendingItem = "ehr:pending";
 
     // The account held between steps, or null when there is none or it has expired: the person starts over.
     public async Task<StaffUser?> HeldAsync(HttpContext context)
@@ -136,11 +149,45 @@ public sealed class StaffSignIn(
         return false;
     }
 
-    public async Task CompleteAsync(HttpContext context, StaffUser user, CancellationToken cancellationToken)
+    // The second factor in place of the code: one of the account's passkeys, from the options StaffPasskeys gave this
+    // password step (BeginSignInAsync). Its signature count is kept. Refused, it counts towards the lockout as a wrong code does, and
+    // is recorded; null then. Otherwise the audit log's details for the sign-in, which name the passkey.
+    public async Task<string?> VerifyPasskeyAsync(HttpContext context, StaffUser user, string? credentialJson, string? state, CancellationToken cancellationToken)
+    {
+        if (await passkeys.SignInAsync(context, user, credentialJson, state, await PendingAsync(context)) is { } used)
+        {
+            return used;
+        }
+
+        await users.AccessFailedAsync(user);
+        await RecordAsync(AuditActions.SignInFailed, user, "passkey refused", cancellationToken);
+        return null;
+    }
+
+    // The account held for the rest of the request (StaffUserLock) and read again, before its second factor is checked:
+    // second factors racing on one account are then checked and counted one after another, never lost to the account's
+    // concurrency stamp and rolled back (step 19's final review).
+    public Task HoldAccountAsync(StaffUser user, CancellationToken cancellationToken) => StaffUserLock.AcquireAsync(db, user, cancellationToken);
+
+    // An account locked out, by wrong passwords or wrong second factors, takes no second factor until the lockout ends,
+    // as it takes no password (CheckPasswordAsync). Recorded when it is so.
+    public async Task<bool> LockedOutAsync(StaffUser user, CancellationToken cancellationToken)
+    {
+        if (!await users.IsLockedOutAsync(user))
+        {
+            return false;
+        }
+
+        await RecordAsync(AuditActions.SignInFailed, user, "locked out", cancellationToken);
+        return true;
+    }
+
+    // Signed in, with the second factor's details for the audit log: none for a code, the passkey for a passkey.
+    public async Task CompleteAsync(HttpContext context, StaffUser user, CancellationToken cancellationToken, string? details = null)
     {
         await context.SignOutAsync(AccountSchemes.StaffPending);
         await context.SignInAsync(AccountSchemes.Staff, await principals.CreateAsync(user));
-        await RecordAsync(AuditActions.SignIn, user, null, cancellationToken);
+        await RecordAsync(AuditActions.SignIn, user, null, cancellationToken, details);
     }
 
     public async Task SignOutAsync(HttpContext context, Guid? userId, CancellationToken cancellationToken)
@@ -153,12 +200,12 @@ public sealed class StaffSignIn(
         }
     }
 
-    // Codes are typed with the spaces or dashes apps show them with.
-    static string Normalize(string code) => code.Replace(" ", "").Replace("-", "");
+    // Codes are typed with the spaces or dashes apps show them with. Adding a passkey takes one too (StaffPasskeys).
+    internal static string Normalize(string code) => code.Replace(" ", "").Replace("-", "");
 
-    async Task RecordAsync(string action, StaffUser user, string? reason, CancellationToken cancellationToken)
+    async Task RecordAsync(string action, StaffUser user, string? reason, CancellationToken cancellationToken, string? details = null)
     {
-        audit.Record(action, reason: reason, actorId: user.Id);
+        audit.Record(action, reason: reason, actorId: user.Id, details: details);
         await db.SaveChangesAsync(cancellationToken);
     }
 }
