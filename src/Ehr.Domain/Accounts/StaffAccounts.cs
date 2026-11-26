@@ -12,7 +12,8 @@ namespace Ehr.Domain.Accounts;
 // temporary passwords change hands. A forgotten password gets a new setup link, a lost phone or device a new
 // authenticator enrollment, with the account's passkeys removed (step 19), and a person who leaves has their account
 // disabled: locked out indefinitely, never deleted. Each of those changes the account's security stamp, so its cookies
-// and desktop sessions end. Every action is an audit event.
+// and desktop sessions end, and a sign-in begun before it, between its password and its second factor, goes back to the
+// password (StaffSignIn.UnchangedAsync, step 19.1). Every action is an audit event.
 public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db, AuditRecorder audit, StaffPasskeys passkeys)
 {
     public Task<List<StaffUser>> ListAsync(CancellationToken cancellationToken) =>
@@ -45,9 +46,12 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
     }
 
     // A new setup link, for an invitation that never arrived or a forgotten password. A password the account had stops
-    // working now; the person chooses the next one through the link.
+    // working now; the person chooses the next one through the link. The account is held first, as for each action
+    // below (StaffUserLock, step 19.1's final review), so a passkey added or removed at the same moment waits or is
+    // waited for, and never fails the action on the account's concurrency stamp.
     public async Task<Invitation> ReissueAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         if (user.PasswordHash is not null)
         {
             var removed = await users.RemovePasswordAsync(user);
@@ -65,9 +69,12 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
 
     // The account enrolls an authenticator app again at its next sign-in; the old app, the recovery codes and every
     // passkey stop working: a passkey is never left on an account without its authenticator, and a lost device may hold
-    // either. How many passkeys were removed, each recorded with the admin who removed it.
+    // either. How many passkeys were removed, each recorded with the admin who removed it. The account is held first
+    // (StaffUserLock, step 19.1), so a passkey whose add finishes at the same moment is either saved before the reset
+    // reads the account's passkeys, and removed and counted with them, or refused at its finish (StaffPasskeys).
     public async Task<int> ResetAuthenticatorAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         var removed = 0;
         foreach (var passkey in await passkeys.ListAsync(user))
         {
@@ -84,6 +91,7 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
     // Disabled: locked out with no end, which sign-in and row-level security both refuse. Nothing is deleted.
     public async Task DisableAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         await users.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
         await users.UpdateSecurityStampAsync(user);
         audit.Record(AuditActions.AccountDisabled, tableName: "staff_users", rowId: user.Id);
@@ -92,6 +100,7 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
 
     public async Task EnableAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         await users.SetLockoutEndDateAsync(user, null);
         await users.ResetAccessFailedCountAsync(user);
         audit.Record(AuditActions.AccountEnabled, tableName: "staff_users", rowId: user.Id);

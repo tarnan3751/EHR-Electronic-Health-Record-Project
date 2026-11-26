@@ -50,8 +50,15 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
         }
 
         // Wrong codes lock the account as wrong passwords do, and a locked account takes no code either (step 19), each
-        // checked and counted after any other for the same account.
+        // checked and counted after any other for the same account. Held, the account is read again: if an
+        // authenticator reset or a reissued password came first, the sign-in goes back to the password before any code
+        // is checked (step 19.1), since the key this request read before the hold may be the one the reset ended.
         await signIn.HoldAccountAsync(user, HttpContext.RequestAborted);
+        if (!await StillHeldAsync(user))
+        {
+            return RedirectToPage("SignIn", new { ReturnUrl });
+        }
+
         if (await signIn.LockedOutAsync(user, HttpContext.RequestAborted))
         {
             ModelState.AddModelError("", Locked);
@@ -84,14 +91,22 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
     // The passkey the browser used. Refused, the page says so, and the code is there as before.
     public async Task<IActionResult> OnPostPasskeyAsync(string? credential, string? state)
     {
-        if (await HeldAsync() is not { } user || !await OfferAsync(user))
+        if (await HeldAsync() is not { } user)
+        {
+            return RedirectToPage("SignIn", new { ReturnUrl });
+        }
+
+        // Held before its passkeys are read (step 19.1), so the passkey is checked against its count as stored, and the
+        // same answer sent twice at once signs in once; and, read again, the account goes back to the password if a reset
+        // or a reissued password came first.
+        await signIn.HoldAccountAsync(user, HttpContext.RequestAborted);
+        if (!await StillHeldAsync(user) || !await OfferAsync(user))
         {
             return RedirectToPage("SignIn", new { ReturnUrl });
         }
 
         // The code's own field isn't part of this post.
         ModelState.Remove(nameof(Code));
-        await signIn.HoldAccountAsync(user, HttpContext.RequestAborted);
         if (await signIn.LockedOutAsync(user, HttpContext.RequestAborted))
         {
             ModelState.AddModelError("", Locked);
@@ -112,6 +127,11 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
     // The account held by the password step, if its next step is this one.
     async Task<StaffUser?> HeldAsync() =>
         await signIn.HeldAsync(HttpContext) is { } user && await signIn.NextStepAsync(user) == SignInStep.EnterCode ? user : null;
+
+    // Once the account is held and read again (step 19.1): its security stamp still the password step's, which a reset, a
+    // reissued password or a disabling changes, and its next step still this one, which a reset changes too.
+    async Task<bool> StillHeldAsync(StaffUser user) =>
+        await signIn.UnchangedAsync(HttpContext, user) && await signIn.NextStepAsync(user) == SignInStep.EnterCode;
 
     // Whether the account has a passkey to offer, where the clinic has passkeys.
     async Task<bool> OfferAsync(StaffUser user) => OffersPasskey = settings.On && (await passkeys.ListAsync(user)).Count > 0;

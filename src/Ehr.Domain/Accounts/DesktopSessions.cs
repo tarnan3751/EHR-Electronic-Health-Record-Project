@@ -46,7 +46,18 @@ public sealed class DesktopSessions(
             return new(check.Outcome == PasswordOutcome.LockedOut ? DesktopSignInOutcome.LockedOut : DesktopSignInOutcome.Refused);
         }
 
+        // Held and read again once its password is checked, as the web's code page holds it (step 19.1's final review):
+        // sign-ins racing each other or an administrator's action on the account are checked one after another, never
+        // failing on a stale account with a 500, and one whose account changed since its password was checked (a reset,
+        // a reissued password, a disabling) is refused, nothing counted, as the web goes back to the password.
         var user = check.User!;
+        var stamp = user.SecurityStamp;
+        await signIn.HoldAccountAsync(user, cancellationToken);
+        if (user.SecurityStamp != stamp)
+        {
+            return new(DesktopSignInOutcome.Refused);
+        }
+
         if (user.MustChangePassword || !user.TwoFactorEnabled || await users.GetAuthenticatorKeyAsync(user) is null)
         {
             return new(DesktopSignInOutcome.NotSetUp);

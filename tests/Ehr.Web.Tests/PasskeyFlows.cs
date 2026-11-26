@@ -4,6 +4,7 @@ using Ehr.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Playwright;
+using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -11,7 +12,8 @@ namespace Ehr.Web.Tests;
 
 // Step 19's ceremonies as passkeys.js runs them, against an app, with a TestAuthenticator in place of the device: the
 // first post's JSON answer, then the passkey sent back as a plain form. Adding one on the passkeys page, and using one
-// on the code page after the password.
+// on the code page after the password. And, to put requests racing on one account in an order, the account's row held
+// from outside the apps (step 19.1).
 static class PasskeyFlows
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -138,4 +140,49 @@ static class PasskeyFlows
             .UseSetting("Ehr:Passkeys:Domain", "localhost")
             .UseSetting("Ehr:Passkeys:Origins:0", url)
             .UseSetting("Ehr:Passkeys:Origins:1", url));
+
+    // A staff account's row held from outside the apps, as a request's StaffUserLock holds it, to put requests for the
+    // account in an order (step 19.1): each that holds the account waits, in turn, until this transaction ends.
+    public static async Task<AccountHold> HoldAccountAsync(WebApps apps, Guid account)
+    {
+        var connection = await apps.OpenDatabaseAsync();
+        var transaction = await connection.BeginTransactionAsync(Cancel);
+        await using var command = new NpgsqlCommand("SELECT 1 FROM ehr.staff_users WHERE id = @id FOR UPDATE", connection, transaction);
+        command.Parameters.AddWithValue("id", account);
+        await command.ExecuteScalarAsync(Cancel);
+        return new(connection, transaction);
+    }
+
+    // Until this many requests are waiting for a lock. Each test class has a database of its own, and runs one test
+    // at a time.
+    public static async Task WaitingForLocksAsync(WebApps apps, int requests)
+    {
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'", connection);
+        for (var tries = 0; tries < 400; tries++)
+        {
+            if ((long)(await command.ExecuteScalarAsync(Cancel))! >= requests)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(25), Cancel);
+        }
+
+        Assert.Fail($"{requests} requests never waited for a lock.");
+    }
+}
+
+// The transaction holding an account's row (PasskeyFlows.HoldAccountAsync), with its connection; disposed, it ends.
+sealed class AccountHold(NpgsqlConnection connection, NpgsqlTransaction transaction) : IAsyncDisposable
+{
+    public NpgsqlConnection Connection => connection;
+
+    public NpgsqlTransaction Transaction => transaction;
+
+    public async ValueTask DisposeAsync()
+    {
+        await transaction.DisposeAsync();
+        await connection.DisposeAsync();
+    }
 }

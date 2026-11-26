@@ -4,11 +4,15 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Domain.Accounts;
 using Ehr.Testing;
 using Ehr.Web.Api.Desktop;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
+using static Ehr.Web.Tests.PasskeyFlows;
 
 namespace Ehr.Web.Tests;
 
@@ -32,6 +36,108 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, onPrem.StatusCode);
         Assert.Equal(HttpStatusCode.OK, cloud.StatusCode);
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+    }
+
+    // Step 19.1: the desktop app's sign-in takes a recovery code in place of the authenticator's code, as its page says,
+    // once. Before, no recovery code ever signed in, here or on the web (StaffSignIn).
+    [Fact]
+    public async Task A_recovery_code_signs_the_desktop_app_in_once()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Desktop Recovery", StaffRoles.Clinician);
+        var code = (await apps.RecoveryCodesAsync(account))[0];
+
+        using var signedIn = await apps.DesktopSignInResponseAsync(apps.OnPrem, account, code);
+        using var again = await apps.DesktopSignInResponseAsync(apps.OnPrem, account, code);
+
+        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RecoveryCodeUsed, actorId: account.Id));
+        Assert.Equal(HttpStatusCode.Unauthorized, again.StatusCode);
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+    }
+
+    // Step 19.1's final review: a desktop sign-in waiting behind an administrator's authenticator reset, with the old
+    // app's code or a recovery code. Held and read again once its password is checked, the account has changed since:
+    // refused with a 401, nothing counted, no recovery code used up. Before, the sign-in read the account before the
+    // reset and wrote after it: with a recovery code its failure was written over a stale account, and it answered 500;
+    // with the app's code it answered 200 with a token the reset had already ended.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_desktop_sign_in_waiting_behind_a_reset_is_refused(bool recoveryCode)
+    {
+        var admin = await apps.CreateStaffAsync($"Desktop Reset Admin {recoveryCode}", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        var account = await apps.CreateStaffAsync($"Dr. Desktop During Reset {recoveryCode}", StaffRoles.Clinician);
+        var code = recoveryCode ? (await apps.RecoveryCodesAsync(account))[0] : Totp.Code(account.AuthenticatorKey);
+        var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
+
+        Task<HttpResponseMessage> resetting, signingIn;
+        await using (var hold = await HoldAccountAsync(apps, account.Id))
+        {
+            resetting = adminSession.Client.PostAsync("/admin/staff?handler=ResetAuthenticator", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel);
+            await WaitingForLocksAsync(apps, 1);
+            signingIn = apps.DesktopSignInResponseAsync(apps.OnPrem, account, code);
+            await WaitingForLocksAsync(apps, 2);
+            await hold.Transaction.CommitAsync(Cancel);
+        }
+
+        using var reset = await resetting;
+        using var signedIn = await signingIn;
+
+        Assert.Contains("will set up an authenticator app again", Words(await ReadAsync(reset)));
+        Assert.Equal(HttpStatusCode.Unauthorized, signedIn.StatusCode);
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignInFailed, actorId: account.Id));
+        var (failed, codesLeft) = await FailedAndCodesLeftAsync(account);
+        Assert.Equal((0, StaffSignIn.RecoveryCodes), (failed, recoveryCode ? codesLeft : StaffSignIn.RecoveryCodes));
+    }
+
+    // Step 19.1's final review: one recovery code sent twice at once from the desktop app, the second waiting behind the
+    // first, and then at once ten times: one signs in, the other is refused as the used code it then is, never a 500.
+    // Before, the second wrote its failure over the account as it had read it before the first's redemption, and
+    // answered 500.
+    [Fact]
+    public async Task One_recovery_code_sent_twice_at_once_signs_the_desktop_app_in_once()
+    {
+        for (var run = 0; run < 11; run++)
+        {
+            var account = await apps.CreateStaffAsync($"Dr. Desktop Code Twice {run}", StaffRoles.Clinician);
+            var code = (await apps.RecoveryCodesAsync(account))[0];
+            HttpResponseMessage[] answers;
+            if (run == 0)
+            {
+                Task<HttpResponseMessage> first, second;
+                await using (var hold = await HoldAccountAsync(apps, account.Id))
+                {
+                    first = apps.DesktopSignInResponseAsync(apps.OnPrem, account, code);
+                    await WaitingForLocksAsync(apps, 1);
+                    second = apps.DesktopSignInResponseAsync(apps.OnPrem, account, code);
+                    await WaitingForLocksAsync(apps, 2);
+                    await hold.Transaction.CommitAsync(Cancel);
+                }
+
+                answers = [await first, await second];
+            }
+            else
+            {
+                answers = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => apps.DesktopSignInResponseAsync(apps.OnPrem, account, code)));
+            }
+
+            var statuses = answers.Select(a => a.StatusCode).Order().ToList();
+            Array.ForEach(answers, a => a.Dispose());
+            Assert.True(statuses.SequenceEqual([HttpStatusCode.OK, HttpStatusCode.Unauthorized]), $"Run {run}: {string.Join(", ", statuses.Select(s => (int)s))}.");
+            Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RecoveryCodeUsed, actorId: account.Id));
+            Assert.Equal((1, StaffSignIn.RecoveryCodes - 1), await FailedAndCodesLeftAsync(account));
+        }
+    }
+
+    // The account's count of failed attempts and its recovery codes left.
+    async Task<(int Failed, int CodesLeft)> FailedAndCodesLeftAsync(StaffAccount account)
+    {
+        await using var scope = apps.OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        var user = (await users.FindByIdAsync(account.Id.ToString()))!;
+        return (user.AccessFailedCount, await users.CountRecoveryCodesAsync(user));
     }
 
     // TC-UC7-02 (FR-21) in the SE document (Sara Lelo), server side: the offline download holds only the clinician's

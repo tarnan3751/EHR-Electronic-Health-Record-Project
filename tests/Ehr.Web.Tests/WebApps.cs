@@ -196,6 +196,14 @@ public sealed class WebApps : IAsyncLifetime
         return new(user.Id, email, StaffPassword, key);
     }
 
+    // New recovery codes for the account, as its enrolment makes and shows them: five characters, a dash, five more.
+    public async Task<IReadOnlyList<string>> RecoveryCodesAsync(StaffAccount account)
+    {
+        await using var scope = OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        return [.. (await users.GenerateNewTwoFactorRecoveryCodesAsync((await users.FindByIdAsync(account.Id.ToString()))!, StaffSignIn.RecoveryCodes))!];
+    }
+
     // A staff account that has set its password but not enrolled an authenticator yet: invited, with its setup done.
     public async Task<StaffAccount> CreateStaffWithoutAuthenticatorAsync(string displayName, params string[] roles)
     {
