@@ -91,6 +91,58 @@ else
                 </div>
             </section>
         }
+        @if (Model.Form.Warnings.Count > 0)
+        {
+            @* Step 8: what the database knows against this order. Signing needs a reason, kept on the order. *@
+            var safetyError = Model.Errors.GetValueOrDefault("SafetyReason");
+            var stops = Model.Form.Warnings.Any(OrderSafetyText.NeedsReason);
+            <section class="sc-notice @(stops ? "sc-notice--danger" : "sc-notice--warning")" data-order-safety="@(stops ? "reason" : "information")">
+                <h3>@(stops ? "Check before signing" : "Be aware")</h3>
+                <ul class="sc-list">
+                    @foreach (var warning in OrderSafetyText.Ordered(Model.Form.Warnings))
+                    {
+                        <li data-safety="@warning.Kind" data-safety-source="@warning.Source">
+                            <strong>@OrderSafetyText.Heading(warning)</strong>
+                            <span class="sc-tag sc-tag--warning">@OrderSafetyText.SeverityName(warning.Severity)</span>
+                            <br>@OrderSafetyText.Advice(warning)
+                            @if (warning.Detail is not null)
+                            {
+                                <br>@warning.Detail
+                            }
+                            <br><span class="sc-muted">Source: @OrderSafetyText.SourceName(warning.Source)@(warning.Citation is null ? "." : $". {warning.Citation}")
+                                @if (warning.Source == Ehr.Data.Reference.DrugInteractionSource.DdInter)
+                                {
+                                    <a href="@OrderSafetyText.DdInterChecker" rel="noreferrer noopener" target="_blank">Look the pair up in DDInter (needs internet)</a>
+                                }
+                            </span>
+                        </li>
+                    }
+                </ul>
+                @if (!stops)
+                {
+                    <input type="hidden" name="SafetySeen" value="true">
+                    <p>These don't stop the order. They are kept on it. @(Model.ShowingNotes ? "Sign again to go ahead, or cancel." : null)</p>
+                }
+                else
+                {
+                <p>Cancel, or give a reason and sign to order it all the same.</p>
+                <div class="sc-field">
+                    <label for="order-safety-reason">Reason for ordering despite the warnings <span>(required)</span></label>
+                    <textarea id="order-safety-reason" class="sc-field__input" name="SafetyReason" rows="2" maxlength="@OrderForms.MaximumReasonLength" required
+                              autofocus="@(safetyError is not null && Model.Errors.Count == 1)"
+                              aria-invalid="@(safetyError is null ? null : "true")" aria-describedby="@(safetyError is null ? null : "order-safety-reason-error")">@Model.SafetyReason</textarea>
+                    @if (safetyError is not null)
+                    {
+                        <p class="sc-field__error" id="order-safety-reason-error">@safetyError</p>
+                    }
+                </div>
+                }
+            </section>
+        }
+        @if (Model.KnownType == Ehr.Data.Orders.OrderType.Medication)
+        {
+            <p class="sc-muted" data-safety-disclaimer>Medication orders with a drug code are checked against the patient's coded allergies and medications. @OrderSafetyText.Disclaimer</p>
+        }
         @if (replaced is not null)
         {
             var changeError = Model.Errors.GetValueOrDefault("ChangeReason");
@@ -105,7 +157,7 @@ else
             </div>
         }
         <div class="sc-actions">
-            <button type="submit" class="sc-btn sc-btn--primary">@(replaced is null ? "Sign order" : "Sign changed order")</button>
+            <button type="submit" class="sc-btn sc-btn--primary" data-order-sign autofocus="@Model.ShowingNotes">@(replaced is null ? "Sign order" : "Sign changed order")</button>
             <a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Cancel</a>
         </div>
     </form>
@@ -114,7 +166,10 @@ else
 @functions {
     // Keyboard first (NFR-12): the page opens with the cursor in the first field to fix, or in the item when there is
     // nothing to fix yet.
-    string Focused() => Model.Errors.Count == 0 || Model.Errors.ContainsKey("Item")
+    string Focused() => Model.ShowingNotes
+        // Back only to show notes: the cursor is on "Sign order".
+        ? ""
+        : Model.Errors.Count == 0 || Model.Errors.ContainsKey("Item")
         ? "Item"
         : OrderForms.Fields[Model.KnownType!].Select(detail => detail.Name).FirstOrDefault(Model.Errors.ContainsKey) ?? "";
 

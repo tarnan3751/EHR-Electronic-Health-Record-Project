@@ -51,9 +51,12 @@ public sealed class AuditRecorder(EhrDbContext db, UserContext user, AuditSource
     }
 }
 
-// Where the cloud site keeps the events it records until the on-prem app has them. Enqueue stores all the events it is
-// given, in order, and returns only once they are stored durably; otherwise, including when one is an event the on-prem
-// app wouldn't take, it throws and stores none of them, so a read is never shown without its record.
+// Where the cloud site puts the events it records until the on-prem app has them. Enqueue takes the events it is
+// given, in order, or throws when one is an event the on-prem app wouldn't take. It does not promise they are on the
+// disk when it returns: within a request the cloud site holds them and writes them together, durably, before any of
+// the response is sent, and fails the request if it can't (RequestAuditEvents and CloudAuditFlushMiddleware in
+// Ehr.Web, the expansion plan's step 10c). That, not this call, is what keeps a read from being shown without its
+// record: whatever records through this must send its response through that middleware.
 public interface IAuditQueue
 {
     void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents);

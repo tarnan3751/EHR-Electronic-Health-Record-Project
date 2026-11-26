@@ -36,6 +36,16 @@ Added in the expansion plan's step 7 (Tahseen Arnan).
 - **Acknowledge.** The clinician who signed the order gets an inbox item, "Results are in", with the patient's name and no values. **Open the results**, then **Acknowledge results**, records who acknowledged and when, and clears the item. It covers the results that were on the page: if another arrived meanwhile, the page comes back with it and nothing is recorded yet. A result's inbox item can't be ticked off any other way. Any clinician with the patient on their panel can acknowledge. Once acknowledged, nothing more is added to that order's results.
 - **The patient** sees a filed result in the portal at once, as results have always shown there, acknowledged or not.
 
+### Safety checks on a medication order
+
+Added in the expansion plan's step 8 (Tahseen Arnan).
+
+- **What is checked.** When a medication order is signed, the database checks it against the patient's coded allergies (the drug itself, another drug of the same FDA class, and classes known to cross-react) and against what the patient takes (active medications on the chart and other active medication orders) for known interactions.
+- **What the form shows.** Each warning names the problem, with its severity, one general line of advice, and its source: the chart, DDInter 2.0, the ONC high-priority list (by way of Wikidata), or an FDA label, with what the label says and where to read it.
+- **What stops the order.** An allergy; a drug of a class known to cross-react with one the patient is allergic to (the penicillins, cephalosporins and penems, from a curated table); or a major or high-priority interaction: the form comes back headed **Check before signing**, with the cursor in **Reason for ordering despite the warnings**. Give a reason and sign, or cancel. The reason and what was found are kept on the order and in the write audit.
+- **What doesn't.** A moderate or minor interaction, and a drug that only shares an FDA class with an allergy (those classes group drugs by how they act, which is not how most allergies run), are shown under **Be aware** and kept on the order, without asking for a reason. The first **Sign order** brings the notes up with the cursor on the button; pressing it again signs.
+- **What it is not.** The form says so on every medication order: decision support for this demonstration system, not a complete clinical reference. Only coded allergies and medications are checked, and no warning doesn't mean a combination is safe. `docs/expansion/reference-data.md` says what the interaction data covers and what it doesn't.
+
 ## Decisions
 
 - **Who.** Clinicians only, and only for a patient on their panel, as for "New note" and dictation. Under emergency access the chart says to add the patient to the panel first, and the order page sends anyone off the panel back to the chart before anything is read.
@@ -83,6 +93,14 @@ The Assignment 4 test cases are one file each, in `tests/Ehr.Web.Tests/TestCases
 | TC-UC1-17, NFR-12 (results) | In a real browser, entering and acknowledging results with the keyboard only | `TC_UC1_17_Nfr12_ResultsKeyboardFirst.cs` |
 
 `tests/Ehr.Security.Tests/ResultSecurityTests.cs` asks the database directly: a filed result gets the database's own name, unit and range; only a panel clinician files, only for a test of an open lab order of that patient; an order is completed only by its results and then never changes; results are acknowledged once, by a panel clinician as themselves, which ends the filing. TC-UC6-12 is the portal's side and TC-UC15-07 the inbox's.
+
+| TC-UC1-18, alternative flow (safety) | An allergy, and a high-priority and a major interaction, each stop the order until a reason is given; each warning names its severity, advice and source | `TC_UC1_18_SafetyWarningsOverride.cs` |
+| TC-UC1-19, alternative flow and exceptional condition (safety) | A moderate interaction is shown and kept without a reason; an uncoded allergy and a lab order raise nothing; off-site the warning shows from the cloud copy | `TC_UC1_19_SafetyInformationOnly.cs` |
+| TC-UC1-20, NFR-12 (safety) | In a real browser, a stopped order is answered and signed with the keyboard only | `TC_UC1_20_Nfr12_SafetyKeyboardFirst.cs` |
+
+| TC-UC1-21, successful flow (trends) | An order's results page charts each test that has earlier values, with the reference range and a table of the numbers (the plan's step 9) | `TC_UC1_21_ResultTrends.cs` |
+
+`tests/Ehr.Security.Tests/OrderSafetySecurityTests.cs` asks the database directly: an order for a drug the patient is allergic to needs a reason, kept with what the database found (not what the client claimed); same-class and cross-reactive classes; interactions from each source, with only serious ones needing a reason; and only a clinician is told anything.
 
 TC-UC1-05, TC-UC1-11 and TC-UC1-16 run only against a run of the render benchmark; `tests/Ehr.Web.Tests/TestCases/PerformanceResults.cs` says how. In the normal test run they are skipped.
 
@@ -139,6 +157,7 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - For changing and discontinuing: in `db/policies/60-orders.sql`, the signing trigger's replacement check and its exception to the duplicate check, `ehr.discontinue_order()` and `ehr.check_order_replacement()` with its deferred constraint trigger; in `10-grants.sql`, the UPDATE grant on three columns; in `30-rls.sql`, the `orders_panel_update` policy; the `OrderChanges` migration's check constraints; and the panel rule on the discontinue page and on the chart's two links.
 - The order page's panel rule (`Areas/Clinical/Pages/Patients/Orders/New.cshtml.cs`) and the chart's condition for offering "New order".
 - The new `PhiReader` methods. `CloudAuditEvents` is unchanged.
+- For safety checks (step 8): the new `db/policies/61-order-safety.sql` (`ehr.order_safety_warnings`, which runs as the caller); in `60-orders.sql`, the part of `ehr.sign_order()` that finds the warnings, keeps them and requires a reason for serious ones.
 - For results (step 7): the new `db/policies/75-results.sql` (`ehr.deliver_result` and `ehr.clear_result_items` run as their owner); in `60-orders.sql`, the first branch of `ehr.discontinue_order()`, which lets an active order become completed when a final result exists; in `30-rls.sql`, `observations_panel_insert`, the policies on `result_acknowledgments`, and the check of `orders_panel_update`; `INSERT` on `observations` in `10-grants.sql`; and the gate of the results page (`MessagePage.GateAsync`).
 
 ## Limits
@@ -155,6 +174,13 @@ These need line-by-line review by someone other than Tahseen (AGENTS.md):
 - A change keeps the order's type.
 - An order isn't sent anywhere: no lab, pharmacy or referral interface.
 - The catalog is small and synthetic, and changing it takes a migration.
-- A medication order isn't checked against the patient's allergies; the form shows them for the clinician to read.
+- Safety checks see only coded data: an allergy or medication typed without a code is not checked. Food and other non-drug allergies are not checked against drugs.
+- An interaction is known only if one of three sources has the pair. Whole classes are still thin (an ACE inhibitor with an angiotensin receptor blocker beyond lisinopril with losartan, for example): see `docs/expansion/reference-data.md`.
+- A DDInter warning links to DDInter's interaction checker, not to a page for the pair.
+- The reason for overriding is kept on the order and in the audit, but the chart doesn't show it beside the order yet.
+- A warning names a medication the patient takes even when it is marked sensitive: the clinician signing the order needs to know. What the order and its audit keep says only "a medication marked sensitive", since administrators can read an order's audit details.
+- An item with no drug code (the albuterol inhaler among the common items) can't be checked, and the form says only coded items are.
+- A warning that appears between opening the form and signing is caught by the database and shown; adding a medication at the same instant as an order is signed can slip past.
+- Doses, kidney function, age and pregnancy are not considered.
 - The form's behaviour with `fetch` in a browser is checked by hand; the tests cover the server side.
 - With `--stack`, the render benchmark leaves its 600 orders on the primary, as it leaves its audit events.

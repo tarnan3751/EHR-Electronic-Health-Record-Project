@@ -280,16 +280,27 @@ public sealed class WebApps : IAsyncLifetime
             "INSERT INTO ehr.conditions (id, patient_id, code, display, clinical_status, onset_date) VALUES (@id, @patient, @code, @display, @status, @onset)",
             ("patient", patientId), ("code", code), ("display", display), ("status", status), ("onset", onset));
 
+    // A visit, with the vital signs taken at it as observations (step 9), each with the name, unit and reference
+    // range db/reference gives its code; its blood pressure one reading (step 9c).
     public Task InsertVisitAsync(
         Guid patientId, DateTimeOffset start, string status = EncounterStatus.Finished, string? reason = null, short? systolic = null,
         short? diastolic = null, short? heartRate = null) =>
         InsertChartRowAsync(
             """
-            INSERT INTO ehr.encounters (id, patient_id, status, class_code, reason, period_start, systolic_mm_hg, diastolic_mm_hg, heart_rate_per_minute)
-            VALUES (@id, @patient, @status, 'AMB', @reason, @start, @systolic, @diastolic, @heart_rate)
+            WITH visit AS (
+                INSERT INTO ehr.encounters (id, patient_id, status, class_code, reason, period_start)
+                VALUES (@id, @patient, @status, 'AMB', @reason, @start)
+                RETURNING id, patient_id, period_start)
+            INSERT INTO ehr.observations (id, patient_id, encounter_id, reading_id, category, code, display, status, value, unit, reference_low, reference_high, effective_at, issued_at)
+            SELECT gen_random_uuid(), visit.patient_id, visit.id, CASE WHEN v.code IN ('8480-6', '8462-4') THEN @reading END, 'vital-signs', v.code, c.display, 'final', v.value, c.unit,
+                c.reference_low, c.reference_high, visit.period_start, visit.period_start
+            FROM visit
+            CROSS JOIN (VALUES ('8480-6', @systolic::numeric), ('8462-4', @diastolic::numeric), ('8867-4', @heart_rate::numeric)) AS v(code, value)
+            JOIN ehr.observation_codes c ON c.code = v.code
+            WHERE v.value IS NOT NULL
             """,
             ("patient", patientId), ("status", status), ("reason", reason), ("start", start.ToUniversalTime()), ("systolic", systolic),
-            ("diastolic", diastolic), ("heart_rate", heartRate));
+            ("diastolic", diastolic), ("heart_rate", heartRate), ("reading", Guid.CreateVersion7()));
 
     async Task InsertChartRowAsync(string sql, params (string Name, object? Value)[] parameters)
     {

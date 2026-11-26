@@ -37,6 +37,21 @@ public sealed record PatientChart(
     // The patient's appointments still to come, soonest first (FR-17): part of the same recorded read.
     public IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming { get; init; } = [];
 
+    // The blood pressure and heart rate taken at each visit shown, by the visit's ID (step 9).
+    public IReadOnlyDictionary<Guid, VisitVitals> VisitVitals { get; init; } = new Dictionary<Guid, VisitVitals>();
+
+    // The patient's signed notes for the chart's list, newest first: sensitive ones only when sensitive items are shown.
+    public IReadOnlyList<SignedNoteEntry> Notes { get; init; } = [];
+
+    // Signed notes marked sensitive that the chart's list leaves out (step 10); zero when sensitive items are shown.
+    public int SensitiveNotesHidden { get; init; }
+
+    // For the desktop app's offline copy only: the latest signed notes that aren't sensitive, with their addenda.
+    public IReadOnlyList<OfflineNote> OfflineNotes { get; init; } = [];
+
+    // The newest value of each vital sign among the patient's latest sets, in the flowsheet's order (step 9).
+    public IReadOnlyList<LatestVital> LatestVitals { get; init; } = [];
+
     // Whether the patient has any signed note, and any draft the reader may see: the page asks for those lists
     // only when there is something in them.
     public bool HasNotes { get; init; } = true;
@@ -53,6 +68,106 @@ public sealed record PatientChart(
     // When "No known allergies" is the allergy list's state: who recorded it, when the history knows (seeded entries
     // have none). Part of the same recorded read.
     public string? NoKnownAllergiesRecordedBy { get; init; }
+}
+
+// The vital signs a visit shows on the chart; null where one wasn't taken. The blood pressure is one reading's two
+// numbers (step 9c).
+public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal? HeartRate)
+{
+    public static VisitVitals Of(Ehr.Domain.Results.BloodPressure? pressure, decimal? heartRate) =>
+        new(pressure?.Systolic.Value, pressure?.Diastolic.Value, heartRate);
+}
+
+// A signed note as the chart lists it: when it was signed and whether it is sensitive. Not its text.
+public sealed record SignedNoteEntry(Guid Id, DateTimeOffset SignedAt, bool Sensitive);
+
+// An addendum to a signed note as a page shows it.
+public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt, bool Sensitive, Guid AuthorId, string AuthorName)
+{
+    // Whether its author is the note's signer (step 10b): one that isn't is labeled as not the note's author.
+    public bool ByNoteAuthor { get; init; } = true;
+
+    // Sensitive only because its note is: the mark came from the note and goes with it.
+    public bool SensitiveInherited { get; init; }
+
+    // Who made it sensitive, and why and when its sensitivity last changed after it was signed.
+    public Guid? SensitiveMarkedBy { get; init; }
+
+    public string? SensitiveReason { get; init; }
+
+    public DateTimeOffset? SensitiveChangedAt { get; init; }
+}
+
+// A note's addenda in the order they were signed: the ones shown, how many sensitive ones were left out, and whether
+// sensitive ones were shown.
+public sealed record NoteAddenda(IReadOnlyList<AddendumEntry> Shown, int SensitiveHidden, bool SensitiveShown)
+{
+    // Every one, hidden ones too: for the reader's own use, never for a page to list.
+    internal IReadOnlyList<AddendumEntry> All { get; init; } = [];
+}
+
+// A signed note for the offline copy: the note, who signed it, and its addenda.
+public sealed record OfflineNote(ClinicalNote Note, string SignerName, IReadOnlyList<AddendumEntry> Addenda)
+{
+    // Sensitive addenda the note has that are not in the copy.
+    public int SensitiveAddendaNotKept { get; init; }
+}
+
+// A vital sign's newest value, for the chart's short flowsheet.
+public sealed record LatestVital(string Code, string Display, decimal Value, string? Unit, decimal? ReferenceLow, decimal? ReferenceHigh, DateTimeOffset TakenAt)
+{
+    // The reading before this one, when the chart's query held one (step 9b): for the up or down mark.
+    public decimal? Previous { get; init; }
+
+    // What its range is (ReferenceKind): a child's blood pressure is a screening value (step 9d).
+    public string ReferenceKind { get; init; } = Data.Patients.ReferenceKind.Normal;
+
+    // For a blood pressure, which is one reading (step 9c): this is its systolic, and this the diastolic of the same
+    // reading, with the diastolic of the reading before.
+    public LatestVital? Diastolic { get; init; }
+
+    // Up or down from the reading before: for a blood pressure, only when its two numbers didn't move opposite ways.
+    public string? Direction
+    {
+        get
+        {
+            var moves = new[] { (Value, Previous), (Diastolic?.Value, Diastolic?.Previous) }.Where(move => move.Item1 is not null && move.Item2 is not null)
+                .Select(move => Math.Sign(move.Item1!.Value - move.Item2!.Value)).ToList();
+            if (moves.Count == 0 || (Diastolic is not null && moves.Count < 2) || moves.Contains(1) == moves.Contains(-1))
+            {
+                return null;
+            }
+
+            return moves.Contains(1) ? "up" : "down";
+        }
+    }
+
+    // The value as the chart shows it, and the reading before, the same way: "126/80" for a blood pressure.
+    public string Shown => Diastolic is null ? $"{Value:0.#}" : $"{Value:0.#}/{Diastolic.Value:0.#}";
+
+    public string PreviousShown => Diastolic is null ? $"{Previous:0.#}" : $"{Previous:0.#}/{Diastolic.Previous:0.#}";
+
+    // Its flags, each once, a blood pressure's systolic first: "High", "Low" or "Needs follow-up" (VitalFlag).
+    public IReadOnlyList<string> Flags => [.. new[] { Flag, Diastolic?.Flag }.OfType<string>().Distinct()];
+
+    string? Flag => Results.VitalFlag.Of(Value, ReferenceLow, ReferenceHigh, ReferenceKind);
+
+    // The newest blood pressure among these readings, newest first: its systolic, with the diastolic of the same
+    // reading, each with the value of the reading before it.
+    public static IEnumerable<LatestVital> Pressure(IReadOnlyList<Ehr.Domain.Results.BloodPressure> readings)
+    {
+        if (readings.Count > 0)
+        {
+            var (latest, before) = (readings[0], readings.Count > 1 ? readings[1] : null);
+            yield return Of(latest.Systolic) with { Previous = before?.Systolic.Value, Diastolic = Of(latest.Diastolic) with { Previous = before?.Diastolic.Value } };
+        }
+    }
+
+    public static LatestVital Of(Observation value) =>
+        new(value.Code!, value.Display, value.Value!.Value, value.Unit, value.ReferenceLow, value.ReferenceHigh, value.EffectiveAt)
+        {
+            ReferenceKind = value.ReferenceKind,
+        };
 }
 
 // A patient's message threads, latest first, already recorded as one read of the patient.
@@ -104,7 +219,12 @@ public sealed record ChartHistory(
 // UC 1 (Tahseen Arnan): a patient as the order form shows them, already recorded as one read of the patient: the
 // banner's name and allergies, and, once an item is picked, the patient's active orders for it, for the duplicate warning.
 // Replaced is the active order a change replaces, or the one being discontinued; it is never among the duplicates.
-public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<ActiveOrder> Duplicates, ActiveOrder? Replaced);
+public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<ActiveOrder> Duplicates, ActiveOrder? Replaced)
+{
+    // Step 8: what the database knows against ordering the chosen item for this patient (an allergy, a class the
+    // patient is allergic to, an interaction with something they take). Empty until an item is chosen.
+    public IReadOnlyList<Ehr.Data.Orders.SafetyWarning> Warnings { get; init; } = [];
+}
 
 // UC 1: a patient's discontinued orders as their page lists them, with the banner's allergies, already recorded as one
 // read of the patient. More is set when there are more than the page asked for.

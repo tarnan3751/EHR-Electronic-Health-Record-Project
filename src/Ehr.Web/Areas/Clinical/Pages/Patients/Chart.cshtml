@@ -93,10 +93,13 @@ else if (Model.Chart.Saved is { } saved)
 {
     <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="Chart" asp-all-route-data="sensitiveRoute">Hide sensitive items</a></p>
 }
-else if (Model.Chart.SensitiveHidden > 0)
+else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0)
 {
     sensitiveRoute["sensitive"] = "true";
-    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @Model.Chart.SensitiveHidden @(Model.Chart.SensitiveHidden == 1 ? "diagnosis or medication is" : "diagnoses or medications are") not shown. <a asp-page="Chart" asp-all-route-data="sensitiveRoute">Show sensitive items</a></p>
+    @* Step 10: signed notes marked sensitive are counted beside the sensitive diagnoses and medications. *@
+    var hiddenLists = Model.Chart.SensitiveHidden == 0 ? "" : $"{Model.Chart.SensitiveHidden} {(Model.Chart.SensitiveHidden == 1 ? "diagnosis or medication is" : "diagnoses or medications are")} not shown. ";
+    var hiddenNotes = Model.Chart.SensitiveNotesHidden == 0 ? "" : $"{Model.Chart.SensitiveNotesHidden} signed {(Model.Chart.SensitiveNotesHidden == 1 ? "note is" : "notes are")} not shown. ";
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @hiddenLists@hiddenNotes<a asp-page="Chart" asp-all-route-data="sensitiveRoute">Show sensitive items</a></p>
 }
 <p><a asp-page="Lists/History" asp-all-route-data="historyRoute">History of allergies, medications and diagnoses</a></p>
 
@@ -141,13 +144,13 @@ else if (Model.Chart.SensitiveHidden > 0)
             <ul class="sc-list">
                 @foreach (var note in Model.Notes)
                 {
-                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</a></li>
+                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</a>@if (note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</li>
                 }
             </ul>
         }
         else
         {
-            <p class="sc-muted">No signed notes recorded.</p>
+            <p class="sc-muted">@(Model.Chart.SensitiveNotesHidden > 0 ? "No other signed notes." : "No signed notes recorded.")</p>
         }
     </section>
 
@@ -286,6 +289,41 @@ else if (Model.Chart.SensitiveHidden > 0)
         {
             <p class="sc-muted">No messages.</p>
         }
+    </section>
+
+    @* Vital signs (step 9): the newest value of each sign, from the chart's one query of the patient's vital signs. Every set, the trends and recording are on the vital signs page. *@
+    <section class="sc-panel" aria-labelledby="chart-vitals">
+        <h2 class="sc-panel__title" id="chart-vitals">Vital signs</h2>
+        @if (Model.Chart.LatestVitals.Count == 0)
+        {
+            <p class="sc-muted">No vital signs recorded.</p>
+        }
+        else
+        {
+            @* A list, not a table: the panel is a third of the page. Short names, as on the entry form. *@
+            <ul class="sc-list" data-latest-vitals>
+                @foreach (var vital in Model.Chart.LatestVitals)
+                {
+                    <li>
+                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range, or a
+                           child's at or above its screening value (step 9d). *@
+                        <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
+                        @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
+                        @foreach (var flag in vital.Flags)
+                        {
+                            <span class="sc-tag sc-tag--warning">@flag</span>
+                        }
+                        @* Up or down against the reading before it (step 9b), in a shape and in words. *@
+                        @if (vital.Direction is { } direction)
+                        {
+                            <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
+                        }
+                        <span class="sc-muted">· @vital.TakenAt.UtcDateTime.ToString("yyyy-MM-dd") UTC</span>
+                    </li>
+                }
+            </ul>
+        }
+        <p><a asp-page="Vitals/Index" asp-route-patientId="@Model.Patient.Id" data-vitals>Flowsheet, trends and recording</a></p>
     </section>
 
     @* Who can use the portal for this patient (FR-19): on its own page, read when it is opened. *@
@@ -445,7 +483,7 @@ else if (Model.Chart.SensitiveHidden > 0)
             var latest = Model.Chart.Visits[0];
             <p class="latest-visit">
                 Latest visit, @latest.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd"):
-                blood pressure @(ChartModel.BloodPressure(latest) ?? "not taken"), heart rate @(ChartModel.HeartRate(latest) ?? "not taken").
+                blood pressure @(Model.BloodPressure(latest) ?? "not taken"), heart rate @(Model.HeartRate(latest) ?? "not taken").
             </p>
             <div class="sc-table-wrap">
                 <table class="sc-table">
@@ -458,8 +496,8 @@ else if (Model.Chart.SensitiveHidden > 0)
                             <tr>
                                 <td class="sc-table__mono">@visit.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd")</td>
                                 <td>@visit.Reason</td>
-                                <td>@ChartModel.BloodPressure(visit)</td>
-                                <td>@ChartModel.HeartRate(visit)</td>
+                                <td>@Model.BloodPressure(visit)</td>
+                                <td>@Model.HeartRate(visit)</td>
                             </tr>
                         }
                     </tbody>

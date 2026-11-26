@@ -135,6 +135,9 @@ public sealed record OrderResults(
     Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, Guid OrderId, string Display, string Type, string Status, string SignedBy, DateTimeOffset SignedAt,
     IReadOnlyList<OrderTest> Tests, string? AcknowledgedBy, DateTimeOffset? AcknowledgedAt)
 {
+    // The patient's earlier and present values of the tests this order reports, for their trends (step 9).
+    public IReadOnlyList<Trend> Trends { get; init; } = [];
+
     public bool HasResults => Tests.Any(test => test.Value is not null);
 
     // What a page showing these results has shown: how many, and when the latest was released. An acknowledgment

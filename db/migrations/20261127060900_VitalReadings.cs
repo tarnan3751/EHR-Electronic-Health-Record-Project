@@ -1,0 +1,367 @@
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace Ehr.Migrations
+{
+    /// <inheritdoc />
+    public partial class VitalReadings : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropIndex(
+                name: "ux_observations_vital_sign_once",
+                schema: "ehr",
+                table: "observations");
+
+            migrationBuilder.AddColumn<Guid>(
+                name: "reading_id",
+                schema: "ehr",
+                table: "observations",
+                type: "uuid",
+                nullable: true);
+
+            // Written by hand (the expansion plan's step 9c). Before the new rules can hold, the vital signs already
+            // recorded are put in their shape, in this order:
+            //   1. Every vital sign of a patient's moment (the time it was taken) gets the visit of the first one
+            //      recorded there, as the database now decides it; a check-in between two values could split them.
+            //      The first values' visits are not decided again.
+            //   2. Where a sign other than blood pressure has more than one standing value at a moment, the most
+            //      recently entered (issued_at, then id) is kept and the others are marked entered in error,
+            //      "duplicate resolved by migration 9c". Blood pressure goes by pairs, in 4.
+            //   A row with no code, which only an insert past the apps could leave, is no sign: 1 and 2 leave it as it
+            //   is (the older schema's index, which a rollback makes again, held two of them at one moment apart only
+            //   by their visits).
+            //   3. Where that marked a weight or a height, the body mass index standing for the moment was worked out
+            //      from the value marked: it is marked too, "body mass index of a value marked as a duplicate
+            //      (migration 9c)", and one is worked out again from the weight and height kept, if both stand,
+            //      exactly as ehr.file_result (db/policies/75-results.sql) works one out: the newest final weight and
+            //      height of the moment, rounded to one decimal, the name, unit and range of observation_codes (or a
+            //      range for the patient's age, were there one for the body mass index), refused outside 1 to 500.
+            //   4. A moment's standing blood pressure is the most recent pair entered together whose two values both
+            //      stand (Tahseen's rule, 20 November: a reading must be a pair that was entered together). Values were
+            //      entered together when one transaction wrote them, which the data shows as their inserts' audit
+            //      events having the same time (the transaction's start) and person; values with no insert event, which
+            //      the seed and the VitalSigns migration loaded, were entered together when they have the same
+            //      issued_at and the visit they were loaded for (both give a visit's values the visit's start, so two
+            //      visits starting at one instant load two pairs with one issued_at; of two such pairs, the one loaded
+            //      for the visit 1 gives the moment, its first value's whatever sign that is, stands, then the one with
+            //      the smaller ID). Every other standing blood pressure value of the moment is marked entered in error:
+            //      an older pair whose values both stand, "duplicate resolved by migration 9c"; where a pair stands,
+            //      any other value, "not entered together with a standing partner (migration 9c)"; where none does, a
+            //      value whose partner, entered with it, was marked in error alone under step 9b, "partner value was
+            //      marked in error before readings existed (migration 9c)" (Tahseen's rule); a value that never had a
+            //      partner, the moment holding no value of the other sign (only an insert past the apps could leave
+            //      one), "blood pressure value without its partner (migration 9c)"; and any other, "not entered
+            //      together with a standing partner (migration 9c)".
+            //   5. Each standing systolic and diastolic of a moment become one reading. Values in error get readings
+            //      too: a moment's systolic and diastolic in error share one only when they were marked together (the
+            //      same reason, by the same person, within a second of each other: one statement marks them
+            //      microseconds apart); any other has one of its own, so no reason is hidden behind another.
+            // 1 to 4 change patient data and are audited, as the write-audit trigger records any change: with nobody
+            // signed in, the audit page shows "System" as who, and the reason is in the change; the body mass index
+            // worked out again is an insert by "System". 5 fills a new column, not audited, as VitalCorrections
+            // re-ranged readings. Marked rows have no one recorded as marking them. As in VitalCorrections, forced
+            // row-level security is lifted on observations for the owner while it runs. The body mass index's cascade
+            // is paused: 3 marks the body mass index itself, with a reason of its own. It reports each count with
+            // RAISE NOTICE, which the migration job prints (DatabaseNotices). Its run time is in
+            // docs/expansion/PLAN.md's log, step 9c; the migration job allows ten minutes (infra/migrate). Rule 4 was
+            // changed in place after Tahseen's answers on step 9c, which said no rerun is needed: no database that had
+            // already run this migration holds a moment it would decide differently (the decision log, 20 November).
+            migrationBuilder.Sql("""
+                DO $$
+                DECLARE
+                    forced boolean := (SELECT relforcerowsecurity FROM pg_class WHERE oid = 'ehr.observations'::regclass);
+                    audited boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_audit');
+                    cascading boolean := EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'ehr.observations'::regclass AND tgname = 'observations_mark_body_mass_index');
+                    moved bigint;
+                    duplicates bigint;
+                    indexes_marked bigint;
+                    indexes_again bigint;
+                    partners bigint;
+                    unpaired bigint;
+                    unpartnered bigint;
+                    readings bigint;
+                    apart bigint;
+                BEGIN
+                    ALTER TABLE ehr.observations NO FORCE ROW LEVEL SECURITY;
+                    IF cascading THEN
+                        ALTER TABLE ehr.observations DISABLE TRIGGER observations_mark_body_mass_index;
+                    END IF;
+
+                    -- Each blood pressure value with what it was entered with, before 1 moves any visit: its insert's
+                    -- audit event, the time of the transaction that wrote it and who; or, loaded with none, its
+                    -- issued_at and the visit it was loaded for (two visits starting at one instant load two pairs with
+                    -- one issued_at). That visit is the one it had before its visit was first moved, which every move
+                    -- records, so a run after a rollback finds the same.
+                    CREATE TEMPORARY TABLE pressure_values ON COMMIT DROP AS
+                    SELECT o.id, o.patient_id, o.effective_at, o.code, o.status <> 'entered-in-error' AS standing, o.issued_at,
+                        i.occurred_at IS NOT NULL AS logged, coalesce(i.occurred_at, o.issued_at) AS entered_at, i.actor_id AS entered_by,
+                        CASE WHEN i.occurred_at IS NOT NULL THEN NULL WHEN m.moved THEN m.was ELSE o.encounter_id END AS loaded_for
+                    FROM ehr.observations o
+                    LEFT JOIN LATERAL (
+                        SELECT e.occurred_at, e.actor_id FROM ehr.audit_events e
+                        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'insert' AND e.row_id = o.id
+                        ORDER BY e.occurred_at
+                        LIMIT 1) i ON true
+                    LEFT JOIN LATERAL (
+                        SELECT true AS moved, (e.details -> 'encounter_id' ->> 'old')::uuid AS was FROM ehr.audit_events e
+                        WHERE e.patient_id = o.patient_id AND e.table_name = 'observations' AND e.action = 'update' AND e.row_id = o.id
+                          AND e.details ? 'encounter_id'
+                        ORDER BY e.occurred_at, e.id
+                        LIMIT 1) m ON true
+                    WHERE o.category = 'vital-signs' AND o.code IN ('8480-6', '8462-4');
+
+                    WITH split AS (
+                        SELECT patient_id, effective_at FROM ehr.observations WHERE category = 'vital-signs' AND code IS NOT NULL
+                        GROUP BY patient_id, effective_at
+                        HAVING count(DISTINCT encounter_id) + max(CASE WHEN encounter_id IS NULL THEN 1 ELSE 0 END) > 1),
+                    firsts AS (
+                        SELECT DISTINCT ON (o.patient_id, o.effective_at) o.patient_id, o.effective_at, o.encounter_id
+                        FROM ehr.observations o JOIN split s ON s.patient_id = o.patient_id AND s.effective_at = o.effective_at
+                        WHERE o.category = 'vital-signs' AND o.code IS NOT NULL
+                        ORDER BY o.patient_id, o.effective_at, o.issued_at, o.id)
+                    UPDATE ehr.observations o SET encounter_id = f.encounter_id
+                    FROM firsts f
+                    WHERE o.category = 'vital-signs' AND o.code IS NOT NULL AND o.patient_id = f.patient_id AND o.effective_at = f.effective_at
+                      AND o.encounter_id IS DISTINCT FROM f.encounter_id;
+                    GET DIAGNOSTICS moved = ROW_COUNT;
+
+                    -- The moments where a weight or a height was marked as a duplicate, and those whose body mass index
+                    -- was marked for it.
+                    CREATE TEMPORARY TABLE measure_duplicates (patient_id uuid, effective_at timestamptz) ON COMMIT DROP;
+                    CREATE TEMPORARY TABLE index_marks (patient_id uuid, effective_at timestamptz) ON COMMIT DROP;
+
+                    WITH ranked AS (
+                        SELECT id, row_number() OVER (PARTITION BY patient_id, code, effective_at ORDER BY issued_at DESC NULLS LAST, id DESC) AS place
+                        FROM ehr.observations
+                        WHERE category = 'vital-signs' AND code IS NOT NULL AND code NOT IN ('8480-6', '8462-4') AND status <> 'entered-in-error'),
+                    marked AS (
+                        UPDATE ehr.observations o
+                        SET status = 'entered-in-error', entered_in_error_reason = 'duplicate resolved by migration 9c', entered_in_error_at = clock_timestamp()
+                        FROM ranked r WHERE o.id = r.id AND r.place > 1
+                        RETURNING o.patient_id, o.effective_at, o.code),
+                    measures AS (
+                        INSERT INTO measure_duplicates SELECT DISTINCT patient_id, effective_at FROM marked WHERE code IN ('29463-7', '8302-2'))
+                    SELECT count(*) INTO duplicates FROM marked;
+
+                    WITH marked AS (
+                        UPDATE ehr.observations o
+                        SET status = 'entered-in-error', entered_in_error_reason = 'body mass index of a value marked as a duplicate (migration 9c)',
+                            entered_in_error_at = clock_timestamp()
+                        FROM measure_duplicates d
+                        WHERE o.patient_id = d.patient_id AND o.effective_at = d.effective_at AND o.category = 'vital-signs' AND o.code = '39156-5'
+                          AND o.status <> 'entered-in-error'
+                        RETURNING o.patient_id, o.effective_at)
+                    INSERT INTO index_marks SELECT DISTINCT patient_id, effective_at FROM marked;
+                    GET DIAGNOSTICS indexes_marked = ROW_COUNT;
+
+                    INSERT INTO ehr.observations (id, patient_id, encounter_id, category, code, display, status, value, unit, reference_low, reference_high,
+                        effective_at, issued_at)
+                    SELECT uuidv7(), m.patient_id, b.encounter_id, 'vital-signs', '39156-5', left(c.display, 200), 'final', b.value, left(c.unit, 20),
+                        CASE WHEN banded.found THEN band.low ELSE c.reference_low END, CASE WHEN banded.found THEN band.high ELSE c.reference_high END,
+                        m.effective_at, clock_timestamp()
+                    FROM index_marks m
+                    CROSS JOIN LATERAL (
+                        SELECT w.encounter_id, round(w.value / ((h.value / 100) ^ 2), 1) AS value
+                        FROM ehr.observations w, ehr.observations h
+                        WHERE w.patient_id = m.patient_id AND w.code = '29463-7' AND w.effective_at = m.effective_at AND w.status = 'final'
+                          AND h.patient_id = m.patient_id AND h.code = '8302-2' AND h.effective_at = m.effective_at AND h.value > 0
+                          AND h.status = 'final'
+                        ORDER BY w.issued_at DESC, h.issued_at DESC
+                        LIMIT 1) b
+                    JOIN ehr.observation_codes c ON c.code = '39156-5' AND c.kind = 'vital'
+                    CROSS JOIN (SELECT EXISTS (SELECT 1 FROM ehr.vital_reference_ranges r WHERE r.code = '39156-5') AS found) banded
+                    LEFT JOIN LATERAL (
+                        SELECT r.low, r.high
+                        FROM ehr.vital_reference_ranges r
+                        JOIN ehr.patients p ON p.id = m.patient_id
+                        CROSS JOIN LATERAL (
+                            SELECT (extract(year FROM age((m.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)) * 12
+                                    + extract(month FROM age((m.effective_at AT TIME ZONE 'UTC')::date::timestamp, p.birth_date::timestamp)))::int AS months) a
+                        WHERE r.code = '39156-5' AND greatest(a.months, 0) >= r.from_months AND (r.to_months IS NULL OR greatest(a.months, 0) < r.to_months)) band ON true
+                    WHERE b.value >= 1 AND b.value <= 500;
+                    GET DIAGNOSTICS indexes_again = ROW_COUNT;
+
+                    -- The values of a moment entered together: a pair when one systolic and one diastolic.
+                    CREATE TEMPORARY TABLE pressure_entries ON COMMIT DROP AS
+                    SELECT patient_id, effective_at, logged, entered_at, entered_by, loaded_for,
+                        count(*) FILTER (WHERE code = '8480-6') = 1 AND count(*) FILTER (WHERE code = '8462-4') = 1 AS pair,
+                        bool_and(standing) AS standing, max(issued_at) AS latest, min(id::text) AS first_id
+                    FROM pressure_values
+                    GROUP BY patient_id, effective_at, logged, entered_at, entered_by, loaded_for;
+
+                    -- Each moment's blood pressure: the most recent pair entered together whose two values stand. Two
+                    -- loaded for two visits starting at one instant are equally recent: the one loaded for the visit 1
+                    -- gave the moment (its first value's, whatever sign) stands, then the one with the smaller ID.
+                    CREATE TEMPORARY TABLE pressure_kept ON COMMIT DROP AS
+                    SELECT DISTINCT ON (e.patient_id, e.effective_at) e.patient_id, e.effective_at, e.logged, e.entered_at, e.entered_by, e.loaded_for
+                    FROM pressure_entries e
+                    LEFT JOIN LATERAL (
+                        SELECT o.encounter_id FROM ehr.observations o
+                        WHERE o.patient_id = e.patient_id AND o.effective_at = e.effective_at AND o.category = 'vital-signs' AND o.code IS NOT NULL
+                        LIMIT 1) m ON true
+                    WHERE e.pair AND e.standing
+                    ORDER BY e.patient_id, e.effective_at, e.latest DESC, e.entered_at DESC, (e.loaded_for IS NOT DISTINCT FROM m.encounter_id) DESC, e.first_id;
+
+                    WITH marks AS (
+                        SELECT v.id,
+                            CASE
+                                WHEN n.pair AND n.standing THEN 'duplicate resolved by migration 9c'
+                                WHEN k.patient_id IS NOT NULL THEN 'not entered together with a standing partner (migration 9c)'
+                                WHEN n.pair THEN 'partner value was marked in error before readings existed (migration 9c)'
+                                WHEN NOT EXISTS (SELECT 1 FROM pressure_values w WHERE w.patient_id = v.patient_id AND w.effective_at = v.effective_at AND w.code <> v.code)
+                                    THEN 'blood pressure value without its partner (migration 9c)'
+                                ELSE 'not entered together with a standing partner (migration 9c)'
+                            END AS reason
+                        FROM pressure_values v
+                        JOIN pressure_entries n ON n.patient_id = v.patient_id AND n.effective_at = v.effective_at AND n.logged = v.logged
+                            AND n.entered_at = v.entered_at AND n.entered_by IS NOT DISTINCT FROM v.entered_by AND n.loaded_for IS NOT DISTINCT FROM v.loaded_for
+                        LEFT JOIN pressure_kept k ON k.patient_id = v.patient_id AND k.effective_at = v.effective_at
+                        WHERE v.standing
+                          AND NOT (k.patient_id IS NOT NULL AND k.logged = v.logged AND k.entered_at = v.entered_at AND k.entered_by IS NOT DISTINCT FROM v.entered_by
+                                   AND k.loaded_for IS NOT DISTINCT FROM v.loaded_for)),
+                    marked AS (
+                        UPDATE ehr.observations o
+                        SET status = 'entered-in-error', entered_in_error_reason = m.reason, entered_in_error_at = clock_timestamp()
+                        FROM marks m WHERE o.id = m.id
+                        RETURNING o.entered_in_error_reason AS reason)
+                    SELECT duplicates + count(*) FILTER (WHERE reason = 'duplicate resolved by migration 9c'),
+                        count(*) FILTER (WHERE reason = 'partner value was marked in error before readings existed (migration 9c)'),
+                        count(*) FILTER (WHERE reason = 'blood pressure value without its partner (migration 9c)'),
+                        count(*) FILTER (WHERE reason = 'not entered together with a standing partner (migration 9c)')
+                    INTO duplicates, partners, unpaired, unpartnered
+                    FROM marked;
+
+                    -- Each moment's blood pressure now: whether a systolic and a diastolic stand.
+                    CREATE TEMPORARY TABLE pressure_moments ON COMMIT DROP AS
+                    SELECT patient_id, effective_at,
+                        bool_or(code = '8480-6' AND status <> 'entered-in-error') AS systolic, bool_or(code = '8462-4' AND status <> 'entered-in-error') AS diastolic
+                    FROM ehr.observations WHERE category = 'vital-signs' AND code IN ('8480-6', '8462-4')
+                    GROUP BY patient_id, effective_at;
+
+                    IF audited THEN
+                        ALTER TABLE ehr.observations DISABLE TRIGGER observations_audit;
+                    END IF;
+
+                    -- One reading ID for each moment, drawn once: materialized, so no plan can draw it once a row.
+                    WITH moments AS MATERIALIZED (
+                        SELECT patient_id, effective_at, uuidv7() AS reading FROM pressure_moments WHERE systolic AND diastolic)
+                    UPDATE ehr.observations o SET reading_id = r.reading
+                    FROM moments r
+                    WHERE o.patient_id = r.patient_id AND o.effective_at = r.effective_at AND o.category = 'vital-signs'
+                      AND o.code IN ('8480-6', '8462-4') AND o.status <> 'entered-in-error';
+                    GET DIAGNOSTICS readings = ROW_COUNT;
+
+                    WITH loose AS MATERIALIZED (
+                        SELECT id, patient_id, effective_at, code, entered_in_error_reason AS reason, entered_in_error_by AS marker, entered_in_error_at AS marked,
+                            count(*) FILTER (WHERE code = '8480-6') OVER moment AS systolics, count(*) FILTER (WHERE code = '8462-4') OVER moment AS diastolics
+                        FROM ehr.observations
+                        WHERE category = 'vital-signs' AND code IN ('8480-6', '8462-4') AND reading_id IS NULL
+                        WINDOW moment AS (PARTITION BY patient_id, effective_at)),
+                    pairs AS MATERIALIZED (
+                        SELECT s.patient_id, s.effective_at, uuidv7() AS reading
+                        FROM loose s JOIN loose d ON d.patient_id = s.patient_id AND d.effective_at = s.effective_at AND d.code = '8462-4'
+                        WHERE s.code = '8480-6' AND s.systolics = 1 AND s.diastolics = 1
+                          AND s.reason IS NOT DISTINCT FROM d.reason AND s.marker IS NOT DISTINCT FROM d.marker
+                          AND abs(extract(epoch FROM s.marked - d.marked)) <= 1)
+                    UPDATE ehr.observations o SET reading_id = coalesce(p.reading, uuidv7())
+                    FROM loose l LEFT JOIN pairs p ON p.patient_id = l.patient_id AND p.effective_at = l.effective_at
+                    WHERE o.id = l.id;
+                    GET DIAGNOSTICS apart = ROW_COUNT;
+
+                    IF audited THEN
+                        ALTER TABLE ehr.observations ENABLE TRIGGER observations_audit;
+                    END IF;
+                    IF cascading THEN
+                        ALTER TABLE ehr.observations ENABLE TRIGGER observations_mark_body_mass_index;
+                    END IF;
+                    IF forced THEN
+                        ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
+                    END IF;
+
+                    RAISE NOTICE 'Migration 9c: % vital signs moved to the visit of the first value recorded at their moment (audited)', moved;
+                    RAISE NOTICE 'Migration 9c: % duplicate values marked entered in error, "duplicate resolved by migration 9c" (audited)', duplicates;
+                    RAISE NOTICE 'Migration 9c: % body mass index values marked entered in error, "body mass index of a value marked as a duplicate (migration 9c)" (audited)', indexes_marked;
+                    RAISE NOTICE 'Migration 9c: % body mass index values worked out again from the weight and height kept (audited)', indexes_again;
+                    RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error because their partner was, "partner value was marked in error before readings existed (migration 9c)" (audited)', partners;
+                    RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that never had a partner, "blood pressure value without its partner (migration 9c)" (audited)', unpaired;
+                    RAISE NOTICE 'Migration 9c: % blood pressure values marked entered in error that were not entered together with a standing partner, "not entered together with a standing partner (migration 9c)" (audited)', unpartnered;
+                    RAISE NOTICE 'Migration 9c: % standing blood pressure values made into % readings; % values in error given readings', readings, readings / 2, apart;
+                END
+                $$;
+                """);
+
+            migrationBuilder.CreateIndex(
+                name: "ux_observations_reading",
+                schema: "ehr",
+                table: "observations",
+                columns: new[] { "reading_id", "code" },
+                unique: true,
+                filter: "reading_id IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "ux_observations_vital_sign_once",
+                schema: "ehr",
+                table: "observations",
+                columns: new[] { "patient_id", "code", "effective_at" },
+                unique: true,
+                filter: "category = 'vital-signs' AND status <> 'entered-in-error'");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_observations_reading",
+                schema: "ehr",
+                table: "observations",
+                sql: "(reading_id IS NOT NULL) = (category = 'vital-signs' AND code IS NOT NULL AND code IN ('8480-6', '8462-4'))");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            // Written by hand. The readings' triggers name the column this drops, and the rest of step 9c's rules
+            // (db/policies/75-results.sql and 30-rls.sql) mean nothing without it: they go first. The values marked
+            // entered in error and the visits moved stay as they are, which the older schema holds. Until the earlier
+            // release's db/policies is applied after a rollback, recording a vital sign fails: apply it straight after.
+            migrationBuilder.Sql("""
+                DROP TRIGGER IF EXISTS observations_reading_inserted ON ehr.observations;
+                DROP TRIGGER IF EXISTS observations_reading_changed ON ehr.observations;
+                DROP TRIGGER IF EXISTS observations_reading_deleted ON ehr.observations;
+                DROP TRIGGER IF EXISTS observations_mark_reading ON ehr.observations;
+                DROP FUNCTION IF EXISTS ehr.check_vital_reading();
+                DROP FUNCTION IF EXISTS ehr.mark_reading_in_error();
+                DROP POLICY IF EXISTS observations_owner_select ON ehr.observations;
+                """);
+
+            migrationBuilder.DropIndex(
+                name: "ux_observations_reading",
+                schema: "ehr",
+                table: "observations");
+
+            migrationBuilder.DropIndex(
+                name: "ux_observations_vital_sign_once",
+                schema: "ehr",
+                table: "observations");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_observations_reading",
+                schema: "ehr",
+                table: "observations");
+
+            migrationBuilder.DropColumn(
+                name: "reading_id",
+                schema: "ehr",
+                table: "observations");
+
+            migrationBuilder.CreateIndex(
+                name: "ux_observations_vital_sign_once",
+                schema: "ehr",
+                table: "observations",
+                columns: new[] { "patient_id", "code", "effective_at", "encounter_id" },
+                unique: true,
+                filter: "category = 'vital-signs' AND status <> 'entered-in-error'")
+                .Annotation("Npgsql:NullsDistinct", false);
+        }
+    }
+}

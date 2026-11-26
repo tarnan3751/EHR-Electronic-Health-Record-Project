@@ -61,7 +61,8 @@ public class TC_UC1_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         // The banner and allergies are one recorded read.
         Assert.Equal(reads + 1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
 
-        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
+        // By the database's clock, which stamps the times.
+        DateTimeOffset before = (await apps.Database.NowAsync()).AddSeconds(-1);
         using var signed = await SignAsync(session.Client, patient, "lab", "complete blood count (CBC)", Cbc);
         Assert.Equal(HttpStatusCode.OK, signed.StatusCode);
         var url = JsonDocument.Parse(await signed.Content.ReadAsStringAsync(Cancel)).RootElement.GetProperty("url").GetString()!;
@@ -84,9 +85,9 @@ public class TC_UC1_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         await using var reader = await command.ExecuteReaderAsync(Cancel);
         Assert.True(await reader.ReadAsync(Cancel));
         Assert.Equal(clinician.Id, reader.GetGuid(0));
-        Assert.InRange(reader.GetFieldValue<DateTimeOffset>(1), before, DateTimeOffset.UtcNow.AddSeconds(1));
+        Assert.InRange(reader.GetFieldValue<DateTimeOffset>(1), before, (DateTimeOffset)(await apps.Database.NowAsync()).AddSeconds(1));
         Assert.Equal(clinician.Id, reader.GetGuid(2));
-        Assert.InRange(reader.GetFieldValue<DateTimeOffset>(3), before, DateTimeOffset.UtcNow.AddSeconds(1));
+        Assert.InRange(reader.GetFieldValue<DateTimeOffset>(3), before, (DateTimeOffset)(await apps.Database.NowAsync()).AddSeconds(1));
         Assert.False(await reader.ReadAsync(Cancel));
     }
 }

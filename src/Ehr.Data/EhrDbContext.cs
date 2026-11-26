@@ -76,6 +76,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // The rest of the reference data (Ehr.Data.Reference): not PHI.
     public DbSet<Reference.ObservationCode> ObservationCodes => Set<Reference.ObservationCode>();
 
+    public DbSet<Reference.VitalReferenceRange> VitalReferenceRanges => Set<Reference.VitalReferenceRange>();
+
     public DbSet<Reference.OrderResultCode> OrderResultCodes => Set<Reference.OrderResultCode>();
 
     public DbSet<Reference.Questionnaire> Questionnaires => Set<Reference.Questionnaire>();
@@ -96,6 +98,8 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     public DbSet<AiFieldProposal> AiFieldProposals => Set<AiFieldProposal>();
 
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
+
+    public DbSet<NoteAddendum> NoteAddenda => Set<NoteAddendum>();
 
     // UC 1: the orders clinicians sign, PHI like the chart (read them only through the PHI reader), and the catalog of
     // what can be ordered, which isn't.

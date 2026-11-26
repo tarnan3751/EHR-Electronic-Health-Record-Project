@@ -72,6 +72,18 @@ else
         </table>
     </div>
 
+    @if (order.Trends.Count > 0)
+    {
+        @* Each test's values over time, this result with the patient's earlier ones (step 9). *@
+        <h2>Trends</h2>
+        <div class="sc-trends">
+            @foreach (var trend in order.Trends)
+            {
+                <partial name="_Trend" model="trend" />
+            }
+        </div>
+    }
+
     <h2>Acknowledgment</h2>
     @if (order.AcknowledgedAt is { } when)
     {

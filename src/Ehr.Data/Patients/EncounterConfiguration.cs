@@ -12,7 +12,6 @@ public sealed class EncounterConfiguration : IEntityTypeConfiguration<Encounter>
         encounter.ToTable("encounters", table =>
         {
             table.HasCheckConstraint("ck_encounters_status", $"status IN ({Codes.List(EncounterStatus.All)})");
-            table.HasCheckConstraint("ck_encounters_vital_signs", "systolic_mm_hg > 0 AND diastolic_mm_hg > 0 AND heart_rate_per_minute > 0");
         });
 
         encounter.Property(e => e.Status).HasMaxLength(20);

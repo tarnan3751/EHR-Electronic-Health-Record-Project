@@ -23,6 +23,19 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
         await Seeded.AssertProtectedAsync(database);
         // Synthetic rows in an empty clinic, loaded with the trigger off: no write-audit events.
         Assert.Equal(0, await Seeded.WriteEventsAsync(database));
+        // Each visit's blood pressure is one reading (step 9c). The seed loads them with the database's check of readings
+        // off, as it does the audit trigger, so every reading is checked here as the database would: one patient, time and
+        // visit, and exactly one standing systolic and one standing diastolic, nothing else.
+        Assert.Equal(["true 0"], await Accounts.QueryAsync(database.SuperuserConnectionString, null,
+            """
+            SELECT (count(*) > 0) || ' ' || count(*) FILTER (WHERE NOT whole)
+            FROM (
+                SELECT reading_id IS NOT NULL AND count(*) = 2 AND count(DISTINCT patient_id) = 1 AND count(DISTINCT effective_at) = 1
+                    AND count(DISTINCT encounter_id) + max(CASE WHEN encounter_id IS NULL THEN 1 ELSE 0 END) = 1
+                    AND count(*) FILTER (WHERE code = '8480-6' AND status <> 'entered-in-error') = 1
+                    AND count(*) FILTER (WHERE code = '8462-4' AND status <> 'entered-in-error') = 1 AS whole
+                FROM ehr.observations WHERE code IN ('8480-6', '8462-4') GROUP BY reading_id) r
+            """));
 
         // Once there are patients, the seed refuses, and nothing changes.
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -40,8 +53,42 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
 
         Assert.Equal(first.Patient.Id, again.Patient.Id);
         Assert.Equal((first.Patient.GivenName, first.Patient.FamilyName, first.Patient.BirthDate), (again.Patient.GivenName, again.Patient.FamilyName, again.Patient.BirthDate));
-        Assert.Equal(first.Visits.Select(v => (v.Id, v.PeriodStart, v.SystolicMmHg)), again.Visits.Select(v => (v.Id, v.PeriodStart, v.SystolicMmHg)));
+        Assert.Equal(first.Visits.Select(v => (v.Id, v.PeriodStart)), again.Visits.Select(v => (v.Id, v.PeriodStart)));
+        // The vital signs taken at the visits are observations (step 9): the same ones, with the same values.
+        Assert.NotEmpty(first.Vitals);
+        Assert.Equal(first.Vitals.Select(v => (v.Id, v.EncounterId, v.ReadingId, v.Code, v.Value)), again.Vitals.Select(v => (v.Id, v.EncounterId, v.ReadingId, v.Code, v.Value)));
         Assert.Equal("SYN0001235", first.Patient.Mrn);
+
+        // Steps 9b and 9d: every seeded vital sign carries the range for the patient's age on the day of the visit and
+        // their sex, and the seeded clinic has children of every band among them. Healthy synthetic children are mostly
+        // unflagged: of each sign, at most one child's value in seven is flagged (a blood pressure at or above its
+        // screening value, as the pages flag it).
+        var seen = new Dictionary<string, (int In, int Out)>();
+        var children = new Dictionary<string, (int All, int Flagged)>();
+        foreach (var chart in Enumerable.Range(0, 3000).Select(SyntheticClinic.Chart))
+        {
+            foreach (var vital in chart.Vitals)
+            {
+                var months = Ehr.Data.Reference.AgeBand.Months(chart.Patient.BirthDate, DateOnly.FromDateTime(vital.EffectiveAt.UtcDateTime));
+                var range = Ehr.Data.Reference.VitalRanges.For(vital.Code!, months, chart.Patient.Gender);
+                Assert.Equal((range?.Low, range?.High, range?.Kind ?? Ehr.Data.Patients.ReferenceKind.Normal), (vital.ReferenceLow, vital.ReferenceHigh, vital.ReferenceKind));
+                var band = Ehr.Data.Reference.AgeBand.Of(months);
+                var outside = vital.ReferenceKind == Ehr.Data.Patients.ReferenceKind.Screening
+                    ? vital.Value >= vital.ReferenceHigh
+                    : vital.Value < vital.ReferenceLow || vital.Value > vital.ReferenceHigh;
+                var (inside, flagged) = seen.GetValueOrDefault(band);
+                seen[band] = outside ? (inside, flagged + 1) : (inside + 1, flagged);
+                if (band != Ehr.Data.Reference.AgeBand.Adult)
+                {
+                    var (all, flaggedChildren) = children.GetValueOrDefault(vital.Code!);
+                    children[vital.Code!] = (all + 1, flaggedChildren + (outside ? 1 : 0));
+                }
+            }
+        }
+
+        Assert.Equal(Ehr.Data.Reference.AgeBand.All.Order(), seen.Keys.Order());
+        Assert.All(seen.Values, counts => Assert.True(counts.In > counts.Out, $"More seeded values outside the range than inside: {counts}"));
+        Assert.All(children, sign => Assert.True(sign.Value.Flagged * 7 <= sign.Value.All, $"Too many seeded children flagged for {sign.Key}: {sign.Value}"));
         Assert.Equal(7, first.Patient.Id.Version);
     }
 }

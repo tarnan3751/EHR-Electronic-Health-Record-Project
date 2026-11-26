@@ -1,0 +1,224 @@
+@page "/patients/{patientId:guid}/vitals"
+@using Ehr.Data.Patients
+@using Ehr.Domain.Results
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Vitals.IndexModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Vitals.Patient;
+    ViewData["Title"] = $"Vital signs: {patient.FamilyName}, {patient.GivenName}";
+    var names = Model.Vitals.Signs.GroupBy(sign => sign.Code!).ToDictionary(group => group.Key, group => group.First());
+    // The signs with something to show in the sets listed: a value that stands, or, when they are shown, one in error.
+    var recorded = VitalSign.All.Where(code => names.ContainsKey(code)
+        && Model.Times.Any(time => Model.At(code, time) is not null || Model.ShowErrors && Model.ErrorsAt(code, time).Any())).ToList();
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Vitals.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+</div>
+<h1>Vital signs: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Marked is > 0)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Marked:</span> @Model.Marked @(Model.Marked == 1 ? "reading is" : "readings are") marked entered in error and left out of the flowsheet and trends. Record the correct values as a new set.</p>
+}
+@if (Model.Saved)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> the vital signs are recorded, and the patient can see them in the portal.</p>
+}
+
+@* The form comes first: the cursor starts in it (NFR-12), and the flowsheet and trends stay in view under it. *@
+<h2>Record vital signs</h2>
+@if (!Model.OnPanel)
+{
+    <p class="sc-muted">Add this patient to your panel to record vital signs.</p>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">Vital signs can't be recorded until the clinic's server is back.</p>
+}
+else
+{
+    <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@patient.Id">
+        @if (Model.Errors.Count > 0)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : "fix the highlighted fields and save again.")</p>
+        }
+        <p class="sc-muted">Enter what was taken and leave the rest empty. Body mass index is worked out from the weight and height.</p>
+        @{
+            // The cursor starts in the first field that is wrong; in the first field when nothing is, or when what is
+            // wrong is the whole form; in the time when only the time is.
+            var wrong = VitalSigns.Fields.Select(field => field.Code).FirstOrDefault(Model.Errors.ContainsKey);
+            var focus = wrong ?? (Model.Errors.ContainsKey("TakenAt") && !Model.Errors.ContainsKey("") ? "TakenAt" : VitalSigns.Fields[0].Code);
+        }
+        <div class="sc-vitals-fields">
+        @foreach (var (code, label, unit, _, _) in VitalSigns.Fields)
+        {
+            var id = $"vital-{code}";
+            var error = Model.Errors.GetValueOrDefault(code);
+            <div class="sc-field">
+                <label for="@id">@label <span>(@unit)</span></label>
+                <input id="@id" class="sc-field__input" name="Values[@code]" value="@Model.Values.GetValueOrDefault(code)" inputmode="decimal" autocomplete="off"
+                       autofocus="@(code == focus)"
+                       aria-invalid="@(error is null ? null : "true")" aria-describedby="@(error is null ? null : id + "-error")">
+                @if (error is not null)
+                {
+                    <p class="sc-field__error" id="@(id)-error">@error</p>
+                }
+            </div>
+        }
+            <div class="sc-field">
+                <label for="vital-taken">Taken (UTC) <span>(required)</span></label>
+                <input id="vital-taken" class="sc-field__input" type="datetime-local" name="TakenAt" value="@Model.TakenAt" required autofocus="@(focus == "TakenAt")"
+                       aria-invalid="@(Model.Errors.ContainsKey("TakenAt") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("TakenAt") ? "vital-taken-error" : null)">
+                @if (Model.Errors.TryGetValue("TakenAt", out var takenError))
+                {
+                    <p class="sc-field__error" id="vital-taken-error">@takenError</p>
+                }
+            </div>
+        </div>
+        <div class="sc-actions">
+            <button type="submit" class="sc-btn sc-btn--primary" data-record-vitals>Record vital signs</button>
+        </div>
+    </form>
+}
+
+<h2>Flowsheet</h2>
+@if (recorded.Count == 0)
+{
+    <p class="sc-muted">No vital signs recorded.</p>
+}
+else
+{
+    <div class="sc-table-wrap sc-table-wrap--wide">
+        <table class="sc-table" data-flowsheet>
+            <caption class="sc-visually-hidden">The latest @Model.Times.Count sets of vital signs, newest first. Times are UTC.</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Vital sign</th>
+                    @foreach (var time in Model.Times)
+                    {
+                        <th scope="col" class="sc-table__mono">@time.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var code in recorded.Where(code => code != VitalSign.Diastolic || !recorded.Contains(VitalSign.Systolic)))
+                {
+                    if (VitalSign.BloodPressure.Contains(code))
+                    {
+                        @* A blood pressure is one reading (step 9c): its two numbers from one reading, flagged when either is outside its range,
+                           or a child's at or above its screening value (step 9d). *@
+                        <tr>
+                            <th scope="row">Blood pressure <span class="sc-muted">(@Units.Shown(names[code].Unit))</span></th>
+                            @foreach (var time in Model.Times)
+                            {
+                                <td class="sc-table__mono">
+                                    @if (Model.PressureAt(time) is { } pressure)
+                                    {
+                                        @pressure.Text
+                                        @foreach (var flag in pressure.Flags)
+                                        {
+                                            <span class="sc-tag sc-tag--warning">@flag</span>
+                                        }
+                                    }
+                                    @if (Model.ShowErrors)
+                                    {
+                                        foreach (var wrong in Model.PressureErrorsAt(time))
+                                        {
+                                            <span class="sc-struck" data-in-error><s>@IndexModel.PressureShown(wrong)</s> <span class="sc-struck__reason">entered in error: @wrong[0].EnteredInErrorReason</span></span>
+                                        }
+                                    }
+                                </td>
+                            }
+                        </tr>
+                        continue;
+                    }
+                    <tr>
+                        <th scope="row">@names[code].Display <span class="sc-muted">(@Units.Shown(names[code].Unit))</span></th>
+                        @foreach (var time in Model.Times)
+                        {
+                            var sign = Model.At(code, time);
+                            <td class="sc-table__mono">
+                                @if (sign is not null)
+                                {
+                                    @sign.Value!.Value.ToString("0.#")
+                                    @if (VitalFlag.Of(sign) is { } flag)
+                                    {
+                                        <span class="sc-tag sc-tag--warning">@flag</span>
+                                    }
+                                }
+                                @if (Model.ShowErrors)
+                                {
+                                    @* Entries in error (step 9b): struck through, and said in words too. *@
+                                    foreach (var wrong in Model.ErrorsAt(code, time))
+                                    {
+                                        <span class="sc-struck" data-in-error><s>@wrong.Value!.Value.ToString("0.#")</s> <span class="sc-struck__reason">entered in error: @wrong.EnteredInErrorReason</span></span>
+                                    }
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+            @if (Model.OnPanel && OnPrem.IsReachable)
+            {
+                @* Step 9b: a reading is never deleted or edited. A wrong one is marked entered in error, a set at a time. *@
+                <tfoot>
+                    <tr>
+                        <th scope="row">Correct a set</th>
+                        @foreach (var time in Model.Times)
+                        {
+                            <td>
+                                @if (recorded.Any(code => Model.At(code, time) is not null))
+                                {
+                                    <a asp-page="Error" asp-route-patientId="@patient.Id" asp-route-at="@time.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss")" data-mark-in-error>Mark in error<span class="sc-visually-hidden">, the set taken @time.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</span></a>
+                                }
+                            </td>
+                        }
+                    </tr>
+                </tfoot>
+            }
+        </table>
+    </div>
+}
+@if (Model.MoreSets || Model.Earlier)
+{
+    <p class="sc-muted">
+        @if (Model.Earlier)
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id">Show the latest @IndexModel.Columns sets only</a>
+        }
+        else
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-earlier="true" data-earlier-sets>Show earlier sets</a>
+        }
+    </p>
+}
+@if (Model.InError > 0)
+{
+    <p class="sc-muted" data-in-error-count>
+        @Model.InError @(Model.InError == 1 ? "reading is" : "readings are") marked entered in error and left out.
+        @if (Model.ShowErrors)
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id">Hide entries in error</a>
+        }
+        else
+        {
+            <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-showErrors="true">Show entries in error</a>
+        }
+    </p>
+}
+
+@if (Model.Trends.Count > 0)
+{
+    <h2>Trends</h2>
+    <div class="sc-trends">
+        @foreach (var trend in Model.Trends)
+        {
+            <partial name="_Trend" model="trend" />
+        }
+    </div>
+}

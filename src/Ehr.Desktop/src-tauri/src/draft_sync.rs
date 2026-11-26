@@ -28,6 +28,10 @@ pub struct ServerDraft {
     pub patient_id: String,
     pub body: String,
     pub version: i64,
+    /// The draft was signed as a sensitive note, which is never kept on this
+    /// device: the server sends no text, and any copy here is emptied.
+    #[serde(default)]
+    pub withheld: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -65,7 +69,7 @@ pub fn list(db: &Connection, owner: Uuid, patient: Uuid) -> Result<Vec<DraftView
 pub fn waiting(db: &Connection, owner: Uuid) -> Result<usize> {
     db.query_row(
         "SELECT count(*) FROM clinical_drafts d LEFT JOIN clinical_draft_sync s ON s.id=d.id
-        WHERE d.clinician_id=?1 AND coalesce(s.state,'pending')!='synced'",
+        WHERE d.clinician_id=?1 AND coalesce(s.state,'pending') NOT IN ('synced','withheld')",
         [owner.to_string()],
         |r| Ok(r.get::<_, u32>(0)? as usize),
     )
@@ -122,6 +126,22 @@ pub fn pull(
     }
     for draft in changed {
         let owner = owner.to_string();
+        if draft.withheld {
+            // Signed as a sensitive note. Whatever state the copy here is in, its text goes: the note is final, so
+            // nothing local could still be saved to it. A draft this device never had is not created.
+            let emptied = tx.execute(
+                "UPDATE clinical_drafts SET body='' WHERE id=?1 AND clinician_id=?2 AND patient_id=?3",
+                params![draft.id, owner, draft.patient_id],
+            )?;
+            if emptied == 1 {
+                tx.execute(
+                    "INSERT INTO clinical_draft_sync(id,version,state) VALUES(?1,?2,'withheld')
+                    ON CONFLICT(id) DO UPDATE SET version=excluded.version,state='withheld',theirs=NULL,their_version=NULL,problem=NULL",
+                    params![draft.id, draft.version],
+                )?;
+            }
+            continue;
+        }
         tx.execute("INSERT OR IGNORE INTO clinical_drafts(id,clinician_id,patient_id,body,pending_change_id)
             VALUES(?1,?2,?3,?4,?5)", params![draft.id, owner, draft.patient_id, draft.body, Uuid::now_v7().to_string()])?;
         if tx.changes() == 1 {
@@ -306,6 +326,7 @@ mod tests {
             patient_id: patient.to_string(),
             body: "Theirs".to_owned(),
             version: 2,
+            withheld: false,
         };
         answer(
             &mut db,
@@ -342,5 +363,71 @@ mod tests {
         assert!(resolve(&mut db, owner, patient, id, 3, false).unwrap());
         assert_eq!(list(&db, owner, patient).unwrap()[0].body, "Theirs");
         assert_eq!(waiting(&db, owner).unwrap(), 0);
+    }
+
+    /// The expansion plan's step 10: a draft signed as a sensitive note is never kept on this device. The server
+    /// sends it with no text and marked withheld; the copy here is emptied whatever state it was in (synced, or
+    /// holding text not yet sent), stops counting as waiting, and offers nothing to send. A withheld draft this
+    /// device never had is not created.
+    #[test]
+    fn a_draft_signed_as_a_sensitive_note_is_emptied_here_and_not_created() {
+        let mut db = Connection::open_in_memory().unwrap();
+        drafts::initialize(&db).unwrap();
+        initialize(&db).unwrap();
+        let owner = Uuid::now_v7();
+        let patient = Uuid::now_v7();
+        let withheld = |id: &str, version| ServerDraft {
+            id: id.to_owned(),
+            patient_id: patient.to_string(),
+            body: String::new(),
+            version,
+            withheld: true,
+        };
+
+        // One that was synced from the server, and one typed here and still waiting to be sent.
+        let synced = Uuid::now_v7().to_string();
+        let server = ServerDraft {
+            id: synced.clone(),
+            patient_id: patient.to_string(),
+            body: "Synthetic sensitive text, synced".to_owned(),
+            version: 1,
+            withheld: false,
+        };
+        pull(&mut db, owner, "0", "1", &[server]).unwrap();
+        let typed =
+            drafts::save(&db, owner, patient, "Synthetic sensitive text, typed here").unwrap();
+        assert_eq!(waiting(&db, owner).unwrap(), 1);
+
+        let never_here = Uuid::now_v7().to_string();
+        pull(
+            &mut db,
+            owner,
+            "1",
+            "2",
+            &[
+                withheld(&synced, 2),
+                withheld(&typed.id, 2),
+                withheld(&never_here, 2),
+            ],
+        )
+        .unwrap();
+
+        let shown = list(&db, owner, patient).unwrap();
+        assert_eq!(shown.len(), 2);
+        assert!(
+            shown
+                .iter()
+                .all(|draft| draft.body.is_empty() && draft.state == "withheld")
+        );
+        assert_eq!(waiting(&db, owner).unwrap(), 0);
+        assert!(pending(&db, owner).unwrap().is_empty());
+        let kept: i64 = db
+            .query_row(
+                "SELECT count(*) FROM clinical_drafts WHERE body LIKE '%sensitive%'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept, 0);
     }
 }

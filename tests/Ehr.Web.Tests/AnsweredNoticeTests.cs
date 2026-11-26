@@ -20,7 +20,7 @@ public class AnsweredNoticeTests(WebApps apps) : IClassFixture<WebApps>
         var (_, patient, session) = await OnPanelAsync(apps);
         var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
 
-        using var filed = await FileAsync(session.Client, patient, order, (Hemoglobin, "13.1"), (Platelets, "250"), (Hematocrit, "41"), (Leukocytes, "6.2"));
+        using var filed = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, "13.1"), (Platelets, "250"), (Hematocrit, "41"), (Leukocytes, "6.2"));
         var page = await ReadAsync(filed);
         Assert.Matches("<p class=\"sc-notice sc-notice--success\" role=\"status\" tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Saved:</span>", page);
         Assert.Contains("data-acknowledge", page);

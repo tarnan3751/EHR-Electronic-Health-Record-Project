@@ -145,6 +145,30 @@ internal static partial class RenderBenchmark
                 }));
                 results.Add(await MeasureAsync(client, times, "Inbox, with results to acknowledge", typing: false, () => "/inbox"));
                 await AcknowledgeResultsAsync(app, clinicianId, resulted);
+                // Addenda to signed notes (step 10): eight more patients join the panel, each with a signed note and
+                // three addenda, one of them sensitive. They are not among the patients the chart rows pick from, so
+                // those rows measure what they did. The note's page with its addenda, and the page that signs one.
+                var noted = await SignNotesAsync(app, clinicianId, patients);
+                var noteRandom = new Random(20261121);
+                // A generator of its own, so the rows after it pick the notes they always did.
+                var notedChartRandom = new Random(20261124);
+                results.Add(await MeasureAsync(client, times, "Chart with a signed note, a patient on the panel", typing: false,
+                    () => $"/patients/{noted[notedChartRandom.Next(noted.Count)].Patient}"));
+                results.Add(await MeasureAsync(client, times, "Signed note with addenda, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                    return $"/patients/{patient}/notes/{note}";
+                }));
+                results.Add(await MeasureAsync(client, times, "Note sensitivity form, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                    return $"/patients/{patient}/notes/{note}/sensitivity";
+                }));
+                results.Add(await MeasureAsync(client, times, "Addendum form, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                    return $"/patients/{patient}/notes/{note}/addendum";
+                }));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -187,7 +211,7 @@ internal static partial class RenderBenchmark
                 else
                 {
                     await SettleAsync(database);
-                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments));
+                    results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted));
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -246,6 +270,12 @@ internal static partial class RenderBenchmark
         var random = new Random(20261115);
         SyntheticChart Anyone() => SyntheticClinic.Chart(random.Next(patients));
         static string Date(SyntheticChart chart) => chart.Patient.BirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        // The panel's seeded sets of vital signs (step 9b): the patient and the time each was taken. A generator of
+        // its own, so the rows after this one pick the patients they always did.
+        var step = patients / Math.Min(PanelSize, patients);
+        var sets = Enumerable.Range(0, panel.Count).SelectMany(i => SyntheticClinic.Chart(i * step).Vitals.Select(v => (Patient: panel[i], At: v.EffectiveAt.UtcDateTime)))
+            .Distinct().Take(200).ToList();
+        var setRandom = new Random(20261122);
 
         return
         [
@@ -296,6 +326,14 @@ internal static partial class RenderBenchmark
             // The staff inbox (the expansion plan's step 3): its items, each naming a patient, which is a recorded read
             // of each. Every row above also counted the inbox for the app bar.
             await MeasureAsync(client, times, prefix + $"Inbox, {InboxSize} items", typing: false, () => "/inbox"),
+            // Vital signs (step 9): the flowsheet and its trend charts, drawn by the server.
+            await MeasureAsync(client, times, prefix + "Vital signs, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}/vitals"),
+            // Step 9b: the page that marks a set's readings entered in error, for a seeded visit's set.
+            await MeasureAsync(client, times, prefix + "Mark vital signs in error form, a patient on the panel", typing: false, () =>
+            {
+                var (patient, at) = sets[setRandom.Next(sets.Count)];
+                return $"/patients/{patient}/vitals/error?at={at:yyyy-MM-ddTHH:mm:ss}";
+            }),
             await MeasureAsync(client, times, prefix + "Chart history, a patient on the panel", typing: false,
                 () => $"/patients/{panel[random.Next(panel.Count)]}/chart-history"),
         ];
@@ -310,7 +348,7 @@ internal static partial class RenderBenchmark
     // audit queue goes in a folder of its own, deleted at the end.
     static async Task<List<Result>> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
-        string scheduleDay, List<Guid> appointments)
+        string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -326,6 +364,17 @@ internal static partial class RenderBenchmark
             using var client = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
             var results = await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
             results.AddRange(await MeasureScheduleAsync(client, times, "Off-site, ", panel, scheduleDay, appointments));
+            // Pages that record more than one audit event (step 10c): a chart that has a signed note records the
+            // patient's read and the note's; a note's page records the patient's and the note's. Off-site each event
+            // used to be its own write to the queue, flushed to disk; now a request's events go together.
+            var noteRandom = new Random(20261123);
+            results.Add(await MeasureAsync(client, times, "Off-site, Chart with a signed note, a patient on the panel", typing: false,
+                () => $"/patients/{noted[noteRandom.Next(noted.Count)].Patient}"));
+            results.Add(await MeasureAsync(client, times, "Off-site, Signed note with addenda, a patient on the panel", typing: false, () =>
+            {
+                var (patient, note) = noted[noteRandom.Next(noted.Count)];
+                return $"/patients/{patient}/notes/{note}";
+            }));
             return results;
         }
         finally
@@ -546,9 +595,10 @@ internal static partial class RenderBenchmark
     }
 
     // UC 2 (Tahseen Arnan): the cloud app's audit queue, its append timed as the request's commit. The append writes the
-    // page's events and flushes them to disk before the page is sent (CloudAuditQueue), as an on-prem page's commit waits
+    // page's events together and flushes them to disk before the page is sent (RequestAuditEvents, step 10c, and
+    // CloudAuditQueue), as an on-prem page's commit waits
     // for its audit events to reach the disk; writing a few lines of JSON is a small part of it.
-    internal sealed class TimedAuditQueue(IAuditQueue queue, DatabaseTimes times) : IAuditQueue
+    internal sealed class TimedAuditQueue(IDurableAuditQueue queue, DatabaseTimes times) : IDurableAuditQueue
     {
         public void Enqueue(IReadOnlyCollection<AuditEvent> auditEvents)
         {
@@ -793,6 +843,9 @@ internal static partial class RenderBenchmark
                     CatalogCode = item.Code,
                     Details = "{}",
                     Status = OrderStatus.Active,
+                    // The seeded patients take medications of their own, some of which interact with what is ordered
+                    // here (step 8): the database then signs the order only with a reason, and drops one it doesn't need.
+                    SafetyOverrideReason = item.Type == OrderType.Medication ? "Synthetic: benchmark order" : null,
                 };
                 db.Add(order);
                 if (stopped.Contains(item))
@@ -874,6 +927,63 @@ internal static partial class RenderBenchmark
 
         await transaction.CommitAsync();
         return resulted;
+    }
+
+    // Step 10: a signed note with three addenda (one sensitive) for each of eight patients added to the panel for it,
+    // through the database's own signing triggers and policies.
+    static async Task<List<(Guid Patient, Guid Note)>> SignNotesAsync(BenchApp app, Guid clinicianId, int patients)
+    {
+        var noted = new List<(Guid, Guid)>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var assignments = scope.ServiceProvider.GetRequiredService<PatientAssignments>();
+        var notes = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.ClinicalNotes>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var step = patients / Math.Min(PanelSize, patients);
+        foreach (var index in Enumerable.Range(0, 8).Select(i => ((i * step) + (step / 2)) % patients).Distinct())
+        {
+            var patient = SyntheticClinic.Chart(index).Patient.Id;
+            await assignments.AssignAsync(patient, CancellationToken.None);
+            var draft = new Ehr.Data.Patients.ClinicalDraft
+            {
+                Id = Guid.CreateVersion7(),
+                PatientId = patient,
+                ClinicianId = clinicianId,
+                Body = "Synthetic note",
+                Version = 1,
+                History = "Synthetic history: cough for two days.",
+                Assessment = "Synthetic assessment: viral illness.",
+                Plan = "Synthetic plan: rest and follow-up.",
+                StructuredVersion = 1,
+            };
+            db.Add(draft);
+            await db.SaveChangesAsync();
+            var note = new Ehr.Data.Patients.ClinicalNote
+            {
+                Id = Guid.CreateVersion7(),
+                DraftId = draft.Id,
+                PatientId = patient,
+                DraftVersion = 1,
+                History = draft.History,
+                Assessment = draft.Assessment,
+                Plan = draft.Plan,
+            };
+            db.Add(note);
+            await db.SaveChangesAsync();
+            foreach (var (text, sensitive) in new[] { ("Synthetic addendum: culture negative.", false), ("Synthetic addendum: seen in follow-up, improving.", false), ("Synthetic sensitive addendum.", true) })
+            {
+                if ((await notes.AddAddendumAsync(patient, note.Id, text, sensitive, CancellationToken.None)).Status != 200)
+                {
+                    throw new InvalidOperationException("The benchmark's addendum was refused.");
+                }
+            }
+
+            noted.Add((patient, note.Id));
+        }
+
+        await transaction.CommitAsync();
+        return noted;
     }
 
     static async Task AcknowledgeResultsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Order)> resulted)
@@ -1112,7 +1222,7 @@ internal static partial class RenderBenchmark
                 {
                     services.AddSingleton(keys);
                     services.AddSingleton(new OnPremApp(OnPremUrl, new HttpMessageInvoker(new LinkDown())));
-                    services.AddSingleton<IAuditQueue>(provider => new TimedAuditQueue(provider.GetRequiredService<CloudAuditQueue>(), times));
+                    services.AddSingleton<IDurableAuditQueue>(provider => new TimedAuditQueue(provider.GetRequiredService<CloudAuditQueue>(), times));
                     services.ConfigureDbContext<EhrDbContext>(options => options.AddInterceptors(times));
                 });
 

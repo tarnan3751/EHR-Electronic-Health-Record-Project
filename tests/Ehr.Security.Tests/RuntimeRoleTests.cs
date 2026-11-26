@@ -75,6 +75,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // The rest of the reference data: read only.
         [("ehr_app", "observation_codes")] = ["SELECT"],
         [("ehr_read", "observation_codes")] = ["SELECT"],
+        [("ehr_app", "vital_reference_ranges")] = ["SELECT"],
+        [("ehr_read", "vital_reference_ranges")] = ["SELECT"],
         [("ehr_app", "order_result_codes")] = ["SELECT"],
         [("ehr_read", "order_result_codes")] = ["SELECT"],
         [("ehr_app", "questionnaires")] = ["SELECT"],
@@ -99,6 +101,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "ai_field_proposals")] = ["SELECT"],
         [("ehr_app", "clinical_notes")] = ["SELECT", "INSERT"],
         [("ehr_read", "clinical_notes")] = ["SELECT"],
+        [("ehr_app", "note_addenda")] = ["SELECT", "INSERT"],
+        [("ehr_read", "note_addenda")] = ["SELECT"],
         [("ehr_app", "clinical_drafts")] = ["SELECT", "INSERT", "UPDATE"],
         // UC 14 adds replica draft reads under the same private-author/active-panel RLS as the primary.
         [("ehr_read", "clinical_drafts")] = ["SELECT"],
@@ -217,7 +221,10 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.clinical_codes")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.conditions")]
     [InlineData("ehr_read", MigratedDatabase.ReadPassword, "INSERT INTO ehr.encounters (id, patient_id, status, class_code, period_start) VALUES (gen_random_uuid(), gen_random_uuid(), 'finished', 'AMB', now())")]
-    [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.observations SET status = 'cancelled'")]
+    // The apps update two columns of an observation, to mark a vital sign entered in error (step 9b), and a trigger
+    // holds that to exactly one change (VitalSignCorrectionSecurityTests). Its value, and every other column, never.
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.observations SET value = 1")]
+    [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.observations SET status = 'cancelled', issued_at = now()")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "UPDATE ehr.audit_events SET reason = 'changed'")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "DELETE FROM ehr.audit_events")]
     [InlineData("ehr_app", MigratedDatabase.AppPassword, "SELECT details FROM ehr.audit_events")]
@@ -273,6 +280,11 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_app", "messages", "UPDATE")] = ["read_at"],
         // FR-19: revoking a proxy grant, and the patient allowing sensitive items.
         [("ehr_app", "proxy_grants", "UPDATE")] = ["include_sensitive", "revoked_at", "revoked_by"],
+        // Step 10b: marking a signed note or addendum sensitive, or unmarking it.
+        [("ehr_app", "clinical_notes", "UPDATE")] = ["sensitive", "sensitive_reason"],
+        [("ehr_app", "note_addenda", "UPDATE")] = ["sensitive", "sensitive_reason"],
+        // Step 9b: marking a vital sign entered in error.
+        [("ehr_app", "observations", "UPDATE")] = ["entered_in_error_reason", "status"],
         // Marking an inbox item done.
         [("ehr_app", "inbox_items", "UPDATE")] = ["done_at"],
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.

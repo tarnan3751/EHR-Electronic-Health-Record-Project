@@ -94,7 +94,7 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         : $" is now {ChartListWords.Status(saved.Table, saved.Status).ToLowerInvariant()}, so it is no longer listed.";
 
     public IReadOnlyList<ClinicalDraft> Drafts { get; private set; } = [];
-    public IReadOnlyList<ClinicalNote> Notes { get; private set; } = [];
+    public IReadOnlyList<SignedNoteEntry> Notes { get; private set; } = [];
 
     // The patient's conversations with their care team (FR-18), latest first.
     public IReadOnlyList<Ehr.Domain.Messaging.ThreadEntry> Threads => Chart.Threads;
@@ -107,11 +107,11 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     public string? EnrollmentCode { get; private set; }
 
     // A visit's vital signs as the chart shows them, or null when they weren't taken.
-    public static string? BloodPressure(Encounter visit) =>
-        visit is { SystolicMmHg: { } systolic, DiastolicMmHg: { } diastolic } ? $"{systolic}/{diastolic} mmHg" : null;
+    public string? BloodPressure(Encounter visit) =>
+        Chart.VisitVitals.GetValueOrDefault(visit.Id) is { Systolic: { } systolic, Diastolic: { } diastolic } ? $"{systolic:0.#}/{diastolic:0.#} mmHg" : null;
 
-    public static string? HeartRate(Encounter visit) =>
-        visit.HeartRatePerMinute is { } rate ? $"{rate}/min" : null;
+    public string? HeartRate(Encounter visit) =>
+        Chart.VisitVitals.GetValueOrDefault(visit.Id)?.HeartRate is { } rate ? $"{rate:0.#}/min" : null;
 
     public async Task<IActionResult> OnGetAsync(Guid id) => await LoadAsync(id) ?? Page();
 
@@ -199,17 +199,14 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         (string, Guid)? saved = Saved is { } entry && SavedList is not null && Lists.EntryModel.Lists.TryGetValue(SavedList, out var list)
             ? (list.Table, entry)
             : null;
-        var chart = await phi.ChartAsync(id, RecentVisits, HttpContext.RequestAborted, Discontinued, Sensitive, saved, Ordered);
+        var chart = await phi.ChartAsync(id, RecentVisits, HttpContext.RequestAborted, Discontinued, Sensitive, saved: saved, ordered: Ordered);
         if (chart is null)
         {
             return NotFound();
         }
 
         Chart = chart;
-        if (chart.HasNotes)
-        {
-            Notes = await phi.NotesAsync(id, HttpContext.RequestAborted);
-        }
+        Notes = chart.Notes;
 
         if (OnPanel && chart.HasDrafts)
         {
