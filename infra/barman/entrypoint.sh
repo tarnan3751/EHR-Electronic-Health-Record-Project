@@ -2,7 +2,9 @@
 # Keeps WAL streaming from the primary and takes a base backup when none exists, then every 23 hours, so the retention
 # policy (onprem.conf) always has newer backups to keep in place of the old ones, which `barman cron` deletes with the
 # WAL before them; and deletes a base backup that failed once it is a day old, since Barman's retention never does and
-# it keeps whatever it had copied. Barman only connects out; nothing in this container listens.
+# it keeps whatever it had copied. After each pass it writes whether `barman check` passes and when the last base backup
+# that succeeded began, for the monitoring profile's node exporter (infra/monitoring/alerts.yml). Barman only connects
+# out; nothing in this container listens.
 set -eu
 
 # Seconds between base backups: 23 hours, so with the 6-day window nothing older than 7 days can be restored
@@ -10,9 +12,12 @@ set -eu
 every=${BARMAN_BACKUP_EVERY:-82800}
 # When the last base backup this loop took began, in seconds since the epoch, kept with the backups.
 last=/var/lib/barman/last-base-backup
+# Barman's state for the node exporter's textfile collector, on a volume of its own that the exporter reads.
+metrics=/var/lib/barman-metrics/barman.prom
 
 if [ "$(id -u)" = 0 ]; then
   install -d -o postgres -g postgres -m 700 /var/lib/barman /var/log/barman
+  install -d -o postgres -g postgres -m 755 /var/lib/barman-metrics
   touch /var/log/barman/barman.log
   chown postgres:postgres /var/log/barman/barman.log
   (umask 077 && printf '*:*:*:barman:%s\n' "$BARMAN_PASSWORD" > "$PGPASSFILE")
@@ -42,5 +47,15 @@ while :; do
       echo "$now" > "$last"
     fi
   fi
+  # Written whole, then renamed, so the exporter never reads half a file; it reads only names ending .prom.
+  if barman check onprem > /dev/null 2>&1; then ok=1; else ok=0; fi
+  {
+    echo "# HELP barman_check_ok 1 when barman check onprem passes, 0 when any of its checks fails."
+    echo "# TYPE barman_check_ok gauge"
+    echo "barman_check_ok $ok"
+    echo "# HELP barman_last_base_backup_start_timestamp_seconds When the last base backup that succeeded began; 0 before the first."
+    echo "# TYPE barman_last_base_backup_start_timestamp_seconds gauge"
+    echo "barman_last_base_backup_start_timestamp_seconds $(cat "$last" 2>/dev/null || echo 0)"
+  } > "$metrics.tmp" && mv "$metrics.tmp" "$metrics"
   sleep 30
 done

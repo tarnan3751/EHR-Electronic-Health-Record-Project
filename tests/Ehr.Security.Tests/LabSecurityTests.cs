@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Ehr.Data.Accounts;
 using Ehr.Testing;
@@ -405,6 +406,54 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         Assert.False(last);
         Assert.Equal(100, first.GetArrayLength());
         Assert.Equal(signed, first.EnumerateArray().Concat(rest.EnumerateArray()).Select(o => o.GetProperty("id").GetGuid()));
+    }
+
+    // Step 21: a session of the on-prem app's role left idle in a transaction that has taken a transaction ID, as its
+    // first write does, holds back the hand-over, which stops short of the oldest transaction still running. The role's
+    // idle limit (db/policies/00-roles.sql) ends that session after a minute, rolling its transaction back, and the lab
+    // is then handed what was held back. This test waits out the real minute; it holds nothing back outside this class,
+    // whose database is its own and whose tests run one at a time.
+    [Fact]
+    public async Task A_session_left_idle_in_a_transaction_is_ended_after_a_minute_and_no_longer_holds_back_the_lab()
+    {
+        var (clinician, patient) = await PanelAsync();
+        var since = await NowAsync();
+
+        await using var idle = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(App) { Pooling = false }.ConnectionString);
+        await idle.OpenAsync(Cancel);
+        var pid = idle.ProcessID;
+        await using var transaction = await idle.BeginTransactionAsync(Cancel);
+        await using (var write = new NpgsqlCommand("SELECT pg_current_xact_id()", idle, transaction))
+        {
+            await write.ExecuteScalarAsync(Cancel);
+        }
+
+        var idleFor = Stopwatch.StartNew();
+
+        // Signed after the idle session's transaction began, so held back: not handed over while it lasts.
+        var order = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, clinician, Order, ("id", order), ("patient", patient), ("type", "lab"), ("code", "SYN-LAB-005"));
+        var (_, _, held) = await HandOverAsync(Key, since);
+        Assert.DoesNotContain(order, held.EnumerateArray().Select(o => o.GetProperty("id").GetGuid()));
+
+        while ((await AsSuperuserAsync("SELECT count(*)::text FROM pg_stat_activity WHERE pid = @pid", ("pid", pid))).Single() != "0"
+            && idleFor.Elapsed < TimeSpan.FromSeconds(90))
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(250), Cancel);
+        }
+
+        // Ended by the server at the minute, not before, and its next command is told why.
+        Assert.InRange(idleFor.Elapsed, TimeSpan.FromSeconds(59), TimeSpan.FromSeconds(90));
+        await using (var next = new NpgsqlCommand("SELECT 1", idle, transaction))
+        {
+            var ended = await Assert.ThrowsAsync<PostgresException>(() => next.ExecuteScalarAsync(Cancel));
+            // idle_in_transaction_session_timeout, which Npgsql's PostgresErrorCodes doesn't name.
+            Assert.Equal("25P03", ended.SqlState);
+        }
+
+        await SettledAsync(patient);
+        var (_, _, handed) = await HandOverAsync(Key, since);
+        Assert.Contains(order, handed.EnumerateArray().Select(o => o.GetProperty("id").GetGuid()));
     }
 
     [Fact]

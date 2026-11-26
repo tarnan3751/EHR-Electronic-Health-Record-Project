@@ -1,0 +1,27 @@
+# Alertmanager on the cloud server (infra/deploy/README.md, "Monitoring"): the local stack's alertmanager.yml
+# (infra/monitoring), sending through an outside mail relay instead of the stack's mail catcher. Copy it to the server,
+# put in the relay's address, the sender and the administrators' addresses, and give the relay's password in a file of
+# its own, owned by the user Alertmanager runs as (nobody, 65534) and readable only by it (mode 600), mounted read-only
+# at the path below. The password is never in this file. CI checks this file with amtool, as written. Untested against
+# a real relay.
+global:
+  smtp_smarthost: smtp.relay.example.com:587
+  smtp_from: swiftchart-alerts@example.com
+  smtp_auth_username: swiftchart-alerts@example.com
+  smtp_auth_password_file: /etc/alertmanager/relay-password
+  smtp_require_tls: true
+
+# One email for each alert and each thing it is about (a site, an exporter), so a second site failing while the first
+# is already alerted is emailed after group_wait, not held for the first one's group_interval.
+route:
+  receiver: administrators
+  group_by: [alertname, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: administrators
+    email_configs:
+      - to: admins@example.com
+        send_resolved: true

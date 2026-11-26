@@ -1,0 +1,60 @@
+# What Prometheus watches in the local stack's monitoring profile (infra/compose/compose.yaml, infra/compose/README.md
+# "Monitoring"), every 15 seconds: the three sites and the clinic as the cloud reaches it (blackbox.yml), the primary's
+# replication slots, and the host's disk with Barman's backup state. alerts.yml says when that is worth an email, and
+# alertmanager.yml where the email goes. Nothing it collects is patient data. infra/deploy/README.md says what changes
+# on real servers.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files: [alerts.yml]
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]
+
+scrape_configs:
+  # Each site's sign-in page, as a browser asks for it. Every page opens a database transaction, so a 200 means the app
+  # and its database both answer. The cloud app serves the off-site staff site and the portal on one address, told
+  # apart here by the name in the TLS handshake, as the internet's browsers send it.
+  - job_name: sites
+    metrics_path: /probe
+    static_configs:
+      - targets: [https://ehr.example.com:8443/sign-in]
+        labels: {site: on-site, module: https_200}
+      - targets: [https://cloud-app:8443/sign-in]
+        labels: {site: off-site, module: https_200_off_site}
+      - targets: [https://cloud-app:8443/portal/sign-in]
+        labels: {site: portal, module: https_200_portal}
+    relabel_configs: &probe
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [module]
+        target_label: __param_module
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  # The on-prem app as the cloud app reaches it, across the WAN link: the path every off-site save and every off-site
+  # read's audit event takes.
+  - job_name: clinic-link
+    metrics_path: /probe
+    static_configs:
+      - targets: [https://onprem.example.com:8443/sign-in]
+        labels: {module: https_200}
+    relabel_configs: *probe
+
+  - job_name: postgres
+    static_configs:
+      - targets: [postgres-exporter:9187]
+        labels: {database: primary}
+
+  - job_name: node
+    static_configs:
+      - targets: [node-exporter:9100]
+
+  - job_name: blackbox
+    static_configs:
+      - targets: [blackbox:9115]
