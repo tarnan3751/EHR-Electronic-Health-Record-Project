@@ -1,6 +1,7 @@
 //! The local database, encrypted with SQLCipher under a key from the OS credential store (key.rs). It holds the
 //! phrases as the server last sent them, the outbox of changes not yet sent, the changes the server refused (for the
-//! person to choose), and the sync watermark. What the app shows is the server's copy with the outbox on top.
+//! person to choose), and the sync watermark. What the app shows is the server's copy with the outbox on top. It also
+//! holds the offline charts, drafts and recordings (the lib crate's modules), and the lock's record (unlock.rs).
 
 use std::fmt;
 use std::path::Path;
@@ -12,7 +13,7 @@ use uuid::Uuid;
 
 use crate::api::{Operation, Outcome, PullResponse, PushResult, QuickText};
 use crate::rules;
-use ehr_desktop::{charts, draft_sync, drafts, recordings};
+use ehr_desktop::{charts, draft_sync, drafts, recordings, unlock};
 
 const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS quick_texts (
@@ -131,7 +132,13 @@ impl Store {
         draft_sync::initialize(&connection)?;
         recordings::initialize(&connection)?;
         charts::initialize(&connection)?;
+        unlock::initialize(&connection)?;
         Ok(Store { connection })
+    }
+
+    /// The lock's record, read or written by `use_it`, one of ehr_desktop::unlock's functions.
+    pub fn unlock<T>(&self, use_it: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Result<T> {
+        Ok(use_it(&self.connection)?)
     }
 
     pub fn replace_panel(&mut self, owner: Uuid, panel: &[charts::Chart]) -> Result<()> {
@@ -142,6 +149,10 @@ impl Store {
 
     pub fn offline_panel(&self, owner: Uuid) -> Result<Vec<charts::ChartSummary>> {
         Ok(charts::panel(&self.connection, owner)?)
+    }
+
+    pub fn charts_updated(&self, owner: Uuid) -> Result<Option<charts::Updated>> {
+        Ok(charts::updated(&self.connection, owner)?)
     }
 
     pub fn offline_chart(
