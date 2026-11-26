@@ -89,33 +89,33 @@ public static partial class DictationApi
         if (await SignInEndsTooSoonAsync(context, ambient: true) is { } tooSoon) return tooSoon;
         var cancel = context.RequestAborted;
         if (!input.Agreed)
-            return ReviewAnswer(context, ReviewResult.Invalid("Confirm that everyone who will speak has agreed, aloud, to the visit being recorded."));
+            return ReviewAnswer(ReviewResult.Invalid("Confirm that everyone who will speak has agreed, aloud, to the visit being recorded."));
         if (input.Speakers is not (2 or 3) || input.GivenBy is not (AmbientConsentGivers.Patient or AmbientConsentGivers.Representative))
-            return ReviewAnswer(context, ReviewResult.Invalid("Say who will speak, and who agreed for the patient."));
+            return ReviewAnswer(ReviewResult.Invalid("Say who will speak, and who agreed for the patient."));
         if (input.SpokenLanguage is { } language && !string.Equals(language, "en", StringComparison.OrdinalIgnoreCase))
-            return ReviewAnswer(context, ReviewResult.Invalid("Listening to a visit works in English only."));
+            return ReviewAnswer(ReviewResult.Invalid("Listening to a visit works in English only."));
         if (input.ReviewId == Guid.Empty || input.PatientId == Guid.Empty || input.DraftId == Guid.Empty)
-            return ReviewAnswer(context, ReviewResult.Invalid("Supply a patient and a review request ID."));
+            return ReviewAnswer(ReviewResult.Invalid("Supply a patient and a review request ID."));
 
         await using (var transaction = await db.Database.BeginTransactionAsync(cancel))
         {
-            if (!await phi.IsAssignedAsync(input.PatientId, cancel)) return ReviewAnswer(context, ReviewResult.Missing);
+            if (!await phi.IsAssignedAsync(input.PatientId, cancel)) return ReviewAnswer(ReviewResult.Missing);
             if (await phi.AiReviewAsync(input.ReviewId, cancel) is { } existing)
             {
                 await transaction.CommitAsync(cancel);
                 await ReportReviewWalAsync(context, db);
                 return existing.PatientId == input.PatientId && existing.Mode == AiReviewModes.Ambient
                     && (input.DraftId is null || input.DraftId == existing.DraftId)
-                    ? BoundSession(context, existing) : ReviewAnswer(context, ReviewResult.Missing);
+                    ? BoundSession(existing) : ReviewAnswer(ReviewResult.Missing);
             }
             if (input.DraftId is { } draftId)
             {
                 var draft = await phi.ReadDraftAsync(draftId, input.PatientId, cancel, tracking: false);
-                if (draft is null) { await transaction.CommitAsync(cancel); return ReviewAnswer(context, ReviewResult.Missing); }
+                if (draft is null) { await transaction.CommitAsync(cancel); return ReviewAnswer(ReviewResult.Missing); }
                 if (await phi.SignedDraftAsync(draftId, input.PatientId, cancel) is not null)
-                { await transaction.CommitAsync(cancel); return ReviewAnswer(context, ReviewResult.Signed); }
+                { await transaction.CommitAsync(cancel); return ReviewAnswer(ReviewResult.Signed); }
                 if (draft.Version != input.Version)
-                { await transaction.CommitAsync(cancel); return ReviewAnswer(context, ReviewResult.Conflict(draft.Version)); }
+                { await transaction.CommitAsync(cancel); return ReviewAnswer(ReviewResult.Conflict(draft.Version)); }
             }
             await transaction.CommitAsync(cancel);
         }
@@ -150,7 +150,7 @@ public static partial class DictationApi
                         await transaction.CommitAsync(CancellationToken.None);
                         begun = result.Status == StatusCodes.Status201Created;
                         await ReportReviewWalAsync(context, db);
-                        return result.Review is { } review ? BoundSession(context, review) : ReviewAnswer(context, result);
+                        return result.Review is { } review ? BoundSession(review) : ReviewAnswer(result);
                     });
                 }
                 finally

@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // as patients come: the link arrives by email, works once, and the old password is over.
 public partial class PortalPasswordResetTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_patient_resets_a_forgotten_password_through_the_emailed_link()
     {

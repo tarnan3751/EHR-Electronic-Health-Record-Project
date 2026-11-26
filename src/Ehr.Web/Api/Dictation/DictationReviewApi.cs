@@ -36,10 +36,10 @@ public static partial class DictationApi
         if (await SignInEndsTooSoonAsync(context, ambient: false) is { } tooSoon) return tooSoon;
         var cancel = context.RequestAborted;
         if (input.ReviewId == Guid.Empty || input.PatientId == Guid.Empty || input.DraftId == Guid.Empty)
-            return ReviewAnswer(context, ReviewResult.Invalid("Supply a patient and a review request ID."));
+            return ReviewAnswer(ReviewResult.Invalid("Supply a patient and a review request ID."));
         await using (var transaction = await db.Database.BeginTransactionAsync(cancel))
         {
-            if (!await phi.IsAssignedAsync(input.PatientId, cancel)) return ReviewAnswer(context, ReviewResult.Missing);
+            if (!await phi.IsAssignedAsync(input.PatientId, cancel)) return ReviewAnswer(ReviewResult.Missing);
             if (await phi.AiReviewAsync(input.ReviewId, cancel) is { } existing)
             {
                 await transaction.CommitAsync(cancel);
@@ -47,16 +47,16 @@ public static partial class DictationApi
                 // A visit's binding (step 16) is never handed to a dictation, as AmbientApi's start never hands one a dictation's.
                 return existing.PatientId == input.PatientId && existing.Mode == AiReviewModes.Dictation
                     && (input.DraftId is null || input.DraftId == existing.DraftId)
-                    ? BoundSession(context, existing) : ReviewAnswer(context, ReviewResult.Missing);
+                    ? BoundSession(existing) : ReviewAnswer(ReviewResult.Missing);
             }
             if (input.DraftId is { } draftId)
             {
                 var draft = await phi.ReadDraftAsync(draftId, input.PatientId, cancel, tracking: false);
-                if (draft is null) { await transaction.CommitAsync(cancel); return ReviewAnswer(context, ReviewResult.Missing); }
+                if (draft is null) { await transaction.CommitAsync(cancel); return ReviewAnswer(ReviewResult.Missing); }
                 if (await phi.SignedDraftAsync(draftId, input.PatientId, cancel) is not null)
-                { await transaction.CommitAsync(cancel); return ReviewAnswer(context, ReviewResult.Signed); }
+                { await transaction.CommitAsync(cancel); return ReviewAnswer(ReviewResult.Signed); }
                 if (draft.Version != input.Version)
-                { await transaction.CommitAsync(cancel); return ReviewAnswer(context, ReviewResult.Conflict(draft.Version)); }
+                { await transaction.CommitAsync(cancel); return ReviewAnswer(ReviewResult.Conflict(draft.Version)); }
             }
             await transaction.CommitAsync(cancel);
         }
@@ -74,7 +74,7 @@ public static partial class DictationApi
                         session.SessionId, session.MaxSeconds, Math.Min(session.MaxChunkBytes, MaxChunkBytes), token);
                     await transaction.CommitAsync(CancellationToken.None);
                     await ReportReviewWalAsync(context, db);
-                    return result.Review is { } review ? BoundSession(context, review) : ReviewAnswer(context, result);
+                    return result.Review is { } review ? BoundSession(review) : ReviewAnswer(result);
                 });
             });
     }
@@ -90,13 +90,13 @@ public static partial class DictationApi
             binding = await phi.AiReviewAsync(reviewId, context.RequestAborted);
             await transaction.CommitAsync(context.RequestAborted);
         }
-        if (binding is null) return ReviewAnswer(context, ReviewResult.Missing);
+        if (binding is null) return ReviewAnswer(ReviewResult.Missing);
         if (binding.State is AiReviewStates.Pending or AiReviewStates.Completed)
         {
             await ReportReviewWalAsync(context, db);
-            return ReviewAnswer(context, new(200, [], binding));
+            return ReviewAnswer(new(200, [], binding));
         }
-        if (binding.State != AiReviewStates.Recording) return ReviewAnswer(context, ReviewResult.Invalid("This dictation was discarded."));
+        if (binding.State != AiReviewStates.Recording) return ReviewAnswer(ReviewResult.Invalid("This dictation was discarded."));
 
         // The session is read from the persisted binding, and the owner header from the current account. A recorded visit's
         // (step 16) is asked for as one, and discarded at the service once staged: its result isn't needed there any more.
@@ -121,7 +121,7 @@ public static partial class DictationApi
                     await transaction.CommitAsync(CancellationToken.None);
                     staged = outcome.Status == StatusCodes.Status200OK;
                     await ReportReviewWalAsync(context, db);
-                    return ReviewAnswer(context, outcome);
+                    return ReviewAnswer(outcome);
                 });
                 if (staged && ambient)
                 {
@@ -142,7 +142,7 @@ public static partial class DictationApi
             var result = await reviews.DiscardAsync(reviewId, context.RequestAborted);
             await transaction.CommitAsync(CancellationToken.None);
             await ReportReviewWalAsync(context, db);
-            return ReviewAnswer(context, result);
+            return ReviewAnswer(result);
         });
     }
 
@@ -150,7 +150,7 @@ public static partial class DictationApi
         context.Response.Headers[DatabaseTransactionFilter.WalPositionHeader] =
             await WalPosition.OfPrimaryAsync(db, CancellationToken.None);
 
-    static IResult BoundSession(HttpContext context, AiNoteReview review) => Results.Json(new
+    static IResult BoundSession(AiNoteReview review) => Results.Json(new
     {
         review.SessionId,
         review.MaxSeconds,
@@ -163,7 +163,7 @@ public static partial class DictationApi
         editorUrl = EditorUrl(review),
     }, statusCode: 201);
 
-    static IResult ReviewAnswer(HttpContext context, ReviewResult result) => Results.Json(new
+    static IResult ReviewAnswer(ReviewResult result) => Results.Json(new
     {
         result.Errors,
         result.Version,
