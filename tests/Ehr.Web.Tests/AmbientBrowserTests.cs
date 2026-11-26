@@ -347,6 +347,61 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
     }
 
+    // TC-UC23-01 in the browser: Stop pressed while a chunk is on its way, its answer arriving before the recorder hands
+    // over its last chunk (a recorder does so after stop() returns: held here until the answer is in). The visit is
+    // stopped only once that last chunk has been sent, and its voices are shown. Before (found through step 19.2's CI, as
+    // the cause of the limit test's flakiness), the page took the recorder's "inactive" state for the end of the
+    // recording: it asked the service to stop on that answer, the last chunk was then refused as too late, and the page
+    // discarded the visit, saying "This visit's recording has already been stopped."
+    [Fact]
+    public async Task TC_UC23_01_stop_with_a_chunk_on_its_way_sends_the_last_chunk_before_the_visit_is_stopped()
+    {
+        var (patient, session) = await AccountAsync(apps);
+        await using var server = await ClinicalBrowserHost.StartAsync(apps);
+        using var playwright = await Playwright.CreateAsync();
+        var (page, browser) = await ListenAsync(patient, session, server, playwright);
+        await using var _ = browser;
+        var holdNext = 0;
+        var held = new TaskCompletionSource();
+        var answer = new TaskCompletionSource();
+        await page.RouteAsync(url => url.Contains("/audio?seq=", StringComparison.Ordinal), async route =>
+        {
+            if (Interlocked.Exchange(ref holdNext, 0) == 1)
+            {
+                held.TrySetResult();
+                await answer.Task;
+            }
+
+            await route.ContinueAsync();
+        });
+        await ConsentAsync(page);
+        await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
+
+        // The next chunk's upload held on its way, Stop pressed meanwhile, and the recorder's last chunk held too.
+        Interlocked.Exchange(ref holdNext, 1);
+        await held.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        await page.EvaluateAsync("window.__ambient.hold = true");
+        await page.FocusAsync("[data-ambient-stop]");
+        await page.Keyboard.PressAsync("Enter");
+        await page.WaitForFunctionAsync("window.__ambient.held.length === 1");
+        answer.SetResult();
+        await page.WaitForFunctionAsync("window.__ambient.uploading === 0");
+        await page.WaitForTimeoutAsync(300);
+        var answered = (await EventsAsync(page)).Count(e => e.Contains("/audio ", StringComparison.Ordinal));
+
+        await page.EvaluateAsync("window.__ambient.release()");
+        await page.WaitForFunctionAsync($"window.__ambient.events.filter(e => e.includes('/audio ')).length > {answered}");
+
+        Assert.EndsWith(" 200", (await EventsAsync(page)).Last(e => e.Contains("/audio ", StringComparison.Ordinal)));
+        await page.WaitForSelectorAsync("[data-ambient-voice='2']");
+        Assert.DoesNotContain("already been stopped", await page.TextContentAsync("[data-ambient-status]"));
+        var events = await EventsAsync(page);
+        Assert.True(
+            Array.FindLastIndex(events, e => e.Contains("/audio ", StringComparison.Ordinal))
+                < Array.FindIndex(events, e => e.StartsWith("sent POST", StringComparison.Ordinal) && e.EndsWith("/stop", StringComparison.Ordinal)),
+            "The visit was stopped before its last chunk was sent.");
+    }
+
     // TC-UC23-06 in the browser: three voices told apart under a consent for the patient and the clinician. The third can
     // only be "I can't tell", as the page says, and from the keyboard: typing a choice's first letter, Tab between. Its
     // words are shown as "Unsure" in the review, and the order it said is listed as said where who spoke couldn't be told.
