@@ -8,6 +8,9 @@
 //! carries on. It opens with the password, checked by the server when one answers and otherwise against the hash in
 //! the store (ehr_desktop::unlock); after the 12 hours, with a full sign-in, or the password alone while no server can
 //! complete one; after the server ended the session, with a full sign-in only.
+//!
+//! When a server the sign-in was made with says an administrator revoked it, the app deletes everything it keeps on
+//! this computer (the expansion plan's step 20, wipe.rs), says so, and refuses everything else until it's quit.
 
 // Release builds on Windows open no console window alongside the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -17,6 +20,7 @@ mod key;
 mod rules;
 mod store;
 mod sync;
+mod wipe;
 
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -47,6 +51,11 @@ struct App {
     lock: Mutex<Lock>,
     /// Why the kept sign-in was forgotten at start, for the sign-in form; none once someone signs in.
     notice: Mutex<Option<&'static str>>,
+    /// The local database's file; none on Linux, which keeps it in memory.
+    database: Option<PathBuf>,
+    /// Once an administrator revoked the sign-in: whether everything here was deleted, or what couldn't be. From then
+    /// on the app refuses everything, and says so.
+    deleted: Mutex<Option<Result<(), String>>>,
 }
 
 /// Said when the app starts with servers other than the ones the kept sign-in was made with (step 19a's final review).
@@ -58,6 +67,9 @@ const LOCKED: &str = "Locked: unlock the window to see the offline charts.";
 
 impl App {
     fn store(&self) -> Result<MutexGuard<'_, Store>, String> {
+        if self.deleted().is_some() {
+            return Err(DELETED.to_owned());
+        }
         self.store
             .as_ref()
             .map(store::lock)
@@ -66,6 +78,13 @@ impl App {
 
     fn sync(&self) -> Result<&sync::Sync, String> {
         self.sync.as_ref().map_err(Clone::clone)
+    }
+
+    fn deleted(&self) -> Option<Result<(), String>> {
+        self.deleted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     fn status(&self) -> MutexGuard<'_, Status> {
@@ -128,30 +147,69 @@ impl App {
     }
 
     /// The server ended the sign-in's 12 hours, or the session: kept in the lock's record, so a restart knows, and told
-    /// to the lock. A record that can't be written changes nothing the session doesn't: with it over, nothing opens.
-    fn ending(&self, ending: sync::Ending) {
+    /// to the lock. A record that can't be written changes nothing the session doesn't: with it over, nothing opens. Or
+    /// an administrator revoked the sign-in: everything here is deleted.
+    fn ending(&self, ending: sync::Ending, handle: &AppHandle) {
+        let record = match ending {
+            sync::Ending::SignIn => unlock::sign_in_ended,
+            sync::Ending::Session => unlock::session_over,
+            sync::Ending::Revoked => return self.revoked(handle),
+        };
         if let Ok(store) = self.store() {
-            let _ = store.unlock(match ending {
-                sync::Ending::SignIn => unlock::sign_in_ended,
-                sync::Ending::Session => unlock::session_over,
-            });
+            let _ = store.unlock(record);
         }
         let mut lock = self.lock();
         match ending {
             sync::Ending::SignIn => lock.server_ended_sign_in(),
-            sync::Ending::Session => lock.server_ended_session(),
+            _ => lock.server_ended_session(),
         }
     }
 
-    fn take_ending(&self) {
+    fn take_ending(&self, handle: &AppHandle) {
         if let Some(ending) = self.sync().ok().and_then(sync::Sync::take_ending) {
-            self.ending(ending);
+            self.ending(ending, handle);
         }
+    }
+
+    /// The remote wipe (wipe.rs), only for a sign-in made with the servers that said so. The app was started with them,
+    /// so they always are (starting_lock forgets a sign-in made with others before anything is sent): this checks it
+    /// again where it matters, and otherwise treats the answer as the session's end, deleting nothing.
+    fn revoked(&self, handle: &AppHandle) {
+        let record = self
+            .store()
+            .ok()
+            .and_then(|store| store.unlock(unlock::account).ok().flatten());
+        let servers = self.sync().map(sync::Sync::servers).unwrap_or_default();
+        if !wipe_allowed(record.as_ref(), servers) {
+            if let Ok(sync) = self.sync() {
+                let _ = sync.forget_kept();
+            }
+            self.lock().server_ended_session();
+            return;
+        }
+        // From here on the app refuses everything (store()), whatever becomes of the rest.
+        *self.deleted.lock().unwrap_or_else(PoisonError::into_inner) = Some(Ok(()));
+        let deleted = key::key_entry().and_then(|key| {
+            let mut store = self.store.as_ref().ok().map(store::lock);
+            wipe::delete(store.as_deref_mut(), self.database.as_deref(), &key)
+        });
+        if deleted.is_ok() {
+            if let Some(window) = handle.get_webview_window("main") {
+                let _ = window.clear_all_browsing_data();
+                let _ = window.reload();
+            }
+            if let Ok(sync) = self.sync() {
+                let _ = sync.forget_kept();
+            }
+        }
+        self.lock().signed_out(Moment::now());
+        *self.deleted.lock().unwrap_or_else(PoisonError::into_inner) = Some(deleted);
+        let _ = handle.emit("changed", ());
     }
 }
 
 /// The lock, for the page (frontend/app.js).
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct LockView {
     /// "signedOut" (nothing to lock), "unlocked", "warning" or "locked".
@@ -190,7 +248,7 @@ struct Status {
     checked_at: Option<u64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct View {
     phrases: Vec<Phrase>,
@@ -207,10 +265,21 @@ struct View {
     signed_out_because: Option<&'static str>,
     /// The servers a sign-in goes to, in order, which the sign-in form names.
     servers: Vec<String>,
+    /// An administrator revoked the sign-in, and everything here was deleted: the page shows only that.
+    deleted: bool,
+    /// What couldn't be deleted, when something couldn't: quitting and starting again finishes it.
+    deleted_problem: Option<String>,
 }
 
 #[tauri::command]
 fn view(app: State<'_, App>) -> Result<View, String> {
+    if let Some(deleted) = app.deleted() {
+        return Ok(View {
+            deleted: true,
+            deleted_problem: deleted.err(),
+            ..View::default()
+        });
+    }
     let lock = app.lock_view();
     let store = app.store()?;
     Ok(View {
@@ -220,6 +289,8 @@ fn view(app: State<'_, App>) -> Result<View, String> {
             .sync()
             .map(|sync| sync.servers().to_vec())
             .unwrap_or_default(),
+        deleted: false,
+        deleted_problem: None,
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
@@ -247,11 +318,11 @@ struct OfflineChart {
 }
 
 #[tauri::command]
-async fn download_panel(app: State<'_, App>) -> Result<(), String> {
+async fn download_panel(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
     app.unlocked()?;
     let sync = app.sync()?;
     let downloaded = sync.download_panel().await;
-    app.take_ending();
+    app.take_ending(&handle);
     let (token, panel) = downloaded?;
     let mut store = app.store()?;
     sync.with_clinician(Some(&token), |owner| {
@@ -467,7 +538,12 @@ fn lock_now(app: State<'_, App>) -> LockView {
 /// can does this computer, against its hash; a server's no stands. For a full sign-in, the same: the password alone
 /// opens it past the 12 hours only when no server can complete a sign-in; after the server ended the session, never.
 #[tauri::command]
-async fn unlock(app: State<'_, App>, password: String, code: String) -> Result<LockView, String> {
+async fn unlock(
+    app: State<'_, App>,
+    handle: AppHandle,
+    password: String,
+    code: String,
+) -> Result<LockView, String> {
     let Some(need) = app.lock().need() else {
         return Ok(app.lock_view());
     };
@@ -500,7 +576,7 @@ async fn unlock(app: State<'_, App>, password: String, code: String) -> Result<L
         Next::CheckHere => open_here(&app, password).await?,
         Next::Refused(problem) => return Err(problem),
         Next::Ended(ending, problem) => {
-            app.ending(ending);
+            app.ending(ending, &handle);
             return Err(problem);
         }
     }
@@ -531,6 +607,7 @@ fn after_unlock(answer: sync::Unlock) -> Next {
                 .to_owned(),
         ),
         sync::Unlock::SessionOver => Next::Ended(sync::Ending::Session, SESSION_OVER.to_owned()),
+        sync::Unlock::Revoked => Next::Ended(sync::Ending::Revoked, DELETED.to_owned()),
         sync::Unlock::Unreachable => Next::CheckHere,
     }
 }
@@ -595,6 +672,21 @@ async fn open_here(app: &App, password: String) -> Result<(), String> {
         _ => "Wrong password. The clinic's server can't be reached, so this computer checked it."
             .to_owned(),
     })
+}
+
+/// What every command answers once an administrator revoked the sign-in and the app deleted what it kept here.
+const DELETED: &str = "Deleted: an administrator revoked this computer's sign-in. Quit SwiftChart.";
+
+/// Whether the remote wipe's marker may delete what's kept here: only for a sign-in whose lock's record says it was made
+/// with the servers the app has, which are the ones that answered (adjustment c of the step's plan review).
+fn wipe_allowed(record: Option<&unlock::Account>, servers: &[String]) -> bool {
+    record.is_some_and(|record| record.servers == servers)
+}
+
+/// Ends the app, from the page that says everything here was deleted.
+#[tauri::command]
+fn quit(handle: AppHandle) {
+    handle.exit(0);
 }
 
 const TOO_MANY: &str = "Too many wrong passwords: only a sign-in with your password and the code from your \
@@ -748,7 +840,11 @@ async fn sync_in_background(handle: AppHandle) {
     loop {
         let report = client.round(store).await;
         // Before the page hears of the round: a session the server ended locks the window, rather than clear it.
-        app.take_ending();
+        app.take_ending(&handle);
+        if app.deleted().is_some() {
+            // Wiped: nothing more is sent, or kept.
+            return;
+        }
         let _ = handle.emit("lock", app.lock_view());
         {
             let mut status = app.status();
@@ -769,15 +865,15 @@ async fn sync_in_background(handle: AppHandle) {
     }
 }
 
-/// Opens the encrypted database without replacing it if the key is missing or invalid.
-fn open_store(app: &tauri::App) -> Result<Store, String> {
-    let path = database_path(app)?;
+/// Opens the encrypted database at `path` without replacing it if the key is missing or invalid.
+fn open_store(path: &Result<PathBuf, String>) -> Result<Store, String> {
+    let path = path.as_ref().map_err(Clone::clone)?;
     let exists = path != std::path::Path::new(":memory:")
         && path
             .try_exists()
             .map_err(|error| format!("{}: {error}", path.display()))?;
     let key = key::load(exists)?;
-    Store::open(&path, &key).map_err(Into::into)
+    Store::open(path, &key).map_err(Into::into)
 }
 
 /// In the app's data folder on macOS and Windows. Linux is for development only, and keeps its key in memory
@@ -799,7 +895,8 @@ fn database_path(app: &tauri::App) -> Result<PathBuf, String> {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let store = open_store(app).map(Mutex::new);
+            let database = database_path(app);
+            let store = open_store(&database).map(Mutex::new);
             // After open_store, which chose the credential store that keeps the session.
             let sync = key::session_entry().and_then(sync::Sync::from_environment);
             let (lock, notice) = starting_lock(&store, &sync);
@@ -810,6 +907,10 @@ fn main() {
                 wake: Notify::new(),
                 lock: Mutex::new(lock),
                 notice: Mutex::new(notice),
+                database: database
+                    .ok()
+                    .filter(|path| path != std::path::Path::new(":memory:")),
+                deleted: Mutex::new(None),
             });
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
             tauri::async_runtime::spawn(lock_in_background(app.handle().clone()));
@@ -835,6 +936,7 @@ fn main() {
             recording,
             lock_now,
             unlock,
+            quit,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");
@@ -948,6 +1050,26 @@ mod tests {
         );
         assert_eq!(notice, None);
         assert_eq!(sync.unwrap().account().as_deref(), Some("Dr. Example"));
+    }
+
+    /// TC-UC7-12 (proposed FR-69): the remote wipe's marker deletes what's kept here only for a sign-in made with the
+    /// servers the app has, which answered; a sign-in with no lock's record, or made with others, is never wiped.
+    #[test]
+    fn only_the_servers_the_sign_in_was_made_with_can_wipe_it() {
+        let (store, _) = kept_sign_in(vec![SIGNED_IN_WITH.to_owned()]);
+        let record = store::lock(&store.unwrap())
+            .unlock(unlock::account)
+            .unwrap();
+        let theirs = [SIGNED_IN_WITH.to_owned()];
+        let others = ["https://someone-else.example.net".to_owned()];
+
+        assert!(wipe_allowed(record.as_ref(), &theirs));
+        assert!(!wipe_allowed(record.as_ref(), &others));
+        assert!(!wipe_allowed(None, &theirs));
+        assert_eq!(
+            after_unlock(sync::Unlock::Revoked),
+            Next::Ended(sync::Ending::Revoked, DELETED.to_owned())
+        );
     }
 
     /// TC-UC7-10 (proposed FR-68), the lock's choice: the password is checked on this computer only when no server

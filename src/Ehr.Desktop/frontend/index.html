@@ -167,6 +167,23 @@
     </form>
   </div>
 
+  <!-- Everything SwiftChart kept on this computer was deleted, after an administrator revoked its sign-in (the expansion
+       plan's step 20; src-tauri/src/wipe.rs). The page was loaded again, so nothing it showed is kept; this fills the
+       window as the lock does, and its words are set by app.js. -->
+  <div id="deleted" class="desktop-lock" role="dialog" aria-modal="true" aria-labelledby="deleted-title" hidden>
+    <div class="sc-form desktop-lock__form">
+      <p class="sc-brandmark">
+        <img class="sc-art--color" src="img/swiftchart-mark.svg" alt="SwiftChart" width="56" height="48">
+        <img class="sc-art--reversed" src="img/swiftchart-mark-reversed.svg" alt="SwiftChart" width="56" height="48">
+      </p>
+      <h1 id="deleted-title">Deleted</h1>
+      <p id="deleted-text" class="sc-notice sc-notice--warning"></p>
+      <div class="sc-actions">
+        <button type="button" id="quit" class="sc-btn sc-btn--primary">Quit SwiftChart</button>
+      </div>
+    </div>
+  </div>
+
   <!-- The warning 2 minutes before the window locks: the web's session warning (docs/brand: Dialog), in words for a
        lock, which keeps everything and isn't a sign-out. Escape stays, as on the web. -->
   <dialog id="lock-warning" class="sc-dialog" role="alertdialog" aria-labelledby="lock-warning-title" aria-describedby="lock-warning-text">

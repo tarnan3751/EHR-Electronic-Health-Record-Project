@@ -41,6 +41,11 @@ pub fn load(database_exists: bool) -> Result<[u8; 32], String> {
     }
 }
 
+/// The entry that keeps the local database's key, in the store load() chose, for the remote wipe to delete (wipe.rs).
+pub fn key_entry() -> Result<Entry, String> {
+    Entry::new(SERVICE, USER).map_err(|error| format!("credential store: {error}"))
+}
+
 /// The entry that keeps the session, in the store load() chose.
 pub fn session_entry() -> Result<Entry, String> {
     Entry::new(SERVICE, SESSION_USER).map_err(|error| format!("credential store: {error}"))
@@ -58,7 +63,8 @@ pub fn save_session(entry: &Entry, session: &Session) -> Result<(), String> {
         .map_err(|error| format!("credential store: {error}"))
 }
 
-pub fn forget_session(entry: &Entry) -> Result<(), String> {
+/// Deletes the entry: the session at sign-out, or the key at the remote wipe. One that isn't there is deleted already.
+pub fn delete(entry: &Entry) -> Result<(), String> {
     match entry.delete_credential() {
         Ok(()) | Err(Error::NoEntry) => Ok(()),
         Err(error) => Err(format!("credential store: {error}")),

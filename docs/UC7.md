@@ -124,6 +124,35 @@ copy older than it would have, so the offline charts now say how old they are: "
 recorded with each download, by this computer's clock, in the encrypted store (`charts.rs`); charts downloaded by an
 earlier build say that when isn't recorded, until they are downloaded again.
 
+## The remote wipe (the plan's step 20)
+
+When an administrator revokes a clinician's desktop sign-ins (`docs/UC11.md`), every server refuses their tokens
+saying so (`Ehr-Sign-In: revoked`, `docs/UC8.md`), and the next time the app on each of their computers reaches a
+server, by its sync every 10 seconds, a chart download or the lock's check of the password, it deletes everything it
+keeps there (`src-tauri/src/wipe.rs`, proposed FR-69). Nothing else leads to it: a plain 401, the 12-hour answer and any
+other refusal keep what the computer holds, as before. And only for a sign-in whose lock's record says it was made with
+the servers that answered, which the app was started with: a release build has those built in (step 20), and a sign-in
+made with others is forgotten at start before anything is sent (step 19a).
+
+In this order, so that a crash at any point leaves nothing readable and the next start, told again, finishes it:
+
+1. The encrypted database, closed first, since Windows can't delete an open file, and SQLite's files beside it: the
+   offline charts, drafts and recordings, phrases and changes not sent, and the lock's record with its hash of the
+   password.
+2. Its key, in the Keychain or Credential Manager. Until then the database was unreadable without it; after, there is
+   nothing left to read.
+3. The web view's own data (the page keeps nothing there, but it's cleared all the same), and the page itself, loaded
+   again, so nothing it showed or had typed in it stays in memory.
+4. The kept sign-in, last: until then a start after a crash presents it again and is told again.
+
+The window then shows only: "Deleted: an administrator revoked this computer's sign-in, so SwiftChart deleted
+everything it kept here: the offline charts, drafts and recordings not yet sent, and its key. Quit SwiftChart; when it
+starts again it is empty, and you can sign in.", with **Quit SwiftChart**; every command is refused. If something
+couldn't be deleted, it says "Not finished:" and what, and starting again finishes it. Drafts and recordings not yet
+sent are lost, by design: the administrator is told before revoking. One way past it: a clinician who signs in again
+with the password and the code before the app's first round reaches a server replaces the revoked sign-in, so nothing
+is deleted; only the account's owner can, and for someone leaving the administrator disables the account too.
+
 ## Test cases
 
 - **TC-UC7-07** (`tests/Ehr.Web.Tests/TestCases/UC7/TC_UC7_07_DesktopUnlock.cs`): the right password unlocks, on the
@@ -152,5 +181,11 @@ earlier build say that when isn't recorded, until they are downloaded again.
   with, it starts locked for the password with the sign-in kept; a release build refuses a plain-HTTP server.
 - **TC-UC7-11** (`src-tauri/src/unlock.rs`): the hash takes under a second, and CI's macOS and Windows runners print how
   long.
+- **TC-UC7-12** (`src-tauri/src/sync.rs`, `wipe.rs`, `main.rs`): only the remote wipe's marker leads to the wipe: a
+  round answered with it keeps the session to be deleted last, says so and sends nothing more, as a chart download and
+  the lock's check do; beside it a plain 401 forgets the session, the 12-hour marker keeps it, and a 426 is a problem
+  like any other; the wipe deletes the database's files after closing it, then its key, and a second run finds nothing
+  and is fine; and it runs only for a sign-in whose lock's record names the servers the app has, never with no record
+  or other servers.
 - **The download's time** (`charts.rs`, `a_download_records_when_it_was_made`): a download records when it was made and
   the clinic's time zone, for that clinician only, and the next one moves it on.

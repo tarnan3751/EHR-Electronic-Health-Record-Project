@@ -136,6 +136,14 @@ impl Store {
         Ok(Store { connection })
     }
 
+    /// Closes the database's file, for the remote wipe (wipe.rs), which can't delete it while it's open on Windows. What
+    /// is left is an empty database in memory, which nothing reads: once wiped, the app refuses everything (main.rs).
+    pub fn close(&mut self) -> Result<()> {
+        let file = std::mem::replace(&mut self.connection, Connection::open_in_memory()?);
+        file.close().map_err(|(_, error)| error)?;
+        Ok(())
+    }
+
     /// The lock's record, read or written by `use_it`, one of ehr_desktop::unlock's functions.
     pub fn unlock<T>(&self, use_it: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Result<T> {
         Ok(use_it(&self.connection)?)

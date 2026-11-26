@@ -9,7 +9,9 @@
 //! outlasts the app. Every sync request carries its token: signed out, a round sends nothing, and a server that
 //! refuses the token (401) ends the session here too, unless it says the sign-in's 12 hours are over ("Ehr-Sign-In:
 //! ended", the expansion plan's step 19a): then the session and its offline copy are kept, and nothing more is sent
-//! until a full sign-in. Either way main.rs hears of it (take_ending) and locks the window. So is the lock's check of
+//! until a full sign-in. Either way main.rs hears of it (take_ending) and locks the window. A 401 that says an
+//! administrator revoked the sign-in ("Ehr-Sign-In: revoked", step 20) keeps the session too, and main.rs deletes
+//! everything the app keeps here, the session last (wipe.rs): nothing else ever leads there. So is the lock's check of
 //! the password at the server (unlock), and the lock's full sign-in (sign_in_answer), which say when no server could
 //! answer, so the lock can check the password on this computer instead.
 
@@ -41,7 +43,8 @@ const PATH: &str = "/api/sync/quick-texts";
 const SIGN_IN: &str = "/api/desktop/sign-in";
 const SIGN_OUT: &str = "/api/desktop/sign-out";
 const UNLOCK: &str = "/api/desktop/unlock";
-/// On a 401, says the token was refused only because the sign-in's 12 hours are over (DesktopTokenHandler.cs).
+/// On a 401, says the token was refused only because the sign-in's 12 hours are over ("ended"), or because an
+/// administrator revoked it ("revoked") (DesktopTokenHandler.cs).
 const SIGN_IN_HEADER: &str = "ehr-sign-in";
 /// How long the lock waits for a server to check the password before it checks it here.
 const UNLOCK_WAIT: Duration = Duration::from_secs(5);
@@ -67,6 +70,9 @@ pub enum Ending {
     SignIn,
     /// The session is over, and forgotten here.
     Session,
+    /// An administrator revoked the sign-in: everything the app keeps here is to be deleted (main.rs). The session is
+    /// kept until then, so a start after a crash halfway is told again.
+    Revoked,
 }
 
 /// What the server said of the lock's password.
@@ -79,6 +85,8 @@ pub enum Unlock {
     SignInEnded,
     /// The session is over.
     SessionOver,
+    /// An administrator revoked the sign-in.
+    Revoked,
     /// No server could check it.
     Unreachable,
 }
@@ -117,6 +125,8 @@ enum Failure {
     SessionEnded,
     /// The server refused the token (401) only because the sign-in's 12 hours are over.
     SignInEnded,
+    /// The server refused the token (401) because an administrator revoked it.
+    Revoked,
     /// The server answered, but not with what the round needed.
     Problem(String),
 }
@@ -237,6 +247,10 @@ impl Sync {
             })
             .await?;
         if response.status() == StatusCode::UNAUTHORIZED {
+            if revoked(&response) {
+                self.ended(Ending::Revoked);
+                return Err(REVOKED.to_owned());
+            }
             if sign_in_ended(&response) {
                 self.ended(Ending::SignIn);
                 return Err(
@@ -335,6 +349,10 @@ impl Sync {
                 return Unlock::Unlocked;
             }
             if status == StatusCode::UNAUTHORIZED {
+                if revoked(&response) {
+                    self.ended(Ending::Revoked);
+                    return Unlock::Revoked;
+                }
                 if sign_in_ended(&response) {
                     self.ended(Ending::SignIn);
                     return Unlock::SignInEnded;
@@ -400,6 +418,14 @@ impl Sync {
                     return Report {
                         server: Some(server.clone()),
                         problem: Some("The session ended: sign in again to sync.".to_owned()),
+                    };
+                }
+                Err(Failure::Revoked) => {
+                    // The session stays until everything else here is deleted (main.rs, wipe.rs).
+                    self.ended(Ending::Revoked);
+                    return Report {
+                        server: Some(server.clone()),
+                        problem: Some(REVOKED.to_owned()),
                     };
                 }
                 Err(Failure::SignInEnded) => {
@@ -787,7 +813,7 @@ impl Sync {
             return Ok(());
         }
         *current = None;
-        key::forget_session(&self.saved)
+        key::delete(&self.saved)
     }
 }
 
@@ -839,7 +865,9 @@ async fn answer<T: DeserializeOwned>(
 
     let status = response.status();
     if status == StatusCode::UNAUTHORIZED {
-        return Err(if sign_in_ended(&response) {
+        return Err(if revoked(&response) {
+            Failure::Revoked
+        } else if sign_in_ended(&response) {
             Failure::SignInEnded
         } else {
             Failure::SessionEnded
@@ -865,6 +893,18 @@ fn sign_in_ended(response: &Response) -> bool {
         .get(SIGN_IN_HEADER)
         .is_some_and(|value| value == "ended")
 }
+
+/// A 401 that says an administrator revoked the sign-in: the remote wipe's marker, and the only thing that leads to it.
+fn revoked(response: &Response) -> bool {
+    response
+        .headers()
+        .get(SIGN_IN_HEADER)
+        .is_some_and(|value| value == "revoked")
+}
+
+/// What a round or a download says when the server answers with the remote wipe's marker, until main.rs has deleted
+/// everything and the window says so.
+const REVOKED: &str = "Revoked: an administrator revoked this computer's sign-in.";
 
 /// The innermost cause, which names what actually went wrong: "Connection refused", an untrusted certificate.
 fn reason(error: &reqwest::Error) -> String {
@@ -894,6 +934,8 @@ mod tests {
     const HANG_UP: u16 = 0;
     /// A status for `FakeServer` to answer 401 saying the sign-in's 12 hours are over, as DesktopTokenHandler does.
     const SIGN_IN_ENDED: u16 = 1401;
+    /// A status for `FakeServer` to answer 401 saying an administrator revoked the sign-in, as DesktopTokenHandler does.
+    const REVOKED_STATUS: u16 = 2401;
 
     /// One request as the fake server saw it: the method and path, the Authorization header, then the body.
     type Request = (String, Option<String>, String);
@@ -919,10 +961,10 @@ mod tests {
                     if status == HANG_UP {
                         continue;
                     }
-                    let (status, header) = if status == SIGN_IN_ENDED {
-                        (401, "Ehr-Sign-In: ended\r\n")
-                    } else {
-                        (status, "")
+                    let (status, header) = match status {
+                        SIGN_IN_ENDED => (401, "Ehr-Sign-In: ended\r\n"),
+                        REVOKED_STATUS => (401, "Ehr-Sign-In: revoked\r\n"),
+                        _ => (status, ""),
                     };
                     write!(
                         &stream,
@@ -1280,6 +1322,52 @@ mod tests {
             1,
             "the change stays here"
         );
+    }
+
+    /// TC-UC7-12 (proposed FR-69): only the remote wipe's marker leads to the wipe. A round answered with it keeps the
+    /// session (deleted last, by main.rs) and says so, sending nothing more; so do a chart download and the lock's check
+    /// of the password. Beside it, a plain 401 forgets the session as always, the 12-hour marker keeps it for a full
+    /// sign-in, and a 426, which a server below whose minimum version this app is answers, is a problem like any other.
+    #[tokio::test]
+    async fn only_the_revoked_marker_leads_to_the_wipe() {
+        let store = memory_store();
+        store::lock(&store).add(".mine", "Waiting").unwrap();
+        let answering = |status: u16| {
+            let server = FakeServer::start(move |_| (status, "{}".to_owned()));
+            let credentials = credentials(Some(offline_session()));
+            let client = client_with(&[&server.url], &credentials);
+            (server, credentials, client)
+        };
+
+        let (server, credentials, client) = answering(REVOKED_STATUS);
+        let report = client.round(&store).await;
+        assert_eq!(report.problem.as_deref(), Some(REVOKED));
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert_eq!(
+            saved(&credentials),
+            Some(offline_session()),
+            "kept until the wipe"
+        );
+        assert_eq!(server.requests().len(), 1, "nothing sent after the answer");
+        let Err(problem) = client.download_panel().await else {
+            panic!("a download with a revoked sign-in");
+        };
+        assert_eq!(problem, REVOKED);
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert_eq!(client.unlock("a password").await, Unlock::Revoked);
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+
+        for (status, ending, kept) in [
+            (401, Some(Ending::Session), false),
+            (SIGN_IN_ENDED, Some(Ending::SignIn), true),
+            (426, None, true),
+        ] {
+            let (_server, credentials, client) = answering(status);
+            client.round(&store).await;
+            assert_eq!(client.take_ending(), ending, "{status}");
+            assert_eq!(saved(&credentials).is_some(), kept, "{status}");
+        }
+        assert_eq!(store::lock(&store).pending(10).unwrap().len(), 1);
     }
 
     /// A session with offline charts, signed in a while ago.
