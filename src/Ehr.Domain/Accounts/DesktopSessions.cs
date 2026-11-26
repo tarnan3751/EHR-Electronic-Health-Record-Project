@@ -118,8 +118,8 @@ public sealed class DesktopSessions(
     // authenticated just before, so it was good and its account not locked out then. As at the password step (step
     // 19.2), the password is checked with nothing held, then the account held and read again before anything is counted
     // or recorded: wrong passwords sent at once are each counted, the fifth locks the account, and the rest are refused
-    // as locked; a right one whose account changed in between is refused, counting nothing. Each unlock and each
-    // refusal is recorded, with the session's device.
+    // as locked; a right one whose account changed in between is refused, counting nothing and recording nothing.
+    // Each unlock and each other refusal is recorded, with the session's device.
     public async Task<DesktopUnlockOutcome> UnlockAsync(Guid sessionId, string password, CancellationToken cancellationToken)
     {
         var session = await db.DesktopSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId, cancellationToken);
