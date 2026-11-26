@@ -167,6 +167,32 @@ sent are lost, by design: the administrator is told before revoking. One way pas
 with the password and the code before the app's first round reaches a server replaces the revoked sign-in, so nothing
 is deleted; only the account's owner can, and for someone leaving the administrator disables the account too.
 
+## Updates (the plan's step 20)
+
+The app updates itself with Tauri's updater (`src-tauri/src/updates.rs`, Tahseen's 15a, proposed FR-70), from Rust
+only: the page has no permission for the updater.
+
+- **Where from:** the servers the build was made for, in order (`docs/UC8.md` has the server's side), after each start
+  and every 24 hours, and at once when a server refuses this version as too old.
+- **What it takes:** only a release newer than this one, never an older, and only if its signature matches the key built
+  into the app (`tauri.conf.json`, `plugins.updater.pubkey`) for the very version announced (`requireSignedVersion`), so
+  nobody who can change what a server says can pair a new version number with an older release. The updater checks it
+  after downloading and again before installing; a signature that doesn't match installs nothing: "Not installed:
+  SwiftChart … couldn't be downloaded or installed, or its signature didn't match, so nothing was changed." An
+  interrupted download fails the same check. The signing key never reaches CI (`docs/desktop-install.md`).
+- **When:** it asks, and only while the window is unlocked and nothing is recording: "Update available: SwiftChart ….
+  Get it ready, and it installs when you restart SwiftChart; nothing you've saved is affected.", with **Get it ready**
+  and **Not now**, which puts it away until the next start. Got ready, on macOS the checked app replaces this one on
+  disk at once, swapped whole, and runs from the next start; on Windows its installer runs at **Restart now**, quietly,
+  for this user, and starts the new version (quitting instead offers it again at the next start). **Restart now** is
+  refused while recording. A start after an update opens on the lock, as every start with a sign-in kept does, and what
+  the app keeps is untouched: the identifier is the same.
+- **Below the minimum** a server names (`docs/UC8.md`), the status says the server's words, "Update needed: the
+  clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the offline charts can
+  still be read.", and the app checks for the update at once. The lock and the offline charts work as before.
+- **No going back** from inside the app: a bad release is followed by a newer one, or the previous installer run again,
+  which keeps what the app holds.
+
 ## Test cases
 
 - **TC-UC7-07** (`tests/Ehr.Web.Tests/TestCases/UC7/TC_UC7_07_DesktopUnlock.cs`): the right password unlocks, on the
@@ -205,5 +231,9 @@ is deleted; only the account's owner can, and for someone leaving the administra
   once a recording ends, and a lock for the password asks for one; a kept sign-in started past them opens on that lock
   with its session and the lock's record kept; signed out, there's nothing to lock. The full sign-in with no server to
   complete it opens nothing then (TC-UC7-10's test of the lock's choice).
+- **TC-UC7-14** (`src-tauri/src/updates.rs`): an update is shown only while the window is unlocked and nothing is
+  recording, and "Not now" puts an offer away until the next start, while one being got ready, ready or failed still
+  shows; each built-in server is asked at its own address. The updater's own checks of the signature and the version
+  aren't run by a test here: the hands-on check's step for a bad signature is.
 - **The download's time** (`charts.rs`, `a_download_records_when_it_was_made`): a download records when it was made and
   the clinic's time zone, for that clinician only, and the next one moves it on.

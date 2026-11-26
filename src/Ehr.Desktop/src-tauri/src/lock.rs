@@ -379,7 +379,8 @@ impl Lock {
         self.signed_in_at.is_some() && self.offline_until.is_some_and(|until| now.wall >= until)
     }
 
-    fn recording_now(&self, now: Moment) -> bool {
+    /// A recording is being made, and holds the lock off (and an update's restart, updates.rs).
+    pub fn recording_now(&self, now: Moment) -> bool {
         self.recording
             .is_some_and(|since| now.since(&since) < RECORDING_HOLD)
     }

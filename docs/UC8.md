@@ -76,6 +76,10 @@ before step 20 takes as a waiting recording refused for good.
 - **TC-UC8-11** (`tests/Ehr.Web.Tests/TestCases/UC8/TC_UC8_11_DesktopUpdates.cs`): each site, asked with no cookie or
   token, hands out the release's macOS entry alone with its file at its own address, and the file; nothing for a
   platform with none or with no folder; and no file outside the folder, nor `latest.json` or one not there.
+- **TC-UC8-12** (`src/Ehr.Desktop/src-tauri/src/sync.rs`,
+  `a_server_that_refuses_this_version_says_why_and_asks_for_the_update`): every request says the app's version; a 426
+  is shown in the server's words, for a round and a chart download, keeps the session, and asks for an update check
+  once.
 - **TC-UC8-08** (`src/Ehr.Desktop/src-tauri/src/sync.rs`, `an_ended_sign_in_keeps_the_session_and_says_so`): a round
   answered with `Ehr-Sign-In: ended` keeps the session and the offline charts open, says a sign-in is needed, tells the
   lock once, and sends nothing; a chart download answered so says the same.

@@ -32,8 +32,19 @@
     <p class="sc-lede">Shared phrases, each inserted by typing its shortcut. Changes are saved on this computer first, then sent.</p>
 
     <section aria-label="Sync">
-      <p class="sc-status"><span id="waiting"></span> <span id="checked"></span></p>
+      <p class="sc-status"><span id="waiting"></span> <span id="checked"></span> <span id="version"></span></p>
       <p id="sync-problem" class="sc-notice sc-notice--warning" hidden></p>
+    </section>
+
+    <!-- An update, offered only while the window is unlocked and nothing is recording (the expansion plan's step 20;
+         src-tauri/src/updates.rs). Its words are set by app.js. -->
+    <section id="update" aria-label="Update" hidden>
+      <p id="update-text" class="sc-notice sc-notice--info" role="status"></p>
+      <div class="sc-actions">
+        <button type="button" id="update-accept" class="sc-btn sc-btn--primary">Get it ready</button>
+        <button type="button" id="update-dismiss" class="sc-btn sc-btn--quiet">Not now</button>
+        <button type="button" id="update-restart" class="sc-btn sc-btn--primary">Restart now</button>
+      </div>
     </section>
 
     <!-- The sign-in's 12 hours are over and the lock opened with the password alone, since no server could complete a

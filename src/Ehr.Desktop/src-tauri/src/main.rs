@@ -10,7 +10,8 @@
 //! complete one; after the server ended the session, with a full sign-in only.
 //!
 //! When a server the sign-in was made with says an administrator revoked it, the app deletes everything it keeps on
-//! this computer (the expansion plan's step 20, wipe.rs), says so, and refuses everything else until it's quit.
+//! this computer (the expansion plan's step 20, wipe.rs), says so, and refuses everything else until it's quit. It
+//! offers updates from the same servers, never over the lock or a recording (updates.rs).
 
 // Release builds on Windows open no console window alongside the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -20,6 +21,7 @@ mod key;
 mod rules;
 mod store;
 mod sync;
+mod updates;
 mod wipe;
 
 use std::path::PathBuf;
@@ -56,6 +58,9 @@ struct App {
     /// Once an administrator revoked the sign-in: whether everything here was deleted, or what couldn't be. From then
     /// on the app refuses everything, and says so.
     deleted: Mutex<Option<Result<(), String>>>,
+    /// This build's version (Cargo.toml, or a release build's --config), which the page shows and every request says.
+    version: String,
+    updates: updates::Updates,
 }
 
 /// Said when the app starts with servers other than the ones the kept sign-in was made with (step 19a's final review).
@@ -269,6 +274,10 @@ struct View {
     deleted: bool,
     /// What couldn't be deleted, when something couldn't: quitting and starting again finishes it.
     deleted_problem: Option<String>,
+    /// This build's version.
+    version: String,
+    /// An update, while the window is unlocked and nothing is recording.
+    update: Option<updates::Offer>,
 }
 
 #[tauri::command]
@@ -281,6 +290,8 @@ fn view(app: State<'_, App>) -> Result<View, String> {
         });
     }
     let lock = app.lock_view();
+    let recording = app.lock().recording_now(Moment::now());
+    let update = app.updates.view(lock.state == "locked", recording);
     let store = app.store()?;
     Ok(View {
         lock,
@@ -291,6 +302,8 @@ fn view(app: State<'_, App>) -> Result<View, String> {
             .unwrap_or_default(),
         deleted: false,
         deleted_problem: None,
+        version: app.version.clone(),
+        update,
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
@@ -323,6 +336,9 @@ async fn download_panel(app: State<'_, App>, handle: AppHandle) -> Result<(), St
     let sync = app.sync()?;
     let downloaded = sync.download_panel().await;
     app.take_ending(&handle);
+    if sync.take_update_required() {
+        app.updates.check_now();
+    }
     let (token, panel) = downloaded?;
     let mut store = app.store()?;
     sync.with_clinician(Some(&token), |owner| {
@@ -691,6 +707,50 @@ fn wipe_allowed(record: Option<&unlock::Account>, servers: &[String]) -> bool {
     record.is_some_and(|record| record.servers == servers)
 }
 
+/// Get the offered update ready: downloaded, its signature checked, and on macOS installed for the next start.
+#[tauri::command]
+async fn accept_update(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
+    let _ = handle.emit("changed", ());
+    let accepted = app.updates.accept().await;
+    let _ = handle.emit("changed", ());
+    accepted
+}
+
+/// "Not now": the offer is put away until the next start.
+#[tauri::command]
+fn dismiss_update(app: State<'_, App>) {
+    app.updates.dismiss();
+}
+
+/// Restart now, with an update ready: never while the window is locked or a recording is being made.
+#[tauri::command]
+fn restart_for_update(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
+    {
+        let lock = app.lock();
+        if lock.is_locked() {
+            return Err(LOCKED.to_owned());
+        }
+        if lock.recording_now(Moment::now()) {
+            return Err("Finish the recording first: restarting would stop it.".to_owned());
+        }
+    }
+    app.updates.restart(&handle)
+}
+
+/// Checks for updates from the servers this build was made for (updates.rs).
+async fn updates_in_background(handle: AppHandle) {
+    let app = handle.state::<App>();
+    let servers = app
+        .sync()
+        .map(|sync| sync.servers().to_vec())
+        .unwrap_or_default();
+    if !servers.is_empty() {
+        app.updates
+            .check_in_background(handle.clone(), servers)
+            .await;
+    }
+}
+
 /// Ends the app, from the page that says everything here was deleted.
 #[tauri::command]
 fn quit(handle: AppHandle) {
@@ -851,6 +911,9 @@ async fn sync_in_background(handle: AppHandle) {
         let report = client.round(store).await;
         // Before the page hears of the round: a session the server ended locks the window, rather than clear it.
         app.take_ending(&handle);
+        if client.take_update_required() {
+            app.updates.check_now();
+        }
         if app.deleted().is_some() {
             // Wiped: nothing more is sent, or kept.
             return;
@@ -904,11 +967,14 @@ fn database_path(app: &tauri::App) -> Result<PathBuf, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let database = database_path(app);
             let store = open_store(&database).map(Mutex::new);
             // After open_store, which chose the credential store that keeps the session.
-            let sync = key::session_entry().and_then(sync::Sync::from_environment);
+            let version = app.package_info().version.to_string();
+            let sync = key::session_entry()
+                .and_then(|entry| sync::Sync::from_environment(entry, &version));
             let (lock, notice) = starting_lock(&store, &sync);
             app.manage(App {
                 store,
@@ -921,9 +987,12 @@ fn main() {
                     .ok()
                     .filter(|path| path != std::path::Path::new(":memory:")),
                 deleted: Mutex::new(None),
+                version,
+                updates: updates::Updates::default(),
             });
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
             tauri::async_runtime::spawn(lock_in_background(app.handle().clone()));
+            tauri::async_runtime::spawn(updates_in_background(app.handle().clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -947,6 +1016,9 @@ fn main() {
             lock_now,
             unlock,
             quit,
+            accept_update,
+            dismiss_update,
+            restart_for_update,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");
@@ -1024,7 +1096,10 @@ mod tests {
                 .to_string(),
             )
             .unwrap();
-        (Ok(Mutex::new(store)), sync::Sync::new(servers, entry))
+        (
+            Ok(Mutex::new(store)),
+            sync::Sync::new(servers, entry, "0.2.0"),
+        )
     }
 
     /// Step 19a's final review, the reviewer's case: with the window locked, someone at the computer starts the app again

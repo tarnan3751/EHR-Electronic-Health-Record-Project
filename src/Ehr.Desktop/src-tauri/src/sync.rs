@@ -11,10 +11,13 @@
 //! ended", the expansion plan's step 19a): then the session and its offline copy are kept, and nothing more is sent
 //! until a full sign-in. Either way main.rs hears of it (take_ending) and locks the window. A 401 that says an
 //! administrator revoked the sign-in ("Ehr-Sign-In: revoked", step 20) keeps the session too, and main.rs deletes
-//! everything the app keeps here, the session last (wipe.rs): nothing else ever leads there. So is the lock's check of
+//! everything the app keeps here, the session last (wipe.rs): nothing else ever leads there. Every request says the
+//! app's version (Ehr-Desktop-Version); a server that refuses it as too old (426, step 20's minimum version) is a
+//! problem like any other here, said in its words, and main.rs checks for the update at once. So is the lock's check of
 //! the password at the server (unlock), and the lock's full sign-in (sign_in_answer), which say when no server could
 //! answer, so the lock can check the password on this computer instead.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -46,6 +49,8 @@ const UNLOCK: &str = "/api/desktop/unlock";
 /// On a 401, says the token was refused only because the sign-in's 12 hours are over ("ended"), or because an
 /// administrator revoked it ("revoked") (DesktopTokenHandler.cs).
 const SIGN_IN_HEADER: &str = "ehr-sign-in";
+/// The app's version, on every request, for the server's minimum (src/Ehr.Web/Api/Desktop/DesktopUpdates.cs).
+const VERSION_HEADER: &str = "ehr-desktop-version";
 /// How long the lock waits for a server to check the password before it checks it here.
 const UNLOCK_WAIT: Duration = Duration::from_secs(5);
 const OFFLINE_PANEL: &str = "/api/desktop/offline-panel";
@@ -61,6 +66,8 @@ pub struct Sync {
     session: Mutex<Option<Session>>,
     /// How the server last ended the sign-in or the session, until main.rs takes it.
     ending: Mutex<Option<Ending>>,
+    /// A server refused this version as too old (426), until main.rs takes it.
+    update_required: AtomicBool,
 }
 
 /// How the server ended things, for the lock (main.rs).
@@ -129,6 +136,8 @@ enum Failure {
     Revoked,
     /// The server answered, but not with what the round needed.
     Problem(String),
+    /// The server refused this version as too old (426), saying so.
+    UpdateRequired(String),
 }
 
 impl From<store::Error> for Failure {
@@ -138,10 +147,11 @@ impl From<store::Error> for Failure {
 }
 
 impl Sync {
-    pub fn from_environment(saved: Entry) -> Result<Sync, String> {
+    /// `version` is the app's, which every request says.
+    pub fn from_environment(saved: Entry, version: &str) -> Result<Sync, String> {
         let release = !cfg!(debug_assertions);
         let servers = servers_for(std::env::var("EHR_SYNC_SERVERS").ok(), release);
-        Sync::new(parse_servers(&servers, release)?, saved)
+        Sync::new(parse_servers(&servers, release)?, saved, version)
     }
 
     /// The servers, in the order they're tried.
@@ -150,9 +160,16 @@ impl Sync {
     }
 
     /// HTTPS is checked against the OS's trusted certificates, as a browser would. `saved` is where the session is
-    /// kept; the one in it, if any, carries on.
-    pub fn new(servers: Vec<String>, saved: Entry) -> Result<Sync, String> {
+    /// kept; the one in it, if any, carries on. `version` goes with every request.
+    pub fn new(servers: Vec<String>, saved: Entry, version: &str) -> Result<Sync, String> {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            VERSION_HEADER,
+            reqwest::header::HeaderValue::from_str(version)
+                .map_err(|_| format!("{version} isn't a version"))?,
+        );
         let http = Client::builder()
+            .default_headers(headers)
             .connect_timeout(Duration::from_secs(3))
             .timeout(Duration::from_secs(20))
             .build()
@@ -168,6 +185,7 @@ impl Sync {
             saved,
             session,
             ending: Mutex::new(None),
+            update_required: AtomicBool::new(false),
         })
     }
 
@@ -195,6 +213,11 @@ impl Sync {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .take()
+    }
+
+    /// Whether a server refused this version as too old since this was last asked.
+    pub fn take_update_required(&self) -> bool {
+        self.update_required.swap(false, Ordering::SeqCst)
     }
 
     fn ended(&self, ending: Ending) {
@@ -271,6 +294,10 @@ impl Sync {
             let _ = self.forget(&token);
             self.ended(Ending::Session);
             return Err("The session ended. Sign in again to download charts.".to_owned());
+        }
+        if response.status() == StatusCode::UPGRADE_REQUIRED {
+            self.update_required.store(true, Ordering::SeqCst);
+            return Err(refusal(response).await);
         }
         if !response.status().is_success() {
             return Err(format!(
@@ -450,6 +477,10 @@ impl Sync {
                     };
                 }
                 Err(Failure::Problem(problem)) => {
+                    answered.get_or_insert((server, problem));
+                }
+                Err(Failure::UpdateRequired(problem)) => {
+                    self.update_required.store(true, Ordering::SeqCst);
                     answered.get_or_insert((server, problem));
                 }
             }
@@ -883,6 +914,9 @@ async fn answer<T: DeserializeOwned>(
             Failure::SessionEnded
         });
     }
+    if status == StatusCode::UPGRADE_REQUIRED {
+        return Err(Failure::UpdateRequired(refusal(response).await));
+    }
     if !status.is_success() {
         return Err(Failure::Problem(format!(
             "Couldn't {doing}: the server answered {status}."
@@ -894,6 +928,14 @@ async fn answer<T: DeserializeOwned>(
             reason(&error)
         ))
     })
+}
+
+/// What a server that refuses this version as too old says, in its words (DesktopUpdates.cs).
+async fn refusal(response: Response) -> String {
+    match response.json::<Refusal>().await {
+        Ok(refusal) => refusal.problem,
+        Err(_) => "Update needed: the server syncs only with a newer SwiftChart.".to_owned(),
+    }
 }
 
 /// A 401 that says the token was refused only because the sign-in's 12 hours are over.
@@ -1095,6 +1137,7 @@ mod tests {
         Sync::new(
             servers.iter().map(|server| (*server).to_owned()).collect(),
             saved_entry(credentials),
+            "0.2.0",
         )
         .unwrap()
     }
@@ -1378,6 +1421,65 @@ mod tests {
             assert_eq!(saved(&credentials).is_some(), kept, "{status}");
         }
         assert_eq!(store::lock(&store).pending(10).unwrap().len(), 1);
+    }
+
+    /// TC-UC8-12 (proposed FR-70): every request says the app's version, and a server that refuses it as too old (426)
+    /// is a problem in its own words, for a round and a chart download, which keeps the session and tells main.rs to
+    /// check for the update; nothing else does.
+    #[tokio::test]
+    async fn a_server_that_refuses_this_version_says_why_and_asks_for_the_update() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&heard);
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut head = String::new();
+                let mut reader = BufReader::new(&stream);
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line.trim().is_empty() {
+                        break;
+                    }
+                    head.push_str(&line.to_ascii_lowercase());
+                }
+                seen.lock().unwrap().push(head);
+                let body = r#"{"problem":"Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later."}"#;
+                write!(
+                    stream,
+                    "HTTP/1.1 426 Upgrade Required\r\nEhr-Desktop-Minimum: 0.3.0\r\nContent-Type: application/json\r\n\
+                     Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .unwrap();
+            }
+        });
+        let store = memory_store();
+        let credentials = credentials(Some(offline_session()));
+        let client = client_with(&[&url], &credentials);
+
+        let report = client.round(&store).await;
+        let problem =
+            "Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later.";
+        assert_eq!(report.problem.as_deref(), Some(problem));
+        assert!(client.take_update_required());
+        assert!(!client.take_update_required(), "once");
+        let Err(download) = client.download_panel().await else {
+            panic!("a download refused for the version");
+        };
+        assert_eq!(download, problem);
+        assert!(client.take_update_required());
+        assert_eq!(client.take_ending(), None);
+        assert_eq!(saved(&credentials), Some(offline_session()));
+        assert!(
+            heard
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|head| head.contains("ehr-desktop-version: 0.2.0"))
+        );
     }
 
     /// A session with offline charts, signed in a while ago.

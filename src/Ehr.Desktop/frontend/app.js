@@ -54,6 +54,8 @@ async function refresh() {
     if (locked || view.lock.sessionOver) return;
     const signedIn = view.status.account != null;
     renderStatus(view.status, view.waiting);
+    byId('version').textContent = `SwiftChart ${view.version}.`;
+    renderUpdate(view.update);
     renderAccount(view.status.account);
     show(byId('sign-in-notice'), view.signedOutBecause);
     byId('sign-in-servers').textContent = `Signs in to: ${view.servers.map(host).join(', ')}`;
@@ -87,6 +89,37 @@ function renderStatus(status, waiting) {
   byId('checked').textContent = checked ? `Checked at ${new Date(status.checkedAt).toLocaleTimeString()}.` : '';
   show(byId('sync-problem'), status.problem);
 }
+
+// An update (src-tauri/src/updates.rs), which the Rust side gives only while the window is unlocked and nothing is
+// recording: offered, being got ready, ready for a restart, or not installed. Each notice starts with its state word.
+const updateWords = {
+  offered: (update) => ['Update available:', ` SwiftChart ${update.version}. Get it ready, and it installs when you restart SwiftChart; nothing you've saved is affected.`],
+  downloading: (update) => ['Getting it ready:', ` SwiftChart ${update.version} is being downloaded and its signature checked.`],
+  ready: (update) => ['Ready:', ` SwiftChart ${update.version} is ready to install. Save what you're typing, then choose Restart now: restarting closes this window.`],
+  failed: (update) => ['Not installed:', ` ${update.problem}`],
+};
+
+function renderUpdate(update) {
+  byId('update').hidden = !update;
+  if (!update) return;
+  const [state, words] = updateWords[update.state](update);
+  const text = byId('update-text');
+  text.className = `sc-notice sc-notice--${update.state === 'failed' ? 'warning' : 'info'}`;
+  text.replaceChildren(el('span', { className: 'sc-notice__state', textContent: state }), words);
+  byId('update-accept').hidden = update.state !== 'offered';
+  byId('update-dismiss').hidden = update.state !== 'offered';
+  byId('update-restart').hidden = update.state !== 'ready';
+}
+
+byId('update-accept').addEventListener('click', async () => {
+  await call('accept_update');
+  refresh();
+});
+byId('update-dismiss').addEventListener('click', async () => {
+  await call('dismiss_update');
+  refresh();
+});
+byId('update-restart').addEventListener('click', () => call('restart_for_update'));
 
 // Signed out, the page offers to sign in, and the phrases can be read but not changed (renderPhrases).
 function renderAccount(account) {

@@ -16,7 +16,11 @@ SwiftChart is distributed unsigned (the expansion plan's standing decision for s
 - **No Windows code-signing certificate.** Windows warns before the first install, below.
 - **What a build talks to is fixed when it is built:** the servers in `EHR_BUILD_SERVERS`, or by default the local
   server stack's, `https://ehr.example.com:8443` and `https://ehr-remote.example.com:9443`. The sign-in form names
-  them. A build for other servers is a build of its own (see the README's **Running the apps**).
+  them. A build for other servers is a build of its own (see the README's **Running the apps**). Its updates come from
+  the same servers.
+- **Updates are signed, by their own key:** the updater's key pair, made on the owner's Mac. The public half is built
+  into every build (`plugins.updater.pubkey` in `tauri.conf.json`); the private half never leaves the owner's Mac, and
+  never reaches CI.
 
 What follows was checked against Apple's and Microsoft's documentation as of November 2026, not yet on a teammate's
 computer; the hands-on check (`docs/expansion/20-hands-on-check.md`) records what each one actually shows, and this
@@ -29,7 +33,8 @@ Nothing is published: there is no GitHub release. Two ways:
 - **From CI, when it keeps them.** Every CI run builds the `.dmg` (macOS, Apple Silicon) and the NSIS setup (Windows,
   x64), and keeps neither. A run started by hand with **upload_installers** keeps both as the run's artifacts for 3
   days: `gh workflow run ci.yml --ref <branch> -f upload_installers=true`, then download `SwiftChart-macOS` or
-  `SwiftChart-Windows` from the run's page. The repository is public, so anyone signed in to GitHub can download them
+  `SwiftChart-Windows` from the run's page. Add `-f desktop_version=0.2.1` to build them as another version, to test an
+  update to it. The repository is public, so anyone signed in to GitHub can download them
   meanwhile: whether that's allowed is the owner's call.
 - **From source**, on the computer it's for, from the repository at the commit you want:
   - **What must be installed:** what the README's **Setup** lists for the desktop app: Rust through rustup (the pinned
@@ -88,10 +93,52 @@ Then, as with every build of SwiftChart (the README, **Running the apps**):
 
 To remove it: **Settings > Apps > Installed apps > SwiftChart > Uninstall**, which offers to delete its data too.
 
-## Installing a newer build
+## Updates
 
-Install it over the old one, the same way. What SwiftChart keeps stays, since the identifier is the same: the next
-start opens on the lock, with the sign-in kept. Drafts and recordings it hadn't sent are still there to send.
+SwiftChart asks before it updates, and never over the lock or a recording (`docs/UC7.md`). **Get it ready** downloads
+the update and checks its signature; on a Mac it then installs at once and runs from the next start, and on Windows it
+installs at **Restart now**, which shows the installer's progress and starts SwiftChart again. Either way what SwiftChart
+keeps stays, since the identifier is the same: the next start opens on the lock, with the sign-in kept, and drafts and
+recordings not yet sent are still there to send. On a Mac, as with any new build, the Keychain may ask again (**Always
+Allow**), and the microphone may be asked for again.
+
+An installer run over an installed copy, the same way as the first time, does the same: that is also how a copy goes
+back to an earlier release if one goes wrong, since the updater itself never takes an older one.
+
+## Making a release (the owner)
+
+On the Mac that holds the updater's private key (`~/.swiftchart-secrets/swiftchart-updater.key`, the expansion plan's
+decision log, step 20). Nothing here prints the key.
+
+1. **The macOS update**, built and signed in one go, as version `<version>` (newer than every installed copy), from
+   `src/Ehr.Desktop/src-tauri`:
+
+   ```
+   TAURI_SIGNING_PRIVATE_KEY="$HOME/.swiftchart-secrets/swiftchart-updater.key" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" \
+     cargo tauri build --config '{"version":"<version>","bundle":{"createUpdaterArtifacts":true}}' -- --locked
+   ```
+
+   It makes `target/release/bundle/macos/SwiftChart.app.tar.gz` and its signature, `SwiftChart.app.tar.gz.sig`, bound
+   to that version, beside the `.dmg` for new installs.
+2. **The Windows update** is its installer, built on Windows as that version (by CI, `-f desktop_version=<version>`, or
+   on a PC with `cargo tauri build --config '{"version":"<version>"}' -- --locked` in PowerShell 7), then signed on the
+   Mac:
+
+   ```
+   TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" cargo tauri signer sign -f "$HOME/.swiftchart-secrets/swiftchart-updater.key" \
+     --app-version <version> SwiftChart_<version>_x64-setup.exe
+   ```
+
+   which writes `SwiftChart_<version>_x64-setup.exe.sig` beside it. Only the signature leaves the Mac.
+3. **On each server**, put the files and `latest.json` in the folder `Ehr:Desktop:UpdatesFolder` names: in the local
+   stack, `infra/compose/desktop-updates/`, served with `compose.desktop-updates.yaml` (`infra/compose/README.md`, "Desktop
+   updates", has `latest.json`'s form, each signature being the contents of its `.sig` file). Each copy checks within a
+   day, or at its next start.
+4. **To make every older copy update before it syncs again**, set `Ehr:Desktop:MinimumVersion` to the new version on
+   both servers (`EHR_DESKTOP_MINIMUM_VERSION` in the local stack).
+
+If the key is lost, no installed copy can be updated again: each is reinstalled by hand from a build with a new key, and
+keeps what it holds. If it leaks, see the decision log's entry for what to do.
 
 ## Where SwiftChart keeps things
 

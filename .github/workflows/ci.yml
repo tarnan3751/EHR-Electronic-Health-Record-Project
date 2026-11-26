@@ -16,6 +16,10 @@ on:
         description: Keep the desktop installers as this run's artifacts, for 3 days
         type: boolean
         default: false
+      desktop_version:
+        description: Build the desktop installers as this version (such as 0.2.1, to test an update), not Cargo.toml's
+        type: string
+        default: ""
 
 # Every job gets a read-only token unless it asks for more.
 permissions:
@@ -385,8 +389,18 @@ jobs:
       - name: Install the Tauri CLI
         run: cargo install tauri-cli --version 2.12.0 --locked
 
+      # A run started by hand may build them as another version, to test an update to it; the update's signature is
+      # made on the owner's Mac (docs/desktop-install.md), never here.
       - name: Build the installer
-        run: cargo tauri build --ci -- --locked
+        shell: bash
+        env:
+          DESKTOP_VERSION: ${{ inputs.desktop_version }}
+        run: |
+          if [ -n "$DESKTOP_VERSION" ]; then
+            cargo tauri build --ci --config "{\"version\":\"$DESKTOP_VERSION\"}" -- --locked
+          else
+            cargo tauri build --ci -- --locked
+          fi
 
       - name: Keep the installer
         if: github.event_name == 'workflow_dispatch' && inputs.upload_installers

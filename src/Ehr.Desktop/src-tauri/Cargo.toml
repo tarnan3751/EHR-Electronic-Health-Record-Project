@@ -27,6 +27,8 @@ getrandom = "0.3"
 hex = "0.4"
 # The lock's slow hash of the password, kept in the encrypted store (src/unlock.rs).
 argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "password-hash"] }
+# Updates (src/updates.rs): checked from the servers built in, installed only if signed with the key in tauri.conf.json.
+tauri-plugin-updater = "2.14.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The "keychain" store works for apps that are not code-signed with a provisioning profile.
