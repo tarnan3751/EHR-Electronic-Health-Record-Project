@@ -57,8 +57,6 @@ public class VitalRangeSecurityTests(MigratedDatabase database) : IClassFixture<
         yield return "8462-4 any 216 none 60 79 normal";
     }
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
     Task<List<string>> AsSuperuserAsync(string sql, params (string Name, object Value)[] parameters) =>

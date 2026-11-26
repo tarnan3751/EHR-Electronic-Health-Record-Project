@@ -778,8 +778,6 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
 
     // Proxy access (FR-19).
 
-    public const string ProxyGrantsTable = "proxy_grants";
-
     // Who can use the portal for this patient: every grant, the ones in force first, then the latest. For the patient's
     // own access page and the clinician's; a recorded read of the patient. Null when the patient isn't the reader's
     // to see.

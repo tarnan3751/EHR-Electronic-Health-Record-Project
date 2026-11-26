@@ -307,8 +307,6 @@ public static class VitalRanges
 
     static readonly Dictionary<string, (string Code, string Sex, int FromMonths, int? ToMonths, decimal? Low, decimal? High, string Kind, string Source)[]> ByCode =
         All.GroupBy(range => range.Code).ToDictionary(group => group.Key, group => group.ToArray());
-
-    public static bool IsBanded(string code) => All.Any(range => range.Code == code);
 }
 
 // The five age bands the seed draws its synthetic children's values by (step 9b): the ranges themselves now go by

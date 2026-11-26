@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Web.CloudAudit;
@@ -273,9 +272,6 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
         var setCookie = context.Response.Headers.SetCookie.ToString();
         return setCookie[..setCookie.IndexOf(';')];
     }
-
-    [GeneratedRegex("(?:href|src)=\"(/_content/[^\"]+)\"")]
-    private static partial Regex PageAssets();
 
     // The expansion plan's step 17: a note's dictation started off-site in Spanish reaches the on-prem app with its body
     // as sent, so the dictation service is asked for one in Spanish, for the review the browser named.

@@ -13,8 +13,6 @@ public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture
 {
     const string SentMessage = "If that address has a portal account waiting to be confirmed, we have sent it a new link.";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_link_that_no_longer_works_offers_a_new_one()
     {
