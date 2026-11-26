@@ -29,7 +29,7 @@ busy the app is, as a web sign-in does (Tahseen's ruling 11b of 25 November 2026
   after the 12 hours, it says when they were last updated (`docs/UC7.md`).
 - **Unchanged:** the 30 days, which are now how long the app may open its offline copy without a sign-in (the sign-in's
   `offlineAccess`); signing out; and an administrator ending a session by disabling the account. Remote wipe and what
-  happens when the 30 days run out offline are step 20's (below).
+  happens when the 30 days run out offline are step 20's (below, and `docs/UC7.md`).
 
 ## A revoked sign-in's token says so (the plan's step 20)
 

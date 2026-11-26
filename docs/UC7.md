@@ -124,6 +124,20 @@ copy older than it would have, so the offline charts now say how old they are: "
 recorded with each download, by this computer's clock, in the encrypted store (`charts.rs`); charts downloaded by an
 earlier build say that when isn't recorded, until they are downloaded again.
 
+## When the 30 days pass offline (the plan's step 20)
+
+A sign-in's session lets the app open its offline copy for 30 days (the sign-in's `offlineAccess`). A computer that
+stops reaching any server, a revoked one that is never connected again included, could otherwise keep its charts open
+with the password alone. So, Tahseen's ruling 14b: when the 30 days pass, by this computer's clock, the window locks,
+as soon as no recording holds it off, and also opens on that lock at start: "Locked: the offline charts open for 30
+days after a sign-in, and yours have passed. Nothing on this computer was deleted." Only a full sign-in, the password
+and the code, opens it, and only once a server can complete one: the password alone is never enough, whether or not a
+server can be reached (`lock.rs`, `Why::OfflineEnded`). Nothing is deleted, and the session is kept, so the next server
+to answer says what became of it: a revoked one is wiped (below); one merely over is forgotten, keeping what the
+computer holds, as before. The commands that read the offline charts already refused them after the 30 days; this
+closes a chart that was open when they passed. Setting the computer's clock back delays it, as it delays the 12-hour
+lock (the decision log, step 19a); changing the clock needs the computer's administrator.
+
 ## The remote wipe (the plan's step 20)
 
 When an administrator revokes a clinician's desktop sign-ins (`docs/UC11.md`), every server refuses their tokens
@@ -187,5 +201,9 @@ is deleted; only the account's owner can, and for someone leaving the administra
   like any other; the wipe deletes the database's files after closing it, then its key, and a second run finds nothing
   and is fine; and it runs only for a sign-in whose lock's record names the servers the app has, never with no record
   or other servers.
+- **TC-UC7-13** (`src-tauri/src/lock.rs`, `main.rs`): when the 30 days pass the window locks for a full sign-in only,
+  once a recording ends, and a lock for the password asks for one; a kept sign-in started past them opens on that lock
+  with its session and the lock's record kept; signed out, there's nothing to lock. The full sign-in with no server to
+  complete it opens nothing then (TC-UC7-10's test of the lock's choice).
 - **The download's time** (`charts.rs`, `a_download_records_when_it_was_made`): a download records when it was made and
   the clinic's time zone, for that clinician only, and the next one moves it on.

@@ -727,6 +727,7 @@ const lockReasons = {
   longest: () => ['Locked:', ' a sign-in lasts at most 12 hours.'],
   wrongPasswords: () => ['Locked:', ' too many wrong passwords were typed here.'],
   ended: () => ['Signed out:', ' the server ended this sign-in: your password was changed, your account was locked or disabled, or it is 30 days since you signed in.'],
+  offlineEnded: () => ['Locked:', ' the offline charts open for 30 days after a sign-in, and yours have passed. Nothing on this computer was deleted.'],
 };
 
 const lockHow = {
@@ -740,7 +741,7 @@ function renderLock(view) {
   const why = byId('lock-why');
   why.className = `sc-notice sc-notice--${view.need === 'signedOut' ? 'warning' : 'info'}`;
   why.replaceChildren(el('span', { className: 'sc-notice__state', textContent: state }), words);
-  byId('lock-title').textContent = view.need === 'signedOut' ? 'Signed out' : 'Locked';
+  byId('lock-title').textContent = view.why === 'ended' ? 'Signed out' : 'Locked';
   byId('lock-how').textContent = view.why === 'wrongPasswords'
     ? 'Enter your password and the code from your authenticator app, once the clinic\'s server can be reached. Nothing on this computer was deleted, and what you typed is kept.'
     : lockHow[view.need];

@@ -476,10 +476,18 @@ async fn sign_in(
 ) -> Result<(), String> {
     app.sync()?.sign_in(&email, &password, &code).await?;
     let remembered = remember_sign_in(&app, &email, password).await;
-    app.lock().signed_in(SystemTime::now(), Moment::now());
+    signed_in(&app);
     *app.notice.lock().unwrap_or_else(PoisonError::into_inner) = None;
     app.wake.notify_one();
     remembered
+}
+
+/// A sign-in with both factors: the lock's 12 hours start now, and the offline copy's 30 days are the new session's.
+fn signed_in(app: &App) {
+    let offline_until = app.sync().ok().and_then(sync::Sync::offline_until);
+    let mut lock = app.lock();
+    lock.signed_in(SystemTime::now(), Moment::now());
+    lock.offline_until(offline_until);
 }
 
 /// After a sign-in with both factors, what the lock needs to open without a server (ehr_desktop::unlock): the password's
@@ -564,7 +572,7 @@ async fn unlock(
         let answer = sync.sign_in_answer(&email, &password, &code).await;
         if answer.is_ok() {
             remember_sign_in(&app, &email, password).await?;
-            app.lock().signed_in(SystemTime::now(), Moment::now());
+            signed_in(&app);
             *app.notice.lock().unwrap_or_else(PoisonError::into_inner) = None;
             app.wake.notify_one();
             return Ok(app.lock_view());
@@ -748,6 +756,8 @@ fn starting_lock(
         let signed_in_at =
             UNIX_EPOCH + Duration::from_secs(u64::try_from(record.signed_in_at).unwrap_or(0));
         let mut lock = Lock::new(times(), Some(signed_in_at), record.sign_in_ended, now);
+        // Past the sign-in's 30 days, it opens on the lock for a full sign-in only (lock.rs), the session kept.
+        lock.offline_until(sync.as_ref().ok().and_then(sync::Sync::offline_until));
         if record.wrong >= unlock::WRONG_BEFORE_SIGN_IN {
             lock.require_sign_in();
         }
@@ -981,6 +991,14 @@ mod tests {
     fn kept_sign_in(
         servers: Vec<String>,
     ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
+        kept_sign_in_until(servers, 4_102_444_800)
+    }
+
+    /// kept_sign_in, with the offline copy's 30 days ending at `offline_until`, in seconds since 1970.
+    fn kept_sign_in_until(
+        servers: Vec<String>,
+        offline_until: u64,
+    ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
         let store = Store::open(Path::new(":memory:"), &[7; 32]).unwrap();
         store
             .unlock(|db| {
@@ -1002,7 +1020,7 @@ mod tests {
             .set_password(
                 &serde_json::json!({ "token": "the-token", "displayName": "Dr. Example",
                     "expiresAt": "2099-01-01T00:00:00Z",
-                    "offlineAccess": { "clinicianId": CLINICIAN, "expiresUnixSeconds": 4_102_444_800u64 } })
+                    "offlineAccess": { "clinicianId": CLINICIAN, "expiresUnixSeconds": offline_until } })
                 .to_string(),
             )
             .unwrap();
@@ -1050,6 +1068,32 @@ mod tests {
         );
         assert_eq!(notice, None);
         assert_eq!(sync.unwrap().account().as_deref(), Some("Dr. Example"));
+    }
+
+    /// TC-UC7-13 (proposed FR-69, Tahseen's 14b): a kept sign-in whose 30 days are over starts on the lock for a full
+    /// sign-in only, with the session kept for the next server to answer, and nothing deleted.
+    #[test]
+    fn a_kept_sign_in_past_its_30_days_starts_locked_for_a_full_sign_in() {
+        let yesterday = u64::try_from(unix_now()).unwrap() - 24 * 60 * 60;
+        let (store, sync) = kept_sign_in_until(vec![SIGNED_IN_WITH.to_owned()], yesterday);
+
+        let (mut lock, notice) = starting_lock(&store, &sync);
+
+        assert_eq!(
+            lock.tick(Moment::now()),
+            lock::State::Locked {
+                need: Need::SignedOut,
+                why: Why::OfflineEnded
+            }
+        );
+        assert_eq!(notice, None);
+        assert_eq!(sync.unwrap().account().as_deref(), Some("Dr. Example"));
+        assert!(
+            store::lock(&store.unwrap())
+                .unlock(unlock::account)
+                .unwrap()
+                .is_some()
+        );
     }
 
     /// TC-UC7-12 (proposed FR-69): the remote wipe's marker deletes what's kept here only for a sign-in made with the

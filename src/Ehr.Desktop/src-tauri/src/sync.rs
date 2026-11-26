@@ -179,6 +179,16 @@ impl Sync {
             .map(|access| access.clinician_id)
     }
 
+    /// Until when the kept session lets the offline copy be opened without a sign-in, by this computer's clock; none
+    /// while signed out, or for a session from a server too old to say.
+    pub fn offline_until(&self) -> Option<SystemTime> {
+        self.session()
+            .as_ref()?
+            .offline_access
+            .as_ref()
+            .map(|access| UNIX_EPOCH + Duration::from_secs(access.expires_unix_seconds))
+    }
+
     /// How the server last ended the sign-in or the session, once.
     pub fn take_ending(&self) -> Option<Ending> {
         self.ending
