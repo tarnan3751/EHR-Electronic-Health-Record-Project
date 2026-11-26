@@ -19,6 +19,8 @@ public class SignOutModel(PatientSignIn signIn) : PageModel
         var userId = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : (Guid?)null;
         var patientId = Guid.TryParse(User.FindFirstValue(EhrClaims.PatientId), out var patient) ? patient : (Guid?)null;
         await signIn.SignOutAsync(HttpContext, userId, patientId, HttpContext.RequestAborted);
+        // Whoever signs in next on this browser starts on their own record.
+        ActingCookie.Clear(HttpContext);
         return Page();
     }
 }

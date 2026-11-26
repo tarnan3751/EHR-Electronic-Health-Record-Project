@@ -6,11 +6,11 @@
 @{
     ViewData["Title"] = Model.Thread.Subject;
 }
-<p><a asp-page="Index">Back to your messages</a></p>
+<p><a asp-page="Index">@(Model.Acting ? "Back to the messages" : "Back to your messages")</a></p>
 <h1>@Model.Thread.Subject</h1>
 @if (Model.Sent && Model.Error is null)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent:</span> your care team will see your message. Replies appear here.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent:</span> @(Model.Acting ? "the care team will see your message." : "your care team will see your message.") Replies appear here.</p>
 }
 <partial name="_Thread" model="(Model.Thread.Messages, MessageSender.Patient)" />
 @if (!OnPrem.IsReachable)

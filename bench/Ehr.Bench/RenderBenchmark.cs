@@ -125,6 +125,7 @@ internal static partial class RenderBenchmark
                 await SettleAsync(database);
                 var results = await MeasureEachAsync(client, times, "", panel, labOrders, patients);
                 results.AddRange(await MeasureScheduleAsync(client, times, "", panel, scheduleDay, appointments));
+                results.Add(await MeasureAsync(client, times, "Proxy access, a patient on the panel", typing: false, () => $"/patients/{panel[0]}/proxies"));
                 // A conversation's page for the clinician (FR-18): its messages, and a recorded read of the thread.
                 var threadRandom = new Random(20261119);
                 results.Add(await MeasureAsync(client, times, "Conversation, a patient on the panel", typing: false, () =>
@@ -137,6 +138,8 @@ internal static partial class RenderBenchmark
                 // off-site rows.
                 var (patientUserId, patientEmail, patientPassword, portalPatient) = await CreatePatientAccountAsync(app, patients);
                 var portalThread = await WritePortalThreadAsync(app, clinicianId, portalPatient);
+                // Proxy access (FR-19): the clinician records the portal patient as a proxy for one of the panel.
+                var proxyGrant = await RecordProxyAsync(app, clinicianId, panel[0], patientEmail);
                 try
                 {
                     using var portal = await PortalSignInAsync(app, patientEmail, patientPassword);
@@ -145,6 +148,19 @@ internal static partial class RenderBenchmark
                     results.Add(await MeasureAsync(portal, times, "Portal home, the patient's own", typing: false, () => "/portal"));
                     results.Add(await MeasureAsync(portal, times, "Portal messages, the patient's own", typing: false, () => "/portal/messages"));
                     results.Add(await MeasureAsync(portal, times, "Portal conversation, the patient's own", typing: false, () => $"/portal/messages/{portalThread}"));
+                    results.Add(await MeasureAsync(portal, times, "Portal access, the patient's own", typing: false, () => "/portal/access"));
+                    // The same session, now looking at the record it holds a proxy grant for: every page first checks
+                    // the grant, and every policy resolves the subject through it.
+                    using (var chosen = await PostFormAsync(portal, "/portal/acting", await portal.GetStringAsync("/portal/access"), ("grantId", proxyGrant.ToString())))
+                    {
+                        if (chosen.RequestMessage?.RequestUri?.AbsolutePath != "/portal")
+                        {
+                            throw new InvalidOperationException("Choosing the proxied record did not end at /portal.");
+                        }
+                    }
+
+                    results.Add(await MeasureAsync(portal, times, "Portal home, as a proxy", typing: false, () => "/portal"));
+                    results.Add(await MeasureAsync(portal, times, "Portal results, as a proxy", typing: false, () => "/portal/results"));
                 }
                 finally
                 {
@@ -817,6 +833,25 @@ internal static partial class RenderBenchmark
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return thread.Id;
+    }
+
+    // The clinician records a proxy for a patient on their panel, through the app's own service and the database's rules.
+    static async Task<Guid> RecordProxyAsync(BenchApp app, Guid clinicianId, Guid patient, string proxyEmail)
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var access = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Proxies.ProxyAccess>();
+        if (await access.GiveAsync(patient, [], proxyEmail, Ehr.Data.Proxies.ProxyScope.RecordAndMessages, includeSensitive: false, 30, CancellationToken.None)
+            != Ehr.Domain.Proxies.GiveResult.Given)
+        {
+            throw new InvalidOperationException("The benchmark's proxy grant was refused.");
+        }
+
+        var grant = await db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM ehr.proxy_grants WHERE patient_id = {patient} AND revoked_at IS NULL").SingleAsync();
+        await transaction.CommitAsync();
+        return grant;
     }
 
     // The portal patient's own conversation: the clinician puts them on the panel first, since only the care team writes.

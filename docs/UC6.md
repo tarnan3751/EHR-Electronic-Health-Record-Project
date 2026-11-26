@@ -56,15 +56,13 @@ These need line-by-line review by someone other than Simar (AGENTS.md):
 - Results are numeric only. A text result such as "negative" gets no flag and the "ask your care team" wording.
 - Dates are shown in UTC, labelled, since the app has no clinic time zone yet. A sample taken on a Chicago evening shows the next day's date.
 
-## Not built
+## Built since the first version
 
-The A3 UC 6 specification includes these; they are listed as remaining work in the SE document (section 7.5).
-
-| Part of UC 6 | Requirement | What's left |
-|---|---|---|
-| Step 1 alternative: a proxy chooses which patient's records to view | FR-19 | A proxy authorization table, a patient picker after sign-in, and row-level security keyed on the chosen patient rather than the account's own |
+The A3 UC 6 specification includes appointments, secure messages and proxy access, which the SE document lists as remaining work (section 7.5). All three are now built:
 
 **Appointments (FR-17) are built** (the expansion plan's step 4, by Tahseen Arnan). The portal's home page lists the patient's next three appointments, and `/portal/appointments` lists all of them: those coming up, soonest first, and earlier ones, with "Attended", "Missed" or "Cancelled". Each shows the date written out, the time in UTC, the length, the clinician and the reason the clinic entered. There is no self-scheduling: the page says to contact the clinic. The patient comes from the session; row-level security returns only their own appointments; the page is one recorded read. Staff book and change appointments as `docs/UC16.md` describes. Test case TC-UC6-07 (`TC_UC6_07_Appointments.cs`) covers the portal's side, off-site included.
+
+**Proxy access (FR-19) is built** (the expansion plan's step 6, by Tahseen Arnan). Under **Access**, "Records you can view" lists the records someone has shared with the signed-in account; **View this record** switches the portal to that patient, and every page then carries a band saying whose record it is, with **Back to my own record**. The proxy sees that patient's record, results and appointments, and messages when the access includes them, and never their own record at the same time. Everything they open is recorded under their own account and the patient. A record is chosen by naming the access that was given, never a patient, and the database checks on every query that the access is theirs and still in force; when it ends, their next page is their own record and says so. Giving and removing access is `docs/UC18.md`. Test cases TC-UC6-10 (`TC_UC6_10_ProxyChoosesRecord.cs`) and TC-UC6-11 (`TC_UC6_11_ProxyLimits.cs`). One difference from the A3 specification: the record is chosen under Access, not on a picker straight after sign-in; a proxy always lands on their own record first.
 
 **Secure messages (FR-18) are built** (the expansion plan's step 5, by Tahseen Arnan). **Messages** in the portal lists the patient's conversations with their care team, the latest first, with "New" on any that has an unread reply. **Write to your care team** starts one with a subject and a message; a conversation's page shows every message in order, the patient's as "You" and staff's as "Your care team", and has a reply box. The patient comes from the session; a conversation that isn't theirs is not found. Opening one is a recorded read. When the clinic's server can't be reached, the pages stay readable and say "Read-only: messages can't be sent until the clinic's server is back." A reply from the clinic sends an email that says only that there is a new message. The clinician's side is `docs/UC17.md`. Test cases TC-UC6-08 (`TC_UC6_08_SendMessage.cs`) and TC-UC6-09 (`TC_UC6_09_MessagesRefused.cs`).
 

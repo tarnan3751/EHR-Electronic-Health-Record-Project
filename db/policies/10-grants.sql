@@ -120,6 +120,14 @@ GRANT SELECT, INSERT ON ehr.orders TO ehr_app;
 GRANT UPDATE (status, discontinue_reason, replaced_by_order_id) ON ehr.orders TO ehr_app;
 GRANT SELECT ON ehr.orders TO ehr_read;
 
+-- Proxy grants (FR-19). PHI: row-level security and the write-audit trigger follow. The patient, or a clinician with
+-- them on their panel, gives one: INSERT. The only UPDATEs are revoking it and, for the patient, changing whether
+-- sensitive items are included, on those columns alone; a trigger holds them to that (95-proxy-access.sql). Never
+-- DELETE: a grant that ended stays as the record of who could see what, and when.
+GRANT SELECT, INSERT ON ehr.proxy_grants TO ehr_app;
+GRANT UPDATE (include_sensitive, revoked_at, revoked_by) ON ehr.proxy_grants TO ehr_app;
+GRANT SELECT ON ehr.proxy_grants TO ehr_read;
+
 -- Secure messages (FR-18). PHI: row-level security and the write-audit trigger follow. A patient and their care
 -- team start threads and send messages: INSERT. Nothing edits a thread or a message: the one UPDATE is recording when
 -- the other side first read a message, on that column alone, and a trigger holds it to that (90-messages.sql). Never

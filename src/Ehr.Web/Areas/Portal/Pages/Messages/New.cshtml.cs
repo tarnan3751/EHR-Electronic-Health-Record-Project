@@ -13,7 +13,7 @@ namespace Ehr.Web.Areas.Portal.Pages.Messages;
 // has the patient on their panel. Off-site the post is forwarded to the clinic's server; when that can't be reached
 // the cloud app's "Not saved" page shows what was typed again (UC 2, ShownIfNotSaved).
 [ShownIfNotSaved(nameof(Subject), nameof(Body))]
-public class NewModel(SecureMessages messages) : PageModel
+public class NewModel(PortalSubject subject, SecureMessages messages) : PageModel
 {
     [BindProperty]
     public string? Subject { get; set; }
@@ -27,27 +27,47 @@ public class NewModel(SecureMessages messages) : PageModel
     // has the focus.
     public bool About { get; private set; }
 
-    public void OnGet() => Response.Headers.CacheControl = "no-store";
+    // Whether these are someone else's messages, read as a proxy (FR-19): the page then doesn't call them "yours".
+    public bool Acting => subject.Acting is not null;
+
+    public IActionResult OnGet()
+    {
+        Response.Headers.CacheControl = "no-store";
+        // A proxy whose grant doesn't include messages (FR-19) is sent to the page that says so.
+        return subject.MayMessage ? Page() : RedirectToPage("Index");
+    }
 
     // The results page posts the subject here, so it stays out of the address. Nothing is saved: the form comes back
     // with the subject filled in, for the patient to write the message and send it. The subject is the patient's to
     // change, like any they type, and is cut to the length a subject may have.
-    public void OnPostAbout()
+    // A proxy whose grant doesn't include messages is sent to the page that says so, as from the form itself.
+    public IActionResult OnPostAbout()
     {
         Response.Headers.CacheControl = "no-store";
+        if (!subject.MayMessage)
+        {
+            return RedirectToPage("Index");
+        }
+
         About = true;
-        var subject = Subject?.Trim();
-        Subject = subject?.Length > SecureMessages.MaximumSubject ? subject[..SecureMessages.MaximumSubject] : subject;
+        var typed = Subject?.Trim();
+        Subject = typed?.Length > SecureMessages.MaximumSubject ? typed[..SecureMessages.MaximumSubject] : typed;
         Body = null;
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         Response.Headers.CacheControl = "no-store";
+        if (!subject.MayMessage)
+        {
+            return RedirectToPage("Index");
+        }
+
         var errors = SecureMessages.Check(Subject, Body, reply: false);
         if (errors.Count == 0)
         {
-            var patientId = Guid.Parse(User.FindFirstValue(EhrClaims.PatientId)!);
+            var patientId = subject.PatientId;
             var (result, thread) = await messages.StartAsync(patientId, MessageSender.Patient, Subject!, Body!, HttpContext.RequestAborted);
             if (result == SendResult.Sent)
             {

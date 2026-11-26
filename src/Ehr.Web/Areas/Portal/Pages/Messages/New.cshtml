@@ -3,10 +3,10 @@
 @model Ehr.Web.Areas.Portal.Pages.Messages.NewModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
-    ViewData["Title"] = "Write to your care team";
+    ViewData["Title"] = Model.Acting ? "Write to the care team" : "Write to your care team";
 }
-<p><a asp-page="Index">Back to your messages</a></p>
-<h1>Write to your care team</h1>
+<p><a asp-page="Index">@(Model.Acting ? "Back to the messages" : "Back to your messages")</a></p>
+<h1>@ViewData["Title"]</h1>
 @if (!OnPrem.IsReachable)
 {
     <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> messages can't be sent until the clinic's server is back.</p>
