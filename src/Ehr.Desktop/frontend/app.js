@@ -107,7 +107,7 @@ function renderUpdate(update) {
   text.className = `sc-notice sc-notice--${update.state === 'failed' ? 'warning' : 'info'}`;
   text.replaceChildren(el('span', { className: 'sc-notice__state', textContent: state }), words);
   byId('update-accept').hidden = update.state !== 'offered';
-  byId('update-dismiss').hidden = update.state !== 'offered';
+  byId('update-dismiss').hidden = update.state !== 'offered' && update.state !== 'failed';
   byId('update-restart').hidden = update.state !== 'ready';
 }
 

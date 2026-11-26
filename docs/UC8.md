@@ -50,8 +50,8 @@ start, with nothing sent and nothing brought back applied. When the administrato
 next of those answers is `revoked`, and the app is wiped. The token goes only when the person signs out on that
 computer, which a server that says `revoked` turns into the wipe too, or when a new full sign-in replaces it. What that
 costs the server: one refused request every 5 minutes for each such computer, with no audit event and no lockout count;
-the authentication handler's log line at Information, "Desktop was not authenticated", as for any refused token. The sync
-client follows no redirect, so only the servers named ever answer.
+the authentication handler's log line at Information, "Desktop was not authenticated", as for any refused token. Neither
+the sync client nor the updater follows a redirect, so only the servers named ever answer.
 
 ## Updates, and the oldest build that may sync (the plan's step 20)
 
@@ -64,7 +64,8 @@ installs a release only if it's newer than itself and signed with the key built 
 
 A site can also refuse to sync with a build older than `Ehr:Desktop:MinimumVersion` (Tahseen's 15a: "the server can
 name a minimum version and refuse sync below it"). The app says its version in `Ehr-Desktop-Version` on every request;
-one older, or a build from before step 20, which says nothing, gets 426 from the sync API and the desktop's data
+one older, or a build from before step 20, which says nothing, or a pre-release such as 0.3.0-beta, which isn't read as
+a version and so is always below any minimum, gets 426 from the sync API and the desktop's data
 (the chart download, the drafts, the offline recordings), with the minimum in `Ehr-Desktop-Minimum` and "Update
 needed: the clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the
 offline charts can still be read." Sign-in, the lock's check of the password, sign-out and the updates are never

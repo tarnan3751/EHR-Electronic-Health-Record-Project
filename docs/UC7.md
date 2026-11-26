@@ -191,10 +191,11 @@ only: the page has no permission for the updater.
   interrupted download fails the same check. The signing key never reaches CI (`docs/desktop-install.md`).
 - **When:** it asks, and only while the window is unlocked and nothing is recording: "Update available: SwiftChart ….
   Get it ready, and it installs when you restart SwiftChart; nothing you've saved is affected.", with **Get it ready**
-  and **Not now**, which puts it away until the next start. Got ready, on macOS the checked app replaces this one on
-  disk at once, swapped whole, and runs from the next start; on Windows its installer runs at **Restart now**, quietly,
-  for this user, and starts the new version (quitting instead offers it again at the next start). **Restart now** is
-  refused while recording. A start after an update opens on the lock, as every start with a sign-in kept does, and what
+  and **Not now**, which puts it away; a notice that it failed can be put away too. The daily check goes on all the
+  same, and offers a release again unless it's the one put away; a check gives up after 30 seconds. Got ready, on macOS
+  the checked app replaces this one on disk at once, swapped whole, and runs from the next start; on Windows its
+  installer runs at **Restart now**, showing its progress, for this user, and starts the new version (quitting instead
+  offers it again at the next start). **Restart now** is refused while recording. A start after an update opens on the lock, as every start with a sign-in kept does, and what
   the app keeps is untouched: the identifier is the same.
 - **Below the minimum** a server names (`docs/UC8.md`), the status says the server's words, "Update needed: the
   clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the offline charts can

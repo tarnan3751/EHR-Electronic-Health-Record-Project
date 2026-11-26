@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 
@@ -13,8 +14,10 @@ namespace Ehr.Web.Api.Desktop;
 // platform's url a file name in that folder ("darwin-aarch64": { "signature": "…", "url":
 // "SwiftChart.app.tar.gz" }), answered with that platform's entry alone and its url on the site that was asked, so
 // the clinic's server and the cloud app each hand out their own copy; 204 with no folder, no release, or nothing for
-// the platform. The app decides whether the release is newer than itself, and never takes an older one. The files,
-// GET /api/desktop/updates/files/{name}: any file directly in the folder, by its name alone.
+// the platform, and with a latest.json it can't read, which it logs. The app decides whether the release is newer than
+// itself, and never takes an older one. The files, GET /api/desktop/updates/files/{name}: any regular file directly in
+// the folder, by its name alone, never a link to somewhere else. Neither route is rate-limited (AccountRateLimits counts
+// account posts only); a proxy in front of an internet-facing site is where to limit them.
 //
 // The minimum version, Ehr:Desktop:MinimumVersion (none when empty): a request to sync or to the desktop's data
 // (DesktopVersionFilter), from a build that says it is older in Ehr-Desktop-Version, or says nothing, as builds from
@@ -69,15 +72,31 @@ public static class DesktopUpdates
     public static Version? ParseVersion(string? text) =>
         Version.TryParse(text?.Trim(), out var version) ? new Version(version.Major, version.Minor, Math.Max(version.Build, 0)) : null;
 
-    static async Task<IResult> Release(string platform, HttpRequest request, IOptionsMonitor<DesktopUpdateOptions> options, CancellationToken cancellationToken)
+    static async Task<IResult> Release(
+        string platform, HttpRequest request, IOptionsMonitor<DesktopUpdateOptions> options, ILoggerFactory loggers, CancellationToken cancellationToken)
     {
         if (options.CurrentValue.UpdatesFolder is not { Length: > 0 } folder || !System.IO.File.Exists(Path.Combine(folder, Manifest)))
         {
             return Results.NoContent();
         }
 
-        var release = JsonNode.Parse(await System.IO.File.ReadAllTextAsync(Path.Combine(folder, Manifest), cancellationToken))!.AsObject();
-        if (release["platforms"]?[platform] is not JsonObject entry || entry["url"]?.GetValue<string>() is not { } name || !IsFileName(name))
+        JsonObject release;
+        string? name;
+        JsonObject? entry;
+        try
+        {
+            release = JsonNode.Parse(await System.IO.File.ReadAllTextAsync(Path.Combine(folder, Manifest), cancellationToken))!.AsObject();
+            entry = release["platforms"]?[platform] as JsonObject;
+            name = entry?["url"]?.GetValue<string>();
+        }
+        catch (Exception problem) when (problem is JsonException or InvalidOperationException or NullReferenceException)
+        {
+            // A release put up by hand, written wrong: no update until it's put right, which the log says.
+            loggers.CreateLogger(typeof(DesktopUpdates)).LogWarning("The desktop updates' {Manifest} can't be read: {Problem}", Manifest, problem.Message);
+            return Results.NoContent();
+        }
+
+        if (entry is null || name is null || !IsFileName(name))
         {
             return Results.NoContent();
         }
@@ -99,11 +118,20 @@ public static class DesktopUpdates
         return Results.Text(answer.ToJsonString(), "application/json");
     }
 
-    static IResult UpdateFile(string name, IOptionsMonitor<DesktopUpdateOptions> options) =>
-        options.CurrentValue.UpdatesFolder is { Length: > 0 } folder && IsFileName(name) && name != Manifest
-            && System.IO.File.Exists(Path.Combine(folder, name))
-            ? Results.File(Path.Combine(Path.GetFullPath(folder), name), "application/octet-stream", enableRangeProcessing: true)
+    static IResult UpdateFile(string name, IOptionsMonitor<DesktopUpdateOptions> options)
+    {
+        if (options.CurrentValue.UpdatesFolder is not { Length: > 0 } folder || !IsFileName(name) || name == Manifest)
+        {
+            return Results.NotFound();
+        }
+
+        // A regular file in the folder itself: not a link, which could lead out of it.
+        var file = new FileInfo(Path.Combine(Path.GetFullPath(folder), name));
+        return file.Exists && file.LinkTarget is null && !file.Attributes.HasFlag(FileAttributes.ReparsePoint)
+            && file.DirectoryName == Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar)
+            ? Results.File(file.FullName, "application/octet-stream", enableRangeProcessing: true)
             : Results.NotFound();
+    }
 
     // A plain name of a file in the folder: no folder in it, nothing hidden.
     static bool IsFileName(string name) =>
