@@ -100,6 +100,12 @@ builder.Services.AddAccountRateLimits(rateLimits,
 
 // The portal's emails: through the mail server in Ehr:Smtp when there is one, otherwise into the log, for development.
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.Section));
+// The desktop app's updates and the oldest build that may sync (Api/Desktop/DesktopUpdates.cs): a minimum that isn't a
+// version stops the app at start, rather than refuse every build.
+builder.Services.AddOptions<DesktopUpdateOptions>().Bind(builder.Configuration.GetSection(DesktopUpdateOptions.Section))
+    .Validate(desktop => string.IsNullOrWhiteSpace(desktop.MinimumVersion) || desktop.Minimum is not null,
+        "Ehr:Desktop:MinimumVersion must be a version, such as 0.2.1, or empty.")
+    .ValidateOnStart();
 // They go out from a queue in memory (QueuedEmailSender), so a response never waits for the mail server, and one
 // address gets only so many an hour (CappedEmailSender).
 var emailSender = builder.Configuration[$"{SmtpOptions.Section}:Host"] is { Length: > 0 } ? typeof(SmtpEmailSender) : typeof(LoggingEmailSender);
@@ -231,7 +237,8 @@ app.MapRazorPages().WithStaticAssets();
 // The desktop app signs in at /api/desktop and sends the session token it gets with every sync request. Both APIs
 // take the Desktop policy: a clinician's session token, and nothing else (Api/Desktop, Api/Sync).
 app.MapDesktopApi();
-app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop);
+// Both refuse the desktop's data to a build older than Ehr:Desktop:MinimumVersion (DesktopUpdates.cs, step 20).
+app.MapQuickTextSync().RequireAuthorization(EhrPolicies.Desktop).AddEndpointFilter<DesktopVersionFilter>();
 // The cloud app ships its audit events here, with the key both apps share. Without a key (an on-prem app run on its
 // own, as in "Running the apps") there's no cloud app and no door.
 if (site == Site.OnPrem && builder.Configuration["Ehr:CloudAudit:Key"] is { Length: > 0 })

@@ -104,6 +104,7 @@ jobs:
           docker compose config --quiet
           docker compose -f compose.yaml -f compose.nvidia.yaml config --quiet
           docker compose -f compose.yaml -f compose.backup-drill.yaml config --quiet
+          docker compose -f compose.yaml -f compose.desktop-updates.yaml config --quiet
 
       # The monitoring profile's configuration, with the tools of the versions compose.yaml pins: Prometheus's, every
       # alert held to its threshold and wait by its tests (infra/monitoring/alerts*.test.yml), Alertmanager's (the

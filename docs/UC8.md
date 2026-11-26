@@ -41,6 +41,24 @@ locked out. So a computer that comes back after any time away is still wiped. On
 gets it (`revoked_by`); a sign-out's token, or any other session that is over, gets the plain 401 it always did, and the
 app keeps what it holds.
 
+## Updates, and the oldest build that may sync (the plan's step 20)
+
+Each site hands the desktop app its updates, from a folder named in its settings (`Ehr:Desktop:UpdatesFolder`;
+`src/Ehr.Web/Api/Desktop/DesktopUpdates.cs`): `GET /api/desktop/updates/{platform}/{version}`, with nobody signed in,
+so a copy signed out or wiped can update too, answers with the release's entry for that platform, its file's address
+on the site that was asked, or 204 when there is none; `GET /api/desktop/updates/files/{name}` gives the file. The app
+installs a release only if it's newer than itself and signed with the key built into it for the version announced
+(`docs/UC7.md`); the server signs nothing.
+
+A site can also refuse to sync with a build older than `Ehr:Desktop:MinimumVersion` (Tahseen's 15a: "the server can
+name a minimum version and refuse sync below it"). The app says its version in `Ehr-Desktop-Version` on every request;
+one older, or a build from before step 20, which says nothing, gets 426 from the sync API and the desktop's data
+(the chart download, the drafts, the offline recordings), with the minimum in `Ehr-Desktop-Minimum` and "Update
+needed: the clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the
+offline charts can still be read." Sign-in, the lock's check of the password, sign-out and the updates are never
+refused for the version. 426, not a 401, which every build takes as its token refused, nor a 403, which a build from
+before step 20 takes as a waiting recording refused for good.
+
 ## Test cases
 
 - **TC-UC8-07** (`tests/Ehr.Web.Tests/TestCases/UC8/TC_UC8_07_TwelveHourDesktopSignIn.cs`): a desktop token syncs at 11
@@ -51,6 +69,13 @@ app keeps what it holds.
   with `Ehr-Sign-In: revoked` on a sync and an unlock on the on-site app and a sync and a forwarded chart download on
   the cloud app, and still are after the password changes and 31 days pass; a signed-out token of the same account
   never carries the header.
+- **TC-UC8-10** (`tests/Ehr.Web.Tests/TestCases/UC8/TC_UC8_10_MinimumDesktopVersion.cs`): with a minimum of 0.3.0, no
+  version, 0.2.0 and 0.2.9 are refused a sync on both sites and a chart download with 426, the minimum and the words;
+  0.3.0, 0.3 and 1.0.0 sync; sign-in, a wrong password at the lock and sign-out are answered as ever; with no minimum
+  nothing is refused.
+- **TC-UC8-11** (`tests/Ehr.Web.Tests/TestCases/UC8/TC_UC8_11_DesktopUpdates.cs`): each site, asked with no cookie or
+  token, hands out the release's macOS entry alone with its file at its own address, and the file; nothing for a
+  platform with none or with no folder; and no file outside the folder, nor `latest.json` or one not there.
 - **TC-UC8-08** (`src/Ehr.Desktop/src-tauri/src/sync.rs`, `an_ended_sign_in_keeps_the_session_and_says_so`): a round
   answered with `Ehr-Sign-In: ended` keeps the session and the offline charts open, says a sign-in is needed, tells the
   lock once, and sends nothing; a chart download answered so says the same.

@@ -27,6 +27,9 @@ namespace Ehr.Web.Api.Desktop;
 // (AccountRateLimits).
 //
 // Sign-out, POST /api/desktop/sign-out with the token: 204, and the token never works again.
+//
+// The updates, and the minimum version below which the desktop's data is refused (the expansion plan's step 20), are
+// in DesktopUpdates.cs: sign-in, unlock and sign-out are never refused for the version.
 public static class DesktopApi
 {
     public static IEndpointRouteBuilder MapDesktopApi(this IEndpointRouteBuilder endpoints)
@@ -35,9 +38,12 @@ public static class DesktopApi
         desktop.MapPost("/sign-in", SignInAsync).AllowAnonymous();
         desktop.MapPost("/unlock", UnlockAsync);
         desktop.MapPost("/sign-out", SignOutAsync);
-        desktop.MapPost("/offline-panel", OfflinePanelAsync);
-        desktop.MapDraftSync();
-        desktop.MapOfflineDictation();
+        desktop.MapDesktopUpdates();
+        // The desktop's data, refused to a build older than the minimum (DesktopVersionFilter).
+        var data = desktop.MapGroup("").AddEndpointFilter<DesktopVersionFilter>();
+        data.MapPost("/offline-panel", OfflinePanelAsync);
+        data.MapDraftSync();
+        data.MapOfflineDictation();
         return endpoints;
     }
 
