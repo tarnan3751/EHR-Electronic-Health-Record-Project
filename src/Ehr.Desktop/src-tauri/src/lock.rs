@@ -7,7 +7,7 @@
 //! - At the sign-in's 12-hour end (SessionTimes.Longest), warned once 2 minutes before, or as soon as the server says it
 //!   has passed. Once only: a lock opened then with the password alone, because no server could complete a sign-in,
 //!   isn't locked again by each server that says so; every lock after it asks for a full sign-in.
-//! - When the server ends the session (signed out elsewhere, a changed password, an account locked or disabled).
+//! - When the server ends the session (a changed password, the account locked or disabled, the session's 30 days).
 //! - At launch, whenever a sign-in is kept, so quitting never skips the lock.
 //!
 //! A recording being made counts as activity and holds every lock and warning off, for 5 minutes at most: the desktop

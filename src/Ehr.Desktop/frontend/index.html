@@ -48,6 +48,8 @@
     <form id="sign-in" class="sc-form" hidden>
       <h2>Sign in to sync</h2>
       <p>With your clinic account, and the code from your authenticator app or one of your recovery codes.</p>
+      <!-- Why the kept sign-in was forgotten as the app started, when it was (src-tauri/src/main.rs, starting_lock). -->
+      <p id="sign-in-notice" class="sc-notice sc-notice--warning" hidden></p>
       <div class="sc-field">
         <label class="sc-field__label" for="sign-in-email">Email</label>
         <input class="sc-field__input" id="sign-in-email" name="email" type="email" autocomplete="username" required>
@@ -60,8 +62,6 @@
         <label class="sc-field__label" for="sign-in-code">Code</label>
         <input class="sc-field__input sc-field__input--mono" id="sign-in-code" name="code" autocomplete="one-time-code" required>
       </div>
-      <!-- Why the kept sign-in was forgotten as the app started, when it was (src-tauri/src/main.rs, starting_lock). -->
-      <p id="sign-in-notice" class="sc-notice sc-notice--warning" hidden></p>
       <p id="sign-in-problem" class="sc-notice sc-notice--danger" role="alert" hidden></p>
       <button class="sc-btn sc-btn--primary">Sign in</button>
     </form>

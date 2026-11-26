@@ -718,7 +718,7 @@ const lockReasons = {
   asked: () => ['Locked:', ' this window was locked.'],
   longest: () => ['Locked:', ' a sign-in lasts at most 12 hours.'],
   wrongPasswords: () => ['Locked:', ' too many wrong passwords were typed here.'],
-  ended: () => ['Signed out:', ' the server ended this sign-in: signed out on another computer, a changed password, or an account locked or disabled.'],
+  ended: () => ['Signed out:', ' the server ended this sign-in: your password was changed, your account was locked or disabled, or it is 30 days since you signed in.'],
 };
 
 const lockHow = {
@@ -756,7 +756,7 @@ function renderSignInNeeded(view) {
   byId('sign-in-needed-text').replaceChildren(
     el('span', { className: 'sc-notice__state', textContent: serverAnswered ? 'Sign in again:' : 'Offline:' }),
     serverAnswered
-      ? ' a sign-in lasts at most 12 hours, and the clinic\'s server can be reached.'
+      ? ' a sign-in lasts at most 12 hours, and a server is answering. If signing in says the clinic\'s server can\'t be reached, your password alone still opens the offline charts.'
       : ' a sign-in with your code is needed as soon as the clinic\'s server can be reached.',
     ` ${chartsUpdatedText(view.chartsUpdated)} Drafts and recordings are saved on this computer and sent after you sign in.`,
   );

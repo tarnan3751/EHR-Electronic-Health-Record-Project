@@ -22,8 +22,8 @@ and 10a, 11b and 12b of 25 November 2026; proposed FR-68). `src/Ehr.Desktop/src-
   locked already.
 - **At the sign-in's 12-hour end**, warned once 2 minutes before ("Keep working" closes that warning for good), or as
   soon as a server says the 12 hours are over (`docs/UC8.md`). Once only: see "Past the 12 hours" below.
-- **When the server ends the session** (signed out on another computer, a changed password, an account locked or
-  disabled). Before this step the page was cleared then; now it's kept under the lock for the same clinician.
+- **When the server ends the session** (a changed password, the account locked out or disabled, or the session's 30
+  days). Before this step the page was cleared then; now it's kept under the lock for the same clinician.
 - **At every launch with a sign-in kept**, so quitting never skips the lock. A sign-in kept by an earlier build, which has
   no record of the lock's, is forgotten at the first launch of this one: sign in again.
 - **Never over a recording.** A recording being made, and its save, hold every lock and warning off, for 5 minutes at

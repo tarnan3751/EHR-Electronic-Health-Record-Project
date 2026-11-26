@@ -17,8 +17,8 @@ busy the app is, as a web sign-in does (Tahseen's ruling 11b of 25 November 2026
 - **After the 12 hours** every request with the token is refused, on the clinic's site and on the cloud app alike, with a
   401 that carries `Ehr-Sign-In: ended` (`DesktopTokenHandler.cs`). Nothing is sent or brought back: Quick text, the
   drafts' pull and push, recordings' uploads and **Download my charts** all wait for a sign-in with both factors.
-- **Every other refusal** (signed out on another computer, a changed password, an account locked out or disabled) carries
-  no such header: that session is over.
+- **Every other refusal** (a session signed out here, a changed password, an account locked out or disabled, or the
+  session's 30 days) carries no such header: that session is over.
 - **In the app** (`src/Ehr.Desktop/src-tauri/src/sync.rs`): the 12-hour answer keeps the session and the offline copy,
   says "Sign in again: a sign-in lasts at most 12 hours. Nothing is sent or brought back until you do, and what you save
   here waits on this computer.", and locks the window once for a full sign-in (`docs/UC7.md`). Any other 401 forgets the
