@@ -9,7 +9,10 @@
 //! outlasts the app. Every sync request carries its token: signed out, a round sends nothing, and a server that
 //! refuses the token (401) ends the session here too, unless it says the sign-in's 12 hours are over ("Ehr-Sign-In:
 //! ended", the expansion plan's step 19a): then the session and its offline copy are kept, and nothing more is sent
-//! until a full sign-in. Either way main.rs hears of it (take_ending) and locks the window. A 401 that says an
+//! until a full sign-in. An ended session opens nothing, but its token is kept, not forgotten, until the person signs
+//! out here or signs in again (step 20's final review): a round then only presents it, every 5 minutes (main.rs), and
+//! applies nothing, so that an administrator who revokes it afterwards, after disabling the account, say, still
+//! reaches this computer. Either way main.rs hears of it (take_ending) and locks the window. A 401 that says an
 //! administrator revoked the sign-in ("Ehr-Sign-In: revoked", step 20) keeps the session too, and main.rs deletes
 //! everything the app keeps here, the session last (wipe.rs): nothing else ever leads there. Every request says the
 //! app's version (Ehr-Desktop-Version); a server that refuses it as too old (426, step 20's minimum version) is a
@@ -56,6 +59,11 @@ const UNLOCK_WAIT: Duration = Duration::from_secs(5);
 const OFFLINE_PANEL: &str = "/api/desktop/offline-panel";
 /// The most the server takes in one push (QuickTextSync.MaxOperations).
 const BATCH: usize = 100;
+/// What an ended session's round asks for: changes since a watermark no transaction reaches, so nothing comes back.
+const PROBE: &str = "/api/sync/quick-texts?since=18446744073709551615";
+/// Said of an ended session: the window's lock asks for a full sign-in (main.rs).
+const ENDED: &str = "Signed out: the server ended this sign-in. Sign in again with your password and the code from \
+                     your authenticator app; nothing on this computer opens until you do.";
 
 pub struct Sync {
     http: Client,
@@ -168,7 +176,10 @@ impl Sync {
             reqwest::header::HeaderValue::from_str(version)
                 .map_err(|_| format!("{version} isn't a version"))?,
         );
+        // Only the servers named answer: a redirect to another host is an answer from that host, which could carry the
+        // remote wipe's marker (step 20's final review), so none is followed.
         let http = Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
             .default_headers(headers)
             .connect_timeout(Duration::from_secs(3))
             .timeout(Duration::from_secs(20))
@@ -232,6 +243,11 @@ impl Sync {
         }
     }
 
+    /// The server ended the kept session: it opens nothing, and a round only presents its token.
+    pub fn session_ended(&self) -> bool {
+        self.session().as_ref().is_some_and(|session| session.ended)
+    }
+
     /// The name of the clinician signed in, for the page; none while signed out.
     pub fn account(&self) -> Option<String> {
         self.session()
@@ -255,6 +271,9 @@ impl Sync {
             .as_ref()
             .filter(|current| token.is_none_or(|token| token == current.token.as_str()))
             .ok_or_else(|| "Sign in as a clinician to use offline charts.".to_owned())?;
+        if current.ended {
+            return Err(ENDED.to_owned());
+        }
         let access = current.offline_access.as_ref().ok_or_else(|| {
             "Sign out and sign in on the updated server to use offline charts.".to_owned()
         })?;
@@ -291,8 +310,7 @@ impl Sync {
                         .to_owned(),
                 );
             }
-            let _ = self.forget(&token);
-            self.ended(Ending::Session);
+            self.end(&token);
             return Err("The session ended. Sign in again to download charts.".to_owned());
         }
         if response.status() == StatusCode::UPGRADE_REQUIRED {
@@ -394,8 +412,7 @@ impl Sync {
                     self.ended(Ending::SignIn);
                     return Unlock::SignInEnded;
                 }
-                let _ = self.forget(&token);
-                self.ended(Ending::Session);
+                self.end(&token);
                 return Unlock::SessionOver;
             }
             if status.is_server_error() {
@@ -410,18 +427,23 @@ impl Sync {
     }
 
     /// Ends the session on the first server that answers, if any does, then forgets it here whatever the answer: a
-    /// server that can't be reached, or has already ended the session, doesn't keep the person signed in.
+    /// server that can't be reached, or has already ended the session, doesn't keep the person signed in. One that says
+    /// an administrator revoked it is told to main.rs instead, which deletes everything here, the session last.
     pub async fn sign_out(&self) -> Result<(), String> {
         let Some(token) = self.token() else {
             return Ok(());
         };
-        let _ = self
+        let answered = self
             .first_answer(|server| {
                 self.http
                     .post(format!("{server}{SIGN_OUT}"))
                     .bearer_auth(&token)
             })
             .await;
+        if answered.is_ok_and(|response| revoked(&response)) {
+            self.ended(Ending::Revoked);
+            return Ok(());
+        }
         self.forget(&token)
     }
 
@@ -434,6 +456,9 @@ impl Sync {
                 ),
             };
         };
+        if self.session_ended() {
+            return self.probe(&token).await;
+        }
         let mut unreachable = Vec::new();
         let mut answered = None;
         for server in &self.servers {
@@ -448,10 +473,8 @@ impl Sync {
                     unreachable.push(format!("{server} ({reason})"))
                 }
                 Err(Failure::SessionEnded) => {
-                    // Gone from memory either way. An entry the credential store couldn't delete is refused again at
-                    // the next launch, and deleted then.
-                    let _ = self.forget(&token);
-                    self.ended(Ending::Session);
+                    // Ended, its token kept for a revocation to reach (step 20's final review).
+                    self.end(&token);
                     return Report {
                         server: Some(server.clone()),
                         problem: Some("The session ended: sign in again to sync.".to_owned()),
@@ -824,6 +847,30 @@ impl Sync {
         }
     }
 
+    /// An ended session's round: its token presented to the first server that answers, for nothing but what it says
+    /// of it. Only the remote wipe's marker changes anything (main.rs); nothing is sent, and nothing brought back is
+    /// applied, whatever the answer.
+    async fn probe(&self, token: &str) -> Report {
+        match self
+            .first_answer(|server| self.http.get(format!("{server}{PROBE}")).bearer_auth(token))
+            .await
+        {
+            Ok(response) => {
+                if response.status() == StatusCode::UNAUTHORIZED && revoked(&response) {
+                    self.ended(Ending::Revoked);
+                }
+                Report {
+                    server: Some(response.url().origin().ascii_serialization()),
+                    problem: Some(ENDED.to_owned()),
+                }
+            }
+            Err(problem) => Report {
+                server: None,
+                problem: Some(problem),
+            },
+        }
+    }
+
     /// Sends the request `to` makes for each server in turn, until one answers. Err says why none did.
     async fn first_answer(&self, to: impl Fn(&str) -> RequestBuilder) -> Result<Response, String> {
         let mut unreachable = Vec::new();
@@ -842,6 +889,18 @@ impl Sync {
 
     fn token(&self) -> Option<String> {
         self.session().as_ref().map(|session| session.token.clone())
+    }
+
+    /// The server refused `token`, not saying it was revoked: the session is marked ended, here and in the credential
+    /// store, and told to main.rs, unless a sign-in has replaced it since `token` was sent. An entry the credential store
+    /// couldn't write is ended in memory all the same, and refused again at the next launch.
+    fn end(&self, token: &str) {
+        let mut current = self.session();
+        if let Some(session) = current.as_mut().filter(|session| session.token == token) {
+            session.ended = true;
+            let _ = key::save_session(&self.saved, session);
+            self.ended(Ending::Session);
+        }
     }
 
     /// Forgets the session, here and in the credential store, unless a sign-in has replaced it since `token` was sent.
@@ -1341,9 +1400,11 @@ mod tests {
         assert_eq!(store::lock(&store).pending(10).unwrap().len(), 1);
     }
 
-    /// The server answers 401 when the session has expired or been revoked, or the account is locked out.
+    /// The server answers 401 when the session has expired or ended, or the account is locked out. Since step 20's final
+    /// review the session is ended here, not forgotten: it opens nothing, and its token is kept for a later revocation to
+    /// reach; the next round only presents it, and applies nothing.
     #[tokio::test]
-    async fn a_refused_session_is_forgotten() {
+    async fn a_refused_session_is_ended_and_its_token_kept() {
         let refuses = FakeServer::start(|_| (401, "{}".to_owned()));
         let applies = FakeServer::start(server_that_applies);
         let store = memory_store();
@@ -1365,11 +1426,24 @@ mod tests {
             applies.requests().is_empty(),
             "not tried with a refused token"
         );
-        assert_eq!(client.account(), None);
-        assert_eq!(saved(&credentials), None);
+        let mut ended = session();
+        ended["ended"] = json!(true);
+        assert_eq!(saved(&credentials), Some(ended), "kept, and ended");
+        assert!(client.session_ended());
+        assert_eq!(client.account().as_deref(), Some("Dr. Example"));
         assert_eq!(client.take_ending(), Some(Ending::Session));
-        assert_eq!(next.server, None, "signed out now");
-        assert_eq!(refuses.requests().len(), 1);
+        assert_eq!(next.problem.as_deref(), Some(ENDED));
+        assert_eq!(
+            refuses.requests()[1],
+            (
+                format!("GET {PROBE}"),
+                Some("Bearer the-token".to_owned()),
+                String::new()
+            ),
+            "only presented"
+        );
+        assert_eq!(refuses.requests().len(), 2);
+        assert!(applies.requests().is_empty());
         assert_eq!(
             store::lock(&store).pending(10).unwrap().len(),
             1,
@@ -1411,7 +1485,7 @@ mod tests {
         assert_eq!(client.take_ending(), Some(Ending::Revoked));
 
         for (status, ending, kept) in [
-            (401, Some(Ending::Session), false),
+            (401, Some(Ending::Session), true),
             (SIGN_IN_ENDED, Some(Ending::SignIn), true),
             (426, None, true),
         ] {
@@ -1480,6 +1554,112 @@ mod tests {
                 .iter()
                 .all(|head| head.contains("ehr-desktop-version: 0.2.0"))
         );
+    }
+
+    /// Step 20's final review, the defect: an account disabled, or its password or authenticator changed, before an
+    /// administrator revokes it. The token is refused plainly first: the session ends here and opens nothing, and its
+    /// token is kept. The administrator then revokes it, and the next round, presenting the token, hears so, and the
+    /// wipe follows (main.rs). Nothing is ever forgotten in between.
+    #[tokio::test]
+    async fn a_revocation_made_after_the_session_ended_still_reaches_it() {
+        let answers = Arc::new(Mutex::new(0));
+        let counted = Arc::clone(&answers);
+        let server = FakeServer::start(move |_| {
+            let mut answered = counted.lock().unwrap();
+            *answered += 1;
+            (
+                if *answered == 1 { 401 } else { REVOKED_STATUS },
+                "{}".to_owned(),
+            )
+        });
+        let store = memory_store();
+        let credentials = credentials(Some(offline_session()));
+        let client = client_with(&[&server.url], &credentials);
+
+        client.round(&store).await;
+        assert_eq!(client.take_ending(), Some(Ending::Session));
+        assert!(
+            !client.offline_available(),
+            "an ended session opens nothing"
+        );
+        assert_eq!(
+            client.with_clinician(None, |_| Ok(())),
+            Err(ENDED.to_owned())
+        );
+
+        client.round(&store).await;
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert!(saved(&credentials).is_some(), "kept until the wipe ends");
+    }
+
+    /// Step 20's final review: an ended session is forgotten when the person signs out here, or replaced by a new full
+    /// sign-in; a sign-out the server answers with the remote wipe's marker is told to main.rs, which wipes, the session
+    /// kept until then.
+    #[tokio::test]
+    async fn an_ended_session_goes_at_a_sign_out_or_a_new_sign_in() {
+        let mut ended = offline_session();
+        ended["ended"] = json!(true);
+
+        let refuses = FakeServer::start(|_| (401, "{}".to_owned()));
+        let credentials_out = credentials(Some(ended.clone()));
+        let out = client_with(&[&refuses.url], &credentials_out);
+        assert_eq!(out.sign_out().await, Ok(()));
+        assert_eq!(saved(&credentials_out), None);
+        assert_eq!(out.take_ending(), None);
+
+        let signs_in = FakeServer::start(|_| (200, session().to_string()));
+        let credentials_in = credentials(Some(ended.clone()));
+        let again = client_with(&[&signs_in.url], &credentials_in);
+        assert!(again.session_ended());
+        again
+            .sign_in("clinician@example.com", "a password", "123456")
+            .await
+            .unwrap();
+        assert_eq!(saved(&credentials_in), Some(session()));
+        assert!(!again.session_ended());
+
+        let revoked = FakeServer::start(|_| (REVOKED_STATUS, "{}".to_owned()));
+        let credentials_revoked = credentials(Some(ended.clone()));
+        let wiped = client_with(&[&revoked.url], &credentials_revoked);
+        assert_eq!(wiped.sign_out().await, Ok(()));
+        assert_eq!(wiped.take_ending(), Some(Ending::Revoked));
+        assert_eq!(saved(&credentials_revoked), Some(ended));
+    }
+
+    /// Step 20's final review: a redirect is an answer from another host, and is never followed, so the remote wipe's
+    /// marker can come only from the servers named.
+    #[tokio::test]
+    async fn a_redirect_to_another_host_is_never_followed() {
+        let elsewhere = FakeServer::start(|_| (REVOKED_STATUS, "{}".to_owned()));
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let target = elsewhere.url.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let _ = read_request(&stream);
+                write!(
+                    stream,
+                    "HTTP/1.1 307 Temporary Redirect\r\nLocation: {target}{PATH}\r\nContent-Length: 0\r\n\
+                     Connection: close\r\n\r\n"
+                )
+                .unwrap();
+            }
+        });
+        let store = memory_store();
+        let signed_in = credentials(Some(offline_session()));
+        let client = client_with(&[&url], &signed_in);
+
+        client.round(&store).await;
+        let mut ended = offline_session();
+        ended["ended"] = json!(true);
+        let ended_credentials = credentials(Some(ended));
+        let ended_client = client_with(&[&url], &ended_credentials);
+        ended_client.round(&store).await;
+
+        assert_eq!(client.take_ending(), None);
+        assert_eq!(ended_client.take_ending(), None);
+        assert!(elsewhere.requests().is_empty(), "never asked");
     }
 
     /// A session with offline charts, signed in a while ago.
@@ -1588,7 +1768,7 @@ mod tests {
         let gone = client_with(&[&over.url], &credentials_gone);
         assert_eq!(gone.unlock("a password").await, Unlock::SessionOver);
         assert_eq!(gone.take_ending(), Some(Ending::Session));
-        assert_eq!(saved(&credentials_gone), None);
+        assert!(gone.session_ended(), "ended, its token kept");
     }
 
     /// TC-UC7-10: the lock's full sign-in says whether a server refused it, which stands, or none could complete it.

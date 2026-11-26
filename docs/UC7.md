@@ -133,8 +133,8 @@ as soon as no recording holds it off, and also opens on that lock at start: "Loc
 days after a sign-in, and yours have passed. Nothing on this computer was deleted." Only a full sign-in, the password
 and the code, opens it, and only once a server can complete one: the password alone is never enough, whether or not a
 server can be reached (`lock.rs`, `Why::OfflineEnded`). Nothing is deleted, and the session is kept, so the next server
-to answer says what became of it: a revoked one is wiped (below); one merely over is forgotten, keeping what the
-computer holds, as before. The commands that read the offline charts already refused them after the 30 days; this
+to answer says what became of it: a revoked one is wiped (below); one merely over is ended, keeping what the
+computer holds and its token (below). The commands that read the offline charts already refused them after the 30 days; this
 closes a chart that was open when they passed. Setting the computer's clock back delays it, as it delays the 12-hour
 lock (the decision log, step 19a); changing the clock needs the computer's administrator.
 
@@ -143,8 +143,15 @@ lock (the decision log, step 19a); changing the clock needs the computer's admin
 When an administrator revokes a clinician's desktop sign-ins (`docs/UC11.md`), every server refuses their tokens
 saying so (`Ehr-Sign-In: revoked`, `docs/UC8.md`), and the next time the app on each of their computers reaches a
 server, by its sync every 10 seconds, a chart download or the lock's check of the password, it deletes everything it
-keeps there (`src-tauri/src/wipe.rs`, proposed FR-69). Nothing else leads to it: a plain 401, the 12-hour answer and any
-other refusal keep what the computer holds, as before. And only for a sign-in whose lock's record says it was made with
+keeps there (`src-tauri/src/wipe.rs`, proposed FR-69), and so does signing out on it while the server says so. Nothing
+else leads to it: a plain 401, the 12-hour answer and any other refusal keep what the computer holds, as before.
+
+**In either order** (step 20's final review). A plain 401, the account disabled or its password or authenticator
+reset, or the 30 days over, ends the session here but no longer forgets its token: the window locks for a full sign-in,
+nothing opens without one (the offline charts, drafts and recordings refuse an ended session), and the token is kept and
+presented every 5 minutes and at each start, with nothing sent and nothing brought back applied, so that a revocation
+made afterwards still reaches this computer and wipes it. It goes when the person signs out here, or when a new full
+sign-in replaces it. A redirect is never followed, so only the servers named can say `revoked`. And only for a sign-in whose lock's record says it was made with
 the servers that answered, which the app was started with: a release build has those built in (step 20), and a sign-in
 made with others is forgotten at start before anything is sent (step 19a).
 
@@ -165,7 +172,9 @@ starts again it is empty, and you can sign in.", with **Quit SwiftChart**; every
 couldn't be deleted, it says "Not finished:" and what, and starting again finishes it. Drafts and recordings not yet
 sent are lost, by design: the administrator is told before revoking. One way past it: a clinician who signs in again
 with the password and the code before the app's first round reaches a server replaces the revoked sign-in, so nothing
-is deleted; only the account's owner can, and for someone leaving the administrator disables the account too.
+is deleted; only the account's owner can, and for someone leaving the administrator disables the account too, before or
+after revoking. Once deleted, every command but the page's view and Quit is refused, any added later included; a second
+answer of `revoked` while a wipe is under way leaves that wipe to say what became of it.
 
 ## Updates (the plan's step 20)
 

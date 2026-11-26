@@ -52,7 +52,12 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
     public Task<IActionResult> OnPostDisableAsync(Guid id) => ActOnAsync(id, async member =>
     {
         await accounts.DisableAsync(member, HttpContext.RequestAborted);
-        Message = $"{member.DisplayName} is disabled and can no longer sign in.";
+        // Disabling ends a clinician's desktop sign-ins but deletes nothing on their computers: revoking them does,
+        // before or after (DesktopSignIns, the expansion plan's step 20).
+        Message = $"{member.DisplayName} is disabled and can no longer sign in."
+            + (member.Roles.Contains(StaffRoles.Clinician)
+                ? " What SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked, which can be done now or later."
+                : "");
         return null;
     });
 

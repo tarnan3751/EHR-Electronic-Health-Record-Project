@@ -40,6 +40,10 @@ use store::{Conflict, Phrase, Store};
 
 /// How often the app syncs when nothing prompts it sooner.
 const SYNC_EVERY: Duration = Duration::from_secs(10);
+/// How often a session the server ended presents its token (sync.rs), only so that a revocation made afterwards still
+/// reaches this computer: one refused request every 5 minutes, which records no audit event and counts towards no
+/// lockout on the server (step 20's final review).
+const ENDED_EVERY: Duration = Duration::from_secs(5 * 60);
 
 struct App {
     /// Or why the local database couldn't be opened.
@@ -180,6 +184,10 @@ impl App {
     /// so they always are (starting_lock forgets a sign-in made with others before anything is sent): this checks it
     /// again where it matters, and otherwise treats the answer as the session's end, deleting nothing.
     fn revoked(&self, handle: &AppHandle) {
+        // Begun already, by another answer: that wipe says what became of it.
+        if self.deleted().is_some() {
+            return;
+        }
         let record = self
             .store()
             .ok()
@@ -525,8 +533,13 @@ async fn remember_sign_in(app: &App, email: &str, password: String) -> Result<()
 /// Signs out, and starts a round so the status says so. The local copy stays, to read; the lock's record goes, and
 /// there's nothing left to lock. The lock offers it too, to someone else at the computer.
 #[tauri::command]
-async fn sign_out(app: State<'_, App>) -> Result<(), String> {
+async fn sign_out(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
     let signed_out = app.sync()?.sign_out().await;
+    // A server that says the sign-in was revoked: everything here is deleted instead (step 20's final review).
+    app.take_ending(&handle);
+    if app.deleted().is_some() {
+        return Ok(());
+    }
     let forgotten = app
         .store()
         .and_then(|store| store.unlock(unlock::forget).map_err(Into::into));
@@ -737,6 +750,24 @@ fn restart_for_update(app: State<'_, App>, handle: AppHandle) -> Result<(), Stri
     app.updates.restart(&handle)
 }
 
+/// The app's commands, each refused once everything here was deleted, but for those open_after_deletion names.
+fn refused_after_deletion(
+    commands: impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static,
+) -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    move |invoke| {
+        let deleted = invoke
+            .message
+            .webview()
+            .try_state::<App>()
+            .is_some_and(|app| app.deleted().is_some());
+        if deleted && !open_after_deletion(invoke.message.command()) {
+            invoke.resolver.reject(DELETED);
+            return true;
+        }
+        commands(invoke)
+    }
+}
+
 /// Checks for updates from the servers this build was made for (updates.rs).
 async fn updates_in_background(handle: AppHandle) {
     let app = handle.state::<App>();
@@ -749,6 +780,12 @@ async fn updates_in_background(handle: AppHandle) {
             .check_in_background(handle.clone(), servers)
             .await;
     }
+}
+
+/// The commands the page may still call once everything here was deleted: what it shows, and Quit. Every other is
+/// refused, a command added later included (main's invoke handler).
+fn open_after_deletion(command: &str) -> bool {
+    matches!(command, "view" | "quit")
 }
 
 /// Ends the app, from the page that says everything here was deleted.
@@ -820,6 +857,10 @@ fn starting_lock(
         lock.offline_until(sync.as_ref().ok().and_then(sync::Sync::offline_until));
         if record.wrong >= unlock::WRONG_BEFORE_SIGN_IN {
             lock.require_sign_in();
+        }
+        // A session the server ended, kept for a revocation to reach: only a full sign-in opens the lock.
+        if sync.as_ref().is_ok_and(sync::Sync::session_ended) {
+            lock.server_ended_session();
         }
         return (lock, None);
     }
@@ -931,8 +972,13 @@ async fn sync_in_background(handle: AppHandle) {
         // Only a closed window misses it, and the page asks for everything when it opens.
         let _ = handle.emit("changed", ());
 
+        let every = if client.session_ended() {
+            ENDED_EVERY
+        } else {
+            SYNC_EVERY
+        };
         tokio::select! {
-            () = tokio::time::sleep(SYNC_EVERY) => {}
+            () = tokio::time::sleep(every) => {}
             () = app.wake.notified() => {}
         }
     }
@@ -995,7 +1041,7 @@ fn main() {
             tauri::async_runtime::spawn(updates_in_background(app.handle().clone()));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(refused_after_deletion(tauri::generate_handler![
             view,
             add,
             edit,
@@ -1019,7 +1065,7 @@ fn main() {
             accept_update,
             dismiss_update,
             restart_for_update,
-        ])
+        ]))
         .run(tauri::generate_context!())
         .expect("failed to run the EHR desktop app");
 }
@@ -1071,6 +1117,15 @@ mod tests {
         servers: Vec<String>,
         offline_until: u64,
     ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
+        kept_session(servers, offline_until, false)
+    }
+
+    /// kept_sign_in_until, with the session `ended` by the server (sync.rs) or not.
+    fn kept_session(
+        servers: Vec<String>,
+        offline_until: u64,
+        ended: bool,
+    ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
         let store = Store::open(Path::new(":memory:"), &[7; 32]).unwrap();
         store
             .unlock(|db| {
@@ -1091,7 +1146,7 @@ mod tests {
         entry
             .set_password(
                 &serde_json::json!({ "token": "the-token", "displayName": "Dr. Example",
-                    "expiresAt": "2099-01-01T00:00:00Z",
+                    "expiresAt": "2099-01-01T00:00:00Z", "ended": ended,
                     "offlineAccess": { "clinicianId": CLINICIAN, "expiresUnixSeconds": offline_until } })
                 .to_string(),
             )
@@ -1169,6 +1224,59 @@ mod tests {
                 .unwrap()
                 .is_some()
         );
+    }
+
+    /// Step 20's final review: a session the server ended, its token kept for a revocation to reach, starts on the lock
+    /// for a full sign-in only, and opens nothing until then.
+    #[test]
+    fn a_kept_session_the_server_ended_starts_locked_for_a_full_sign_in() {
+        let (store, sync) = kept_session(vec![SIGNED_IN_WITH.to_owned()], 4_102_444_800, true);
+
+        let (mut lock, notice) = starting_lock(&store, &sync);
+
+        assert_eq!(
+            lock.tick(Moment::now()),
+            lock::State::Locked {
+                need: Need::SignedOut,
+                why: Why::Ended
+            }
+        );
+        assert_eq!(notice, None);
+        let sync = sync.unwrap();
+        assert!(sync.session_ended());
+        assert!(!sync.offline_available());
+    }
+
+    /// Step 20's final review: once everything here was deleted, every command is refused but the page's view and Quit,
+    /// a command added later included.
+    #[test]
+    fn after_deletion_only_the_view_and_quit_are_open() {
+        let commands = [
+            "add",
+            "edit",
+            "resolve",
+            "sync_now",
+            "sign_in",
+            "sign_out",
+            "download_panel",
+            "offline_panel",
+            "offline_chart",
+            "save_clinical_draft",
+            "edit_clinical",
+            "resolve_clinical",
+            "save_recording",
+            "lock_state",
+            "activity",
+            "recording",
+            "lock_now",
+            "unlock",
+            "accept_update",
+            "dismiss_update",
+            "restart_for_update",
+            "a_command_added_later",
+        ];
+        assert!(commands.iter().all(|command| !open_after_deletion(command)));
+        assert!(open_after_deletion("view") && open_after_deletion("quit"));
     }
 
     /// TC-UC7-12 (proposed FR-69): the remote wipe's marker deletes what's kept here only for a sign-in made with the
