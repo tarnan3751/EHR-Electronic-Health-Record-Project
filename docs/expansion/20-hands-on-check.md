@@ -133,8 +133,10 @@ in place of `com.example.ehr`, and remove `~/Library/WebKit/io.github.tarnan3751
 - **Smart App Control not On:** Windows Security > App & browser control > Smart App Control says **Off** or
   **Evaluation**. On, Windows blocks SwiftChart with no way past it for one app; turning it off is for the whole PC, and
   the teammate's decision, not ours.
-- **Two installers, 0.2.0 and 0.2.1.** If CI keeps installers (Tahseen decides): download `SwiftChart-Windows` in Edge
-  from a run started by hand at the step's head, and from a second with `-f desktop_version=0.2.1`. If not, build both on
+- **Two installers, 0.2.0 and 0.2.1.** Tahseen starts two CI runs by hand at the step's head, the second with
+  `-f desktop_version=0.2.1`, each with `upload_installers` (his decision of 2026-11-26: an upload is publishing, so
+  only a run started by hand does it, kept 7 days; they are unsigned test builds for a local stack), and the teammate
+  downloads `SwiftChart-Windows` from each in Edge, so the PC needs no Rust. The other way is to build both on
   the PC (`docs/desktop-install.md`, "From source"), which needs Rust through rustup, Visual Studio Build Tools with
   "Desktop development with C++", Strawberry Perl ahead of Git's Perl on `PATH`, and the Tauri CLI,
   `cargo install tauri-cli --version 2.12.0 --locked`; then, in PowerShell, from `src\Ehr.Desktop\src-tauri`:

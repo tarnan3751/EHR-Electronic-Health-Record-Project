@@ -31,11 +31,14 @@ page is corrected from it.
 Nothing is published: there is no GitHub release. Two ways:
 
 - **From CI, when it keeps them.** Every CI run builds the `.dmg` (macOS, Apple Silicon) and the NSIS setup (Windows,
-  x64), and keeps neither. A run started by hand with **upload_installers** keeps both as the run's artifacts for 3
+  x64), and keeps neither. A run started by hand with **upload_installers** keeps both as the run's artifacts for 7
   days: `gh workflow run ci.yml --ref <branch> -f upload_installers=true`, then download `SwiftChart-macOS` or
   `SwiftChart-Windows` from the run's page. Add `-f desktop_version=0.2.1` to build them as another version, to test an
-  update to it. The repository is public, so anyone signed in to GitHub can download them
-  meanwhile: whether that's allowed is the owner's call.
+  update to it. The repository is public, so anyone signed in to GitHub can download them meanwhile: an upload is
+  publishing (the owner's decision of 2026-11-26), which is why no run does it but one started by hand, and why they
+  are kept 7 days and no longer. **What such a run keeps are unsigned test builds for a local stack:** not signed for
+  macOS or Windows, talking only to the local stack's servers (`ehr.example.com:8443` and
+  `ehr-remote.example.com:9443`), with synthetic data. They are not a release, and no update is signed in CI.
 - **From source**, on the computer it's for, from the repository at the commit you want:
   - **What must be installed:** what the README's **Setup** lists for the desktop app: Rust through rustup (the pinned
     version installs itself), and the Tauri CLI 2.x as it says; CI uses 2.12.0, the version these steps were checked
