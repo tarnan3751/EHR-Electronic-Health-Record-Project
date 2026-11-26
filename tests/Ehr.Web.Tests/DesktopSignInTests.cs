@@ -34,6 +34,23 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
     }
 
+    // Step 19.1: the desktop app's sign-in takes a recovery code in place of the authenticator's code, as its page says,
+    // once. Before, no recovery code ever signed in, here or on the web (StaffSignIn).
+    [Fact]
+    public async Task A_recovery_code_signs_the_desktop_app_in_once()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Desktop Recovery", StaffRoles.Clinician);
+        var code = (await apps.RecoveryCodesAsync(account))[0];
+
+        using var signedIn = await apps.DesktopSignInResponseAsync(apps.OnPrem, account, code);
+        using var again = await apps.DesktopSignInResponseAsync(apps.OnPrem, account, code);
+
+        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RecoveryCodeUsed, actorId: account.Id));
+        Assert.Equal(HttpStatusCode.Unauthorized, again.StatusCode);
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+    }
+
     // TC-UC7-02 (FR-21) in the SE document (Sara Lelo), server side: the offline download holds only the clinician's
     // assigned charts, so only those are available offline. The client side is store.rs
     // (an_assigned_chart_and_its_draft_reopen_without_a_connection).

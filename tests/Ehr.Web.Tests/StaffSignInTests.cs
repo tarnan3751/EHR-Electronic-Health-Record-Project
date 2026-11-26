@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
+using Ehr.Domain.Accounts;
 using Ehr.Testing;
 using Ehr.Web.CloudAudit;
 using Microsoft.AspNetCore.Identity;
@@ -180,17 +181,21 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(new[] { "passkey refused" }, await ReasonsAsync(account));
     }
 
-    // Step 19.1, found by reading: the old app's code posted as an administrator's authenticator reset commits. The post
-    // decided the account's next step, reading its authenticator key, before the reset, and holds the account after it:
-    // it is sent back to the password before any code is checked, and nothing signs in, then or after the next account
-    // check. Before, the code was checked against the key read before the reset, and signed in under the security stamp
-    // the reset had just set, so the session outlived the reset.
-    [Fact]
-    public async Task A_code_posted_as_a_reset_commits_signs_nobody_in()
+    // Step 19.1, found by reading: the old app's code, or an old recovery code, posted as an administrator's
+    // authenticator reset commits. The post decided the account's next step, reading its authenticator key, before the
+    // reset, and holds the account after it: it is sent back to the password before any code is checked, and nothing
+    // signs in, then or after the next account check. Before, the app's code was checked against the key read before the
+    // reset, and signed in under the security stamp the reset had just set, so the session outlived the reset; a
+    // recovery code, which the reset leaves stored, would have done the same once recovery codes signed in.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_code_posted_as_a_reset_commits_signs_nobody_in(bool recoveryCode)
     {
-        var admin = await apps.CreateStaffAsync("Resets During A Code", StaffRoles.Admin);
+        var admin = await apps.CreateStaffAsync($"Resets During A Code {recoveryCode}", StaffRoles.Admin);
         var adminSession = await SignInAsync(apps.OnPrem, admin);
-        var account = await apps.CreateStaffAsync("Dr. Code During Reset", StaffRoles.Clinician);
+        var account = await apps.CreateStaffAsync($"Dr. Code During Reset {recoveryCode}", StaffRoles.Clinician);
+        var code = recoveryCode ? (await apps.RecoveryCodesAsync(account))[0] : Totp.Code(account.AuthenticatorKey);
         var (client, codePage) = await PasswordAsync(apps.OnPrem, account);
         var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
 
@@ -199,7 +204,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         {
             resetting = adminSession.Client.PostAsync("/admin/staff?handler=ResetAuthenticator", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel);
             await WaitingForLocksAsync(apps, 1);
-            posting = client.PostAsync(CodePage, Form(("Code", Totp.Code(account.AuthenticatorKey)), ("__RequestVerificationToken", Token(codePage))), Cancel);
+            posting = client.PostAsync(CodePage, Form(("Code", code), ("__RequestVerificationToken", Token(codePage))), Cancel);
             await WaitingForLocksAsync(apps, 2);
             await hold.Transaction.CommitAsync(Cancel);
         }
@@ -216,6 +221,73 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(("/sign-in", "/sign-in"), (then, PathOf(later)));
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+    }
+
+    // Step 19.1: a recovery code signs in, once, typed as the enrolment page shows it, without its dash, or in lower case
+    // with spaces round it; the same code again is refused and counted as a wrong code. Before, the dash was taken out
+    // as an authenticator code's is, so no recovery code ever matched the one stored: each was refused and counted
+    // towards the lockout, since the staff sign-in was built (8e372bd).
+    [Theory]
+    [InlineData("as shown")]
+    [InlineData("without its dash")]
+    [InlineData("in lower case with spaces round it")]
+    public async Task A_recovery_code_signs_in_once_however_it_is_typed(string typed)
+    {
+        var account = await apps.CreateStaffAsync($"Dr. Lost Phone, {typed}", StaffRoles.Clinician);
+        var codes = await apps.RecoveryCodesAsync(account);
+        var code = typed switch
+        {
+            "as shown" => codes[0],
+            "without its dash" => codes[0].Replace("-", "", StringComparison.Ordinal),
+            _ => $"  {codes[0].ToLowerInvariant()} ",
+        };
+
+        var (client, _) = await PasswordAsync(apps.OnPrem, account);
+        using var signedIn = await PostFormAsync(client, CodePage, CodePage, ("Code", code));
+
+        Assert.Equal("/patients", PathOf(signedIn));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RecoveryCodeUsed, actorId: account.Id));
+        Assert.Equal(StaffSignIn.RecoveryCodes - 1, await RecoveryCodesLeftAsync(account));
+
+        var (again, _) = await PasswordAsync(apps.OnPrem, account);
+        using var refused = await PostFormAsync(again, CodePage, CodePage, ("Code", code));
+
+        Assert.Equal(CodePage, PathOf(refused));
+        Assert.Contains("That code did not match.", await ReadAsync(refused));
+        Assert.Equal(new[] { "wrong code" }, await ReasonsAsync(account));
+        Assert.Equal(1, (await AccountOfAsync(account)).AccessFailedCount);
+    }
+
+    // A wrong code of a recovery code's shape is refused and counts towards the lockout, as any wrong code does.
+    [Fact]
+    public async Task A_wrong_code_of_a_recovery_codes_shape_counts_towards_the_lockout()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Wrong Recovery", StaffRoles.Clinician);
+        var codes = await apps.RecoveryCodesAsync(account);
+        // A recovery code's shape, in Identity's alphabet for them, and none of the account's.
+        const string wrong = "22222-22222";
+        Assert.DoesNotContain(wrong, codes);
+
+        var (client, _) = await PasswordAsync(apps.OnPrem, account);
+        using var refused = await PostFormAsync(client, CodePage, CodePage, ("Code", wrong));
+
+        Assert.Contains("That code did not match.", await ReadAsync(refused));
+        Assert.Equal(new[] { "wrong code" }, await ReasonsAsync(account));
+        Assert.Equal(1, (await AccountOfAsync(account)).AccessFailedCount);
+        Assert.Equal(StaffSignIn.RecoveryCodes, await RecoveryCodesLeftAsync(account));
+    }
+
+    async Task<StaffUser> AccountOfAsync(StaffAccount account)
+    {
+        await using var scope = apps.OnPrem.Services.CreateAsyncScope();
+        return (await scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>().FindByIdAsync(account.Id.ToString()))!;
+    }
+
+    async Task<int> RecoveryCodesLeftAsync(StaffAccount account)
+    {
+        await using var scope = apps.OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        return await users.CountRecoveryCodesAsync((await users.FindByIdAsync(account.Id.ToString()))!);
     }
 
     async Task<UserPasskeyInfo> StoredPasskeyAsync(StaffAccount account)

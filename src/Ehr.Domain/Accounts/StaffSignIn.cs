@@ -132,13 +132,12 @@ public sealed class StaffSignIn(
     // code counts towards the lockout like a wrong password.
     public async Task<bool> VerifyCodeAsync(StaffUser user, string code, CancellationToken cancellationToken)
     {
-        var normalized = Normalize(code);
-        if (await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, normalized))
+        if (await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, Normalize(code)))
         {
             return true;
         }
 
-        if ((await users.RedeemTwoFactorRecoveryCodeAsync(user, normalized)).Succeeded)
+        if (RecoveryCode(code) is { } recoveryCode && (await users.RedeemTwoFactorRecoveryCodeAsync(user, recoveryCode)).Succeeded)
         {
             await RecordAsync(AuditActions.RecoveryCodeUsed, user, null, cancellationToken);
             return true;
@@ -200,8 +199,19 @@ public sealed class StaffSignIn(
         }
     }
 
-    // Codes are typed with the spaces or dashes apps show them with. Adding a passkey takes one too (StaffPasskeys).
+    // An authenticator app's codes are typed with the spaces or dashes apps show them with. Adding a passkey takes one
+    // too (StaffPasskeys), and never a recovery code.
     internal static string Normalize(string code) => code.Replace(" ", "").Replace("-", "");
+
+    // A recovery code in the form Identity makes and stores it, five letters or digits in upper case, a dash and five
+    // more, however it was typed: as the enrolment page shows it, without its dash, in either case, with spaces round
+    // it. Null for anything that can't be one. Before step 19.1 a recovery code went through Normalize, which took its
+    // dash out, so none ever matched the one stored.
+    static string? RecoveryCode(string code)
+    {
+        var plain = new string([.. code.Where(char.IsAsciiLetterOrDigit)]).ToUpperInvariant();
+        return plain.Length == 10 ? $"{plain[..5]}-{plain[5..]}" : null;
+    }
 
     async Task RecordAsync(string action, StaffUser user, string? reason, CancellationToken cancellationToken, string? details = null)
     {
