@@ -48,11 +48,26 @@ public sealed class StaffSignIn(
     }
 
     // Holds the account between steps, in the StaffPending cookie, with a value of its own for this password step, which
-    // a passkey's ceremony is bound to (PendingAsync).
+    // a passkey's ceremony is bound to (PendingAsync), and the account's security stamp as its password was accepted
+    // (UnchangedAsync).
     public Task HoldAsync(HttpContext context, StaffUser user) =>
         context.SignInAsync(AccountSchemes.StaffPending, new ClaimsPrincipal(
                 new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], AccountSchemes.StaffPending)),
-            new AuthenticationProperties(new Dictionary<string, string?> { [PendingItem] = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)) }));
+            new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [PendingItem] = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
+                [StampItem] = user.SecurityStamp,
+            }));
+
+    // The StaffPending ticket written again with the account's security stamp as a step of this sign-in has just changed
+    // it (a new password, a new authenticator key), with its password step and its ten minutes as they were. The stamp
+    // is the one this request wrote, never read again, so a change by anyone else in between still ends the sign-in.
+    public async Task RestampAsync(HttpContext context, StaffUser user)
+    {
+        var pending = await context.AuthenticateAsync(AccountSchemes.StaffPending);
+        pending.Properties!.Items[StampItem] = user.SecurityStamp;
+        await context.SignInAsync(AccountSchemes.StaffPending, pending.Principal!, pending.Properties);
+    }
 
     // This password step, as its StaffPending cookie has it, or null without one.
     public static async Task<string?> PendingAsync(HttpContext context)
@@ -63,12 +78,27 @@ public sealed class StaffSignIn(
 
     const string PendingItem = "ehr:pending";
 
-    // The account held between steps, or null when there is none or it has expired: the person starts over.
+    const string StampItem = "ehr:stamp";
+
+    // The account held between steps, or null when there is none, it has expired, or the account has changed since
+    // (UnchangedAsync): the person starts over.
     public async Task<StaffUser?> HeldAsync(HttpContext context)
     {
         var pending = await context.AuthenticateAsync(AccountSchemes.StaffPending);
         var id = pending.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
-        return id is null ? null : await users.FindByIdAsync(id);
+        return id is not null && await users.FindByIdAsync(id) is { } user && await UnchangedAsync(context, user) ? user : null;
+    }
+
+    // Whether the account's security stamp is still the one its StaffPending ticket carries (step 19.1's final review). A
+    // reissued password, a reset authenticator and a disabled account each change it, and end a sign-in begun before
+    // them between its password and its second factor, as they end the account's sessions; a step completing the
+    // sign-in asks again once it holds the account. A ticket written before the stamp was kept carries none, and the
+    // person starts over.
+    public async Task<bool> UnchangedAsync(HttpContext context, StaffUser user)
+    {
+        var pending = await context.AuthenticateAsync(AccountSchemes.StaffPending);
+        return pending.Succeeded && pending.Properties!.Items.TryGetValue(StampItem, out var stamp)
+            && stamp == await users.GetSecurityStampAsync(user);
     }
 
     // What the account still has to do before it is signed in.

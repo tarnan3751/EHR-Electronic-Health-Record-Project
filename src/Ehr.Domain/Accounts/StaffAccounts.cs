@@ -12,7 +12,8 @@ namespace Ehr.Domain.Accounts;
 // temporary passwords change hands. A forgotten password gets a new setup link, a lost phone or device a new
 // authenticator enrollment, with the account's passkeys removed (step 19), and a person who leaves has their account
 // disabled: locked out indefinitely, never deleted. Each of those changes the account's security stamp, so its cookies
-// and desktop sessions end. Every action is an audit event.
+// and desktop sessions end, and a sign-in begun before it, between its password and its second factor, goes back to the
+// password (StaffSignIn.UnchangedAsync, step 19.1). Every action is an audit event.
 public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db, AuditRecorder audit, StaffPasskeys passkeys)
 {
     public Task<List<StaffUser>> ListAsync(CancellationToken cancellationToken) =>
