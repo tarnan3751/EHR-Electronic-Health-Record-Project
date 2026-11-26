@@ -67,7 +67,7 @@ public partial class TC_UC11_07_LinkOpensPageAfterSignIn(WebApps apps) : IClassF
             Assert.Equal("/portal/record", PathOf(landed));
             Assert.Equal("", landed.RequestMessage!.RequestUri!.Query);
             Assert.StartsWith("text/html", landed.Content.Headers.ContentType?.ToString(), StringComparison.Ordinal);
-            Assert.Contains("Health information:", Words(await ReadAsync(landed)));
+            Assert.Contains("Keep it private.", Words(await ReadAsync(landed)));
         }
 
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Download, account));

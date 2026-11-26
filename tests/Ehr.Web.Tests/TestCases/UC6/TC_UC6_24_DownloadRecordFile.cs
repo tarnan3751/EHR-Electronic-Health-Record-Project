@@ -9,7 +9,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test Case ID: TC-UC6-24
 // Purpose / scenario: The patient downloads their record from the portal as a FHIR file: from the home page's link to
 //   "Download my record", which says what the copy holds and that it is theirs to look after once downloaded, then
-//   "Download as a file (FHIR)". The file is one FHIR R4 collection Bundle of their record, from the same mapping as the
+//   "Download file". The file is one FHIR R4 collection Bundle of their record, from the same mapping as the
 //   clinician's FHIR API, valid against R4 and the vital-sign profiles it claims, saved rather than shown, never cached.
 // Type: Functional (successful flow: the file)
 // Requirements: proposed FR-56
@@ -22,8 +22,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   move it".
 // Steps:
 //   1. Open the portal's home and follow "Download my record".
-//   2. Select "Download as a file (FHIR)".
-// Expected result: Step 1: the page says what the copy holds and, before anything is downloaded, "Health information:"
+//   2. Select "Download file".
+// Expected result: Step 1: the page says what the copy holds and, before anything is downloaded, "Keep it private."
 //   and that where it goes is the patient's responsibility; it offers "Include sensitive items"; opening it records
 //   nothing. Step 2: 200, application/fhir+json, Content-Disposition attachment named health-record-<today, UTC>.json,
 //   Cache-Control no-store, no CORS header; a valid collection Bundle: the patient with their MRN; both allergies; the
@@ -51,8 +51,8 @@ public class TC_UC6_24_DownloadRecordFile(WebApps apps) : IClassFixture<WebApps>
             var words = Browser.Words(html);
             Assert.True(page.Headers.CacheControl?.NoStore);
             Assert.Contains("<h1>Download my record</h1>", html);
-            Assert.Contains("Health information: the file and the printable page hold your health information.", words);
-            Assert.Contains("where they go is your responsibility", words);
+            Assert.Contains("Keep it private. Anyone with the file or the printout can read your health information,", words);
+            Assert.Contains("and the clinic can't take it back. On a shared computer, delete the file when you're done.", words);
             Assert.Contains("name=\"sensitive\"", html);
             Assert.Contains("name=\"handler\" value=\"File\"", html);
             Assert.Contains("formaction=\"/portal/record/print\"", html);

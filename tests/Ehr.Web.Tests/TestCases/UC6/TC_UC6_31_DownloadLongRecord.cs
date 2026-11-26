@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Expected result: Step 1: a valid file with 600 results, "Synthetic glucose 1" among them and "Synthetic glucose 601"
 //   not, the heart rate, and the warning "Only the newest 600 of the 601 test results are in this file.". Step 2: 600
 //   results and "Only the newest 600 of the 601 test results are shown."; 50 summaries and "This page shows at most the
-//   50 newest visit summaries.", which nothing says before there are 50; Download my record says the printable page has "the 50 newest visit summaries at most".
+//   50 newest visit summaries.", which nothing says before there are 50; Download my record says the printable page has "the 50 most recent visit summaries".
 // Creator: Tahseen Arnan
 public class TC_UC6_31_DownloadLongRecord(WebApps apps) : IClassFixture<WebApps>
 {
@@ -67,6 +67,6 @@ public class TC_UC6_31_DownloadLongRecord(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(600, page.Split("Synthetic glucose ").Length - 1);
         Assert.Contains("This page shows at most the 50 newest visit summaries.", Words(page));
         Assert.Equal(50, page.Split("data-summary=\"standing\"").Length - 1);
-        Assert.Contains("the 50 newest visit summaries at most", Words(await patient.Client.GetStringAsync(PagePath, TestContext.Current.CancellationToken)));
+        Assert.Contains("the 50 most recent visit summaries", Words(await patient.Client.GetStringAsync(PagePath, TestContext.Current.CancellationToken)));
     }
 }

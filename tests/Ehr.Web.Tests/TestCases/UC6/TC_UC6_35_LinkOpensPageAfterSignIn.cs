@@ -29,7 +29,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. Signed out, follow each link; sign in on the page it leads to.
 //   2. Signed in, open the sign-in page with each link as ReturnUrl.
 // Expected result: Each link leads to /portal/sign-in with the link as its ReturnUrl. After sign-in, the browser is on
-//   the link's page with no query: /portal/record, a page (not a file) with "Health information:" and the box unticked;
+//   the link's page with no query: /portal/record, a page (not a file) with "Keep it private." and the box unticked;
 //   /portal/record/print and /portal/summaries, saying sensitive items are hidden, without them. Step 2 ends on the
 //   same pages, with no query. No download of any
 //   kind and no view of sensitive items is recorded under either account; the proxy, whose sign-in starts on their own
@@ -82,7 +82,7 @@ public class TC_UC6_35_LinkOpensPageAfterSignIn(WebApps apps) : IClassFixture<We
                 Assert.DoesNotContain("sertraline", words);
                 if (link.StartsWith(FilePath, StringComparison.Ordinal))
                 {
-                    Assert.Contains("Health information:", words);
+                    Assert.Contains("Keep it private.", words);
                     Assert.Contains("name=\"sensitive\" value=\"true\" aria-describedby", page);
                 }
 

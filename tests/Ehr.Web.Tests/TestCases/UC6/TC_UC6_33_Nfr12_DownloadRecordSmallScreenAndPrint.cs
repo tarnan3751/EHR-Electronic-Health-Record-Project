@@ -30,8 +30,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test data: FhirRequests.ChartAsync's record.
 // Steps:
 //   1. Open Download my record at 360 pixels.
-//   2. Tab to "Include sensitive items" and press Space; Tab to "Download as a file (FHIR)" and press Enter.
-//   3. Tab to "Open a printable page" and press Enter.
+//   2. Tab to "Include sensitive items" and press Space; Tab to "Download file" and press Enter.
+//   3. Tab to "Open printable page" and press Enter.
 //   4. At 794 pixels, emulate print, light then dark; then screen, light then dark; then the printable page without
 //      sensitive items, on screen and printed.
 //   5. As the proxy, open each portal page and emulate print.
@@ -78,7 +78,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         await page.Keyboard.PressAsync("Space");
         Assert.True(await page.IsCheckedAsync("#record-sensitive"));
         await page.Keyboard.PressAsync("Tab");
-        Assert.Equal("Download as a file (FHIR)", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Equal("Download file", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         Assert.True(await page.EvaluateAsync<bool>(FocusRing));
         // The file is named by the UTC day of the request: the day read just before it, or after it if midnight came
         // between.
@@ -89,7 +89,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         Assert.Contains("sertraline", await System.IO.File.ReadAllTextAsync(await download.PathAsync(), TestContext.Current.CancellationToken));
 
         await page.Keyboard.PressAsync("Tab");
-        Assert.Equal("Open a printable page", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Equal("Open printable page", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         Assert.True(await page.EvaluateAsync<bool>(FocusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.EndsWith("/portal/record/print?sensitive=true", StringComparison.Ordinal));

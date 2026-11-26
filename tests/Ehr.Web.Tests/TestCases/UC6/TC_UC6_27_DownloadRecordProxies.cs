@@ -56,7 +56,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         {
             var page = await proxy.Client.GetStringAsync(PagePath, Cancel);
             Assert.Contains("<h1>Download this record</h1>", page);
-            Assert.Contains("A copy of Synthetic Fhirchart's record", Words(page));
+            Assert.Contains("A copy of Synthetic Fhirchart's allergies", Words(page));
             Assert.Equal(sensitive, page.Contains("name=\"sensitive\"", StringComparison.Ordinal));
 
             var plain = await DownloadAsync(proxy.Client);
