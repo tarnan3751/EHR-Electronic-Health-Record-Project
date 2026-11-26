@@ -23,7 +23,9 @@ public sealed record CachedChart(
     // What the allergy list is: "listed" (Allergies holds them), "none-known" (asked, and none) or "not-recorded".
     string AllergyStatus = "listed",
     // The latest signed notes that aren't sensitive, newest first, each with its addenda in order (step 10).
-    IReadOnlyList<CachedNote>? Notes = null);
+    IReadOnlyList<CachedNote>? Notes = null,
+    // The clinic's time zone, an IANA name (step 10d): the desktop shows this copy's times in it, labeled.
+    string? ClinicTimeZone = null);
 
 // SensitiveAddendaNotKept: how many sensitive addenda the note has that aren't in this copy.
 public sealed record CachedNote(

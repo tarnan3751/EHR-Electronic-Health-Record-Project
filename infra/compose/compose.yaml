@@ -19,6 +19,10 @@ x-web-app: &web-app
     # email. The on-prem app handles forms posted to the cloud site, so it can't take these from the request.
     Ehr__Links__ClinicalBaseUrl: https://ehr-remote.example.com:9443
     Ehr__Links__PortalBaseUrl: https://portal.example.com:9443
+    # The clinic's time zone: clinician pages and the desktop app show and take times in it, labeled with these two
+    # abbreviations (standard, daylight). An IANA name. The audit log stays in UTC.
+    Ehr__Clinic__TimeZone: ${EHR_CLINIC_TIME_ZONE:-America/Chicago}
+    Ehr__Clinic__TimeZoneAbbreviations: ${EHR_CLINIC_TIME_ZONE_ABBREVIATIONS:-CST,CDT}
     # The keys that protect cookies and form tokens are encrypted at rest with the same certificate, which both apps
     # hold (see "Encryption" in the README).
     Ehr__DataProtection__Certificate: /certs/example.com.pem
@@ -81,6 +85,8 @@ services:
       EHR_OWNER_PASSWORD: ${EHR_OWNER_PASSWORD:?set it in infra/compose/.env}
       EHR_APP_PASSWORD: ${EHR_APP_PASSWORD:?set it in infra/compose/.env}
       EHR_READ_PASSWORD: ${EHR_READ_PASSWORD:?set it in infra/compose/.env}
+      # Optional: the simulated lab's key, whose SHA-256 it stores for the lab's door; empty, it stores none.
+      EHR_LAB_KEY: ${EHR_LAB_KEY:-}
       # psql and the migration bundle both verify the primary's certificate against the stack's root.
       PGSSLMODE: verify-full
       PGSSLROOTCERT: /certs/rootCA.pem
@@ -112,9 +118,17 @@ services:
       # dictation service). Without the profile running, the dictation API says dictation is unavailable.
       Ehr__Dictation__Url: http://dictation:8000
       Ehr__Dictation__ApiKey: ${DICTATION_API_KEY:-}
+      # Optional: the key the lab service calls the lab's door with (Api/Lab). Empty, the app has no door, and the
+      # stack runs as it did before the lab.
+      Ehr__Lab__Key: ${EHR_LAB_KEY:-}
     ports:
       - "127.0.0.1:${ONPREM_HTTPS_PORT:-8443}:8443"
-    networks: [onprem, inference]
+    networks:
+      onprem:
+        # Its on-site address on the clinic's network, which the lab service calls it by, as the wildcard
+        # certificate names it.
+        aliases: [ehr.example.com]
+      inference:
     depends_on:
       onprem-db:
         condition: service_healthy
@@ -128,6 +142,31 @@ services:
     ports:
       - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
     networks: [onprem]
+
+  # The simulated lab (src/Ehr.Lab.Simulator), standing in for a lab's system on the clinic's network: it asks the
+  # on-prem app for the lab orders waiting for results and files synthetic results for them, a few seconds after each
+  # is signed. With EHR_LAB_KEY in .env, the migration job stores the key's hash and the on-prem app opens its door;
+  # without it, this says so once and waits doing nothing, so the stack runs as before and `up --wait` still counts it
+  # as running. No port; its file system is read-only apart from a tmpfs. Built here, never published.
+  lab:
+    build:
+      context: ../..
+      dockerfile: src/Ehr.Lab.Simulator/Dockerfile
+    image: ehr-lab:dev
+    restart: "no"
+    command: ["--base-url", "https://ehr.example.com:8443", "--certificate", "/certs/example.com.pem", "--idle-without-key"]
+    environment:
+      EHR_LAB_KEY: ${EHR_LAB_KEY:-}
+    volumes:
+      # The public certificate it pins, alone: it stands for a third party, so not the folder, which holds the
+      # certificate's private key, the one the apps also protect their Data Protection keys with.
+      - ./certs/example.com.pem:/certs/example.com.pem:ro
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [onprem]
+    depends_on:
+      onprem-app:
+        condition: service_started
 
   # Opt-in (--profile ai). Reachable only from the on-prem app, with no internet access.
   llama:

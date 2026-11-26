@@ -1,6 +1,7 @@
 -- Sync's change log. Every insert or update of a synced table adds a row to ehr.change_log, stamped with the
 -- writing transaction's ID by the column's default, pg_current_xact_id(). A sync pull hands out only the rows of
--- transactions that have definitely finished (ChangeLog in Ehr.Data), so no change is ever skipped.
+-- transactions that have definitely finished (ChangeLog in Ehr.Data), so no change is ever skipped. The lab's
+-- hand-over of new lab orders reads it the same way (76-lab.sql).
 -- Applied as ehr_owner after migrations, on every run of infra/migrate; safe to re-run.
 --
 -- The function runs as its owner, ehr_owner (SECURITY DEFINER), so the runtime roles need no privilege on the log:
@@ -28,3 +29,12 @@ CREATE OR REPLACE TRIGGER quick_texts_change_log
 CREATE OR REPLACE TRIGGER clinical_drafts_change_log
     AFTER INSERT OR UPDATE ON ehr.clinical_drafts
     FOR EACH ROW EXECUTE FUNCTION ehr.log_change();
+
+-- Lab orders, for the lab's hand-over (the expansion plan's step 12, 76-lab.sql): each one signed, by the transaction
+-- that signed it, so a lab asks for what was signed since it last asked by transaction ID, never by time. Only the
+-- insert: what happens to an order afterwards is checked when the lab asks and when it files. Other orders aren't
+-- logged; nothing reads them here.
+CREATE OR REPLACE TRIGGER orders_change_log
+    AFTER INSERT ON ehr.orders
+    FOR EACH ROW WHEN (NEW.type = 'lab')
+    EXECUTE FUNCTION ehr.log_change();

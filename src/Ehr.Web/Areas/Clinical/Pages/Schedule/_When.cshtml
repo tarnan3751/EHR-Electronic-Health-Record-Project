@@ -13,7 +13,7 @@
     }
 </div>
 <div class="sc-field">
-    <label for="appointment-time">Time, UTC <span>(required)</span></label>
+    <label for="appointment-time">@* No abbreviation: the day booked may be on the other side of a clock change from today. *@Time, @Clinic.ClockName <span>(required)</span></label>
     <input type="time" id="appointment-time" class="sc-field__input" name="Time" value="@Model.Time" required
            aria-invalid="@(Error("Time") is null ? null : "true")" aria-describedby="@(Error("Time") is null ? null : "appointment-time-error")">
     @if (Error("Time") is { } timeError)

@@ -5,8 +5,9 @@
 --
 -- The function runs as its owner, ehr_owner (SECURITY DEFINER), so it can write the log whatever the caller may do.
 -- Its search_path is pinned, so a caller can't put their own objects in front of the ones it uses, and nobody but
--- its owner may call it directly. Writes only ever happen on the primary, so the source is always onprem. A write to a
--- sensitive item is marked as one, so the audit page shows that it changed and never its values (below).
+-- its owner may call it directly. Writes only ever happen on the primary, so the source is onprem, but for the writes
+-- the lab's door makes (the expansion plan's step 12, 76-lab.sql): no account is behind those, and their source is lab.
+-- A write to a sensitive item is marked as one, so the audit page shows that it changed and never its values (below).
 
 CREATE OR REPLACE FUNCTION ehr.record_write() RETURNS trigger
     LANGUAGE plpgsql
@@ -41,7 +42,11 @@ BEGIN
         (kept ->> 'id')::uuid,
         -- The patient a row belongs to: the row itself in ehr.patients, the patient_id column in every other PHI table.
         CASE WHEN TG_TABLE_NAME = 'patients' THEN (kept ->> 'id')::uuid ELSE (kept ->> 'patient_id')::uuid END,
-        'onprem',
+        -- The lab's door says so for the rows it files (ehr.file_lab_results). Only with nobody signed in: a session
+        -- that sets the same itself can't pass a signed-in account's write off as the lab's, and with nobody signed in
+        -- no policy lets it write a patient's row.
+        CASE WHEN current_setting('app.write_source', true) = 'lab' AND NULLIF(current_setting('app.user_id', true), '') IS NULL
+             THEN 'lab' ELSE 'onprem' END,
         is_sensitive,
         changed);
 

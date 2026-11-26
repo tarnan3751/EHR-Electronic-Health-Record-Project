@@ -10,13 +10,13 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Ehr.Web.Areas.Clinical.Pages.Schedule;
 
-// Books an appointment for a patient (FR-17): with which clinician, when (UTC), for how long and why. The order
+// Books an appointment for a patient (FR-17): with which clinician, when (the clinic's clock), for how long and why. The order
 // form's rule: only for a patient on the clinician's panel; anyone else is sent back to the chart before anything is
 // read. The database refuses a time the clinician is already booked for, even when two bookings arrive at once, and
 // the form then says so with what was entered still in it. Off-site the post is forwarded; when it can't be, the
 // cloud app's "Not saved" page shows the reason typed again (UC 2, ShownIfNotSaved).
 [ShownIfNotSaved(nameof(Reason))]
-public class NewModel(PhiReader phi, PatientAssignments assignments, Appointments appointments) : PageModel
+public class NewModel(PhiReader phi, PatientAssignments assignments, Appointments appointments, Ehr.Domain.Time.ClinicTime clinic) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public SearchQuery Search { get; set; } = SearchQuery.None;
@@ -60,7 +60,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, Appointment
         }
 
         Clinician = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        Day = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        Day = clinic.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return Page();
     }
 
@@ -78,7 +78,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, Appointment
             errors["Clinician"] = "Choose a clinician.";
         }
 
-        var start = AppointmentForm.Check(Day, Time, Minutes, Reason, errors);
+        var start = AppointmentForm.Check(clinic, Day, Time, Minutes, Reason, errors);
         if (errors.Count == 0)
         {
             switch (await appointments.BookAsync(id, Clinician!.Value, start!.Value, Minutes, Reason!, HttpContext.RequestAborted))

@@ -16,7 +16,7 @@
     <p><a asp-page="Index" asp-route-patientId="@patient.Id">Back to vital signs</a></p>
 </div>
 <h1>Mark vital signs entered in error</h1>
-<p class="sc-prose">The set taken <strong>@Model.Taken.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</strong>. A reading marked entered in error stays in the record, marked with your name, the time and the reason, and is left out of the flowsheet, trends and chart. It can't be unmarked: record the correct values as a new set.</p>
+<p class="sc-prose">The set taken <strong>@Clinic.Format(Model.Taken)</strong>. A reading marked entered in error stays in the record, marked with your name, the time and the reason, and is left out of the flowsheet, trends and chart. It can't be unmarked: record the correct values as a new set.</p>
 @if (!OnPrem.IsReachable)
 {
     <p class="sc-muted">Readings can't be marked until the clinic's server is back.</p>

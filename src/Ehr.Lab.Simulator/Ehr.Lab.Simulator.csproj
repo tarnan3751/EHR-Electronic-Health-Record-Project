@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The simulated lab (the expansion plan's step 12, UC 20): a lab's system that asks the on-prem app for the lab
+       orders waiting for results and files synthetic results for them, over HTTP only, as a real lab would (README.md,
+       "Simulated lab"). It references no project of the app's and no package: it shares only the contract's one
+       file. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- Gives the shared contract file this project's namespace. -->
+    <DefineConstants>$(DefineConstants);LAB_SIMULATOR</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The JSON of the lab's door: the very file the on-prem app compiles, so the two can't drift. -->
+    <Compile Include="..\Ehr.Web\Api\Lab\LabApiContract.cs" Link="LabApiContract.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The web tests run it in process against the app, and check the values it makes (LabSimulatorTests). -->
+    <InternalsVisibleTo Include="Ehr.Web.Tests" />
+  </ItemGroup>
+
+</Project>

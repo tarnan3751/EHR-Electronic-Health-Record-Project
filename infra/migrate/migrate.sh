@@ -7,6 +7,7 @@
 #   3. db/policies/*.sql         everything else (grants, row-level security, triggers), in file-name order
 #   4. db/reference/*.sql        the reference data (standard codes, the order catalog, drug classes), in file-name
 #                                order, then db/reference/ddinter/*.sql, which has a license of its own
+#   5. the lab's key             the SHA-256 of EHR_LAB_KEY, or none when it is unset or empty (db/policies/76-lab.sql)
 set -eu
 
 export PGHOST="${PGHOST:-onprem-db}" PGDATABASE="${PGDATABASE:-ehr}" PGUSER=ehr_owner PGPASSWORD="$EHR_OWNER_PASSWORD"
@@ -39,5 +40,20 @@ for file in /reference/*.sql /reference/ddinter/*.sql; do
   echo "  $(basename "$file")"
   sql --file "$file"
 done
+
+# Only the key's hash reaches the database, worked out here, so the key is never in a statement the server could log.
+# Without a key no hash is stored, and the lab's door refuses every call.
+echo "Lab key"
+lab_key_hash=""
+if [ -n "${EHR_LAB_KEY:-}" ]; then
+  lab_key_hash=$(printf '%s' "$EHR_LAB_KEY" | sha256sum | cut -d ' ' -f 1)
+  [ "${#lab_key_hash}" -eq 64 ] || { echo "The lab key's hash couldn't be worked out" >&2; exit 1; }
+  echo "  set"
+else
+  echo "  none: EHR_LAB_KEY is not set, so no lab is connected"
+fi
+sql -v hash="$lab_key_hash" --output /dev/null <<'SQL'
+SELECT ehr.set_lab_key(:'hash');
+SQL
 
 echo "Database is up to date"

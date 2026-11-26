@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -38,7 +39,9 @@ namespace Ehr.Bench;
 // (NFR-03). The apps run in memory, so a request's time is the server's own: authentication, the page's queries and
 // the reads it records, and rendering, with no network in it.
 // Each kind of request is made 100 times to warm up, then 1,000 times one after another, and the times are reported as
-// percentiles, with two parts of each apart from the rest: inserting the audit events of the page's reads, and
+// percentiles. One that takes over a minute in all stops the run (RowLimit): at the budget's 20 ms each, its 1,100
+// requests take 22 seconds, so a query gone wrong fails the run at once instead of holding CI until it times out. The
+// percentiles have two parts of each request apart from the rest: inserting the audit events of the page's reads, and
 // committing its transaction, which waits for them to reach the disk. That wait is only there when the database's
 // fsync, synchronous_commit and full_page_writes are on, as they are on the stack's primary and in the PostgreSQL the
 // benchmark starts itself (MigratedDatabase.Durable; the tests' own have them off). It prints the three as it read
@@ -67,6 +70,8 @@ internal static partial class RenderBenchmark
     const int WarmUp = 100;
 
     const int Measured = 1_000;
+
+    static readonly TimeSpan RowLimit = TimeSpan.FromMinutes(1);
 
     const int PanelSize = 100;
 
@@ -207,11 +212,14 @@ internal static partial class RenderBenchmark
                 if (database is null)
                 {
                     Console.WriteLine("Off-site: not measured with --stack, which has no ehr_read login for the replica.");
+                    Console.WriteLine("The lab's door: not measured with --stack, whose lab key is in the stack's .env alone.");
                 }
                 else
                 {
                     await SettleAsync(database);
                     results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted));
+                    // The lab's door (step 12), last, so every row before it makes the requests it always did.
+                    results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -336,6 +344,53 @@ internal static partial class RenderBenchmark
             }),
             await MeasureAsync(client, times, prefix + "Chart history, a patient on the panel", typing: false,
                 () => $"/patients/{panel[random.Next(panel.Count)]}/chart-history"),
+            .. await MeasureFhirAsync(client, times, prefix, panel),
+        ];
+    }
+
+    // The FHIR API (the expansion plan's step 11, UC 19), last, with generators of its own, so the rows above make the
+    // requests they always did: a patient; their results and vital signs, the API's largest answer; their diagnoses
+    // with the sensitive ones asked for, a read of sensitive items; and a blood pressure reading by its ID, which asks
+    // whose it is before the gate and reads the reading's two values together. The searches and the reads go to the
+    // panel's patients who have a blood pressure reading, so the readings are always among what is measured; their
+    // readings' IDs come from the API itself, once, before the rows.
+    static async Task<List<Result>> MeasureFhirAsync(HttpClient client, DatabaseTimes times, string prefix, List<Guid> panel)
+    {
+        var measured = new List<Guid>();
+        var readings = new List<Guid>();
+        foreach (var patient in panel)
+        {
+            using var found = JsonDocument.Parse(await client.GetStringAsync($"/fhir/Observation?patient={patient}&category=vital-signs"));
+            var pressures = !found.RootElement.TryGetProperty("entry", out var entries)
+                ? []
+                : entries.EnumerateArray().Select(entry => entry.GetProperty("resource"))
+                    .Where(resource => resource.GetProperty("code").GetProperty("coding")[0].GetProperty("code").GetString() == "85354-9")
+                    .Select(resource => Guid.Parse(resource.GetProperty("id").GetString()!)).ToList();
+            if (pressures.Count > 0)
+            {
+                measured.Add(patient);
+                readings.AddRange(pressures);
+            }
+        }
+
+        if (measured.Count < panel.Count / 2)
+        {
+            throw new InvalidOperationException($"Only {measured.Count} of the panel's {panel.Count} patients have a blood pressure reading to measure.");
+        }
+
+        var patients = new Random(20261125);
+        var searched = new Random(20261126);
+        var sensitive = new Random(20261127);
+        var byId = new Random(20261128);
+        return
+        [
+            await MeasureAsync(client, times, prefix + "FHIR patient, a patient on the panel", typing: false, () => $"/fhir/Patient/{measured[patients.Next(measured.Count)]}"),
+            await MeasureAsync(client, times, prefix + "FHIR observations, a patient on the panel", typing: false,
+                () => $"/fhir/Observation?patient={measured[searched.Next(measured.Count)]}"),
+            await MeasureAsync(client, times, prefix + "FHIR conditions with sensitive items, a patient on the panel", typing: false,
+                () => $"/fhir/Condition?patient={measured[sensitive.Next(measured.Count)]}&show-sensitive=true"),
+            await MeasureAsync(client, times, prefix + "FHIR observation by ID, a patient on the panel", typing: false,
+                () => $"/fhir/Observation/{readings[byId.Next(readings.Count)]}"),
         ];
     }
 
@@ -396,16 +451,115 @@ internal static partial class RenderBenchmark
         }
     }
 
+    // The lab's door (step 12, Api/Lab), on-prem, with the lab's key, as a lab's system calls it. A lab asking for what
+    // was signed since it last asked: ten lab orders signed together for ten of the panel, each ask handing all ten over,
+    // with an audit event for each. Then a lab filing one order's results, a complete blood count's four, through the
+    // same rules as a clinician's filing (the order resulted, its signer told), each request for another of 1,100
+    // orders signed for the panel beforehand. Each answer must be the door's success: 200, then 204.
+    static async Task<List<Result>> MeasureLabAsync(BenchApp app, MigratedDatabase database, DatabaseTimes times, Guid clinicianId, List<Guid> panel)
+    {
+        using var lab = app.CreateDefaultClient(Base);
+        lab.DefaultRequestHeaders.Add("X-Lab-Key", MigratedDatabase.LabKey);
+        string since;
+        await using (var connection = new NpgsqlConnection(database.SuperuserConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var watermark = new NpgsqlCommand("SELECT pg_snapshot_xmin(pg_current_snapshot())::text", connection);
+            since = (string)(await watermark.ExecuteScalarAsync())!;
+        }
+
+        await SignLabOrdersAsync(app, clinicianId, panel.Take(10));
+        var asked = await MeasureLabRequestsAsync(lab, times, "Lab orders, ten waiting since the last ask", HttpStatusCode.OK,
+            _ => new HttpRequestMessage(HttpMethod.Get, $"/api/lab/orders?since={since}"));
+
+        var orders = await SignLabOrdersAsync(app, clinicianId, Enumerable.Range(0, WarmUp + Measured).Select(i => panel[i % panel.Count]));
+        var collected = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var results = new[] { ("718-7", 13.5m, "g/dL"), ("4544-3", 41m, "%"), ("6690-2", 6.2m, "10*3/uL"), ("777-3", 250m, "10*3/uL") }
+            .Select(result => new { code = result.Item1, value = result.Item2, unit = result.Item3 }).ToArray();
+        var filed = await MeasureLabRequestsAsync(lab, times, "Lab results, one order filed", HttpStatusCode.NoContent,
+            i => new HttpRequestMessage(HttpMethod.Post, $"/api/lab/orders/{orders[i]}/results") { Content = JsonContent.Create(new { collectedAt = collected, results }) });
+        return [asked, filed];
+    }
+
+    // Complete blood counts the clinician signs, one for each patient given, in one transaction, with a reason to order
+    // one again for a patient who has one active: their IDs, in that order.
+    static async Task<List<Guid>> SignLabOrdersAsync(BenchApp app, Guid clinicianId, IEnumerable<Guid> patients)
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var orders = patients.Select(patient => new Order
+        {
+            Id = Guid.CreateVersion7(),
+            PatientId = patient,
+            Type = OrderType.Lab,
+            CatalogCode = "SYN-LAB-001",
+            Details = "{}",
+            Status = OrderStatus.Active,
+            DuplicateReason = "Synthetic: benchmark repeat",
+        }).ToList();
+        db.AddRange(orders);
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return [.. orders.Select(order => order.Id)];
+    }
+
+    // As MeasureAsync, for the lab's door: each request made by `next` from its number, each answer the status expected.
+    static async Task<Result> MeasureLabRequestsAsync(HttpClient client, DatabaseTimes times, string name, HttpStatusCode expected, Func<int, HttpRequestMessage> next)
+    {
+        var total = new double[Measured];
+        var audit = new double[Measured];
+        var commit = new double[Measured];
+        var row = Stopwatch.StartNew();
+        for (var i = 0; i < WarmUp + Measured; i++)
+        {
+            if (row.Elapsed > RowLimit)
+            {
+                throw new InvalidOperationException(
+                    $"{name}: stopped after {i:N0} of {WarmUp + Measured:N0} requests, which took over {RowLimit.TotalSeconds:0} seconds; at {BudgetMilliseconds} ms each, all of them take {(WarmUp + Measured) * BudgetMilliseconds / 1000:0} seconds.");
+            }
+
+            using var request = next(i);
+            times.Reset();
+            var started = Stopwatch.GetTimestamp();
+            using var response = await client.SendAsync(request);
+            await response.Content.ReadAsByteArrayAsync();
+            var elapsed = Stopwatch.GetElapsedTime(started);
+            if (response.StatusCode != expected)
+            {
+                throw new InvalidOperationException($"{name}: {request.Method} {request.RequestUri} answered {(int)response.StatusCode}.");
+            }
+
+            if (i >= WarmUp)
+            {
+                total[i - WarmUp] = elapsed.TotalMilliseconds;
+                audit[i - WarmUp] = times.AuditMilliseconds;
+                commit[i - WarmUp] = times.CommitMilliseconds;
+            }
+        }
+
+        Console.WriteLine($"  {name}: done");
+        return new Result(name, total, audit, commit);
+    }
+
     // Times one kind of request, after warming it up, and its audit events' insert and its commit within it. Every
-    // answer must be the page itself.
+    // answer must be the page itself, and all of them must come within RowLimit.
     static async Task<Result> MeasureAsync(HttpClient client, DatabaseTimes times, string name, bool typing, Func<string> next)
     {
         var addresses = Enumerable.Range(0, WarmUp + Measured).Select(_ => next()).ToList();
         var total = new double[Measured];
         var audit = new double[Measured];
         var commit = new double[Measured];
+        var row = Stopwatch.StartNew();
         for (var i = 0; i < addresses.Count; i++)
         {
+            if (row.Elapsed > RowLimit)
+            {
+                throw new InvalidOperationException(
+                    $"{name}: stopped after {i:N0} of {addresses.Count:N0} requests, which took over {RowLimit.TotalSeconds:0} seconds; at {BudgetMilliseconds} ms each, all of them take {addresses.Count * BudgetMilliseconds / 1000:0} seconds.");
+            }
+
             using var request = new HttpRequestMessage(HttpMethod.Get, addresses[i]);
             if (typing)
             {
@@ -1190,7 +1344,11 @@ internal static partial class RenderBenchmark
                 builder.UseEnvironment(Environments.Production).UseSetting("ConnectionStrings:Ehr", connectionString);
                 // Required outside Development (step 6c). The benchmark sends no email and issues no enrollment code.
                 builder.UseSetting("Ehr:Links:ClinicalBaseUrl", "https://localhost").UseSetting("Ehr:Links:PortalBaseUrl", "https://localhost")
-                    .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+                    .UseSetting("Ehr:Clinic:TimeZone", "America/Chicago").UseSetting("Ehr:Clinic:TimeZoneAbbreviations", "CST,CDT")
+                    .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
+                    // A lab is connected, as in the tests' databases (step 12), and may ask as fast as the rows do.
+                    .UseSetting("Ehr:Lab:Key", MigratedDatabase.LabKey)
+                    .UseSetting("RateLimits:LabRequestsPerMinute", "1000000");
             }
         }
     }
@@ -1214,6 +1372,7 @@ internal static partial class RenderBenchmark
                 .UseSetting("Ehr:CloudAudit:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
                 .UseSetting("Ehr:CloudAudit:Directory", queueDirectory)
                 .UseSetting("Ehr:Links:ClinicalBaseUrl", "https://localhost").UseSetting("Ehr:Links:PortalBaseUrl", "https://localhost")
+                .UseSetting("Ehr:Clinic:TimeZone", "America/Chicago").UseSetting("Ehr:Clinic:TimeZoneAbbreviations", "CST,CDT")
                 .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
                 .UseSetting("Logging:LogLevel:Default", "Warning")
                 .UseSetting("Logging:LogLevel:Microsoft.AspNetCore.DataProtection", "Critical")

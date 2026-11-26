@@ -1,11 +1,16 @@
 @* A thread's messages, oldest first (docs/brand: messages): who and when above each, the text as written, line
    breaks kept. The reader's own messages are marked, in text as well as in tone. *@
 @model (IReadOnlyList<Ehr.Domain.Messaging.MessageEntry> Messages, string Mine)
+@inject Ehr.Domain.Time.ClinicTime Clinic
+@{
+    // Clinician pages show the clinic's clock (step 10d); the portal's dates are as they were, in UTC.
+    var clinical = string.Equals(ViewContext.RouteData.Values["area"] as string, "Clinical", StringComparison.Ordinal);
+}
 <ol class="sc-thread" aria-label="Messages">
     @foreach (var message in Model.Messages)
     {
         <li class="sc-message @(message.SenderKind == Model.Mine ? "sc-message--mine" : null)" data-message="@message.SenderKind">
-            <p class="sc-message__head"><strong>@message.From</strong> · <span class="sc-message__time">@message.SentAt.UtcDateTime.ToString("MMM d, yyyy HH:mm") UTC</span></p>
+            <p class="sc-message__head"><strong>@message.From</strong> · <span class="sc-message__time">@(clinical ? Clinic.Format(message.SentAt, "MMM d, yyyy HH:mm") : message.SentAt.UtcDateTime.ToString("MMM d, yyyy HH:mm") + " UTC")</span></p>
             <p class="sc-message__body">@message.Body</p>
         </li>
     }

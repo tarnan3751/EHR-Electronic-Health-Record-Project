@@ -1,14 +1,18 @@
 using System.Net;
 using Ehr.Domain.Accounts;
 using Ehr.Web.Email;
+using Ehr.Web.Forwarding;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Ehr.Web.Tests;
 
 // Rate limits (issue #32): the anonymous account POSTs are limited per socket address, whatever X-Forwarded-For says,
-// and one address gets at most so many account emails an hour.
+// and one address gets at most so many account emails an hour; the lab's door has a window for the lab and one for
+// everyone else (step 12).
 public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -33,6 +37,78 @@ public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
         // Reading the page isn't limited.
         using var page = await client.GetAsync("/portal/sign-in", Cancel);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+    }
+
+    // Step 12, the review's probe: nobody without the lab's key can make the lab's requests wait or fail. Keyless
+    // requests to the door, from the clinic's network or the internet, share a small window of their own and earn only
+    // 401s and then 429s; the lab's, with its key, are counted in their own. Through the cloud site nothing reaches the
+    // on-prem app at all.
+    [Fact]
+    public async Task A_keyless_flood_never_touches_the_labs_own_window()
+    {
+        await using var onPrem = apps.OnPrem.WithWebHostBuilder(builder => builder
+            .UseSetting("RateLimits:LabKeylessRequestsPerMinute", "5").UseSetting("RateLimits:LabRequestsPerMinute", "3"));
+        var reached = new CountingLink(onPrem.Server.CreateHandler());
+        await using var cloud = apps.Cloud.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.AddSingleton(new OnPremApp("https://onprem.test", new HttpMessageInvoker(reached)))));
+        var order = Guid.CreateVersion7();
+        var collected = DateTimeOffset.UtcNow.AddMinutes(-5);
+
+        // From the internet: as many keyless posts as anyone likes, none of them forwarded.
+        using var internet = LabTests.Client(cloud, key: null);
+        for (var i = 0; i < 20; i++)
+        {
+            using var posted = await LabTests.PostAsync(internet, order, collected, ("718-7", 9.1m, "g/dL"));
+            Assert.Equal(HttpStatusCode.Unauthorized, posted.StatusCode);
+        }
+
+        Assert.Equal(0, reached.Count);
+
+        // On the clinic's network: the keyless window fills, and its callers get 401, then 429.
+        using var stranger = LabTests.Client(onPrem, key: "not-the-lab-key-but-long-enough-to-look-real");
+        for (var i = 0; i < 5; i++)
+        {
+            using var refused = await LabTests.PostAsync(stranger, order, collected, ("718-7", 9.1m, "g/dL"));
+            Assert.Equal("unauthorized", await LabTests.RefusalAsync(refused));
+        }
+
+        using (var limited = await stranger.GetAsync(LabTests.Orders, Cancel))
+        {
+            Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+            Assert.Equal("too-many", await LabTests.RefusalAsync(limited));
+            Assert.Equal("no-store", limited.Headers.CacheControl?.ToString());
+            Assert.Equal("60", limited.Headers.RetryAfter?.ToString());
+        }
+
+        // The lab, with its key, is untouched: its own window, which only it fills.
+        using var lab = LabTests.Client(onPrem);
+        for (var i = 0; i < 3; i++)
+        {
+            using var asked = await lab.GetAsync(LabTests.Orders, Cancel);
+            Assert.Equal(HttpStatusCode.OK, asked.StatusCode);
+        }
+
+        using var over = await lab.GetAsync(LabTests.Orders, Cancel);
+        Assert.Equal("too-many", await LabTests.RefusalAsync(over));
+    }
+
+    // Counts what reaches the on-prem app under the lab's door. The cloud app's audit shipper crosses the same link and
+    // isn't counted.
+    sealed class CountingLink(HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        int count;
+
+        public int Count => count;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath.StartsWith("/api/lab", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref count);
+            }
+
+            return base.SendAsync(request, cancellationToken);
+        }
     }
 
     [Fact]

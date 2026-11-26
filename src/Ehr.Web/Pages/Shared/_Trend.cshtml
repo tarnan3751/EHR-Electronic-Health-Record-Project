@@ -1,5 +1,10 @@
 @using Ehr.Domain.Results
 @model Trend
+@inject Ehr.Domain.Time.ClinicTime Clinic
+@{
+    // Clinician pages show the clinic's clock (step 10d); the portal's dates are as they were, in UTC.
+    var clinical = string.Equals(ViewContext.RouteData.Values["area"] as string, "Clinical", StringComparison.Ordinal) && !Clinic.IsUtc;
+}
 @* One test's or vital sign's values over time (step 9; docs/brand: sc-trend). Drawn here as SVG: no script, colored
    by the stylesheet's tokens, the reference range as a band behind the line, values outside it marked by shape as well
    as color. For a child's blood pressure the band is what lies below its screening value, and a value at or above it
@@ -28,17 +33,17 @@
             }
         }
     </svg>
-    <p class="sc-trend__summary">@Model.Summary@(!Model.HasRange ? "" : Model.IsScreening ? " The shaded band is below the screening value; values at or above it need follow-up and are diamonds." : " The shaded band is the reference range; values outside it are diamonds.")</p>
+    <p class="sc-trend__summary">@(clinical ? Model.SummaryIn(Clinic) : Model.Summary)@(!Model.HasRange ? "" : Model.IsScreening ? " The shaded band is below the screening value; values at or above it need follow-up and are diamonds." : " The shaded band is the reference range; values outside it are diamonds.")</p>
     <details class="sc-trend__values">
         <summary>The values as a table</summary>
         <div class="sc-table-wrap">
             <table class="sc-table">
-                <thead><tr><th scope="col">Taken (UTC)</th><th scope="col">Value</th></tr></thead>
+                <thead><tr><th scope="col">Taken (@(clinical ? "clinic time" : "UTC"))</th><th scope="col">Value</th></tr></thead>
                 <tbody>
                     @foreach (var point in Model.Points.Reverse())
                     {
                         <tr>
-                            <td class="sc-table__mono">@point.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="sc-table__mono">@(clinical ? Clinic.Format(point.At) : point.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm"))</td>
                             <td class="sc-table__mono">@point.Value.ToString("0.####")@(point.Flag is null ? "" : point.Flag == VitalFlag.FollowUp ? ", needs follow-up" : ", outside the range")</td>
                         </tr>
                     }

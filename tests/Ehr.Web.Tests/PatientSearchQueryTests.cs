@@ -53,8 +53,8 @@ public class PatientSearchQueryTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
-    // Every command EF Core sent, with its parameters' values.
-    sealed class CapturedCommands : DbCommandInterceptor
+    // Every command EF Core sent, with its parameters' values. FhirReaderTests counts them too.
+    internal sealed class CapturedCommands : DbCommandInterceptor
     {
         public List<(string Text, Dictionary<string, object?> Parameters)> Executed { get; } = [];
 

@@ -14,6 +14,11 @@
     <PackageReference Include="Yarp.ReverseProxy" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The web tests check the FHIR API's mapping of observations on its own (FhirObservationsTests). -->
+    <InternalsVisibleTo Include="Ehr.Web.Tests" />
+  </ItemGroup>
+
   <!-- The logo account emails carry (SmtpEmailSender): a mail program won't fetch one from the app. -->
   <ItemGroup>
     <EmbeddedResource Include="..\Ehr.Design\wwwroot\img\swiftchart-lockup.png" LogicalName="swiftchart-lockup.png" />
