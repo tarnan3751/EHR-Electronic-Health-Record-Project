@@ -17,10 +17,10 @@ static class ResultTests
 
     public static string Path(Guid patient, Guid order) => $"/patients/{patient}/orders/{order}/results";
 
-    // "File results" with the values typed, collected a moment ago.
-    public static Task<HttpResponseMessage> FileAsync(HttpClient client, Guid patient, Guid order, params (string Code, string Value)[] values) =>
-        PostFormAsync(client, Path(patient, order), Path(patient, order),
-            [.. values.Select(v => ($"Values[{v.Code}]", (object)v.Value)), ("CollectedAt", DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm"))]);
+    // "File results" with the values typed, collected a moment ago by the database's clock, which judges the time.
+    public static async Task<HttpResponseMessage> FileAsync(WebApps apps, HttpClient client, Guid patient, Guid order, params (string Code, string Value)[] values) =>
+        await PostFormAsync(client, Path(patient, order), Path(patient, order),
+            [.. values.Select(v => ($"Values[{v.Code}]", (object)v.Value)), ("CollectedAt", (await apps.Database.NowAsync()).AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm"))]);
 
     // "Acknowledge results", as the page posts it: with what it showed.
     public static async Task<HttpResponseMessage> AcknowledgeAsync(HttpClient client, Guid patient, Guid order)

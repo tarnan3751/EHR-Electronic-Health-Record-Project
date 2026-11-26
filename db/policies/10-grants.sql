@@ -80,13 +80,17 @@ GRANT SELECT ON ehr.clinical_codes TO ehr_app, ehr_read;
 -- classes its ingredients belong to and which of those cross-react, and known interactions between ingredients. Read
 -- by both apps; nothing at runtime changes any of it. Its rows are db/reference's generated SQL.
 GRANT SELECT ON ehr.observation_codes, ehr.order_result_codes, ehr.questionnaires, ehr.drug_ingredients, ehr.drug_classes,
-    ehr.drug_class_cross_reactions, ehr.drug_interactions TO ehr_app, ehr_read;
+    ehr.drug_class_cross_reactions, ehr.drug_interactions, ehr.vital_reference_ranges TO ehr_app, ehr_read;
 
--- Test results (observations). PHI, like the chart: row-level security and the write-audit trigger follow. A clinician
--- files the results of a lab order: INSERT, which a trigger holds to a final result of one of the order's tests, with
--- the name, unit and reference range the database knows (75-results.sql). No UPDATE or DELETE: a filed result isn't
--- changed. The portal reads them on either server.
+-- Test results and vital signs (observations). PHI, like the chart: row-level security and the write-audit trigger
+-- follow. A clinician files the results of a lab order, or records vital signs: INSERT, which a trigger holds to a
+-- final result of one of the order's tests, or to a vital sign with no order, each with the name, unit and reference
+-- range the database knows (75-results.sql). No DELETE, and no UPDATE but the one below: neither is changed once filed. The portal reads them
+-- on either server.
 GRANT SELECT, INSERT ON ehr.observations TO ehr_app;
+-- Marking a vital sign "entered in error" (step 9b): these two columns, and a trigger holds the update to exactly that
+-- (75-results.sql). No other column of an observation is ever updated by the apps.
+GRANT UPDATE (status, entered_in_error_reason) ON ehr.observations TO ehr_app;
 GRANT SELECT ON ehr.observations TO ehr_read;
 
 -- Acknowledgments of an order's results. PHI. Made once: INSERT, never UPDATE or DELETE.
@@ -108,10 +112,22 @@ GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id,
 
 GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;
 
--- Final clinical records are append-only. Cloud reads remain subject to the same forced RLS.
+-- Final clinical records are append-only, but for their sensitivity (below). Cloud reads remain subject to the same
+-- forced RLS.
 GRANT SELECT ON ehr.clinical_drafts TO ehr_read;
 GRANT SELECT, INSERT ON ehr.clinical_notes TO ehr_app;
 GRANT SELECT ON ehr.clinical_notes TO ehr_read;
+-- Marking a signed note or addendum sensitive, or unmarking it, with a reason (step 10b): these two columns, and a
+-- trigger holds the update to exactly that and sets who and when (50-clinical-notes.sql). No other column of either
+-- is ever updated.
+GRANT UPDATE (sensitive, sensitive_reason) ON ehr.clinical_notes TO ehr_app;
+
+-- Addenda to signed notes (step 10). PHI, append-only like the notes: a clinician signs one (INSERT), nothing deletes
+-- one, and its one update is its sensitivity (step 10b). Row-level security, the signing trigger and the write-audit
+-- trigger follow.
+GRANT SELECT, INSERT ON ehr.note_addenda TO ehr_app;
+GRANT UPDATE (sensitive, sensitive_reason) ON ehr.note_addenda TO ehr_app;
+GRANT SELECT ON ehr.note_addenda TO ehr_read;
 
 -- UC 1 (Tahseen Arnan). The catalog of what can be ordered: not PHI, grants only, seeded by its migration and read by
 -- both apps. Nothing at runtime changes it.

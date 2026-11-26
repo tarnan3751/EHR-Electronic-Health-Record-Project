@@ -388,10 +388,10 @@ DROP POLICY IF EXISTS encounters_own_select ON ehr.encounters;
 CREATE POLICY encounters_own_select ON ehr.encounters FOR SELECT
     USING (patient_id = (SELECT ehr.current_patient_id()));
 
--- Test results (PHI). Clinicians read every patient's. A patient reads only their own, and only once the result is
--- released and finished (Observation.IssuedAt, ObservationStatus.Released): a result still being worked on, cancelled
--- or entered in error never reaches the portal, even through a bug in the app. A clinician files results for a patient
--- on their active panel; nothing updates or deletes one (10-grants.sql).
+-- Test results and vital signs (PHI). Clinicians read every patient's. A patient reads only their own, and only once
+-- the result is released and finished (Observation.IssuedAt, ObservationStatus.Released): a result still being worked
+-- on, cancelled or entered in error never reaches the portal, even through a bug in the app. A clinician files results
+-- and records vital signs for a patient on their active panel. Nothing deletes one; the one update is marking a vital sign entered in error (below, step 9b).
 ALTER TABLE ehr.observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
 
@@ -408,6 +408,42 @@ CREATE POLICY observations_panel_insert ON ehr.observations FOR INSERT
               AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
         )
     );
+
+-- Marking a vital sign entered in error (step 9b): by a clinician with the patient on their active panel, the rule
+-- for recording one. The trigger decides what the update may be (75-results.sql).
+DROP POLICY IF EXISTS observations_panel_update ON ehr.observations;
+CREATE POLICY observations_panel_update ON ehr.observations FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        -- Marked as the person the statement began as: a statement can't name someone else part-way through.
+        AND entered_in_error_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+-- The check that a blood pressure reading is whole (step 9c, ehr.check_vital_reading in 75-results.sql) runs as the
+-- table's owner, which forced row-level security binds too: this lets it see every value of a reading, and nothing
+-- else. The owner's alone; the runtime roles have their own policies above.
+DROP POLICY IF EXISTS observations_owner_select ON ehr.observations;
+CREATE POLICY observations_owner_select ON ehr.observations FOR SELECT TO ehr_owner USING (true);
+
+-- A check-in ties the vital signs already recorded to the visit it starts (step 9c's follow-up,
+-- ehr.attach_vital_signs in 75-results.sql), as the table's owner, which forced row-level security binds too: this
+-- lets it change them. The owner's alone, as above; the function changes only the visit, and the apps' roles can't
+-- call it or change a visit themselves.
+DROP POLICY IF EXISTS observations_owner_update ON ehr.observations;
+CREATE POLICY observations_owner_update ON ehr.observations FOR UPDATE TO ehr_owner USING (true) WITH CHECK (true);
 
 -- Acknowledgments of results (PHI). Clinicians read them, as they read the orders; a clinician with the patient on
 -- their active panel makes one, as themselves. Patients, admins and nobody see none. Never updated or deleted.
@@ -631,6 +667,81 @@ CREATE POLICY clinical_notes_clinician_select ON ehr.clinical_notes FOR SELECT
 DROP POLICY IF EXISTS clinical_notes_own_insert ON ehr.clinical_notes;
 CREATE POLICY clinical_notes_own_insert ON ehr.clinical_notes FOR INSERT
     WITH CHECK ((SELECT ehr.is_clinician()) AND signer_id = (SELECT ehr.current_user_id()));
+
+-- Marking a signed note sensitive or unmarking it (step 10b): a clinician with the patient on their active panel, the
+-- rule for writing notes. The trigger holds the update to exactly that, and decides who may unmark
+-- (50-clinical-notes.sql). The tables' owner reads a note's signer to deliver an addendum to their inbox.
+DROP POLICY IF EXISTS clinical_notes_panel_update ON ehr.clinical_notes;
+CREATE POLICY clinical_notes_panel_update ON ehr.clinical_notes FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        -- A sensitive note is updatable (which can only be unmarking it) by the person who made it so, or its signer:
+        -- decided here, on the row as it stood and the person the statement began as, before anything the statement
+        -- itself does. The trigger checks it again.
+        AND (NOT sensitive OR signer_id = (SELECT ehr.current_user_id()) OR sensitive_marked_by = (SELECT ehr.current_user_id()))
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = clinical_notes.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = clinical_notes.patient_id AND a.ended_at IS NULL
+        )
+    );
+DROP POLICY IF EXISTS clinical_notes_owner_select ON ehr.clinical_notes;
+CREATE POLICY clinical_notes_owner_select ON ehr.clinical_notes FOR SELECT TO ehr_owner USING (true);
+
+-- Addenda to signed notes (PHI; step 10). Read as the notes are, by every clinician on the chart's access model. A
+-- clinician signs one only as themselves and only for a patient on their active panel, the rule for writing notes; the
+-- signing trigger sets who and when and checks the rest (50-clinical-notes.sql). Nothing deletes one (10-grants.sql);
+-- its one update is its sensitivity (step 10b), by the same panel rule.
+ALTER TABLE ehr.note_addenda ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.note_addenda FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS note_addenda_clinician_select ON ehr.note_addenda;
+CREATE POLICY note_addenda_clinician_select ON ehr.note_addenda FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS note_addenda_panel_insert ON ehr.note_addenda;
+CREATE POLICY note_addenda_panel_insert ON ehr.note_addenda FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND author_id = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = note_addenda.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+DROP POLICY IF EXISTS note_addenda_panel_update ON ehr.note_addenda;
+CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        -- As for the note: a sensitive addendum is updatable by the person who made it so (its author, if nobody was
+        -- recorded), or by the signer of its note.
+        -- A mark inherited from the note is cleared by whoever unmarks the note (the trigger refuses it otherwise).
+        AND (NOT sensitive
+             OR sensitive_inherited
+             OR coalesce(sensitive_marked_by, author_id) = (SELECT ehr.current_user_id())
+             OR EXISTS (SELECT 1 FROM ehr.clinical_notes n WHERE n.id = note_addenda.note_id AND n.signer_id = (SELECT ehr.current_user_id())))
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = note_addenda.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = note_addenda.patient_id AND a.ended_at IS NULL
+        )
+    );
 
 -- UC 1 (Tahseen Arnan). Orders (PHI) are read as signed notes are: by every clinician, on the chart's access model. A
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;

@@ -47,7 +47,9 @@
             if ((response.status === 409 || response.status === 422) && type.includes("text/html")) {
                 const page = new DOMParser().parseFromString(await response.text(), "text/html");
                 document.querySelector("main").replaceWith(page.querySelector("main"));
-                document.querySelector("form[data-order-form] [aria-invalid=true]")?.focus();
+                // The first field to fix; or, when the form is back only to show notes, the button that signs.
+                (document.querySelector("form[data-order-form] [aria-invalid=true]")
+                    ?? document.querySelector("form[data-order-form] [data-order-sign][autofocus]"))?.focus();
                 return;
             }
 

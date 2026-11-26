@@ -28,6 +28,9 @@ else if (Model.Errors.Count == 0)
     <form method="post" class="sc-form sc-form--wide" data-note-sign>
         <input type="hidden" asp-for="Version" />
         <label class="sc-check"><input asp-for="Confirmed" /> I have reviewed this note and confirm my signature as @User.Identity?.Name.</label>
+        @* Step 10: a sensitive note is left out of the chart until asked for, and can't be unmarked once signed. *@
+        <label class="sc-check" for="note-sensitive"><input type="checkbox" id="note-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="note-sensitive-hint"> Sensitive</label>
+        <p class="sc-field__hint" id="note-sensitive-hint">A sensitive note is left out of the chart until someone asks for sensitive items, each view of it is recorded, and it is never kept offline. This can't be changed after signing.</p>
         <button class="sc-btn sc-btn--primary">Confirm and sign note</button>
         <p id="note-save-status" class="sc-status" role="status" aria-live="polite"></p>
     </form>

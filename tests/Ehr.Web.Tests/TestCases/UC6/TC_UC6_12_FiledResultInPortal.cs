@@ -36,7 +36,7 @@ public class TC_UC6_12_FiledResultInPortal(WebApps apps) : IClassFixture<WebApps
         var other = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, await apps.InsertPatientAsync("Synthetic", "Bystander"));
         Assert.Contains("You have no test results yet.", await portal.Client.GetStringAsync("/portal/results", Cancel));
 
-        using var filed = await FileAsync(session.Client, patient, order, (Hemoglobin, "9.1"));
+        using var filed = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, "9.1"));
         Assert.Equal([$"{Hemoglobin} 9.1 low"], await FiledAsync(apps, patient));
 
         var results = await portal.Client.GetStringAsync("/portal/results", Cancel);

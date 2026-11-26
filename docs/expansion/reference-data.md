@@ -1,6 +1,6 @@
 # Reference data
 
-The standard code lists SwiftChart loads, where each comes from, and what its publisher asks of anyone who uses it. Nothing is fetched while the apps run: the codes are in the repository as generated SQL, so the clinic's server works with no internet (NFR-08).
+The standard code lists SwiftChart loads, where each comes from, and what its publisher asks of anyone who uses it. Nothing is fetched while the apps run: the codes are in the repository as SQL, generated from pinned sources except for one short hand-written file of interactions taken from FDA labels, so the clinic's server works with no internet (NFR-08).
 
 ## How it is loaded
 
@@ -28,7 +28,9 @@ None of these tables is patient data. Both apps read them and nothing at runtime
 | `drug_ingredients` | What each drug product is made of | The same RxNorm release (RXNREL) | 25,490 |
 | `drug_classes` | The class an ingredient belongs to | FDA pharmacologic class indexing files, and DailyMed's mapping files, downloaded 18 November 2026 | 2,105 |
 | `drug_class_cross_reactions` | Which classes cross-react in an allergic patient | Curated by this project, each row citing its source | 2 |
-| `drug_interactions` | Interactions between two ingredients | DDInter 2.0, downloaded 18 November 2026 | 81,610 |
+| `drug_interactions`, source `ddinter` | Interactions between two ingredients, with DDInter's level | DDInter 2.0, downloaded 18 November 2026 | 81,610 |
+| `drug_interactions`, source `onc` | The ONC high-priority interactions, each marked "high-priority" | Wikidata's "significant drug interaction" statements that cite the ONC list, queried 19 November 2026 (`db/reference/wikidata`) | 717 |
+| `drug_interactions`, source `fda-label` | Important pairs neither holds, with what the label says | Hand-written from FDA labels on DailyMed (`db/reference/60-label-interactions.sql`) | 23 |
 
 The clinic's 29 common order items (`SYN-...`) come from a migration, not from here; where a standard code applies they name it.
 
@@ -37,6 +39,38 @@ Names are the sources' own, with two changes of form: an ICD-10-CM code is writt
 ### Reference ranges
 
 The ranges in `observation_codes` are **this clinic's own**, set for synthetic data from the adult intervals that textbooks and laboratories commonly publish. They are not LOINC's, they don't vary by age or sex, and they are not validated for clinical use. Each row says so in `range_source`.
+
+### Vital-sign ranges by age
+
+Added in the plan's step 9b (Tahseen's decision of 19 November 2026); the children's ranges replaced in step 9d with the two primary sources Tahseen supplied (decision of 19 November 2026). Heart rate, respiratory rate and blood pressure get a range for the patient's age, and a child's blood pressure for their sex too. Temperature and oxygen saturation keep one range. The rows are hand-written in `db/reference/35-vital-ranges.sql`, each naming its source, table and page, and the same rows are `Ehr.Data.Reference.VitalRanges`, which the seed uses; a test fails if the two differ, and another holds both to a copy of the published tables typed from the PDFs. The patient's age in whole months on the day a sign was taken picks the row, so a range changes on the birthday and not before.
+
+They flag synthetic values on a flowsheet. **They are not validated for clinical use.**
+
+| Sign | Birth to 18 years | From 18 |
+|---|---|---|
+| Heart rate, per minute | Fleming's 1st to 99th centile, for 13 age groups | 60 to 100 |
+| Respiratory rate, per minute | Fleming's 1st to 99th centile, for 13 age groups | 12 to 20 |
+| Systolic and diastolic pressure, mmHg | From 1 year: Table 6's screening value for the year of age (13 and over as one) and sex; none under 1 year | 90 to 129 and 60 to 79 |
+
+**Where each comes from:**
+
+- **Children's heart rate and respiratory rate:** Fleming S, Thompson M, Stevens R, et al. Normal ranges of heart rate and respiratory rate in children from birth to 18 years: a systematic review of observational studies. *Lancet* 2011;377:1011–1018 (author manuscript PMC3789232). Read in its Web Appendix (the author manuscript's supplement, `NIHMS54714-supplement-Web_Appendix.pdf`), page 12: Web Table 4, "Proposed respiratory rate cut-offs (breaths/minute) based on centile charts", and Web Table 5, "Proposed heart rate cut-offs (beats/minute) based on centile charts". Every heart and respiratory rate value comes from that page.
+  - **The 1st and 99th centiles** are the flag limits, Tahseen's choice: a value below the 1st or above the 99th is flagged Low or High. The tables also print the 10th, 25th, 50th, 75th and 90th, which are not used.
+  - **The 13 age groups as printed:** 0–3, 3–6, 6–9, 9–12, 12–18 and 18–24 months, then 2–3, 3–4, 4–6, 6–8, 8–12, 12–15 and 15–18 years. A group runs from its first month up to, not including, the next group's, so a child moves on the birthday that ends the group.
+  - **Web Table 5's "Birth" row is not used.** The table prints it above the 0–3 months group for "the immediate neonatal period"; it is not one of the 13 groups, and a newborn is held to the 0–3 months group from the day of birth.
+- **Children's blood pressure:** Flynn JT, Kaelber DC, Baker-Smith CM, et al. Clinical Practice Guideline for Screening and Management of High Blood Pressure in Children and Adolescents. *Pediatrics* 2017;140(3):e20171904, Table 6, "Screening BP Values Requiring Further Evaluation", page 15 (doi:10.1542/peds.2017-1904). Read in the journal's PDF of the article (`peds_20171904.pdf`). Its content carries the words "ROUGH GALLEY PROOF" on 66 of its 72 pages, page 15 among them, in a running line placed just below the bottom edge of each page, so they neither show nor print; page 15 as rendered and its text agree on every value. The table gives a systolic and diastolic value for boys and for girls at each year of age from 1 to 12, and one for 13 and over. Every child's blood pressure value comes from that page, as printed.
+  - **A screening value, not a range.** Section 3.2a, page 8, says the table "is designed as a screening tool only" and "should not be used to diagnose elevated BP or HTN by itself". So a reading at or above the value is flagged **"Needs follow-up"**, never High or abnormal, and nothing below it is flagged: there is no lower value for a child's blood pressure.
+  - **None under 1 year:** the table starts at age 1.
+  - **By sex:** a boy gets the boys' values and a girl the girls'. A patient whose sex is other or unknown is held to the lower of the two, so flagged sooner (the coordinator's answer of 20 November 2026, for Tahseen to confirm).
+  - **13 and over** runs to the 18th birthday, when the adults' range takes over and the flag goes back to High and Low.
+  - **Checked against the original:** the girls' diastolic value at age 1 is 54 on page 15. The Merck Manual's reproduction, from which step 9b took its numbers, gives 57.
+- **Adults:** heart rate 60 to 100, and blood pressure from 90/60, from MedlinePlus (US National Library of Medicine), "Vital signs", reviewed 1 January 2025 (<https://medlineplus.gov/ency/article/002341.htm>). Respiratory rate 12 to 20 from StatPearls, "Vital Sign Assessment" (<https://www.ncbi.nlm.nih.gov/sites/books/NBK553213/>). The upper blood pressure is one below the American Heart Association and American College of Cardiology's stage 1 (130 systolic or 80 diastolic).
+  - The adult diastolic upper value was 84 before step 9b, which no source supported; it is 79 now, in `observation_codes` too (the range used if this table is ever empty). Readings already recorded were given the new ranges by the `VitalCorrections` migration.
+  - **Kept at 60 to 79 (Tahseen, 19 November 2026).** The 2017 ACC/AHA guideline defines normal blood pressure as under 120 systolic and under 80 diastolic, elevated as 120 to 129 and under 80, and stage 1 hypertension as 130 to 139 or 80 to 89: Whelton PK, Carey RM, Aronow WS, et al. 2017 ACC/AHA/AAPA/ABC/ACPM/AGS/APhA/ASH/ASPC/NMA/PCNA Guideline for the Prevention, Detection, Evaluation, and Management of High Blood Pressure in Adults. *Hypertension* 2018;71(6):e13–e115 (<https://doi.org/10.1161/HYP.0000000000000065>). The journal's page refused the request; the categories were read on the American Heart Association's own page, "Understanding Blood Pressure Readings" (<https://www.heart.org/en/health-topics/high-blood-pressure/understanding-blood-pressure-readings>).
+  - **A diastolic of 80 to 84 is "normal" only on the European scale:** optimal is under 120 and under 80, normal is 120 to 129 and/or 80 to 84, and high normal is 130 to 139 and/or 85 to 89. Williams B, Mancia G, Spiering W, et al. 2018 ESC/ESH Guidelines for the management of arterial hypertension. *European Heart Journal* 2018;39(33):3021–3104, Table 3 (<https://doi.org/10.1093/eurheartj/ehy339>), read in the guideline. This project uses the American one.
+- **Replaced in step 9d:** step 9b's children's ranges, fitted to five age bands from Bonafide et al. (*Pediatrics* 2013, hospitalized children's heart and respiratory rate centiles), the Merck Manual's reproduction of Table 6, and the Pediatric Advanced Life Support rule for a low systolic pressure read on WikEM. Readings already recorded were given the new ranges by the `ChildrenRanges` migration, which reports how many flags changed. The five bands remain only to shape the seed's synthetic children.
+
+**Rights.** MedlinePlus is a US government work. The *Pediatrics* article is copyright American Academy of Pediatrics, the *Lancet* article and its web appendix are their publisher's, and StatPearls is CC BY-NC-ND 4.0. Nothing of theirs is copied here but the numbers, which are facts, each with its citation; no table is reproduced.
 
 ### How drug classes are joined to RxNorm
 
@@ -61,6 +95,19 @@ Two rows, both from Khan DA, Banerji A, Blumenthal KG, et al. Drug allergy: a 20
 ### What DDInter's files do and don't hold
 
 Each row is two drug names and a level (major, moderate, minor or unknown). There is no management advice in the files; that text is only on DDInter's web pages. Of 222,383 rows, 47,182 have an unknown level and are left out, and 56,526 name a drug that isn't a RxNorm ingredient (446 of DDInter's 1,939 drugs, many not sold in the United States). 81,610 distinct pairs are loaded. The checks built on this are decision support for a demonstration system, not a complete clinical reference.
+
+### Why DDInter is supplemented, and with what
+
+DDInter's eight download files hold only pairs where at least one drug has an ATC code in groups A, B, D, H, L, P, R or V. Pairs where neither does are not in the files: an SSRI with tramadol, an ACE inhibitor with an angiotensin receptor blocker, a beta-blocker with verapamil. Tahseen decided on 19 November 2026 to supplement it rather than ship around the gaps. A pair can have a row from each source, and every warning names the source it came from.
+
+- **The ONC high-priority list**, by way of Wikidata. Phansalkar S, Desai AA, Bell D, et al. High-priority drug-drug interactions for use in electronic health records. *J Am Med Inform Assoc.* 2012;19(5):735-743: the interactions an electronic record should always warn about. Wikidata records them as "significant drug interaction" (P769) statements that cite the paper, with each drug's RxNorm code; Wikidata is CC0. The query and its dated result are committed in `db/reference/wikidata`, so building the data reads the repository, never the network. Of 1,798 statements, 717 pairs are between RxNorm ingredients (a drug whose Wikidata code is another RxNorm concept is found by its name; twelve drugs, mostly withdrawn ones, are not ingredients at all and their pairs are left out). DDInter also has some of them. Each is loaded with the level "high-priority".
+- **FDA labels**, by hand. `db/reference/60-label-interactions.sql` lists 23 pairs, each with what the label's Drug Interactions section (or its contraindications or boxed warning) says, paraphrased closely, and the label it was read from with its DailyMed set ID. Labels are in the public domain. The level on these rows is this project's reading of the label: major where the label contraindicates the pair, carries a boxed warning or reports a serious outcome; moderate where it says to monitor or adjust; minor otherwise.
+
+Coverage of the order catalog's 2,581 medication ingredients, pairs with a warning: 78,166 from DDInter alone, 78,587 with both supplements (398 more from ONC, 23 from labels). The numbers are small beside DDInter's because the supplements are aimed at what it lacks, not at volume.
+
+**What is still not covered.** Labels mostly speak of classes ("angiotensin receptor blockers", "benzodiazepines", "SSRIs"), and the hand-written table lists pairs, so it covers the pairs written and not their classmates: lisinopril with losartan is there, enalapril with valsartan is not. By class, among catalog ingredients: ACE inhibitor with angiotensin receptor blocker 1 of 88 pairs, beta-blocker with calcium channel blocker 2 of 160, SSRI with SNRI 0 of 40, antipsychotic with antiarrhythmic 18 of 228. No warning never means a pair is safe, and the order form says so.
+
+DDInter's website is not read by any tool here: only its download files. A warning from DDInter links to DDInter's interaction checker, not to a page for the pair, because the files don't give the addresses of pair pages.
 
 ## Not loaded, and why
 

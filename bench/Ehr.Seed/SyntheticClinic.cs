@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using Ehr.Data.Patients;
+using Ehr.Data.Reference;
 
 namespace Ehr.Seed;
 
@@ -136,14 +137,14 @@ public sealed class SyntheticClinic
         }
 
         var has = problems.Select(problem => problem.Code).ToHashSet();
-        var visits = Enumerable.Range(0, Math.Min(12, random.Next(1, 4) + (2 * problems.Count(problem => !problem.Passing))))
+        var visitsWithVitals = Enumerable.Range(0, Math.Min(12, random.Next(1, 4) + (2 * problems.Count(problem => !problem.Passing))))
             .Select(_ =>
             {
                 var start = Today.AddMinutes(-random.Next(1, 5 * 365 * 24 * 60));
                 var vitals = random.NextDouble() < 0.9;
                 // Higher with hypertension, even treated.
                 var systolic = has.Contains("I10") ? random.Next(128, 166) : random.Next(102, 131);
-                return new Encounter
+                var visit = new Encounter
                 {
                     Id = Uuid7(made, random),
                     PatientId = patientId,
@@ -157,12 +158,60 @@ public sealed class SyntheticClinic
                     Reason = problems.Count > 0 && random.NextDouble() < 0.7 ? problems[random.Next(problems.Count)].Visit : Pick(VisitReasons, random),
                     PeriodStart = start,
                     PeriodEnd = start.AddMinutes(20),
-                    SystolicMmHg = vitals ? (short)systolic : null,
-                    DiastolicMmHg = vitals ? (short)(systolic - random.Next(38, 56)) : null,
-                    HeartRatePerMinute = vitals ? (short)random.Next(55, 101) : null,
                 };
+                // The visit's vital signs, drawn as they always were, so the rest of the chart comes out the same.
+                // Drawn only when taken, in this order, as before.
+                var diastolic = vitals ? systolic - random.Next(38, 56) : 0;
+                var heartRate = vitals ? random.Next(55, 101) : 0;
+                // A child's values come from the same draws, with nothing more drawn, so the rest of the chart comes out
+                // the same, shaped for the child's ranges on the day of the visit (steps 9b and 9d): a heart rate inside
+                // Fleming's centiles for their age; from 1 year, a blood pressure below the AAP's screening value for
+                // their age and sex, which only the highest draws (about one in ten) and a child with high blood
+                // pressure reach; under 1 year, where no range applies, the blood pressure lowered as before.
+                var months = AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(start.UtcDateTime));
+                var band = AgeBand.Of(months);
+                if (vitals && band != AgeBand.Adult)
+                {
+                    var (rateLow, rateHigh, _) = VitalRanges.For(VitalSign.HeartRate, months, patient.Gender)!.Value;
+                    heartRate = (int)(rateLow!.Value + ((rateHigh!.Value - rateLow.Value) * (heartRate - 50) / 56));
+                    (systolic, diastolic) = band == AgeBand.Infant
+                        ? (systolic - 30, diastolic - 18)
+                        : ((int)VitalRanges.For(VitalSign.Systolic, months, patient.Gender)!.Value.High!.Value - 17 + ((systolic - 102) * 2 / 3),
+                            (int)VitalRanges.For(VitalSign.Diastolic, months, patient.Gender)!.Value.High!.Value - 12 + ((diastolic - 47) / 3));
+                }
+                return (Visit: visit, Vitals: vitals ? new[] { (VitalSign.Systolic, systolic), (VitalSign.Diastolic, diastolic), (VitalSign.HeartRate, heartRate) } : []);
             })
             .ToList();
+        // Vital signs are observations (step 9): one for each sign taken at a visit, released with the visit. Their
+        // IDs come from a generator of their own, seeded by the visit, so no other part of the chart shifts.
+        var vitalSigns = visitsWithVitals.SelectMany(visit =>
+        {
+            var ids = new SplitMix64(BitConverter.ToUInt64(visit.Visit.Id.ToByteArray(), 8));
+            // The visit's blood pressure is one reading (step 9c): its ID from a generator seeded by the visit's other
+            // half, so no other ID shifts.
+            var reading = Uuid7(visit.Visit.PeriodStart, new SplitMix64(BitConverter.ToUInt64(visit.Visit.Id.ToByteArray(), 0)));
+            // The range for the patient's age on the day, and sex (steps 9b and 9d), as the database gives a recorded one.
+            var months = AgeBand.Months(patient.BirthDate, DateOnly.FromDateTime(visit.Visit.PeriodStart.UtcDateTime));
+            return visit.Vitals.Select(vital => (Vital: vital, Range: VitalRanges.For(vital.Item1, months, patient.Gender))).Select(vital => new Observation
+            {
+                Id = Uuid7(visit.Visit.PeriodStart, ids),
+                PatientId = patientId,
+                EncounterId = visit.Visit.Id,
+                ReadingId = VitalSign.BloodPressure.Contains(vital.Vital.Item1) ? reading : null,
+                Category = ObservationCategory.VitalSigns,
+                Code = vital.Vital.Item1,
+                Display = VitalSigns[vital.Vital.Item1].Display,
+                Status = ObservationStatus.Final,
+                Value = vital.Vital.Item2,
+                Unit = VitalSigns[vital.Vital.Item1].Unit,
+                ReferenceLow = vital.Range?.Low,
+                ReferenceHigh = vital.Range?.High,
+                ReferenceKind = vital.Range?.Kind ?? ReferenceKind.Normal,
+                EffectiveAt = visit.Visit.PeriodStart,
+                IssuedAt = visit.Visit.PeriodStart,
+            });
+        }).ToList();
+        var visits = visitsWithVitals.Select(visit => visit.Visit).ToList();
 
         // Test results (UC6): the tests each condition is followed with, more than once over the years, and a routine
         // one or two. Most are final and released; about one in ten is still preliminary and not released, which the
@@ -205,8 +254,17 @@ public sealed class SyntheticClinic
             })
             .ToList();
 
-        return new SyntheticChart(patient, allergies, medications, conditions, visits, results);
+        return new SyntheticChart(patient, allergies, medications, conditions, visits, results, vitalSigns);
     }
+
+    // The three vital signs a seeded visit records, as db/reference names them (ehr.observation_codes).
+    // Their reference ranges go by age: Ehr.Data.Reference.VitalRanges.
+    static readonly Dictionary<string, (string Display, string Unit)> VitalSigns = new()
+    {
+        [VitalSign.Systolic] = ("Systolic blood pressure", "mm[Hg]"),
+        [VitalSign.Diastolic] = ("Diastolic blood pressure", "mm[Hg]"),
+        [VitalSign.HeartRate] = ("Heart rate", "/min"),
+    };
 
     public static string Mrn(int index) => $"SYN{index + 1:D7}";
 
@@ -410,4 +468,6 @@ public sealed record SyntheticChart(
     IReadOnlyList<MedicationStatement> Medications,
     IReadOnlyList<Condition> Conditions,
     IReadOnlyList<Encounter> Visits,
-    IReadOnlyList<Observation> Results);
+    IReadOnlyList<Observation> Results,
+    // The vital signs taken at the visits: observations too, kept apart from the laboratory results.
+    IReadOnlyList<Observation> Vitals);

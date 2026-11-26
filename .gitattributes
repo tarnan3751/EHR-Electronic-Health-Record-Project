@@ -11,9 +11,15 @@
 *.woff2 binary
 
 # Generated files, collapsed in GitHub's diffs so a review shows what people wrote. The reference data is written by
-# tools/reference from pinned sources; the designer and snapshot files by `dotnet ef migrations add`. A migration's
+# tools/reference from pinned sources, except the files un-marked below; the designer and snapshot files by `dotnet ef migrations add`. A migration's
 # own .cs file and db/migrations/schema.sql are not marked: they are what reviewers read.
 db/reference/** linguist-generated=true
 db/reference/ddinter/LICENSE.md linguist-generated=false
+# Hand-written, to be read: the interactions taken from FDA labels, and the Wikidata query with its notes. (The query's
+# result, the CSV beside them, stays collapsed.)
+db/reference/60-label-interactions.sql linguist-generated=false
+db/reference/35-vital-ranges.sql linguist-generated=false
+db/reference/wikidata/README.md linguist-generated=false
+db/reference/wikidata/*.rq linguist-generated=false
 db/migrations/*.Designer.cs linguist-generated=true
 db/migrations/EhrDbContextModelSnapshot.cs linguist-generated=true

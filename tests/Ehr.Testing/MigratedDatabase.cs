@@ -58,6 +58,17 @@ public sealed class MigratedDatabase : IAsyncLifetime
     public string ConnectionStringFor(string role, string password) =>
         new NpgsqlConnectionStringBuilder(container.GetConnectionString()) { Username = role, Password = password }.ConnectionString;
 
+    // The database's clock now. Its rules hold a time to that clock ("not in the future", the start of a visit it
+    // opens), so a test builds the times it sends from this, read when the test starts, and not from this machine's
+    // clock: the two need not agree (Docker Desktop's clock stops while a Mac sleeps, and runs behind for a while after).
+    public async Task<DateTime> NowAsync()
+    {
+        await using var connection = new NpgsqlConnection(SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT now()", connection);
+        return (DateTime)(await command.ExecuteScalarAsync())!;
+    }
+
     public async ValueTask InitializeAsync()
     {
         await container.StartAsync();

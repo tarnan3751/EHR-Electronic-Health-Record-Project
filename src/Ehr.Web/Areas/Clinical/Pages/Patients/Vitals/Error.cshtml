@@ -1,0 +1,80 @@
+@page "/patients/{patientId:guid}/vitals/error"
+@using Ehr.Data.Patients
+@using Ehr.Domain.Results
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Vitals.ErrorModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Vitals.Patient;
+    ViewData["Title"] = "Mark vital signs entered in error";
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Vitals.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="Index" asp-route-patientId="@patient.Id">Back to vital signs</a></p>
+</div>
+<h1>Mark vital signs entered in error</h1>
+<p class="sc-prose">The set taken <strong>@Model.Taken.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</strong>. A reading marked entered in error stays in the record, marked with your name, the time and the reason, and is left out of the flowsheet, trends and chart. It can't be unmarked: record the correct values as a new set.</p>
+@if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">Readings can't be marked until the clinic's server is back.</p>
+}
+else
+{
+    <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@patient.Id" asp-route-at="@Model.At">
+        @if (Model.Errors.Count > 0)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not marked:</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : string.Join(" ", Model.Errors.Values))</p>
+        }
+        <fieldset class="sc-stack" aria-describedby="@(Model.Errors.ContainsKey("Chosen") ? "chosen-error" : null)">
+            <legend>Which readings are wrong?</legend>
+            @{ var first = true; }
+            @foreach (var reading in Model.Readings)
+            {
+                var id = $"reading-{reading.Id}";
+                <label class="sc-check" for="@id">
+                    <input type="checkbox" id="@id" name="Chosen" value="@reading.Id" checked="@Model.Chosen.Contains(reading.Id)" autofocus="@(first && !Model.Errors.ContainsKey("Reason"))">
+                    @if (reading.ReadingId is { } pressure && Model.Diastolic.GetValueOrDefault(pressure) is { } diastolic)
+                    {
+                        @* A blood pressure is one reading (step 9c): both its numbers, marked together. *@
+                        @:Blood pressure <span class="sc-table__mono">@reading.Value!.Value.ToString("0.#")/@diastolic.Value!.Value.ToString("0.#") @Units.Shown(reading.Unit)</span>
+                    }
+                    else
+                    {
+                        @VitalSigns.Name(reading.Code!, reading.Display) <span class="sc-table__mono">@reading.Value!.Value.ToString("0.#") @Units.Shown(reading.Unit)</span>
+                    }
+                </label>
+                first = false;
+            }
+            @if (Model.Diastolic.Count > 0)
+            {
+                <p class="sc-field__hint">A blood pressure is one reading: marking it marks both of its numbers.</p>
+            }
+            @if (Model.HasBodyMassIndex)
+            {
+                <p class="sc-field__hint">The body mass index isn't listed: marking the weight or the height also marks the body mass index worked out from them.</p>
+            }
+            @if (Model.Errors.TryGetValue("Chosen", out var chosenError))
+            {
+                <p class="sc-field__error" id="chosen-error">@chosenError</p>
+            }
+        </fieldset>
+        <div class="sc-field">
+            <label for="error-reason">Reason <span>(required)</span></label>
+            <input id="error-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="500" required autocomplete="off"
+                   autofocus="@Model.Errors.ContainsKey("Reason")" aria-invalid="@(Model.Errors.ContainsKey("Reason") ? "true" : null)"
+                   aria-describedby="@(Model.Errors.ContainsKey("Reason") ? "error-reason-error" : "error-reason-hint")">
+            <p class="sc-field__hint" id="error-reason-hint">For example: wrong patient, cuff too small, typed 180 for 108.</p>
+            @if (Model.Errors.TryGetValue("Reason", out var reasonError))
+            {
+                <p class="sc-field__error" id="error-reason-error">@reasonError</p>
+            }
+        </div>
+        <div class="sc-actions">
+            <button type="submit" class="sc-btn sc-btn--primary" data-mark-entered-in-error>Mark entered in error</button>
+            <a class="sc-btn" asp-page="Index" asp-route-patientId="@patient.Id">Cancel</a>
+        </div>
+    </form>
+}

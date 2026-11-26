@@ -23,6 +23,7 @@ public class PhiReaderTests
         ["AiFieldProposals"] = typeof(AiFieldProposal),
         ["ClinicalDrafts"] = typeof(ClinicalDraft),
         ["ClinicalNotes"] = typeof(ClinicalNote),
+        ["NoteAddenda"] = typeof(NoteAddendum),
         ["Patients"] = typeof(Patient),
         ["AllergyIntolerances"] = typeof(AllergyIntolerance),
         ["MedicationStatements"] = typeof(MedicationStatement),

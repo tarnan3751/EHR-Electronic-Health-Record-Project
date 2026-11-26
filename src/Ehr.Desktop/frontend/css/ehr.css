@@ -891,6 +891,110 @@
         margin: 0;
     }
 
+    /* A trend chart (step 9): one test or vital sign over time, drawn by the server as SVG. The reference range is a
+       band behind the line; a value outside it is a diamond as well as another color. Its numbers are in the table
+       under it. */
+    .sc-trends {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr));
+        gap: var(--space-5);
+        margin: 0;
+        padding: 0;
+    }
+
+    /* A reading marked entered in error (step 9b): struck through, in the muted ink. On a line of its own, and its
+       reason wraps even in a table cell that otherwise doesn't, so a long reason can't push the page sideways. */
+    .sc-struck {
+        display: block;
+        color: var(--ink-muted);
+        white-space: normal;
+        min-width: 16ch;
+        max-width: 40ch;
+    }
+
+    /* Why, in words beside it: the flowsheet shows entries in error only when asked, so there is room. */
+    .sc-struck__reason {
+        font-family: var(--font-sans);
+    }
+
+    /* The chart's up or down mark against the previous reading: a small shape in the muted ink; the words are for
+       screen readers. Not a color: up is not good or bad by itself. */
+    .sc-trendmark {
+        color: var(--ink-muted);
+        font-size: 0.75em;
+    }
+
+    /* The vital signs form (step 9): its short fields side by side, as many as fit, one column on a narrow screen. */
+    .sc-vitals-fields {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+        gap: var(--space-4) var(--space-5);
+        align-items: start;
+    }
+
+    .sc-trend {
+        margin: 0;
+        padding: var(--space-4);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+    }
+
+    .sc-trend__title {
+        font-weight: 600;
+        margin-bottom: var(--space-2);
+    }
+
+    .sc-trend__chart {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-bottom: 1px solid var(--line-strong);
+    }
+
+    .sc-trend__range {
+        fill: var(--success-soft);
+    }
+
+    .sc-trend__line {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .sc-trend__point {
+        fill: var(--surface-raised);
+        stroke: var(--ink);
+        stroke-width: 1.5;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .sc-trend__point--outside {
+        fill: var(--warning);
+    }
+
+    .sc-trend__summary {
+        margin: var(--space-2) 0;
+        color: var(--ink-muted);
+    }
+
+    .sc-trend__values summary {
+        cursor: pointer;
+    }
+
+    /* The trend's table sits in a narrow card: its value, with the words that say a value is outside its range or
+       needs follow-up, wraps instead of being cut off at the card's edge. */
+    .sc-trend__values td:last-child {
+        white-space: normal;
+    }
+
+    /* A list inside a notice, such as an order's safety warnings: a long address in a citation wraps inside it. */
+    .sc-notice .sc-list li {
+        overflow-wrap: anywhere;
+    }
+
     .sc-notice a {
         color: inherit;
         font-weight: 600;
@@ -1186,11 +1290,20 @@
 
     /* Table container: a border round the table, a header that stays in view, and room to scroll when narrow. */
     .sc-table-wrap {
+        /* Positioned, so text hidden for screen readers inside a cell (which is placed absolutely) stays inside the
+           container and can't widen the page. */
+        position: relative;
         border: 1px solid var(--line);
         border-radius: var(--radius-sm);
         overflow: clip;
         margin: 0 0 var(--space-4);
         background: var(--surface-raised);
+    }
+
+    /* A table that grows sideways, a column for each set of readings: it scrolls inside its container at any width,
+       and the page never does. */
+    .sc-table-wrap--wide {
+        overflow-x: auto;
     }
 
     .sc-table th {

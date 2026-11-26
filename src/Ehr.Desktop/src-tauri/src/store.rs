@@ -819,6 +819,7 @@ mod tests {
             visits: vec![],
             sensitive_not_kept: 0,
             allergy_status: None,
+            notes: vec![],
         };
         store.replace_panel(clinician, &[chart]).unwrap();
         assert!(
@@ -875,6 +876,7 @@ mod tests {
             visits: vec![],
             sensitive_not_kept: 0,
             allergy_status: None,
+            notes: vec![],
         };
 
         // The draft exists: written on the chart and saved by the server as version 1, before going offline.
@@ -895,6 +897,7 @@ mod tests {
                         patient_id: patient.to_string(),
                         body: "Synthetic first draft".to_owned(),
                         version: 1,
+                        withheld: false,
                     },
                 },
             )
@@ -1373,6 +1376,7 @@ mod tests {
                 .collect(),
             sensitive_not_kept: 0,
             allergy_status: None,
+            notes: vec![],
         }
     }
 }

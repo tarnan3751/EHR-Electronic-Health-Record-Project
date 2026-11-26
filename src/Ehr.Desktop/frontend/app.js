@@ -390,6 +390,22 @@ function chartSection(title, rows, none = 'None recorded.') {
       : el('p', { className: 'sc-muted', textContent: none }));
 }
 
+// Signed notes, read-only, each followed by its addenda in the order they were signed. Sensitive notes and addenda
+// are never kept on this device; the line above the visits says how many items were left out.
+function signedNotes(notes) {
+  const stamp = (text) => `${text.slice(0, 10)} ${text.slice(11, 16)} UTC`;
+  const part = (title, text) => [el('h5', { textContent: title }), el('p', { className: 'sc-note__text', textContent: text })];
+  return el('section', {}, el('h4', { textContent: 'Signed notes' }),
+    ...(notes.length ? notes.map((note) => el('details', { className: 'sc-result' },
+      el('summary', { textContent: `Signed note · ${stamp(note.signedAt)} · ${note.signer}${note.addenda.length ? ` · ${note.addenda.length} ${note.addenda.length === 1 ? 'addendum' : 'addenda'}` : ''}` }),
+      ...part('History', note.history), ...part('Assessment', note.assessment), ...part('Plan', note.plan),
+      ...note.addenda.flatMap((addendum) => part(`${addendum.notNoteAuthor ? `Addendum by ${addendum.author}, not the note's author` : `Addendum · ${addendum.author}`} · ${stamp(addendum.signedAt)}`, addendum.text)),
+      ...(note.sensitiveAddendaNotKept
+        ? [el('p', { className: 'sc-muted', textContent: `Sensitive addenda not kept offline: ${note.sensitiveAddendaNotKept}. Open the note on the clinic's site to see them.` })]
+        : []),
+    )) : [el('p', { className: 'sc-muted', textContent: 'None signed.' })]));
+}
+
 async function openChart(patient, reset = true) {
   if (reset) clearChart();
   const request = ++chartRequest;
@@ -414,6 +430,7 @@ async function openChart(patient, reset = true) {
     chartSection('Recent visits', chart.visits.map((v) => details(v.periodStart.slice(0, 10), v.reason,
       v.systolicMmHg != null && v.diastolicMmHg != null ? `${v.systolicMmHg}/${v.diastolicMmHg} mmHg` : '',
       v.heartRatePerMinute != null ? `${v.heartRatePerMinute} bpm` : ''))),
+    signedNotes(chart.notes ?? []),
   );
   byId('saved-drafts').replaceChildren(...drafts.map((draft) => renderDraft(patient, draft)));
   if (!drafts.length) byId('saved-drafts').append(el('li', { className: 'sc-muted', textContent: 'No saved drafts.' }));
@@ -441,7 +458,10 @@ function renderDraft(patient, draft) {
     pending: 'Saved on this device · Pending sync',
     conflict: 'A newer version is on the server. Choose which to keep.',
     invalid: draft.problem ?? 'This draft needs review.',
+    // Signed as a sensitive note: its text was removed from this device, and it can't be edited here.
+    withheld: 'Signed as a sensitive note · Not kept on this device',
   };
+  if (draft.state === 'withheld') return el('li', {}, el('p', { className: 'desktop-draft__state', textContent: labels.withheld }));
   const row = el('li', {}, el('p', { className: 'desktop-draft__state', textContent: labels[draft.state] }),
     el('pre', { className: 'desktop-draft__body', textContent: draft.body }));
   if (draft.state === 'synced' || draft.state === 'invalid') {

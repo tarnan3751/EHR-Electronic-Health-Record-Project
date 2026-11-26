@@ -3,6 +3,8 @@ using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Phi;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Ehr.Domain.Notes;
 
@@ -113,7 +115,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         return errors;
     }
 
-    public async Task<NoteResult> SignAsync(Guid patient, Guid id, long version, bool confirmed, CancellationToken cancel)
+    // `sensitive` (step 10): the signer marks the note sensitive, for good, as it is signed.
+    public async Task<NoteResult> SignAsync(Guid patient, Guid id, long version, bool confirmed, CancellationToken cancel, bool sensitive = false)
     {
         // ReadDraft enforces ownership AND current panel assignment through RLS, even for a retried signature.
         if (!authority.IsPrimaryHost)
@@ -134,6 +137,14 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (await phi.SignedDraftAsync(id, patient, cancel) is { } existing)
         {
+            if (existing.DraftVersion == version && existing.Sensitive != sensitive)
+            {
+                // A retry that ticks or clears "Sensitive" can't change a note that was already signed (step 10).
+                return new(409, [existing.Sensitive
+                    ? "This note was already signed, as sensitive. Open the signed note from the chart."
+                    : "This note was already signed, and not as sensitive. A signed note can't be changed: open it from the chart."]);
+            }
+
             return existing.DraftVersion == version
                 ? new(200, [], Note: existing)
                 : NoteResult.Conflict;
@@ -158,13 +169,149 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             History = draft.History!,
             Assessment = draft.Assessment!,
             Plan = draft.Plan!,
+            Sensitive = sensitive,
         };
         db.AddRange(note);
         audit.Record(AuditActions.SignNote, patient, "clinical_notes", note.Id);
         await db.SaveChangesAsync(cancel);
         return new(200, [], Note: note);
     }
+
+    // Marks a signed note, or one of its addenda, sensitive after signing, or unmarks it, with a reason (step 10b). The
+    // text never changes. The database decides who may (a clinician with the patient on their panel marks; only the
+    // person who made it sensitive, or the note's signer, unmarks), sets who and when, and marks a note's addenda with
+    // it (db/policies/30-rls.sql and 50-clinical-notes.sql). The caller has read the note as this patient's.
+    public async Task<SensitivityResult> SetSensitivityAsync(Guid patient, Guid note, Guid? addendum, bool sensitive, string? reason, CancellationToken cancel)
+    {
+        if (!authority.IsPrimaryHost)
+        {
+            return new(503, ["The authoritative clinic server must be available to change this. Your reason is still displayed."]);
+        }
+
+        reason = reason?.Trim();
+        if (string.IsNullOrEmpty(reason))
+        {
+            return new(422, ["Say why, so the record shows it."]);
+        }
+
+        if (reason.Length > 500)
+        {
+            return new(422, [$"The reason can be up to 500 characters. This one has {reason.Length}."]);
+        }
+
+        if (!await phi.IsAssignedAsync(patient, cancel))
+        {
+            return new(403, ["Add this patient to your panel to change this."]);
+        }
+
+        // Only the two columns the apps may update; the row is found by its ID, under row-level security.
+        object row = addendum is { } id
+            ? new NoteAddendum { Id = id, NoteId = note, PatientId = patient, Text = "", Sensitive = sensitive, SensitiveReason = reason }
+            : new ClinicalNote { Id = note, PatientId = patient, History = "", Assessment = "", Plan = "", Sensitive = sensitive, SensitiveReason = reason };
+        const string savepoint = "note_sensitivity";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancel);
+        try
+        {
+            var entry = db.Attach(row);
+            entry.Property(nameof(ClinicalNote.Sensitive)).IsModified = true;
+            entry.Property(nameof(ClinicalNote.SensitiveReason)).IsModified = true;
+            await db.SaveChangesAsync(cancel);
+            await transaction.ReleaseSavepointAsync(savepoint, cancel);
+            return new(200, []);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // No row the database lets this person update: unmarking is for the person who marked it or the note's
+            // signer (the policy decides, on the row as it stood); the panel was checked above.
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return new(403, [sensitive
+                ? "This couldn't be marked. Open the note again."
+                : "Only the person who marked it sensitive, or the note's signer, can unmark it."]);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation } refusal)
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
+                ? new(403, ["Only the person who marked it sensitive, or the note's signer, can unmark it."])
+                : new(409, [addendum is not null && !sensitive
+                    ? "This can't be unmarked: an addendum to a sensitive note is sensitive, or it has already been unmarked."
+                    : "This has already been changed. Open the note again."]);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.DeadlockDetected })
+        {
+            // Someone changed the note's sensitivity and an addendum's at the same moment, and the database refused
+            // this one of the two. Nothing was changed.
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return new(409, ["Someone else was changing this note at the same moment. Nothing was changed. Open the note again."]);
+        }
+        finally
+        {
+            db.Entry(row).State = EntityState.Detached;
+        }
+    }
+
+    // Signs an addendum to a signed note (step 10): a new text attached to the note, which stays as it was. The
+    // database decides who may (a clinician with the patient on their panel, as themselves), sets who signed and when,
+    // and makes an addendum to a sensitive note sensitive (db/policies/30-rls.sql and 50-clinical-notes.sql).
+    public async Task<AddendumResult> AddAddendumAsync(Guid patient, Guid note, string? text, bool sensitive, CancellationToken cancel)
+    {
+        if (!authority.IsPrimaryHost)
+        {
+            return new(503, ["The authoritative clinic server must be available to sign an addendum. Your text is still displayed."]);
+        }
+
+        text = text?.ReplaceLineEndings("\n").Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            return new(422, ["Write the addendum before signing it."]);
+        }
+
+        if (text.Length > NoteAddendumConfiguration.MaxLength)
+        {
+            return new(422, [$"An addendum can be up to {NoteAddendumConfiguration.MaxLength:N0} characters. This one has {text.Length:N0}."]);
+        }
+
+        if (!await phi.IsAssignedAsync(patient, cancel))
+        {
+            return new(403, ["Add this patient to your panel to sign an addendum."]);
+        }
+
+        object addendum = new NoteAddendum { Id = Guid.CreateVersion7(), NoteId = note, PatientId = patient, AuthorId = user.UserId ?? Guid.Empty, Text = text, Sensitive = sensitive };
+        const string savepoint = "note_addendum";
+        var transaction = db.Database.CurrentTransaction!;
+        await transaction.CreateSavepointAsync(savepoint, cancel);
+        try
+        {
+            db.Add(addendum);
+            await db.SaveChangesAsync(cancel);
+            await transaction.ReleaseSavepointAsync(savepoint, cancel);
+            return new(200, []);
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.InsufficientPrivilege or PostgresErrorCodes.CheckViolation or PostgresErrorCodes.ForeignKeyViolation,
+        } refusal)
+        {
+            await transaction.RollbackToSavepointAsync(savepoint, cancel);
+            return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
+                ? new(403, ["Add this patient to your panel to sign an addendum."])
+                : new(404, ["This note is unavailable."]);
+        }
+        finally
+        {
+            db.Entry(addendum).State = EntityState.Detached;
+        }
+    }
 }
+
+// What became of marking or unmarking: 200 done; 422 with what to fix; 403 not allowed (off the panel, or not the
+// person who may unmark); 409 it is already as asked, or an addendum of a sensitive note; 503 off the clinic's server.
+public sealed record SensitivityResult(int Status, IReadOnlyList<string> Errors);
+
+// What became of an addendum: 200 signed; 422 with what to fix; 403 the patient isn't on the clinician's panel; 404
+// the note isn't this patient's; 503 off the clinic's server.
+public sealed record AddendumResult(int Status, IReadOnlyList<string> Errors);
 
 public sealed record NoteResult(int Status, IReadOnlyList<string> Errors, ClinicalDraft? Draft = null, ClinicalNote? Note = null)
 {

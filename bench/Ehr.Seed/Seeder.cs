@@ -48,6 +48,12 @@ public static class Seeder
                 "ALTER TABLE ehr.allergy_intolerances DISABLE TRIGGER allergy_intolerances_status; ALTER TABLE ehr.allergy_intolerances DISABLE TRIGGER allergy_intolerances_guard",
                 cancellationToken);
 
+            // Nor is each blood pressure reading checked as it is loaded (step 9c): the synthetic clinic gives each visit's
+            // two values one reading, and the seed's tests check every reading instead. The check is run at the commit,
+            // and a table with checks still to run can't have its protection put back; run as each table loads, it added
+            // about a fifth to the time 50,000 patients take.
+            await ExecuteAsync(connection, "ALTER TABLE ehr.observations DISABLE TRIGGER observations_reading_inserted", cancellationToken);
+
             // Only now does the owner see every row.
             await using (var any = new NpgsqlCommand("SELECT EXISTS (SELECT FROM ehr.patients)", connection))
             {
@@ -121,8 +127,7 @@ public static class Seeder
                 cancellationToken);
             rows["encounters"] = await CopyAsync(connection,
                 """
-                COPY ehr.encounters (id, patient_id, status, class_code, reason, period_start, period_end, systolic_mm_hg, diastolic_mm_hg,
-                    heart_rate_per_minute) FROM STDIN (FORMAT BINARY)
+                COPY ehr.encounters (id, patient_id, status, class_code, reason, period_start, period_end) FROM STDIN (FORMAT BINARY)
                 """,
                 clinic.Charts().SelectMany(chart => chart.Visits),
                 async (row, e, ct) =>
@@ -134,17 +139,15 @@ public static class Seeder
                     await WriteAsync(row, e.Reason, ct);
                     await row.WriteAsync(e.PeriodStart, NpgsqlDbType.TimestampTz, ct);
                     await WriteAsync(row, e.PeriodEnd, NpgsqlDbType.TimestampTz, ct);
-                    await WriteAsync(row, e.SystolicMmHg, NpgsqlDbType.Smallint, ct);
-                    await WriteAsync(row, e.DiastolicMmHg, NpgsqlDbType.Smallint, ct);
-                    await WriteAsync(row, e.HeartRatePerMinute, NpgsqlDbType.Smallint, ct);
                 },
                 cancellationToken);
             rows["observations"] = await CopyAsync(connection,
                 """
                 COPY ehr.observations (id, patient_id, code, display, status, value, unit, reference_low, reference_high, effective_at,
-                    issued_at, note) FROM STDIN (FORMAT BINARY)
+                    issued_at, note, category, encounter_id, reading_id, reference_kind) FROM STDIN (FORMAT BINARY)
                 """,
-                clinic.Charts().SelectMany(chart => chart.Results),
+                // Laboratory results, and the vital signs taken at the visits (step 9).
+                clinic.Charts().SelectMany(chart => chart.Results.Concat(chart.Vitals)),
                 async (row, o, ct) =>
                 {
                     await row.WriteAsync(o.Id, NpgsqlDbType.Uuid, ct);
@@ -159,6 +162,10 @@ public static class Seeder
                     await row.WriteAsync(o.EffectiveAt, NpgsqlDbType.TimestampTz, ct);
                     await WriteAsync(row, o.IssuedAt, NpgsqlDbType.TimestampTz, ct);
                     await WriteAsync(row, o.Note, ct);
+                    await row.WriteAsync(o.Category, NpgsqlDbType.Varchar, ct);
+                    await WriteAsync(row, o.EncounterId, NpgsqlDbType.Uuid, ct);
+                    await WriteAsync(row, o.ReadingId, NpgsqlDbType.Uuid, ct);
+                    await row.WriteAsync(o.ReferenceKind, NpgsqlDbType.Varchar, ct);
                 },
                 cancellationToken);
 
@@ -175,6 +182,7 @@ public static class Seeder
             await ExecuteAsync(connection,
                 "ALTER TABLE ehr.allergy_intolerances ENABLE TRIGGER allergy_intolerances_status; ALTER TABLE ehr.allergy_intolerances ENABLE TRIGGER allergy_intolerances_guard",
                 cancellationToken);
+            await ExecuteAsync(connection, "ALTER TABLE ehr.observations ENABLE TRIGGER observations_reading_inserted", cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
         }

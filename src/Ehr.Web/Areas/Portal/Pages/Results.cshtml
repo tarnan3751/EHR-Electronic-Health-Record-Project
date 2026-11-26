@@ -78,4 +78,27 @@ else
         }
     </ul>
 }
+@if (Model.ResultTrends.Count > 0)
+{
+    @* Step 9: how each test has moved, for a test with more than one result. One column on a phone. *@
+    <h2>Over time</h2>
+    <p class="sc-muted">Tests you have had more than once. Each chart has its numbers in a table under it.</p>
+    <div class="sc-trends">
+        @foreach (var trend in Model.ResultTrends)
+        {
+            <partial name="_Trend" model="trend" />
+        }
+    </div>
+}
+@if (Model.VitalTrends.Count > 0)
+{
+    <h2>Vital signs</h2>
+    <p class="sc-muted">Taken at the clinic.</p>
+    <div class="sc-trends">
+        @foreach (var trend in Model.VitalTrends)
+        {
+            <partial name="_Trend" model="trend" />
+        }
+    </div>
+}
 <p><a asp-page="/Index">@(Model.Acting ? "Back to the record" : "Back to my record")</a></p>
