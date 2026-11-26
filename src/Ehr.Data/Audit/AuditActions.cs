@@ -39,6 +39,10 @@ public static class AuditActions
 
     public const string SignOut = "sign_out";
 
+    // The desktop app's lock opened with the account's password, checked by the server (the expansion plan's step 19a). A
+    // wrong one is recorded as SignInFailed, with the desktop session in its details.
+    public const string Unlock = "unlock";
+
     // Emergency access to a patient outside the actor's normal access, with its stated reason.
     public const string BreakGlass = "break_glass";
 
@@ -98,7 +102,7 @@ public static class AuditActions
     // Every action, for the audit page's filter.
     public static readonly string[] All =
     [
-        Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, BreakGlass, BootstrapAdmin, PasswordChanged,
+        Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, Unlock, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
         RecoveryCodeUsed, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
         RegistrationReplaced, ProxyAccountCreated, SentToLab, ReviewItemsFailed,

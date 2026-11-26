@@ -57,3 +57,30 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The lock (the expansion plan's step 19a): while it's up, the app bar and the page are out of sight, kept as they
+   were (they're inert too, app.js), and the lock fills the window on the page's own ground. */
+.desktop-locked > .sc-appbar,
+.desktop-locked > .sc-page {
+  visibility: hidden;
+}
+
+.desktop-lock {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  padding: var(--space-8) var(--space-4);
+  background: var(--surface);
+}
+
+.desktop-lock[hidden] {
+  display: none;
+}
+
+.desktop-lock__form {
+  margin: 0 auto;
+}
+
+.desktop-lock__form > * {
+  margin: 0;
+}

@@ -14,6 +14,7 @@ using Ehr.Web.Api.Desktop;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -84,7 +85,7 @@ public sealed class WebApps : IAsyncLifetime
 
     public DictationSidecarStub Dictation { get; } = new();
 
-    // The sign-in cookies' clock, which a test of a session's end moves on (step 18).
+    // The sign-in cookies' clock, which a test of a session's end moves on (step 18), and the desktop token's (step 19a).
     public ShiftedClock Clock { get; } = new();
 
     // Rather than 20 seconds, so the test of a service that doesn't answer is quick.
@@ -514,6 +515,9 @@ public sealed class WebApps : IAsyncLifetime
                 {
                     services.PostConfigure<CookieAuthenticationOptions>(scheme, options => options.TimeProvider = apps.Clock);
                 }
+
+                // The desktop token's 12 hours (step 19a) run on the same clock.
+                services.PostConfigure<AuthenticationSchemeOptions>(AccountSchemes.Desktop, options => options.TimeProvider = apps.Clock);
 
                 if (onPrem is not null)
                 {
