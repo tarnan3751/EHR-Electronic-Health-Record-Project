@@ -6,7 +6,7 @@ using static Ehr.Web.Tests.RefillRequestTests;
 
 namespace Ehr.Web.Tests.TestCases.UC4;
 
-// Test Case ID: TC-UC4-33
+// Test Case ID: TC-UC4-34
 // Purpose / scenario: An allergy a dictation proposed (step 15) is decided once: opened in two tabs, the second "Save
 //   allergy" adds nothing and says so. A proposal decided already sends the form back to the review; an order's proposal
 //   doesn't open the allergy form; nor does a proposal with an entry to change, or on another list, or one named on the
@@ -32,7 +32,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   patient's chart, then 404 twice; no allergy is added to either, the proposal still waits, and no read of it or its
 //   review is recorded against the other patient.
 // Creator: Tahseen Arnan
-public class TC_UC4_33_AllergyFromDictationRefused(WebApps apps) : IClassFixture<WebApps>
+public class TC_UC4_34_AllergyFromDictationRefused(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
