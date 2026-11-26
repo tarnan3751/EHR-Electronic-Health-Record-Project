@@ -46,9 +46,12 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
     }
 
     // A new setup link, for an invitation that never arrived or a forgotten password. A password the account had stops
-    // working now; the person chooses the next one through the link.
+    // working now; the person chooses the next one through the link. The account is held first, as for each action
+    // below (StaffUserLock, step 19.1's final review), so a passkey added or removed at the same moment waits or is
+    // waited for, and never fails the action on the account's concurrency stamp.
     public async Task<Invitation> ReissueAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         if (user.PasswordHash is not null)
         {
             var removed = await users.RemovePasswordAsync(user);
@@ -88,6 +91,7 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
     // Disabled: locked out with no end, which sign-in and row-level security both refuse. Nothing is deleted.
     public async Task DisableAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         await users.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
         await users.UpdateSecurityStampAsync(user);
         audit.Record(AuditActions.AccountDisabled, tableName: "staff_users", rowId: user.Id);
@@ -96,6 +100,7 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
 
     public async Task EnableAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         await users.SetLockoutEndDateAsync(user, null);
         await users.ResetAccessFailedCountAsync(user);
         audit.Record(AuditActions.AccountEnabled, tableName: "staff_users", rowId: user.Id);

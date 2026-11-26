@@ -603,6 +603,114 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
+    // Step 19.1's final review: an administrator's disable or password reissue as an add finishes, at once and with the
+    // add holding the account first. Each action holds the account first now, as the reset does: both are answered, the
+    // account ends disabled or its password reissued, and the add is either saved first or refused (locked out, or the
+    // account changed). Before, the action failed on the account's concurrency stamp: a disable answered 500 and left
+    // the account enabled, a reissue said "Optimistic concurrency failure, object has been modified." and left the
+    // password.
+    [Theory]
+    [InlineData("Disable", false)]
+    [InlineData("Reissue", false)]
+    [InlineData("Disable", true)]
+    [InlineData("Reissue", true)]
+    public async Task An_administrators_disable_or_reissue_as_an_add_finishes_goes_through(string action, bool addFirst)
+    {
+        var admin = await apps.CreateStaffAsync($"{action} Admin {addFirst}", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        for (var run = 0; run < (addFirst ? 1 : 10); run++)
+        {
+            var account = await apps.CreateStaffAsync($"Dr. {action} As Add {addFirst} {run}", StaffRoles.Clinician);
+            var session = await SignInAsync(apps.OnPrem, account);
+            using var authenticator = new TestAuthenticator();
+            using var begun = await OptionsToAddAsync(session.Client, "Racing", Totp.Code(account.AuthenticatorKey));
+            var (options, state) = await ReadyAsync(begun);
+            var credential = authenticator.Create(options, WebApps.OnSiteOrigin);
+            var token = Token(await session.Client.GetStringAsync(PasskeysPage, Cancel));
+            var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
+            Task<HttpResponseMessage> Add() => session.Client.PostAsync(
+                $"{PasskeysPage}?handler=Add", Form(("credential", credential), ("state", state), ("__RequestVerificationToken", token)), Cancel);
+            Task<HttpResponseMessage> Act() => adminSession.Client.PostAsync(
+                $"/admin/staff?handler={action}", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel);
+
+            HttpResponseMessage[] posts;
+            if (addFirst)
+            {
+                Task<HttpResponseMessage> adding, acting;
+                await using (var hold = await HoldAccountAsync(apps, account.Id))
+                {
+                    adding = Add();
+                    await WaitingForLocksAsync(apps, 1);
+                    acting = Act();
+                    await WaitingForLocksAsync(apps, 2);
+                    await hold.Transaction.CommitAsync(Cancel);
+                }
+
+                posts = [await adding, await acting];
+            }
+            else
+            {
+                posts = await Task.WhenAll(Add(), Act());
+            }
+
+            Assert.True(posts.All(p => p.StatusCode == HttpStatusCode.OK), $"Run {run}: {string.Join(", ", posts.Select(p => (int)p.StatusCode))}.");
+            var (add, acted) = (Words(await ReadAsync(posts[0])), Words(await ReadAsync(posts[1])));
+            Array.ForEach(posts, p => p.Dispose());
+            var user = await AccountAsync(account);
+            var added = add.Contains("Passkey added:", StringComparison.Ordinal);
+            Assert.True(added || add.Contains(action == "Disable" ? "this account is locked after too many failed attempts" : AccountChanged, StringComparison.Ordinal),
+                $"Run {run}: the add was neither saved nor refused for the {action.ToLowerInvariant()}.");
+            Assert.Equal(added ? 1 : 0, (await PasskeysAsync(account)).Count);
+            Assert.True(!addFirst || added, "The add held the account first, and should have been saved.");
+            Assert.DoesNotContain("Optimistic concurrency failure", acted);
+            if (action == "Disable")
+            {
+                Assert.Contains("is disabled and can no longer sign in.", acted);
+                Assert.True(StaffAccounts.IsDisabled(user), $"Run {run}: the account isn't disabled.");
+            }
+            else
+            {
+                Assert.Contains("/sign-in/setup?user=", acted);
+                Assert.True(user.PasswordHash is null, $"Run {run}: the password wasn't reissued.");
+            }
+        }
+    }
+
+    // Beside it, kept as a guard: enabling an account as an add begun before its disable finishes. Both are answered, and
+    // the add is refused, as the account was locked out or has changed since.
+    [Fact]
+    public async Task An_administrators_enable_as_an_add_finishes_goes_through()
+    {
+        var admin = await apps.CreateStaffAsync("Enabling Admin", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        for (var run = 0; run < 10; run++)
+        {
+            var account = await apps.CreateStaffAsync($"Dr. Enabled As Add {run}", StaffRoles.Clinician);
+            var session = await SignInAsync(apps.OnPrem, account);
+            using var authenticator = new TestAuthenticator();
+            using var begun = await OptionsToAddAsync(session.Client, "Racing", Totp.Code(account.AuthenticatorKey));
+            var (options, state) = await ReadyAsync(begun);
+            var credential = authenticator.Create(options, WebApps.OnSiteOrigin);
+            var token = Token(await session.Client.GetStringAsync(PasskeysPage, Cancel));
+            using (var disabled = await PostFormAsync(adminSession.Client, "/admin/staff?handler=Disable", "/admin/staff", ("id", account.Id)))
+            {
+                Assert.Contains("is disabled", Words(await ReadAsync(disabled)));
+            }
+
+            var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
+            var posts = await Task.WhenAll(
+                session.Client.PostAsync($"{PasskeysPage}?handler=Add", Form(("credential", credential), ("state", state), ("__RequestVerificationToken", token)), Cancel),
+                adminSession.Client.PostAsync("/admin/staff?handler=Enable", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel));
+
+            Assert.True(posts.All(p => p.StatusCode == HttpStatusCode.OK), $"Run {run}: {string.Join(", ", posts.Select(p => (int)p.StatusCode))}.");
+            Assert.Contains("Not saved:", Words(await ReadAsync(posts[0])));
+            Assert.Contains("can sign in again.", Words(await ReadAsync(posts[1])));
+            Array.ForEach(posts, p => p.Dispose());
+            Assert.Empty(await PasskeysAsync(account));
+            Assert.False(StaffAccounts.IsDisabled(await AccountAsync(account)));
+        }
+    }
+
     // The two ceremonies' states are not interchangeable: an add's state is refused at sign-in, and a sign-in's state,
     // which carries no security stamp, at an add's finish (step 19.1's check of the stamp comes after its purpose).
     [Fact]
