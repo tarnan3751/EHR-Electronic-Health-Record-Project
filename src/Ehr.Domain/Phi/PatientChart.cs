@@ -46,6 +46,12 @@ public sealed record PatientChart(
     // Signed notes marked sensitive that the chart's list leaves out (step 10); zero when sensitive items are shown.
     public int SensitiveNotesHidden { get; init; }
 
+    // The patient's pre-visit forms (step 13e), every one a sensitive item: how many there are, for the link to their
+    // page, which the chart never lists; and whether the reader has one in their inbox with an answer still to review.
+    public int Forms { get; init; }
+
+    public bool FormToReview { get; init; }
+
     // For the desktop app's offline copy only: the latest signed notes that aren't sensitive, with their addenda.
     public IReadOnlyList<OfflineNote> OfflineNotes { get; init; } = [];
 
@@ -79,7 +85,50 @@ public sealed record VisitVitals(decimal? Systolic, decimal? Diastolic, decimal?
 }
 
 // A signed note as the chart lists it: when it was signed and whether it is sensitive. Not its text.
-public sealed record SignedNoteEntry(Guid Id, DateTimeOffset SignedAt, bool Sensitive);
+public sealed record SignedNoteEntry(Guid Id, DateTimeOffset SignedAt, bool Sensitive)
+{
+    // Whether a visit summary written from it stands in the portal (step 13a).
+    public bool SummaryReleased { get; init; }
+}
+
+// A visit summary as a page shows it (step 13a): its three parts, when the note it was written from was signed, who
+// released it and when, whether it is sensitive and how, and, once withdrawn, who withdrew it, when and why.
+public sealed record VisitSummaryEntry(
+    Guid Id, string TalkedAbout, string Found, string NextSteps, DateTimeOffset NoteSignedAt, string ReleasedBy, DateTimeOffset ReleasedAt, bool Sensitive)
+{
+    public Guid ReleasedById { get; init; }
+
+    // Sensitive only because the note or one of its addenda is: the mark goes with theirs.
+    public bool SensitiveInherited { get; init; }
+
+    // Who made it sensitive, and why and when its sensitivity last changed after it was released.
+    public Guid? SensitiveMarkedBy { get; init; }
+
+    public string? SensitiveReason { get; init; }
+
+    public DateTimeOffset? SensitiveChangedAt { get; init; }
+
+    public DateTimeOffset? WithdrawnAt { get; init; }
+
+    public string? WithdrawnBy { get; init; }
+
+    public string? WithdrawnReason { get; init; }
+}
+
+// A patient's visit summaries as the portal lists them (step 13a), already recorded as one read of the patient and a
+// read of each summary shown: the standing ones, newest note first, as the portal is given them (no marks, reasons or
+// withdrawals), and the withdrawn ones, as their dates alone; how many sensitive ones were left out, and whether
+// sensitive ones were asked for.
+public sealed record PatientVisitSummaries(
+    Patient Patient, IReadOnlyList<Ehr.Data.Patients.PortalVisitSummary> Summaries, IReadOnlyList<Ehr.Data.Patients.WithdrawnVisitSummary> Withdrawn, int SensitiveHidden, bool SensitiveShown);
+
+// A note's visit summaries as its page shows them: the standing one first, then those withdrawn; how many sensitive ones
+// were left out, and whether sensitive ones were shown.
+public sealed record NoteSummaries(IReadOnlyList<VisitSummaryEntry> Shown, int SensitiveHidden, bool SensitiveShown)
+{
+    // Whether one stands in the portal, shown here or not: then no other is offered.
+    public bool HasStanding { get; init; }
+}
 
 // An addendum to a signed note as a page shows it.
 public sealed record AddendumEntry(Guid Id, string Text, DateTimeOffset SignedAt, bool Sensitive, Guid AuthorId, string AuthorName)
@@ -224,6 +273,13 @@ public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance
     // Step 8: what the database knows against ordering the chosen item for this patient (an allergy, a class the
     // patient is allergic to, an interaction with something they take). Empty until an item is chosen.
     public IReadOnlyList<Ehr.Data.Orders.SafetyWarning> Warnings { get; init; } = [];
+
+    // Step 13d: the refill request the order approves, when the form was opened to approve one of this patient's; and
+    // whether the chosen item renews its medication: the same product, the medication's own code. False until an item is
+    // chosen.
+    public Ehr.Domain.Refills.RefillReview? Refill { get; init; }
+
+    public bool RenewsRefill { get; init; }
 }
 
 // UC 1: a patient's discontinued orders as their page lists them, with the banner's allergies, already recorded as one

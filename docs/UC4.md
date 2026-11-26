@@ -48,6 +48,8 @@ Open a patient on your panel. Each of **Allergies**, **Medications** and **Diagn
 
 Mental-health, substance-use and some other diagnoses are sensitive by their code (`docs/expansion/reference-data.md` has the ranges), and you can mark any diagnosis or medication sensitive. On the form, a diagnosis sensitive by its code has its **Sensitive** box checked and fixed, with the hint "Sensitive by its code". (A new diagnosis is checked once it's saved or the form comes back, since the code isn't known while you type; the database marks it either way.) The chart leaves sensitive items out and says how many it left out. **Show sensitive items** reloads the chart with them, each tagged "Sensitive", and that view is recorded in the audit log as `read_sensitive`. The history page follows the same rule, and so does opening a sensitive entry's form. While sensitive items are shown, going to the history or a form and back keeps them shown. Sensitive items are never in the patient banner, and the desktop app doesn't keep them offline.
 
+Pre-visit forms (the plan's step 13e, `docs/UC22.md`) are sensitive items always. The chart's Appointments section links to the patient's **Pre-visit forms** page, with how many there are, and never lists them; that page shows them only when asked, recorded the same way. A clinician with a pre-visit form's answer to review in their own inbox sees a danger notice at the top of the chart, "Needs review: a pre-visit form has an answer for you to review.", until they mark the item done. The desktop app keeps no form and counts them among the sensitive items it doesn't keep.
+
 ## Decisions
 
 - **Who.** Clinicians only, and only for a patient on their panel, as for orders and notes. Under emergency access the chart and the history can be read, and nothing can be changed.
@@ -118,5 +120,6 @@ These need line-by-line review (AGENTS.md):
 - "No known allergies" is cleared by adding an allergy; there is no button to take it back on its own.
 - Allergies and diagnoses can't be marked entered in error yet; a mistaken one is made inactive. (Medications can.)
 - A medication isn't sensitive by rule; that waits for drug-class data.
+- A medication's refill requests (step 13d, `docs/UC21.md`) follow it: marking it sensitive, or unmarking it, marks its requests the same. Stopping it, marking it entered in error, or changing it to another drug or strength, leaves a waiting request in the care team's inboxes, to be declined with a message: it can no longer be approved.
 - The reference codes are a subset until step 2a.
 - The suggestions are the browser's own list, which differs a little between browsers.

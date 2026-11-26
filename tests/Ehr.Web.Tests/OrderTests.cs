@@ -14,7 +14,8 @@ namespace Ehr.Web.Tests;
 // UC 1 Place an order (Tahseen Arnan): the order form's helpers, and extra coverage beside the Assignment 4 test cases,
 // which are one file each in TestCases/UC1 (TC-UC1-01 to TC-UC1-06): a role that can't order, an off-site order that is
 // forwarded, and Cancel; and, for changing and discontinuing an order (TC-UC1-07 to TC-UC1-12), who is offered them,
-// the off-site path, and a link to an order that is no longer active. Through the order form (Areas/Clinical/Pages/Patients/Orders/New) and the chart, as the browser
+// the off-site path, and a link to an order that is no longer active; and that a medication is on order whichever of
+// its catalog items was picked. Through the order form (Areas/Clinical/Pages/Patients/Orders/New) and the chart, as the browser
 // and js/orders.js send them. What the database refuses whatever the app does is in Ehr.Security.Tests
 // (OrderSecurityTests).
 public class OrderTests(WebApps apps) : IClassFixture<WebApps>
@@ -305,6 +306,41 @@ public class OrderTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await OrdersAsync(apps, patient, "2276-4"));
         Assert.Equal(1, await OrdersAsync(apps, patient, "979492"));
         Assert.Contains("<strong>Ferritin [Mass/volume] in Serum or Plasma</strong> (Lab)", await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
+    }
+
+    // A medication is on order whichever of its catalog items was picked (60-orders.sql): the clinic's common item and
+    // RxNorm's own for the same product warn as a duplicate of each other, both ways round, and need a reason, as the
+    // database does; another strength doesn't (the second review of step 13d).
+    [Fact]
+    public async Task The_clinics_item_and_rxnorms_for_one_product_are_the_same_order_both_ways_round()
+    {
+        foreach (var (first, then) in new[] { ("Lisinopril 10 mg tablet", "lisinopril 10 MG Oral Tablet"), ("lisinopril 10 MG Oral Tablet", "Lisinopril 10 mg tablet") })
+        {
+            var (_, patient, session) = await OnPanelAsync(apps);
+            using (var signed = await SignAsync(session.Client, patient, "medication", first, SafetyTests.Details))
+            {
+                Assert.Equal(HttpStatusCode.OK, signed.StatusCode);
+            }
+
+            using (var warned = await SignAsync(session.Client, patient, "medication", then, SafetyTests.Details))
+            {
+                Assert.Equal(HttpStatusCode.UnprocessableEntity, warned.StatusCode);
+                Assert.Contains($"Already ordered An active order for {first} was signed", RefillRequestTests.Said(await warned.Content.ReadAsStringAsync(Cancel)));
+            }
+
+            Assert.Equal(1, await ActiveAsync(apps, patient));
+            using (var again = await SignAsync(session.Client, patient, "medication", then, SafetyTests.Details, reason: "Synthetic: a second supply."))
+            {
+                Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+            }
+
+            using (var stronger = await SignAsync(session.Client, patient, "medication", "lisinopril 20 MG Oral Tablet", SafetyTests.Details))
+            {
+                Assert.Equal(HttpStatusCode.OK, stronger.StatusCode);
+            }
+
+            Assert.Equal(3, await ActiveAsync(apps, patient));
+        }
     }
 
     // Cancel goes back to the chart and saves nothing.

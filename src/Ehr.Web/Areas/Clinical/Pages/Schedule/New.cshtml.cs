@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using Ehr.Data.Audit;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
 using Ehr.Domain.Scheduling;
@@ -108,7 +109,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, Appointment
             return RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
         }
 
-        if (await phi.HeaderAsync(id, HttpContext.RequestAborted) is not { } header)
+        if (await phi.HeaderAsync(id, AuditParts.Appointments, HttpContext.RequestAborted) is not { } header)
         {
             return NotFound();
         }

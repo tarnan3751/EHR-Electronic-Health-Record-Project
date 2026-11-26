@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
 using Ehr.Domain.Patients;
@@ -20,7 +21,7 @@ public class ConfirmModel(PhiReader phi, PatientAssignments assignments, BreakGl
 
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid draftId)
     {
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.NoteDraft) is { } denied)
         {
             return denied;
         }

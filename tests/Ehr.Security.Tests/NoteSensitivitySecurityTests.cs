@@ -418,16 +418,24 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
     }
 
     // Tahseen's question (2026-11-19): if someone viewed it before it was marked, the audit log already shows that.
-    // A view recorded before the mark is still there after it, unchanged, with its time before the mark's. A proxy is
-    // the case he named: today the database gives a proxy no signed note or addendum at all, with or without sensitive
-    // items in their grant, so a proxy has no view of one to show; that is proved here too, so the day notes reach the
-    // portal this test has to be revisited.
+    // A view recorded before the mark is still there after it, unchanged, with its time before the mark's: a
+    // colleague's view of the note, and the views proxies made of the portal's visit summaries (step 13a), which is how
+    // anything written from a note reaches a proxy. And his note of 19 November: a proxy never sees a sensitive note or
+    // addendum. The database gives no portal session a signed note or addendum at all (not the patient, not a proxy
+    // with or without sensitive items in the grant, before the mark, after it, or after it is taken off), only the
+    // note's visit summary: to the patient and a proxy allowed sensitive items always, to a proxy without them only while
+    // the note isn't sensitive, and to a proxy whose access was removed never.
     [Fact]
-    public async Task Views_made_before_a_note_was_marked_stay_in_the_audit_log_and_a_proxy_is_given_no_note_to_view()
+    public async Task Views_made_before_a_note_was_marked_stay_in_the_audit_log_and_a_proxy_sees_no_note_or_addendum_and_its_summary_only_as_the_grant_allows()
     {
         var (signer, patient, note, _) = await SignedAsync();
         var colleague = await ColleagueAsync(patient);
         var addendum = await AddendumAsync(signer, patient, note);
+        // A visit summary written from the note by the colleague, released to the portal (step 13a).
+        var summary = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, colleague,
+            "INSERT INTO ehr.visit_summaries (id, note_id, patient_id, talked_about, found, next_steps) VALUES (@id, @note, @patient, 'We talked about your cough.', 'Your chest was clear.', 'Rest and drink fluids.')",
+            ("id", summary), ("note", note), ("patient", patient));
         // A colleague's view of the note, recorded the way the app records one (AuditRecorder writes this row).
         await Accounts.ExecuteAsync(App, colleague,
             "INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source) VALUES (uuidv7(), now(), @actor, 'read', 'clinical_notes', @note, @patient, 'onprem')",
@@ -436,59 +444,113 @@ public class NoteSensitivitySecurityTests(MigratedDatabase database) : IClassFix
         var before = await AsSuperuserAsync(views, ("patient", patient), ("note", note));
         Assert.Single(before);
 
-        // A proxy acting for the patient, allowed sensitive items: no note and no addendum, in either role.
+        // A proxy acting for the patient, allowed sensitive items.
         var proxyPatient = await Accounts.PatientAsync(database, signer);
         var proxy = await Accounts.PatientAccountAsync(database, proxyPatient);
-        var grant = Guid.CreateVersion7();
         // Given by the clinician, as the clinic gives one (ProxyAccessSecurityTests), and the patient then allows sensitive items.
-        await Accounts.ExecuteAsync(App, signer,
-            """
-            INSERT INTO ehr.proxy_grants (id, patient_id, proxy_email, scope, include_sensitive, expires_at, granted_by, granted_at, granted_by_kind)
-            VALUES (@id, @patient, @email, 'record', false, now() + interval '30 days', gen_random_uuid(), '2000-01-01', 'staff')
-            """, ("id", grant), ("patient", patient), ("email", $"{proxy:N}@example.com"));
+        async Task<Guid> GiveAsync(Guid account)
+        {
+            var id = Guid.CreateVersion7();
+            await Accounts.ExecuteAsync(App, signer,
+                """
+                INSERT INTO ehr.proxy_grants (id, patient_id, proxy_email, scope, include_sensitive, expires_at, granted_by, granted_at, granted_by_kind)
+                VALUES (@id, @patient, @email, 'record', false, now() + interval '30 days', gen_random_uuid(), '2000-01-01', 'staff')
+                """, ("id", id), ("patient", patient), ("email", $"{account:N}@example.com"));
+            return id;
+        }
+
+        var grant = await GiveAsync(proxy);
         // Only the patient allows a proxy sensitive items: they do.
         var own = await Accounts.PatientAccountAsync(database, patient);
         await Accounts.ExecuteAsync(App, own, "UPDATE ehr.proxy_grants SET include_sensitive = true WHERE id = @id", ("id", grant));
         Assert.Equal(["true"], await AsSuperuserAsync("SELECT include_sensitive::text FROM ehr.proxy_grants WHERE id = @id", ("id", grant)));
-        async Task<List<string>> AsProxyAsync(string connection)
+        // A second proxy, whose access doesn't include sensitive items, and a third, whose access the patient removed.
+        var without = await Accounts.PatientAccountAsync(database, await Accounts.PatientAsync(database, signer));
+        var withoutGrant = await GiveAsync(without);
+        var removed = await Accounts.PatientAccountAsync(database, await Accounts.PatientAsync(database, signer));
+        var removedGrant = await GiveAsync(removed);
+        await Accounts.ExecuteAsync(App, own, "UPDATE ehr.proxy_grants SET revoked_at = now() WHERE id = @id", ("id", removedGrant));
+
+        // What each portal session is given, in either role: patients, signed notes, addenda, visit summaries as the
+        // portal is given them (ehr.standing_visit_summaries), and rows of the summaries' table, which is none.
+        async Task<List<string>> AsPortalAsync(string connection, Guid account, Guid? acting)
         {
-            using (Accounts.ActingUnder(grant))
+            using (acting is { } chosen ? Accounts.ActingUnder(chosen) : null)
             {
-                return await Accounts.QueryAsync(connection, proxy,
-                    "SELECT (SELECT count(*) FROM ehr.patients) || ' ' || (SELECT count(*) FROM ehr.clinical_notes) || ' ' || (SELECT count(*) FROM ehr.note_addenda)");
+                return await Accounts.QueryAsync(connection, account,
+                    "SELECT (SELECT count(*) FROM ehr.patients) || ' ' || (SELECT count(*) FROM ehr.clinical_notes) || ' ' || (SELECT count(*) FROM ehr.note_addenda) || ' ' || (SELECT count(*) FROM ehr.standing_visit_summaries(100)) || ' ' || (SELECT count(*) FROM ehr.visit_summaries)");
             }
         }
 
-        foreach (var connection in new[] { App, Read })
+        async Task GivenAsync(string patientSees, string allowedSees, string withoutSees, string removedSees)
         {
-            Assert.Equal(["1 0 0"], await AsProxyAsync(connection));
+            foreach (var connection in new[] { App, Read })
+            {
+                Assert.Equal([patientSees], await AsPortalAsync(connection, own, null));
+                Assert.Equal([allowedSees], await AsPortalAsync(connection, proxy, grant));
+                Assert.Equal([withoutSees], await AsPortalAsync(connection, without, withoutGrant));
+                Assert.Equal([removedSees], await AsPortalAsync(connection, removed, removedGrant));
+            }
         }
+
+        // Before the mark: the record and the summary, never the note or its addendum.
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 1 0", "0 0 0 0 0");
+
+        // The two proxies' views of the summaries page, recorded the way the portal records one: a read of the patient,
+        // and a read of each summary it showed, under the proxy's own account, while acting for the patient.
+        foreach (var (viewer, acting) in new[] { (proxy, grant), (without, withoutGrant) })
+        {
+            using (Accounts.ActingUnder(acting))
+            {
+                await Accounts.ExecuteAsync(App, viewer,
+                    """
+                    INSERT INTO ehr.audit_events (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source)
+                    VALUES (uuidv7(), now(), @actor, 'read', 'patients', @patient, @patient, 'onprem'), (uuidv7(), now(), @actor, 'read', 'visit_summaries', @summary, @patient, 'onprem')
+                    """, ("actor", viewer), ("patient", patient), ("summary", summary));
+            }
+        }
+
+        const string proxyViews = "SELECT id || ' ' || actor_id || ' ' || action || ' ' || table_name || ' ' || occurred_at FROM ehr.audit_events WHERE patient_id = @patient AND action = 'read' AND actor_id = ANY(@viewers) ORDER BY id";
+        Guid[] viewers = [proxy, without];
+        var proxiesBefore = await AsSuperuserAsync(proxyViews, ("patient", patient), ("viewers", viewers));
+        Assert.Equal(4, proxiesBefore.Count);
 
         await ChangeAsync(colleague, "clinical_notes", note, sensitive: true);
 
-        // The earlier view: the same row, the same actor and time, and before the mark.
+        // The earlier views: the same rows, the same actors and times, and before the mark.
         Assert.Equal(before, await AsSuperuserAsync(views, ("patient", patient), ("note", note)));
+        Assert.Equal(proxiesBefore, await AsSuperuserAsync(proxyViews, ("patient", patient), ("viewers", viewers)));
         Assert.Equal(["true"], await AsSuperuserAsync(
             """
             SELECT (e.occurred_at < n.sensitive_changed_at)::text FROM ehr.audit_events e JOIN ehr.clinical_notes n ON n.id = e.row_id
             WHERE e.patient_id = @patient AND e.action = 'read' AND e.row_id = @note
             """, ("patient", patient), ("note", note)));
-        // An administrator still sees that the view happened, by whom and when (it has no values to hide).
+        Assert.Equal(["true"], await AsSuperuserAsync(
+            """
+            SELECT bool_and(e.occurred_at < n.sensitive_changed_at)::text FROM ehr.audit_events e, ehr.clinical_notes n
+            WHERE n.id = @note AND e.patient_id = @patient AND e.action = 'read' AND e.actor_id = ANY(@viewers)
+            """, ("patient", patient), ("note", note), ("viewers", viewers)));
+        // An administrator still sees that the views happened, by whom and when (they have no values to hide).
         var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
         Assert.Equal([colleague.ToString()], await Accounts.QueryAsync(App, admin,
             "SELECT actor_id::text FROM ehr.audit_events WHERE patient_id = @patient AND action = 'read' AND row_id = @note", ("patient", patient), ("note", note)));
+        Assert.Equal([.. viewers.Select(viewer => viewer.ToString()).Order(StringComparer.Ordinal)], await Accounts.QueryAsync(App, admin,
+            "SELECT DISTINCT actor_id::text FROM ehr.audit_events WHERE patient_id = @patient AND action = 'read' AND actor_id = ANY(@viewers) ORDER BY actor_id::text",
+            ("patient", patient), ("viewers", viewers)));
+
+        // Marked: the summary is sensitive with the note, inherited (Tahseen's decision of 21 November 2026). The
+        // patient and the proxy allowed sensitive items still see it; the proxy without them doesn't; nobody in the
+        // portal sees the note or its addendum.
+        Assert.Equal(["true true"], await AsSuperuserAsync("SELECT sensitive || ' ' || sensitive_inherited FROM ehr.visit_summaries WHERE id = @id", ("id", summary)));
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 0 0", "0 0 0 0 0");
         // Nor an addendum signed to the note now that it is sensitive, nor any after the note is unmarked again.
         await AddendumAsync(colleague, patient, note, "Synthetic addendum to a sensitive note.");
-        foreach (var connection in new[] { App, Read })
-        {
-            Assert.Equal(["1 0 0"], await AsProxyAsync(connection));
-        }
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 0 0", "0 0 0 0 0");
 
+        // Unmarked: nothing of the note is sensitive any more, so the summary's inherited mark goes and it is shown to the
+        // proxy without sensitive items again; the note and its addenda still to nobody in the portal.
         await ChangeAsync(colleague, "clinical_notes", note, sensitive: false, reason: "Marked the wrong note.");
-        foreach (var connection in new[] { App, Read })
-        {
-            Assert.Equal(["1 0 0"], await AsProxyAsync(connection));
-        }
+        await GivenAsync("1 0 0 1 0", "1 0 0 1 0", "1 0 0 1 0", "0 0 0 0 0");
 
         Assert.NotEqual(Guid.Empty, addendum);
     }

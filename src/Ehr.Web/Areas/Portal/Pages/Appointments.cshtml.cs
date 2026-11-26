@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Ehr.Data.Audit;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Phi;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -22,6 +23,6 @@ public class AppointmentsModel(PortalSubject subject, PhiReader phi) : PageModel
     {
         Response.Headers.CacheControl = "no-store";
         var patientId = subject.PatientId;
-        Appointments = await phi.AppointmentsAsync(patientId, Past, HttpContext.RequestAborted);
+        Appointments = await phi.AppointmentsAsync(patientId, Past, AuditParts.Appointments, HttpContext.RequestAborted);
     }
 }

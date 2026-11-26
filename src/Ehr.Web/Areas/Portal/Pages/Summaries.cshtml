@@ -1,0 +1,64 @@
+@page "/portal/summaries"
+@model SummariesModel
+@{
+    ViewData["Title"] = "Visit summaries";
+    var own = Model.Own;
+    string[] parts = Ehr.Domain.Notes.VisitSummaries.Parts;
+}
+<h1>Visit summaries</h1>
+@if (Model.Summaries is not { } summaries)
+{
+    <p class="sc-notice sc-notice--danger">@(own ? "Your visit summaries are" : "Visit summaries are") not available right now. Contact the clinic if this continues.</p>
+}
+else
+{
+    @* Standing summaries and the placeholders of withdrawn ones, in one list by date, newest first; a standing one before
+       a placeholder of the same date. Dated, as the results page dates a result, the day the visit's notes were signed:
+       nothing ties a note to a visit's own date. *@
+    var items = summaries.Summaries.Select(s => (Date: s.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)s, Sensitive: s.Sensitive))
+        .Concat(summaries.Withdrawn.Select(w => (Date: w.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)null, Sensitive: w.Sensitive)))
+        .OrderByDescending(item => item.Date.UtcDateTime.Date).ThenBy(item => item.Summary is null).ThenByDescending(item => item.Date).ToList();
+    <p class="sc-muted">@(own ? "Written for you by your care team after a visit" : "Written by the care team after a visit"), newest first. Each is dated the day the visit's notes were signed.</p>
+    @if (Model.MaySeeSensitive && summaries.SensitiveHidden > 0)
+    {
+        @* Left out until asked for (docs/brand: sensitive items). Asking is a link, a read the cloud app answers too. *@
+        <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @summaries.SensitiveHidden @(summaries.SensitiveHidden == 1 ? "visit summary is" : "visit summaries are") not shown. <a asp-page="/Summaries" asp-route-sensitive="true">Show sensitive summaries</a></p>
+    }
+    else if (Model.MaySeeSensitive && summaries.SensitiveShown && items.Any(item => item.Sensitive))
+    {
+        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="/Summaries">Hide sensitive summaries</a></p>
+    }
+    @if (items.Count == 0)
+    {
+        <p>@(own ? "You have no visit summaries yet." : "There are no visit summaries yet.")</p>
+    }
+    else
+    {
+        <ul class="sc-results">
+            @foreach (var item in items)
+            {
+                @if (item.Summary is { } summary)
+                {
+                    <li class="sc-result sc-result--plain" data-summary="standing">
+                        <h2>@summary.NoteSignedAt.UtcDateTime.ToString("MMM d, yyyy") UTC</h2>
+                        <p class="sc-muted">Written by @summary.ReleasedBy@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</p>
+                        <h3>@parts[0]</h3>
+                        <p class="sc-note__text">@summary.TalkedAbout</p>
+                        <h3>@parts[1]</h3>
+                        <p class="sc-note__text">@summary.Found</p>
+                        <h3>@parts[2]</h3>
+                        <p class="sc-note__text">@summary.NextSteps</p>
+                    </li>
+                }
+                else
+                {
+                    @* Tahseen's decision of 21 November 2026: the date and nothing else, not the text, the reason or who. *@
+                    <li class="sc-result sc-result--plain" data-summary="withdrawn">
+                        <partial name="_WithdrawnSummary" model="item.Date" />
+                    </li>
+                }
+            }
+        </ul>
+    }
+}
+<p><a asp-page="/Index">@(own ? "Back to my record" : "Back to the record")</a></p>

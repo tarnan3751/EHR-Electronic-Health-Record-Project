@@ -226,4 +226,37 @@ public class OrderSafetySecurityTests(MigratedDatabase database) : IClassFixture
         // A lab order is not checked, whatever the patient is allergic to.
         Assert.Empty(await Accounts.QueryAsync(App, clinician, Warnings, ("patient", patient), ("code", "SYN-LAB-001")));
     }
+
+    // The policy file runs on every start of the migration job, while order forms ask the function: it is replaced in
+    // place, so no call fails and the function is the same one after (PolicyRerun). Dropping and creating it again on
+    // each run, as the file did, failed calls. And on a database still holding the step's first build, whose result had
+    // no against_sensitive, the file drops that one, once, and creates this one.
+    [Fact]
+    public async Task Running_the_policy_file_again_never_fails_an_order_form_asking_the_function()
+    {
+        var (clinician, patient) = await OnPanelAsync();
+        await TakingAsync(patient, "sertraline");
+        const string Function = "'ehr.order_safety_warnings(uuid, text, uuid)'::regprocedure";
+        const string Shape = $"SELECT {Function}::oid::text || ' ' || pg_get_function_result({Function})";
+        var before = await QueryAsync(Shape);
+
+        Assert.Empty(await PolicyRerun.RunAsync(database, "61-order-safety.sql", clinician,
+            "SELECT count(*) FROM ehr.order_safety_warnings(@patient, 'SYN-MED-005')", ("patient", patient)));
+        Assert.Equal(before, await QueryAsync(Shape));
+
+        await Accounts.ExecuteAsync(database.OwnerConnectionString, null,
+            """
+            DROP FUNCTION ehr.order_safety_warnings(uuid, text, uuid);
+            CREATE FUNCTION ehr.order_safety_warnings(for_patient uuid, catalog_code text, replaces uuid DEFAULT NULL)
+                RETURNS TABLE (kind text, severity text, ordered text, against text, source text, detail text, citation text)
+                LANGUAGE sql STABLE AS $$ SELECT NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::text WHERE false $$;
+            """);
+        await MigratedDatabase.ExecuteAsync(database.OwnerConnectionString,
+            await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/61-order-safety.sql"), TestContext.Current.CancellationToken));
+        Assert.EndsWith("against_sensitive boolean)", (await QueryAsync(Shape)).Single(), StringComparison.Ordinal);
+        Assert.Equal(["true true"], await QueryAsync(
+            $"SELECT has_function_privilege('ehr_app', {Function}, 'EXECUTE')::text || ' ' || has_function_privilege('ehr_read', {Function}, 'EXECUTE')::text"));
+    }
+
+    Task<List<string>> QueryAsync(string sql) => Accounts.QueryAsync(database.SuperuserConnectionString, null, sql);
 }

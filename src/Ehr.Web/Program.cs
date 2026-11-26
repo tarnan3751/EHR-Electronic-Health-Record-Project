@@ -29,6 +29,11 @@ var connectionString = builder.Configuration.GetConnectionString("Ehr")
 builder.Services.AddEhrData(connectionString);
 builder.Services.AddScoped<QuickTextSaver>();
 builder.Services.AddScoped<Ehr.Domain.Notes.ClinicalNotes>();
+builder.Services.AddScoped<Ehr.Domain.Notes.VisitSummaries>();
+// The portal's "something new" email, which visit summaries and refill requests send.
+builder.Services.AddScoped<Ehr.Domain.Accounts.PortalNotices>();
+// Refill requests (Ehr.Domain.Refills).
+builder.Services.AddScoped<Ehr.Domain.Refills.RefillRequests>();
 builder.Services.AddScoped<Ehr.Domain.Notes.NoteReviews>();
 builder.Services.AddSingleton(new Ehr.Domain.Notes.NoteWriteAuthority(site == Site.OnPrem));
 // Which of the two apps this is, for the few pages that write as part of a read (marking a message read) and so must
@@ -47,6 +52,8 @@ builder.Services.AddScoped<Ehr.Domain.Proxies.ProxyInvitations>();
 builder.Services.AddScoped<Ehr.Web.PortalSubject>();
 // Appointments (Ehr.Domain.Scheduling).
 builder.Services.AddScoped<Ehr.Domain.Scheduling.Appointments>();
+// Pre-visit forms (Ehr.Domain.Forms; step 13e).
+builder.Services.AddScoped<Ehr.Domain.Forms.PreVisitForms>();
 // The staff inbox (Ehr.Domain.Inbox).
 builder.Services.AddScoped<Ehr.Domain.Inbox.StaffInbox>();
 

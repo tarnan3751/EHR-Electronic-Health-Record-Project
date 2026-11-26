@@ -2084,3 +2084,203 @@ VALUES ('20261127070100_LabKeys', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.inbox_items DROP CONSTRAINT ck_inbox_items_kind;
+
+CREATE TABLE ehr.visit_summaries (
+    id uuid NOT NULL,
+    note_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    talked_about text NOT NULL,
+    found text NOT NULL,
+    next_steps text NOT NULL,
+    note_signed_at timestamp with time zone NOT NULL,
+    released_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    released_at timestamp with time zone NOT NULL DEFAULT (now()),
+    sensitive boolean NOT NULL,
+    sensitive_inherited boolean NOT NULL,
+    sensitive_marked_by uuid,
+    sensitive_reason character varying(500),
+    sensitive_changed_at timestamp with time zone,
+    withdrawn_at timestamp with time zone,
+    withdrawn_by uuid,
+    withdrawn_reason character varying(500),
+    CONSTRAINT pk_visit_summaries PRIMARY KEY (id),
+    CONSTRAINT ck_visit_summaries_found CHECK (found ~ '[^[:space:]]' AND char_length(found) <= 4000),
+    CONSTRAINT ck_visit_summaries_inherited CHECK (sensitive OR NOT sensitive_inherited),
+    CONSTRAINT ck_visit_summaries_next_steps CHECK (next_steps ~ '[^[:space:]]' AND char_length(next_steps) <= 4000),
+    CONSTRAINT ck_visit_summaries_talked_about CHECK (talked_about ~ '[^[:space:]]' AND char_length(talked_about) <= 4000),
+    CONSTRAINT ck_visit_summaries_withdrawn CHECK ((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawn_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_reason ~ '[^[:space:]]')),
+    CONSTRAINT fk_visit_summaries_clinical_notes_note_id_patient_id FOREIGN KEY (note_id, patient_id) REFERENCES ehr.clinical_notes (id, patient_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_staff_users_released_by FOREIGN KEY (released_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_staff_users_sensitive_marked_by FOREIGN KEY (sensitive_marked_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_visit_summaries_staff_users_withdrawn_by FOREIGN KEY (withdrawn_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn'));
+
+CREATE UNIQUE INDEX ix_visit_summaries_note_id ON ehr.visit_summaries (note_id) WHERE withdrawn_at IS NULL;
+
+CREATE INDEX ix_visit_summaries_note_id_patient_id ON ehr.visit_summaries (note_id, patient_id);
+
+CREATE INDEX ix_visit_summaries_patient_id_note_signed_at ON ehr.visit_summaries (patient_id, note_signed_at);
+
+CREATE INDEX ix_visit_summaries_released_by ON ehr.visit_summaries (released_by);
+
+CREATE INDEX ix_visit_summaries_sensitive_marked_by ON ehr.visit_summaries (sensitive_marked_by);
+
+CREATE INDEX ix_visit_summaries_withdrawn_by ON ehr.visit_summaries (withdrawn_by);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127080100_VisitSummaries', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE ehr.refill_requests (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    medication_statement_id uuid NOT NULL,
+    medication_display character varying(300) NOT NULL,
+    medication_code character varying(20) NOT NULL,
+    note character varying(500),
+    requested_by uuid NOT NULL,
+    requested_at timestamp with time zone NOT NULL,
+    status character varying(20) NOT NULL,
+    order_id uuid,
+    ordered_display character varying(200),
+    decline_message character varying(1000),
+    decided_by uuid,
+    decided_at timestamp with time zone,
+    sensitive boolean NOT NULL,
+    CONSTRAINT pk_refill_requests PRIMARY KEY (id),
+    CONSTRAINT ck_refill_requests_answer CHECK ((status = 'requested') = (decided_at IS NULL) AND (decided_at IS NULL) = (decided_by IS NULL) AND (status = 'completed') = (order_id IS NOT NULL) AND (order_id IS NULL) = (ordered_display IS NULL) AND (status = 'rejected') = (decline_message IS NOT NULL)),
+    CONSTRAINT ck_refill_requests_status CHECK (status IN ('requested', 'completed', 'rejected')),
+    CONSTRAINT fk_refill_requests_medication_statements_medication_statement_ FOREIGN KEY (medication_statement_id) REFERENCES ehr.medication_statements (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_orders_order_id FOREIGN KEY (order_id) REFERENCES ehr.orders (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_patient_users_requested_by FOREIGN KEY (requested_by) REFERENCES ehr.patient_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refill_requests_staff_users_decided_by FOREIGN KEY (decided_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_refill_requests_decided_by ON ehr.refill_requests (decided_by);
+
+CREATE INDEX ix_refill_requests_medication_statement_id ON ehr.refill_requests (medication_statement_id);
+
+CREATE UNIQUE INDEX ix_refill_requests_order_id ON ehr.refill_requests (order_id);
+
+CREATE INDEX ix_refill_requests_patient_id_requested_at ON ehr.refill_requests (patient_id, requested_at);
+
+CREATE INDEX ix_refill_requests_requested_by ON ehr.refill_requests (requested_by);
+
+CREATE UNIQUE INDEX ux_refill_requests_open ON ehr.refill_requests (medication_statement_id) WHERE status = 'requested';
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127080200_RefillRequests', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE ehr.inbox_items DROP CONSTRAINT ck_inbox_items_kind;
+
+ALTER TABLE ehr.inbox_items ADD sensitive boolean NOT NULL DEFAULT FALSE;
+
+CREATE TABLE ehr.questionnaire_requests (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    appointment_id uuid NOT NULL,
+    clinician_id uuid NOT NULL,
+    questionnaire_code character varying(20) NOT NULL,
+    definition jsonb NOT NULL,
+    requested_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    requested_at timestamp with time zone NOT NULL DEFAULT (now()),
+    sensitive boolean NOT NULL,
+    CONSTRAINT pk_questionnaire_requests PRIMARY KEY (id),
+    CONSTRAINT ck_questionnaire_requests_definition CHECK (jsonb_typeof(definition) = 'object'),
+    CONSTRAINT ck_questionnaire_requests_sensitive CHECK (sensitive),
+    CONSTRAINT fk_questionnaire_requests_appointments_appointment_id FOREIGN KEY (appointment_id) REFERENCES ehr.appointments (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_questionnaires_questionnaire_code FOREIGN KEY (questionnaire_code) REFERENCES ehr.questionnaires (code) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_requests_staff_users_requested_by FOREIGN KEY (requested_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.questionnaire_responses (
+    id uuid NOT NULL,
+    request_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    questionnaire_code character varying(20) NOT NULL,
+    clinician_id uuid NOT NULL,
+    answers jsonb NOT NULL,
+    score integer,
+    band character varying(60),
+    follow_up boolean NOT NULL,
+    alert boolean NOT NULL,
+    answered_by uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    proxy_grant_id uuid,
+    answered_at timestamp with time zone NOT NULL DEFAULT (now()),
+    sensitive boolean NOT NULL,
+    CONSTRAINT pk_questionnaire_responses PRIMARY KEY (id),
+    CONSTRAINT ck_questionnaire_responses_answers CHECK (jsonb_typeof(answers) = 'object'),
+    CONSTRAINT ck_questionnaire_responses_score CHECK (score >= 0),
+    CONSTRAINT ck_questionnaire_responses_sensitive CHECK (sensitive),
+    CONSTRAINT fk_questionnaire_responses_patient_users_answered_by FOREIGN KEY (answered_by) REFERENCES ehr.patient_users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_proxy_grants_proxy_grant_id FOREIGN KEY (proxy_grant_id) REFERENCES ehr.proxy_grants (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_questionnaire_requests_request_id FOREIGN KEY (request_id) REFERENCES ehr.questionnaire_requests (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_questionnaires_questionnaire_code FOREIGN KEY (questionnaire_code) REFERENCES ehr.questionnaires (code) ON DELETE RESTRICT,
+    CONSTRAINT fk_questionnaire_responses_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_form_alert_sensitive CHECK (kind <> 'form-alert' OR sensitive);
+
+ALTER TABLE ehr.inbox_items ADD CONSTRAINT ck_inbox_items_kind CHECK (kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert'));
+
+CREATE UNIQUE INDEX ix_questionnaire_requests_appointment_id_questionnaire_code ON ehr.questionnaire_requests (appointment_id, questionnaire_code);
+
+CREATE INDEX ix_questionnaire_requests_clinician_id ON ehr.questionnaire_requests (clinician_id);
+
+CREATE INDEX ix_questionnaire_requests_patient_id_requested_at ON ehr.questionnaire_requests (patient_id, requested_at);
+
+CREATE INDEX ix_questionnaire_requests_questionnaire_code ON ehr.questionnaire_requests (questionnaire_code);
+
+CREATE INDEX ix_questionnaire_requests_requested_by ON ehr.questionnaire_requests (requested_by);
+
+CREATE INDEX ix_questionnaire_responses_answered_by ON ehr.questionnaire_responses (answered_by);
+
+CREATE INDEX ix_questionnaire_responses_clinician_id ON ehr.questionnaire_responses (clinician_id);
+
+CREATE INDEX ix_questionnaire_responses_patient_id_answered_at ON ehr.questionnaire_responses (patient_id, answered_at);
+
+CREATE INDEX ix_questionnaire_responses_proxy_grant_id ON ehr.questionnaire_responses (proxy_grant_id);
+
+CREATE INDEX ix_questionnaire_responses_questionnaire_code ON ehr.questionnaire_responses (questionnaire_code);
+
+CREATE UNIQUE INDEX ix_questionnaire_responses_request_id ON ehr.questionnaire_responses (request_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127080300_PreVisitForms', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+SELECT set_config('lock_timeout', '5s', true);
+
+CREATE INDEX ix_patient_assignments_history ON ehr.patient_assignments (patient_id, clinician_id);
+
+ALTER TABLE ehr.audit_events ADD part character varying(24);
+
+ALTER TABLE ehr.audit_events ADD CONSTRAINT ck_audit_events_part
+    CHECK (part IS NULL
+           OR action IN ('read', 'read_sensitive', 'download', 'download_sensitive')
+           AND part IN ('chart', 'lists', 'orders', 'results', 'vitals', 'search', 'panel',
+                        'schedule', 'inbox', 'appointments', 'home', 'conversations', 'access',
+                        'visit-note', 'note-draft', 'offline', 'fhir', 'summaries', 'printable',
+                        'download', 'views', 'refills', 'forms')) NOT VALID;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127080400_AuditEventParts', '10.0.13');
+
+COMMIT;
+

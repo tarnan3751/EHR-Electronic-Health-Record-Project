@@ -1,18 +1,19 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Ehr.Data;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
+using Ehr.Web.Fhir;
 using Microsoft.Extensions.Options;
 
 namespace Ehr.Web.Api.Fhir;
 
 // A read-only FHIR R4 API for clinicians (the expansion plan's step 11, UC 19), at /fhir on both servers: a patient's
 // demographics, allergies, medications, diagnoses, test results and vital signs, and appointments, read by ID or
-// searched by patient, as FHIR JSON (FhirResources.cs, FhirObservations.cs), and the capability statement that says so
-// at /fhir/metadata.
+// searched by patient, as FHIR JSON (the shared mapping, Fhir/FhirResources.cs and FhirObservations.cs, with the
+// record's own IDs: FhirIds.Record), and the capability statement that says so at /fhir/metadata (FhirCapabilities.cs).
 //
 // Who: the Clinician policy on the whole group (Program.cs), with the clinical app's own sign-in. The staff cookie is
 // the one /fhir reads (AccountSchemes), so UserContextMiddleware hands the clinician to the database as it does for a
@@ -37,8 +38,6 @@ namespace Ehr.Web.Api.Fhir;
 // (off-site, the cloud app forwards it to the clinic's server, as every write, and its answer comes back).
 public static class FhirApi
 {
-    public const string ContentType = "application/fhir+json; charset=utf-8";
-
     // The most entries a search returns: the most values the vital signs page and the portal's results read (PhiReader).
     public const int SearchLimit = 600;
 
@@ -64,14 +63,12 @@ public static class FhirApi
             ["Appointment"] = ("appointments", ["patient"], []),
         };
 
-    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
-
     public static RouteGroupBuilder MapFhirApi(this IEndpointRouteBuilder endpoints)
     {
         var fhir = endpoints.MapGroup(AccountSchemes.FhirPath);
         fhir.AddEndpointFilter(JsonAcceptedAsync);
         fhir.MapGet("/metadata", (HttpContext context, IOptions<SiteAddresses> addresses) =>
-            Unsupported(context.Request.Query, []) ?? Answer(StatusCodes.Status200OK, FhirResources.Capabilities(BaseUrl(addresses))));
+            Unsupported(context.Request.Query, []) ?? Answer(StatusCodes.Status200OK, FhirCapabilities.Statement(BaseUrl(addresses))));
         fhir.MapGet("/{type}", SearchAsync).AddEndpointFilter(InTransactionAsync);
         fhir.MapGet("/{type}/{id}", ReadAsync).AddEndpointFilter(InTransactionAsync);
         // Everything else under /fhir: any method but GET is 405, so every write is refused, and any other GET is 404.
@@ -145,8 +142,8 @@ public static class FhirApi
                 return search.Answer([], 0);
             }
 
-            return await phi.PatientAsync(found, cancel) is { } patient
-                ? search.Answer([(found, FhirResources.Patient(patient))], 1)
+            return await phi.PatientAsync(found, AuditParts.Fhir, cancel) is { } patient
+                ? search.Answer([(found, FhirResources.Patient(patient, FhirIds.Record))], 1)
                 : search.Answer([], 0);
         }
 
@@ -197,22 +194,22 @@ public static class FhirApi
         {
             case "AllergyIntolerance":
                 var allergies = await phi.AllergiesAsync(patientId, only: null, SearchLimit, cancel);
-                return search.Answer(allergies.Entries.Select(a => (a.Id, (object)FhirResources.Allergy(a))), allergies.Total);
+                return search.Answer(allergies.Entries.Select(a => (a.Id, (object)FhirResources.Allergy(a, FhirIds.Record))), allergies.Total);
             case "MedicationStatement":
                 var medications = await phi.MedicationsAsync(patientId, only: null, sensitive, SearchLimit, cancel);
                 return search.LeftOut(medications.SensitiveLeftOut)
-                    .Answer(medications.Entries.Select(m => (m.Id, (object)FhirResources.Medication(m))), medications.Total);
+                    .Answer(medications.Entries.Select(m => (m.Id, (object)FhirResources.Medication(m, FhirIds.Record))), medications.Total);
             case "Condition":
                 var conditions = await phi.ConditionsAsync(patientId, only: null, sensitive, SearchLimit, cancel);
                 return search.LeftOut(conditions.SensitiveLeftOut)
-                    .Answer(conditions.Entries.Select(c => (c.Id, (object)FhirResources.Condition(c))), conditions.Total);
+                    .Answer(conditions.Entries.Select(c => (c.Id, (object)FhirResources.Condition(c, FhirIds.Record))), conditions.Total);
             case "Observation":
                 // A blood pressure's ID is its reading's, not one of its values' (FhirObservations).
                 var observations = await phi.ObservationsAsync(patientId, only: null, category, SearchLimit, cancel);
-                return search.Answer(FhirObservations.Map(observations.Entries).Select(mapped => (mapped.Id, (object)mapped.Resource)), observations.Total);
+                return search.Answer(FhirObservations.Map(observations.Entries, FhirIds.Record).Select(mapped => (mapped.Id, (object)mapped.Resource)), observations.Total);
             default:
                 var appointments = await phi.AllAppointmentsAsync(patientId, only: null, SearchLimit, cancel);
-                return search.Answer(appointments.Entries.Select(a => (a.Id, (object)FhirResources.Appointment(a))), appointments.Total);
+                return search.Answer(appointments.Entries.Select(a => (a.Id, (object)FhirResources.Appointment(a, FhirIds.Record))), appointments.Total);
         }
     }
 
@@ -256,12 +253,12 @@ public static class FhirApi
 
         object? resource = type switch
         {
-            "Patient" => await phi.PatientAsync(key, cancel) is { } found ? FhirResources.Patient(found) : null,
-            "AllergyIntolerance" => (await phi.AllergiesAsync(patient, key, 1, cancel)).Entries.Select(FhirResources.Allergy).SingleOrDefault(),
-            "MedicationStatement" => (await phi.MedicationsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(FhirResources.Medication).SingleOrDefault(),
-            "Condition" => (await phi.ConditionsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(FhirResources.Condition).SingleOrDefault(),
-            "Observation" => FhirObservations.Map((await phi.ObservationsAsync(patient, key, null, 1, cancel)).Entries).Select(mapped => mapped.Resource).SingleOrDefault(),
-            _ => (await phi.AllAppointmentsAsync(patient, key, 1, cancel)).Entries.Select(FhirResources.Appointment).SingleOrDefault(),
+            "Patient" => await phi.PatientAsync(key, AuditParts.Fhir, cancel) is { } found ? FhirResources.Patient(found, FhirIds.Record) : null,
+            "AllergyIntolerance" => (await phi.AllergiesAsync(patient, key, 1, cancel)).Entries.Select(a => FhirResources.Allergy(a, FhirIds.Record)).SingleOrDefault(),
+            "MedicationStatement" => (await phi.MedicationsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(m => FhirResources.Medication(m, FhirIds.Record)).SingleOrDefault(),
+            "Condition" => (await phi.ConditionsAsync(patient, key, sensitive, 1, cancel)).Entries.Select(c => FhirResources.Condition(c, FhirIds.Record)).SingleOrDefault(),
+            "Observation" => FhirObservations.Map((await phi.ObservationsAsync(patient, key, null, 1, cancel)).Entries, FhirIds.Record).Select(mapped => mapped.Resource).SingleOrDefault(),
+            _ => (await phi.AllAppointmentsAsync(patient, key, 1, cancel)).Entries.Select(a => FhirResources.Appointment(a, FhirIds.Record)).SingleOrDefault(),
         };
         return resource is null ? Refusal(StatusCodes.Status404NotFound) : Answer(StatusCodes.Status200OK, resource);
     }
@@ -388,14 +385,14 @@ public static class FhirApi
     static async Task WriteAsync(HttpContext context, int status, object resource)
     {
         context.Response.StatusCode = status;
-        context.Response.ContentType = ContentType;
+        context.Response.ContentType = FhirResources.ContentType;
         context.Response.Headers.CacheControl = "no-store";
         if (status == StatusCodes.Status405MethodNotAllowed)
         {
             context.Response.Headers.Allow = "GET";
         }
 
-        await JsonSerializer.SerializeAsync(context.Response.Body, resource, resource.GetType(), Json, CancellationToken.None);
+        await JsonSerializer.SerializeAsync(context.Response.Body, resource, resource.GetType(), FhirResources.Json, CancellationToken.None);
     }
 
     sealed class FhirAnswer(int status, object resource) : IResult
@@ -438,7 +435,7 @@ public static class FhirApi
             entries.AddRange(notes.Select(note => new BundleEntry(
                 $"urn:uuid:{Guid.NewGuid()}", Outcome(note.Severity, "informational", note.Text), new BundleSearch("outcome"))));
             var self = $"{baseUrl}/{type}" + (parameters.Count > 0 ? "?" + string.Join("&", parameters) : "");
-            return FhirApi.Answer(StatusCodes.Status200OK, new FhirBundle("searchset", total, [new BundleLink("self", self)], entries.Count > 0 ? entries : null));
+            return FhirApi.Answer(StatusCodes.Status200OK, new FhirBundle("searchset", null, total, [new BundleLink("self", self)], entries.Count > 0 ? entries : null));
         }
     }
 }

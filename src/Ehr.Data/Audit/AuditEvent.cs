@@ -42,4 +42,8 @@ public class AuditEvent
     // and who changed it, never its values, which stay here in Details. Set by the write-audit trigger, which also
     // marks an item's earlier events when the item becomes sensitive.
     public bool Sensitive { get; set; }
+
+    // Which part of the record a read was for: one of AuditParts, set by the PHI reader (step 13c2). Null for every
+    // event that isn't a read, and for reads recorded before that step or by an app older than its migration.
+    public string? Part { get; set; }
 }

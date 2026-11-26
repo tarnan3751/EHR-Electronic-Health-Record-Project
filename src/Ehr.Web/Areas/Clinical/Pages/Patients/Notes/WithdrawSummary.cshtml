@@ -1,0 +1,49 @@
+@page "/patients/{patientId:guid}/notes/{noteId:guid}/summaries/{summaryId:guid}/withdraw"
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.WithdrawSummaryModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    ViewData["Title"] = "Withdraw this summary";
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="summary">Back to the signed note</a></p>
+</div>
+<h1>Withdraw this summary</h1>
+<p class="sc-prose">The summary of the note signed @Clinic.Format(Model.Note.SignedAt), released to the patient by <strong>@Model.Summary.ReleasedBy</strong>, @Clinic.Format(Model.Summary.ReleasedAt).</p>
+<p class="sc-prose">Withdrawn, its text is no longer shown in the portal, to the patient or to anyone they share their record with: the portal says only that a summary of that date was withdrawn by the care team. It stays in the record, struck through, with your reason, and views of it before now stay in the audit log. If it had been viewed in the portal, the patient is emailed that there is something new there, with nothing about it. A new summary can then be written.</p>
+@if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">A summary can't be withdrawn until the clinic's server is back.</p>
+}
+else if (Model.Summary.WithdrawnAt is not null)
+{
+    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">Already withdrawn:</span> by @Model.Summary.WithdrawnBy, @Clinic.Format(Model.Summary.WithdrawnAt).</p>
+}
+else
+{
+    <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-summaryId="@Model.Summary.Id">
+        @if (Model.Errors.Count > 0)
+        {
+            <div class="sc-notice sc-notice--danger" role="alert">
+                @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not withdrawn:</span> @error</p> }
+            </div>
+        }
+        <div class="sc-field">
+            <label for="withdraw-reason">Reason <span>(required)</span></label>
+            <input id="withdraw-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="@Ehr.Domain.Notes.VisitSummaries.MaxReasonLength" required autofocus autocomplete="off"
+                   aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)" aria-describedby="withdraw-reason-hint">
+            <p class="sc-field__hint" id="withdraw-reason-hint">Recorded with your name and the time, and shown on the note.</p>
+        </div>
+        <div class="sc-actions">
+            <button type="submit" class="sc-btn sc-btn--primary" data-withdraw-summary>Withdraw summary</button>
+            <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="summary">Cancel</a>
+        </div>
+    </form>
+}
+
+<h2>The summary</h2>
+<partial name="_SummaryContent" model="Model.Summary" />

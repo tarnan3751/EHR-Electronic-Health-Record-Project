@@ -241,6 +241,10 @@ CREATE POLICY break_glass_accesses_own_select ON ehr.break_glass_accesses FOR SE
 DROP POLICY IF EXISTS break_glass_accesses_own_insert ON ehr.break_glass_accesses;
 CREATE POLICY break_glass_accesses_own_insert ON ehr.break_glass_accesses FOR INSERT
     WITH CHECK ((SELECT ehr.is_clinician()) AND clinician_id = (SELECT ehr.current_user_id()));
+-- For the tables' owner alone, which ehr.record_views runs as (42-record-views.sql): it marks a view made inside a
+-- window, and returns no reason. No runtime role is or can become it.
+DROP POLICY IF EXISTS break_glass_accesses_owner_select ON ehr.break_glass_accesses;
+CREATE POLICY break_glass_accesses_owner_select ON ehr.break_glass_accesses FOR SELECT TO ehr_owner USING (true);
 
 -- The rest of the chart (PHI): allergies, medications, diagnoses and visits, each row one patient's. Clinicians read
 -- every patient's; a patient reads their own. A visit is inserted when a patient is checked in for an appointment
@@ -293,9 +297,13 @@ ALTER TABLE ehr.medication_statements FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS medication_statements_clinician_select ON ehr.medication_statements;
 CREATE POLICY medication_statements_clinician_select ON ehr.medication_statements FOR SELECT USING ((SELECT ehr.is_clinician()));
 
+-- The portal's: never a medication entered in error (the expansion plan's step 13b, whose download hands the patient
+-- their medications), as observations_own_released_select never gives a result entered in error. Clinicians still see
+-- it, through their own policy above.
 DROP POLICY IF EXISTS medication_statements_own_select ON ehr.medication_statements;
 CREATE POLICY medication_statements_own_select ON ehr.medication_statements FOR SELECT
-    USING (patient_id = (SELECT ehr.current_patient_id()) AND (NOT sensitive OR (SELECT ehr.portal_sees_sensitive())));
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND status <> 'entered-in-error'
+        AND (NOT sensitive OR (SELECT ehr.portal_sees_sensitive())));
 
 DROP POLICY IF EXISTS medication_statements_panel_insert ON ehr.medication_statements;
 CREATE POLICY medication_statements_panel_insert ON ehr.medication_statements FOR INSERT
@@ -469,7 +477,8 @@ CREATE POLICY observations_own_released_select ON ehr.observations FOR SELECT
         AND issued_at IS NOT NULL
         AND status IN ('final', 'amended', 'corrected'));
 
--- Audit events (restricted). Admins read. Anyone the grants let insert may insert: the app role for read and
+-- Audit events (restricted). Admins read; a portal session reads the views of the record it is looking at only through
+-- ehr.record_views (42-record-views.sql), never here. Anyone the grants let insert may insert: the app role for read and
 -- sign-in events, and the write-audit trigger (40-audit.sql), which runs as the table's owner and is bound by this
 -- policy too because RLS is forced. Nothing deletes, and the one update is the trigger marking an event sensitive
 -- (below, and 40-audit.sql); the runtime roles have neither grant (10-grants.sql).
@@ -629,6 +638,54 @@ CREATE POLICY encounters_panel_insert ON ehr.encounters FOR INSERT
         )
     );
 
+-- Pre-visit forms (PHI; step 13e): a request that a patient fill in a questionnaire before an appointment, and its
+-- answers, every one a sensitive item. Clinicians read them all, as they read charts; the pages show them only when
+-- asked. A portal session reads the forms of the record it is looking at only where ehr.portal_sees_sensitive says so:
+-- always the patient's own, a proxy's only when the patient allowed them sensitive items; to a proxy without them a
+-- record has no forms. A clinician asks, as themselves, for a patient on their active panel. A portal session answers
+-- for the record it is looking at, as its own account and under its own grant, when it may see sensitive items. The
+-- triggers fill in and check the rest, and refuse every change (85-pre-visit-forms.sql). Admins and nobody see none.
+ALTER TABLE ehr.questionnaire_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.questionnaire_requests FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS questionnaire_requests_clinician_select ON ehr.questionnaire_requests;
+CREATE POLICY questionnaire_requests_clinician_select ON ehr.questionnaire_requests FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS questionnaire_requests_own_select ON ehr.questionnaire_requests;
+CREATE POLICY questionnaire_requests_own_select ON ehr.questionnaire_requests FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_sees_sensitive()));
+DROP POLICY IF EXISTS questionnaire_requests_panel_insert ON ehr.questionnaire_requests;
+CREATE POLICY questionnaire_requests_panel_insert ON ehr.questionnaire_requests FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND requested_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = questionnaire_requests.patient_id AND a.ended_at IS NULL
+        )
+    );
+ALTER TABLE ehr.questionnaire_responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.questionnaire_responses FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS questionnaire_responses_clinician_select ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_clinician_select ON ehr.questionnaire_responses FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS questionnaire_responses_own_select ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_own_select ON ehr.questionnaire_responses FOR SELECT
+    USING (patient_id = (SELECT ehr.current_patient_id()) AND (SELECT ehr.portal_sees_sensitive()));
+DROP POLICY IF EXISTS questionnaire_responses_own_insert ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_own_insert ON ehr.questionnaire_responses FOR INSERT
+    WITH CHECK (
+        patient_id = (SELECT ehr.current_patient_id())
+        AND (SELECT ehr.portal_sees_sensitive())
+        AND answered_by = (SELECT ehr.current_user_id())
+        AND proxy_grant_id IS NOT DISTINCT FROM (SELECT ehr.acting_grant_id())
+    );
+-- An answer that needs review follows the care team (ehr.follow_questionnaire_alert_care_team, 85-pre-visit-forms.sql),
+-- which runs as the tables' owner: forced row-level security binds the owner too, and this lets it read the answers.
+-- The owner's alone; no runtime role is or can become it. Nothing changes an answer.
+DROP POLICY IF EXISTS questionnaire_responses_owner_select ON ehr.questionnaire_responses;
+CREATE POLICY questionnaire_responses_owner_select ON ehr.questionnaire_responses FOR SELECT TO ehr_owner USING (true);
+
 -- The staff inbox (PHI). An item is its recipient's alone: they read it and mark it done, while their account is a
 -- staff account that may sign in (a clinician or an admin). Nobody else sees it: not another clinician, not an admin
 -- who isn't the recipient, not the patient. No runtime role inserts or deletes one (10-grants.sql): items are created
@@ -742,6 +799,114 @@ CREATE POLICY note_addenda_panel_update ON ehr.note_addenda FOR UPDATE
               AND a.patient_id = note_addenda.patient_id AND a.ended_at IS NULL
         )
     );
+
+-- Visit summaries (PHI; step 13a): what a clinician writes for the patient from a signed note. Clinicians read them
+-- all, withdrawn ones too, as they read the notes. No portal session reads the table: row-level security can't keep
+-- some of a row's columns (how and why it was marked sensitive, and by whom; its note; its withdrawal) from a session
+-- that may read the row. The portal is given the standing ones of the patient it is looking at, a sensitive one only
+-- where ehr.portal_sees_sensitive says so, through ehr.standing_visit_summaries, and of a withdrawn one only its date,
+-- through ehr.withdrawn_visit_summaries (52-visit-summaries.sql). An earlier build had a policy for the portal's reads,
+-- visit_summaries_own_select: it is dropped. The note and its addenda stay out of the portal: those two functions are
+-- the portal's only way to anything written from a note. A clinician with the patient on their active panel releases
+-- one, as themselves, and withdraws one or changes its sensitivity, a withdrawn one's too. Who withdrew one and when
+-- are the trigger's, from the person signed in as the row changes; it holds every change and decides who may unmark
+-- (52-visit-summaries.sql). A statement that changes who is signed in part-way could record someone else as having
+-- withdrawn one: the known limit of a note's mark (step 10b) and a reading in error (step 9b), which needs arbitrary
+-- SQL as the app's role, and with that anyone can be signed in as anyone. Nothing deletes one (10-grants.sql). Admins
+-- and nobody see none.
+ALTER TABLE ehr.visit_summaries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.visit_summaries FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS visit_summaries_clinician_select ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_clinician_select ON ehr.visit_summaries FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS visit_summaries_own_select ON ehr.visit_summaries;
+DROP POLICY IF EXISTS visit_summaries_panel_insert ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_panel_insert ON ehr.visit_summaries FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND released_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    );
+DROP POLICY IF EXISTS visit_summaries_panel_update ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_panel_update ON ehr.visit_summaries FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = visit_summaries.patient_id AND a.ended_at IS NULL
+        )
+    );
+-- The portal's summaries and placeholders (ehr.standing_visit_summaries, ehr.withdrawn_visit_summaries) and the check
+-- that a withdrawn summary had been viewed (ehr.withdrawn_summary_was_viewed) run as the tables' owner, which forced
+-- row-level security binds too: this lets them read the summaries, and nothing changes one. The owner's alone; no
+-- runtime role is or can become it.
+DROP POLICY IF EXISTS visit_summaries_owner_select ON ehr.visit_summaries;
+CREATE POLICY visit_summaries_owner_select ON ehr.visit_summaries FOR SELECT TO ehr_owner USING (true);
+
+-- Refill requests (PHI; step 13d): a patient's ask to renew a medication, and the care team's answer. Clinicians read
+-- them all, as they read the chart. A portal session asks for the record it is looking at, as the account it is signed
+-- in as, under access that includes messages, about a medication of that record it may read itself: the medications'
+-- own policy above then refuses one entered in error, and a sensitive one unless the session may see sensitive items.
+-- It reads none of the table: the portal is given its requests through ehr.portal_refill_requests, which returns what of
+-- each the portal shows and nothing else (77-refill-requests.sql). A clinician with the patient on their active panel
+-- answers one, as themselves (the trigger sets who first). The trigger holds every change and the one answer
+-- (77-refill-requests.sql). Nothing deletes one (10-grants.sql). Admins and nobody see none.
+ALTER TABLE ehr.refill_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.refill_requests FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS refill_requests_clinician_select ON ehr.refill_requests;
+CREATE POLICY refill_requests_clinician_select ON ehr.refill_requests FOR SELECT
+    USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS refill_requests_own_insert ON ehr.refill_requests;
+CREATE POLICY refill_requests_own_insert ON ehr.refill_requests FOR INSERT
+    WITH CHECK (
+        patient_id = (SELECT ehr.current_patient_id())
+        AND (SELECT ehr.portal_may_message())
+        AND requested_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.medication_statements m
+            WHERE m.id = refill_requests.medication_statement_id AND m.patient_id = refill_requests.patient_id
+        )
+    );
+DROP POLICY IF EXISTS refill_requests_panel_update ON ehr.refill_requests;
+CREATE POLICY refill_requests_panel_update ON ehr.refill_requests FOR UPDATE
+    USING (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = refill_requests.patient_id AND a.ended_at IS NULL
+        )
+    )
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND decided_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = refill_requests.patient_id AND a.ended_at IS NULL
+        )
+    );
+-- The portal's requests (ehr.portal_refill_requests) and the sensitivity that follows the medication's
+-- (ehr.follow_refill_medication) run as the tables' owner, which forced row-level security binds too: these let them
+-- read the requests and change them, and the trigger holds the owner to the sensitivity alone. The owner's alone; no
+-- runtime role is or can become it.
+DROP POLICY IF EXISTS refill_requests_owner_select ON ehr.refill_requests;
+CREATE POLICY refill_requests_owner_select ON ehr.refill_requests FOR SELECT TO ehr_owner USING (true);
+DROP POLICY IF EXISTS refill_requests_owner_update ON ehr.refill_requests;
+CREATE POLICY refill_requests_owner_update ON ehr.refill_requests FOR UPDATE TO ehr_owner USING (true) WITH CHECK (true);
 
 -- UC 1 (Tahseen Arnan). Orders (PHI) are read as signed notes are: by every clinician, on the chart's access model. A
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;

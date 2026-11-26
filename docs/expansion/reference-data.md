@@ -24,7 +24,7 @@ None of these tables is patient data. Both apps read them and nothing at runtime
 | `order_catalog_items` | Medication orders | The same RxNorm release: clinical drugs (SCD) | 11,971 |
 | `observation_codes` | Results, vital signs, survey scores | LOINC 2.83: 33 terms chosen by this project, with UCUM units | 33 |
 | `order_result_codes` | Which results a common lab order produces | Curated by this project | 47 |
-| `questionnaires` | PHQ-9 and GAD-7 | LOINC 2.83 panels 44249-1 and 69737-5, with their answer lists | 2 |
+| `questionnaires` | PHQ-9 and GAD-7, for pre-visit forms | The authors' English forms and instruction manual (phqscreeners.com), with LOINC 2.83's codes: hand-written in `db/reference/36-questionnaires.sql` (below, "Pre-visit questionnaires") | 2 |
 | `drug_ingredients` | What each drug product is made of | The same RxNorm release (RXNREL) | 25,490 |
 | `drug_classes` | The class an ingredient belongs to | FDA pharmacologic class indexing files, and DailyMed's mapping files, downloaded 18 November 2026 | 2,105 |
 | `drug_class_cross_reactions` | Which classes cross-react in an allergic patient | Curated by this project, each row citing its source | 2 |
@@ -38,7 +38,7 @@ Names are the sources' own, with two changes of form: an ICD-10-CM code is writt
 
 ### Reference ranges
 
-The ranges in `observation_codes` are **this clinic's own**, set for synthetic data from the adult intervals that textbooks and laboratories commonly publish. They are not LOINC's, they don't vary by age or sex, and they are not validated for clinical use. Each row says so in `range_source`.
+The ranges in `observation_codes` are **this clinic's own**, set for synthetic data from the adult intervals that textbooks and laboratories commonly publish. They are not LOINC's, they don't vary by age or sex, and they are not validated for clinical use. Each row says so in `range_source`. The two questionnaire totals, the PHQ-9's (44261-6) and the GAD-7's (70274-6), have no range: a score is banded and flagged by its questionnaire's own definition (step 13e), and the made-up range of up to 4 that step 2a gave them is gone.
 
 ### Vital-sign ranges by age
 
@@ -71,6 +71,43 @@ They flag synthetic values on a flowsheet. **They are not validated for clinical
 - **Replaced in step 9d:** step 9b's children's ranges, fitted to five age bands from Bonafide et al. (*Pediatrics* 2013, hospitalized children's heart and respiratory rate centiles), the Merck Manual's reproduction of Table 6, and the Pediatric Advanced Life Support rule for a low systolic pressure read on WikEM. Readings already recorded were given the new ranges by the `ChildrenRanges` migration, which reports how many flags changed. The five bands remain only to shape the seed's synthetic children.
 
 **Rights.** MedlinePlus is a US government work. The *Pediatrics* article is copyright American Academy of Pediatrics, the *Lancet* article and its web appendix are their publisher's, and StatPearls is CC BY-NC-ND 4.0. Nothing of theirs is copied here but the numbers, which are facts, each with its citation; no table is reproduced.
+
+### Pre-visit questionnaires
+
+Added in the plan's step 13e. The PHQ-9 and GAD-7 are hand-written in `db/reference/36-questionnaires.sql`, each line naming its source and page, and a test (`tests/Ehr.Security.Tests/QuestionnaireDefinitionTests.cs`) holds the database's rows to a copy typed from the forms. Step 2a had loaded LOINC's names for the questions ("…in last 2 weeks" added to each, the GAD-7's sixth question "in last 4 weeks", its second worded "Not able to…") and gave the GAD-7 the PHQ-9's prompt; those are replaced. LOINC's codes are kept for each question, answer and total.
+
+**The forms and the manual**, read on 21 November 2026 on phqscreeners.com, Pfizer's site for the measures, which links each file from its "Select a Screener" page (<https://www.phqscreeners.com/select-screener>):
+
+| File | Address | Bytes | SHA-256 |
+| --- | --- | --- | --- |
+| The PHQ-9, English, one page | <https://www.phqscreeners.com/images/sites/g/files/g10060481/f/201412/PHQ-9_English.pdf> | 40,899 | `e3fb5b8853e3530c9025c822b99fd4f4bc17da49eefda5ed689c49238c132a46` |
+| The GAD-7, English, one page | <https://www.phqscreeners.com/images/sites/g/files/g10060481/f/201412/GAD-7_English.pdf> | 32,952 | `180538a8e3f2f3cb012f9991d1b307d3d14720e82bf0593f8853f4885740ce48` |
+| "Instructions for Patient Health Questionnaire (PHQ) and GAD-7 Measures", nine pages | <https://www.phqscreeners.com/images/sites/g/files/g10016261/f/201412/instructions.pdf> | 134,493 | `6ed2f00f97e438c1168cd702d38d31fc923031445c720653005f138aa424228a` |
+
+Each form was read as text and as its page rendered, and the two agree. The prompts, questions, answers, scores and attribution lines are the forms' words exactly, with two changes of form: a printed line break or doubled space is one space, and what belongs to paper (the tick instruction, the office-coding line, the underlining) is left out. The PHQ-9's difficulty question is kept, optional and not scored, as the form prints it and the manual says. The GAD-7's form has no such question, so none is asked.
+
+**Scores, bands and follow-up, and where each comes from:**
+
+| | PHQ-9 | GAD-7 |
+| --- | --- | --- |
+| Each question scores | 0, 1, 2 or 3: "Not at all", "Several days", "More than half the days", "Nearly every day" (the form) | The same (the form) |
+| Total | 0 to 27 (manual, page 3, Table 1) | 0 to 21 (manual, page 3, Table 1) |
+| Bands | 0–4 Minimal, 5–9 Mild, 10–14 Moderate, 15–19 Moderately severe, 20–27 Severe: Kroenke K, Spitzer RL, Williams JBW. The PHQ-9: validity of a brief depression severity measure. *J Gen Intern Med* 2001;16:606–613, Table 2, "Level of Depression Severity, PHQ-9 Score", read in the article (<https://pmc.ncbi.nlm.nih.gov/articles/PMC1495268/>). The manual (pages 5 and 6) gives the same cutpoints, 5, 10, 15 and 20; its Table 4 (page 7) calls 0–4 "None-minimal" | 5–9 Mild, 10–14 Moderate, 15–21 Severe: "Scores of 5, 10, and 15 represent cutpoints for mild, moderate, and severe anxiety, respectively" (manual, page 6). **0–4 "Below mild" is this clinic's wording**: the manual names no band below 5, and the paper that may (Spitzer RL, Kroenke K, Williams JBW, Löwe B. A brief measure for assessing generalized anxiety disorder: the GAD-7. *Arch Intern Med* 2006;166:1092–1097) could not be read: its page, <https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/410326>, answered HTTP 403 with a browser check, Europe PMC lists its full text as by subscription only, and its abstract names no bands. "Minimal" is not used for the GAD-7 |
+| Needs follow-up at | 10 or more: "a cutpoint of 10 or greater is considered a 'yellow flag' on all 3 measures (i.e., drawing attention to a possible clinically significant condition)" (manual, page 2) | 10 or more: "When screening for anxiety disorders, a recommended cutpoint for further evaluation is a score of 10 or greater" (manual, page 6) |
+| Put in the care team's inbox | Any answer to question 9 but "Not at all": it "counts if present at all, regardless of duration" (Kroenke 2001, Methods), and "a final decision about the actual risk of self-harm requires a clinical interview" (manual, page 2). The question names the portal's notice for it, `help: self-harm`, which the web app words (`FormNotices`) | None |
+
+**What each source says about using them**, verbatim, as read on 21 November 2026. They disagree on whether the measures are in the public domain or Pfizer's copyright; every one of them allows reproducing, displaying and distributing them without asking. The plan's list of sources names them as "free to use" (Tahseen's plan, "Reference data and synthetic data"), and the conflict is listed for Tahseen in phase 4's pull request draft.
+
+- The PHQ-9 form and the GAD-7 form, foot of the page (a doubled space after "Inc." made single): "Developed by Drs. Robert L. Spitzer, Janet B.W. Williams, Kurt Kroenke and colleagues, with an educational grant from Pfizer Inc. No permission required to reproduce, translate, display or distribute."
+- The instruction manual, page 8: "All of the measures included in Table 1 are in the public domain. No permission is required to reproduce, translate, display or distribute." Table 1 (page 3) lists the PHQ-9 and the GAD-7.
+- The "Select a Screener" page: "All PHQ, GAD-7 screeners and translations are downloadable from this website and no permission is required to reproduce, translate, display or distribute them."
+- The site's terms, <https://www.phqscreeners.com/terms>: "Content found at the PHQ Screeners site is expressly exempted from Pfizer’s general copyright restrictions; content found on the PHQ Screeners site is free for download and use as stated within the PHQ Screeners site."
+- LOINC 2.83's notice for both panels, their questions and totals (`Loinc.csv`, `EXTERNAL_COPYRIGHT_NOTICE`): "Copyright © Pfizer Inc. All rights reserved. Developed by Drs. Robert L. Spitzer, Janet B.W. Williams, Kurt Kroenke and colleagues, with an educational grant from Pfizer Inc. No permission required to reproduce, translate, display or distribute."
+- Kroenke et al. 2001, Acknowledgments: "PRIME-MD is a trademark of Pfizer Copyright held by Pfizer." Its appendix, the PHQ-9 as printed then: "PRIME-MD is a trademark of Pfizer Inc. Copyright 1999 Pfizer Inc. All rights reserved. Reproduced with permission".
+
+**A request keeps its wording.** Each request for a form stores the definition it was asked with, and the patient answers, the database scores and every page shows that copy, so a later change here never rewrites what someone answered. A questionnaire that has been asked for can't be removed.
+
+They are for a demonstration system's synthetic patients and **are not validated for clinical use**.
 
 ### Units
 
@@ -106,7 +143,7 @@ The FHIR API (the plan's step 11, `docs/UC19.md`) sends each code with its syste
 - **UNII.** Published by the U.S. Food and Drug Administration. No license is stated on its download page; as a work of the U.S. government it is taken to be in the public domain.
 - **FDA pharmacologic class indexing files and DailyMed mapping files.** Published by the FDA and the National Library of Medicine. MED-RT and RxClass are not used.
 - **LOINC.** This material contains content from LOINC (http://loinc.org). LOINC is copyright © Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) Committee and is available at no cost under the license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc. The version used is 2.83. Where LOINC records a third party's rights in a term, its notice is carried in the `copyright` column.
-- **PHQ-9 and GAD-7.** Copyright © Pfizer Inc. All rights reserved. Developed by Drs. Robert L. Spitzer, Janet B.W. Williams, Kurt Kroenke and colleagues, with an educational grant from Pfizer Inc. No permission required to reproduce, translate, display or distribute. (LOINC's notice for both, stored with each questionnaire.) The severity bands are the authors' published ones.
+- **PHQ-9 and GAD-7.** The publisher's instruction manual calls them public domain, and every form says "No permission required to reproduce, translate, display or distribute." LOINC's notice for them, stored with each questionnaire as LOINC's license asks, begins "Copyright © Pfizer Inc. All rights reserved." Every statement found, with where it was read, is under "Pre-visit questionnaires" above. Each severity band and cutpoint comes from the source named there for it: the PHQ-9's bands from Kroenke et al. 2001, Table 2; the GAD-7's cutpoints from Pfizer's instruction manual, page 6; the GAD-7's band below 5 is this clinic's wording, since no source read names it.
 - **UCUM.** Units are written in UCUM, © Regenstrief Institute, Inc., used under the UCUM license (https://ucum.org/license) without change of meaning.
 - **FHIR value sets.** The status, category, criticality and severity codes are HL7 FHIR R4's, published under CC0.
 - **DDInter 2.0. An exception to the project's free-software rule (NFR-16), accepted by Tahseen on 18 November 2026.** Used under CC BY-NC-SA 4.0, which DDInter states on its terms page, https://ddinter.scbdd.com/terms/: free, but not for commercial use, and share-alike. Its table is kept apart in `db/reference/ddinter/`, with `LICENSE.md` there holding the license, the citation and what was changed. If the project ever goes commercial, this table must be replaced. Tian Y, Yi J, Wang N, et al. DDInter 2.0: an enhanced drug interaction resource with expanded data coverage, new interaction types, and improved user interface. *Nucleic Acids Research.* 2025;53(D1):D1356.

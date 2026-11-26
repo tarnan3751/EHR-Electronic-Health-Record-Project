@@ -102,6 +102,32 @@ public class ProxyAccessSecurityTests(MigratedDatabase database) : IClassFixture
         }
     }
 
+    // The portal gets no medication entered in error from the database, whatever the app asks (the expansion plan's step
+    // 13b, whose download hands a patient their medications): not the patient, and not a proxy allowed everything. A
+    // clinician still does. Every other status reaches all three.
+    [Theory]
+    [InlineData("entered-in-error", false)]
+    [InlineData("active", true)]
+    [InlineData("stopped", true)]
+    public async Task The_portal_gets_no_medication_entered_in_error(string status, bool portalSees)
+    {
+        var (clinician, patient, proxy) = await PeopleAsync();
+        var grant = await GrantAsync(patient.Account, patient, proxy, sensitive: true);
+        var id = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(database.SuperuserConnectionString, null,
+            "INSERT INTO ehr.medication_statements (id, patient_id, display, status) VALUES (@id, @patient, 'Synthetic medication', @status)",
+            ("id", id), ("patient", patient.Patient), ("status", status));
+        const string count = "SELECT count(*) FROM ehr.medication_statements WHERE id = @id";
+        var seen = portalSees ? "1" : "0";
+
+        foreach (var connection in new[] { App, Read })
+        {
+            Assert.Equal(["1"], await Accounts.QueryAsync(connection, clinician, count, ("id", id)));
+            Assert.Equal([seen], await Accounts.QueryAsync(connection, patient.Account, count, ("id", id)));
+            Assert.Equal([seen], await ActingAsync(connection, proxy.Account, grant, count, ("id", id)));
+        }
+    }
+
     // Step 6b: a portal account with no record of its own. By itself it reaches no patient data at all and can give
     // nobody access to anything; under a grant addressed to it, exactly what any proxy reaches; and when the grant
     // ends, nothing again.
@@ -123,7 +149,7 @@ public class ProxyAccessSecurityTests(MigratedDatabase database) : IClassFixture
         {
             "patients", "observations", "conditions", "medication_statements", "allergy_intolerances", "encounters", "appointments", "message_threads",
             "messages", "orders", "clinical_notes", "clinical_drafts", "patient_assignments", "break_glass_accesses", "inbox_items", "audit_events",
-            "chart_history", "result_acknowledgments", "proxy_grants",
+            "chart_history", "result_acknowledgments", "proxy_grants", "refill_requests",
         };
         var everything = string.Join(" + ", tables.Select(table => $"(SELECT count(*) FROM ehr.{table})"));
 

@@ -54,6 +54,23 @@ else
                                 @* A value outside its reference range: these come first (step 7). *@
                                 <span class="sc-tag sc-tag--warning" data-inbox-abnormal>Abnormal</span>
                             }
+                            @if (item.Kind == InboxItemKind.FormAlert)
+                            {
+                                @* Step 13e: a pre-visit form has an answer to review; these come before everything else. *@
+                                <span class="sc-tag sc-tag--danger" data-inbox-review>Needs review</span>
+                                @if (clinician && item.SourceTable == "questionnaire_responses" && item.PatientId is { } formPatient)
+                                {
+                                    if (item.DoneAt is null)
+                                    {
+                                        <a asp-page="/Patients/Forms/Response" asp-route-patientId="@formPatient" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
+                                    }
+                                    else if (Model.ChartOpens.Contains(formPatient))
+                                    {
+                                        @* Done: the item no longer opens the answers; the chart does, for a patient on the panel. *@
+                                        <span class="sc-muted" data-inbox-chart-note>Open from the patient's chart.</span>
+                                    }
+                                }
+                            }
                             @if (clinician && item.Kind == InboxItemKind.Result && item.SourceTable == "orders" && item.PatientId is not null)
                             {
                                 @* Where it gets acknowledged, which is what marks it done. *@
@@ -63,6 +80,16 @@ else
                             {
                                 @* Step 10b: someone else added to a note this clinician signed. *@
                                 <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="addenda" data-inbox-source>Open the note</a>
+                            }
+                            @if (clinician && item.Kind == InboxItemKind.SummaryWithdrawn && item.SourceTable == "clinical_notes" && item.PatientId is not null)
+                            {
+                                @* Step 13a: someone else withdrew a visit summary this clinician released. *@
+                                <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="summary" data-inbox-source>Open the note</a>
+                            }
+                            @if (clinician && item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests" && item.PatientId is not null)
+                            {
+                                @* Step 13d: where it gets answered, which is what marks it done. *@
+                                <a asp-page="/Patients/Refills/Review" asp-route-patientId="@item.PatientId" asp-route-requestId="@item.SourceId" data-inbox-source>Review the request</a>
                             }
                             @if (clinician && item.SourceTable == "message_threads" && item.PatientId is not null)
                             {
@@ -87,12 +114,20 @@ else
                         {
                             <td>
                                 @* An order's results are done by acknowledging them on their own page, which records who and
-                                   when. Anything else, a result item with no order behind it included, is marked done here. *@
-                                @if (OnPrem.IsReachable && !(item.Kind == InboxItemKind.Result && item.SourceTable == "orders"))
+                                   when, and a refill request by answering it (step 13d). Anything else, a result item with no
+                                   order behind it included, is marked done here. *@
+                                @if (OnPrem.IsReachable && !(item.Kind == InboxItemKind.Result && item.SourceTable == "orders")
+                                     && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests"))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
-                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary">Mark done</button>
+                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary"
+                                                aria-describedby="@(item.Kind == InboxItemKind.FormAlert ? $"done-{item.Id}" : null)">Mark done</button>
                                     </form>
+                                    @if (item.Kind == InboxItemKind.FormAlert)
+                                    {
+                                        @* Step 13e: the item is the way to the answers only while it is open (PhiReader.FormAnswersAsync). *@
+                                        <p class="sc-muted" id="done-@item.Id" data-inbox-done-note>After you mark this done, the answers open from the patient's chart, which needs the patient on your panel or emergency access.</p>
+                                    }
                                 }
                             </td>
                         }

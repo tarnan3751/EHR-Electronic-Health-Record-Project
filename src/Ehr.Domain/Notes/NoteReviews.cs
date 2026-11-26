@@ -24,7 +24,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         if (draft is null) return ReviewResult.Missing;
         if (draftId is not null && draft.Version != version) return ReviewResult.Conflict(draft.Version);
         if (await phi.SignedDraftAsync(draft.Id, patient, cancel) is not null) return ReviewResult.Signed;
-        if ((await phi.AiReviewsAsync(draft.Id, cancel)).Any(r => r.State is AiReviewStates.Pending or AiReviewStates.Recording))
+        if ((await phi.AiReviewsAsync(draft.Id, AuditParts.NoteDraft, cancel)).Any(r => r.State is AiReviewStates.Pending or AiReviewStates.Recording))
             return ReviewResult.Invalid("Resume or discard the existing dictation review before starting another.");
 
         var review = new AiNoteReview
