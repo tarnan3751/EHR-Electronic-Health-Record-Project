@@ -59,7 +59,7 @@ public class TC_UC6_31_DownloadLongRecord(WebApps apps) : IClassFixture<WebApps>
         {
             var note = await NoteAddendumTests.SignedNoteAsync(session.Client, patient.Patient);
             using var released = await VisitSummaryTests.ReleaseAsync(session.Client, patient.Patient, note);
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var page = await PrintAsync(patient.Client);

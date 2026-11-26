@@ -79,6 +79,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         var confirmUrl = (await JsonAsync(review)).GetProperty("url").GetString()!;
         var confirmation = await page.Session.Client.GetStringAsync(confirmUrl, Cancel);
         Assert.Contains("Confirm signature", confirmation);
+        Assert.Contains("I have reviewed this note and sign it as Dr. Test.", confirmation);
         Assert.DoesNotContain("htmx.min.js", confirmation);
         using var unconfirmed = await PostAsync(page, "Sign", 2);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unconfirmed.StatusCode);
@@ -92,7 +93,8 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(Synthetic.Plan, html);
         Assert.DoesNotContain("textarea", html);
         Assert.DoesNotContain("htmx.min.js", html);
-        Assert.Contains((await apps.ClinicianAsync()).Id.ToString(), html);
+        Assert.Contains("<dt>Signed by</dt><dd>Dr. Test</dd>", html);
+        Assert.DoesNotContain((await apps.ClinicianAsync()).Id.ToString(), html);
         var (count, signer, time) = await SignedAsync(page.Draft);
         Assert.Equal(1, count);
         Assert.Equal((await apps.ClinicianAsync()).Id, signer);

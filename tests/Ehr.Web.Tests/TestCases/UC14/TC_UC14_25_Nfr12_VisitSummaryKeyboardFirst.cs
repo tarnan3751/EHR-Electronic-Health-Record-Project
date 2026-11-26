@@ -18,11 +18,11 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Test data: The three parts of the test's summary.
 // Steps:
 //   1. Open the chart. Press Tab until the signed note's link has the focus, and press Enter.
-//   2. Press Tab until "Write a summary for the patient" has the focus, and press Enter.
+//   2. Press Tab until "Write visit summary" has the focus, and press Enter.
 //   3. Type What we talked about (the cursor starts in it), press Tab and type What we found, press Tab and type What
 //      happens next. Press Tab until "Release to the patient" has the focus, and press Enter.
 // Expected result: Step 1 opens the signed note. Step 2 opens the summary page with the cursor in What we talked about.
-//   Step 3 releases it: the note's page says "Released:" and shows the summary. Every focused control shows the focus
+//   Step 3 releases it: the note's page says "Released." and shows the summary. Every focused control shows the focus
 //   ring, and the pages report no script errors.
 // Creator: Tahseen Arnan
 //
@@ -68,7 +68,7 @@ public class TC_UC14_25_Nfr12_VisitSummaryKeyboardFirst(WebApps apps) : IClassFi
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=summary", StringComparison.Ordinal));
-        Assert.Contains("Released:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Released.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Contains(TalkedAbout, await page.Locator("[data-summary=standing]").TextContentAsync());
 
         Assert.Single(await SummariesAsync(apps, patient));

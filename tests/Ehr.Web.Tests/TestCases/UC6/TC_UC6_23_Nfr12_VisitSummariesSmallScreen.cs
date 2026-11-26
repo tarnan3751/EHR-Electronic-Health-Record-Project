@@ -48,22 +48,22 @@ public class TC_UC6_23_Nfr12_VisitSummariesSmallScreen(WebApps apps) : IClassFix
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, notes[0], found: "Your chest sounded clear: " + new string('a', 60) + "."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, notes[1], "We talked about something private.", sensitive: true))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, notes[2]))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var withdrawn = await WithdrawAsync(session.Client, patient.Patient, notes[2], await StandingAsync(apps, patient.Patient)))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         await using var server = await ClinicalBrowserHost.StartAsync(apps);

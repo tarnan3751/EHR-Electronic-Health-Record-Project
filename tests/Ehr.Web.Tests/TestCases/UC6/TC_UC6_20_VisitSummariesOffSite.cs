@@ -44,14 +44,14 @@ public class TC_UC6_20_VisitSummariesOffSite(WebApps apps) : IClassFixture<WebAp
         async Task<Guid> ReleaseOneAsync(Guid note, string talked = TalkedAbout)
         {
             using var released = await ReleaseAsync(session.Client, patient.Patient, note, talked);
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
             return await StandingAsync(apps, patient.Patient);
         }
 
         async Task WithdrawOneAsync(Guid note, Guid summary)
         {
             using var withdrawn = await WithdrawAsync(session.Client, patient.Patient, note, summary);
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         await WithdrawOneAsync(first, await ReleaseOneAsync(first, "We talked about the wrong visit."));

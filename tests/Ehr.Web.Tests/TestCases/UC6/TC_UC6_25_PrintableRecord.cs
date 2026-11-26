@@ -40,7 +40,7 @@ public class TC_UC6_25_PrintableRecord(WebApps apps) : IClassFixture<WebApps>
         var note = await SignedNoteAsync(chart.Session.Client, chart.Patient);
         using (var released = await ReleaseAsync(chart.Session.Client, chart.Patient, note))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var summaryPage = await ReadsAsync(() => patient.Client.GetStringAsync("/portal/summaries", Cancel), patient);

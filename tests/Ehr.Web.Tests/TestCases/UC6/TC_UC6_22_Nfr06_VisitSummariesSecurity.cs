@@ -45,18 +45,18 @@ public class TC_UC6_22_Nfr06_VisitSummariesSecurity(WebApps apps) : IClassFixtur
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, note, "We talked about the wrong visit."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var withdrawn = await StandingAsync(apps, patient.Patient);
         using (var gone = await WithdrawAsync(session.Client, patient.Patient, note, withdrawn))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(gone)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(gone)));
         }
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, note, sensitive: true))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var standing = await StandingAsync(apps, patient.Patient);

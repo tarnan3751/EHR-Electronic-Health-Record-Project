@@ -83,7 +83,7 @@ public class TC_UC14_19_VisitSummaryInvalidInput(WebApps apps) : IClassFixture<W
         // Ordinary words, doses, dates and numbers: released as typed.
         const string ordinary = "Vitamin B12 and A1c are fine. Take 500 mg twice a day, vitamin D 50,000 units weekly, 1-2 tablets as needed; back on 2026-11-21. Wear an N95 mask.";
         using var released = await ReleaseAsync(session.Client, patient, note, ordinary, ordinary, ordinary);
-        Assert.Contains("Released:", Words(await ReadAsync(released)));
+        Assert.Contains("Released.", Words(await ReadAsync(released)));
         Assert.Single(await SummariesAsync(apps, patient));
     }
 }

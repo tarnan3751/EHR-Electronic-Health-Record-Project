@@ -45,12 +45,12 @@ public class TC_UC6_17_WithdrawnSummaryPlaceholder(WebApps apps) : IClassFixture
         var second = await SignedNoteAsync(session.Client, patient.Patient);
         using (var released = await ReleaseAsync(session.Client, patient.Patient, first))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var withdrawn = await WithdrawAsync(session.Client, patient.Patient, first, await StandingAsync(apps, patient.Patient), "Synthetic private reason."))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         var date = await PortalDateAsync(apps, patient.Patient, first);
@@ -66,7 +66,7 @@ public class TC_UC6_17_WithdrawnSummaryPlaceholder(WebApps apps) : IClassFixture
 
         using (var replaced = await ReleaseAsync(session.Client, patient.Patient, first, "We talked about the right visit."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(replaced)));
+            Assert.Contains("Released.", Words(await ReadAsync(replaced)));
         }
 
         var both = Words(await PortalAsync(patient.Client));
@@ -77,12 +77,12 @@ public class TC_UC6_17_WithdrawnSummaryPlaceholder(WebApps apps) : IClassFixture
         var withoutBefore = WithoutTokens(await PortalAsync(without.Client));
         using (var released = await ReleaseAsync(session.Client, patient.Patient, second, "We talked about something private.", sensitive: true))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var withdrawn = await WithdrawAsync(session.Client, patient.Patient, second, await StandingIdForAsync(patient.Patient, second), "Synthetic second reason."))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         foreach (var reader in new[] { patient, allowed })

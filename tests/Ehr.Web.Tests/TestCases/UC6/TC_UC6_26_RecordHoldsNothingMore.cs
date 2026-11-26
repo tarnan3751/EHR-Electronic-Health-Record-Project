@@ -58,18 +58,18 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
             """, chart.Patient, ("clinician", chart.Clinician.Id));
         using (var released = await ReleaseAsync(client, chart.Patient, note, "We talked about the wrong visit."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var withdrawn = await WithdrawAsync(client, chart.Patient, note, await StandingAsync(apps, chart.Patient)))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         // And a summary that stands, of a second note.
         using (var released = await ReleaseAsync(client, chart.Patient, await SignedNoteAsync(client, chart.Patient)))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (await VitalTests.MarkAsync(apps, client, chart.Patient, chart.VitalsAt, "Synthetic: wrong cuff size", VitalSign.Systolic))

@@ -45,7 +45,7 @@ public class TC_UC14_35_WaitingProposalsDontHoldUpSigning(WebApps apps) : IClass
         var html = await dictated.Session.Client.GetStringAsync(note, Cancel);
         Assert.Contains("Awaiting review: 2 orders or allergies proposed from dictation. Review them: they can still be opened in their forms or dismissed.", Said(html));
         Assert.DoesNotContain("hold up signing", Said(html));
-        Assert.InRange(html.IndexOf("data-waiting-proposals", StringComparison.Ordinal), html.IndexOf("permanently saved to the clinical record", StringComparison.Ordinal),
+        Assert.InRange(html.IndexOf("data-waiting-proposals", StringComparison.Ordinal), html.IndexOf("Corrections go in an addendum.", StringComparison.Ordinal),
             html.IndexOf("<dl class=\"record\">", StringComparison.Ordinal));
         Assert.Contains($"/notes/drafts/{dictated.Draft}/review/{dictated.Review}", html);
         Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Order));

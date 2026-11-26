@@ -46,7 +46,7 @@ public class TC_UC6_35_LinkOpensPageAfterSignIn(WebApps apps) : IClassFixture<We
         var note = await SignedNoteAsync(chart.Session.Client, chart.Patient);
         using (var released = await ReleaseAsync(chart.Session.Client, chart.Patient, note, "We talked about something private.", sensitive: true))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var (proxy, _) = await ProxyForAsync(apps, patient, "Linkedproxy", sensitive: true);

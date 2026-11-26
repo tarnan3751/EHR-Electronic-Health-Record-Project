@@ -46,7 +46,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         var second = await SignedNoteAsync(session.Client, patient.Patient);
         using (var released = await ReleaseAsync(session.Client, patient.Patient, first))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var before = new Dictionary<ProxyTests.Person, string>();
@@ -60,7 +60,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, second, "We talked about something private.", sensitive: true))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         // No hint, asking or not: the same page as before the sensitive one existed.
@@ -85,7 +85,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         // The first note marked: its summary is sensitive with it, and gone at once for the proxies without them.
         using (var marked = await ChangeSensitivityAsync(session.Client, patient.Patient, first, mark: true, "Discussed a private matter."))
         {
-            Assert.Contains("Saved:", Words(await ReadAsync(marked)));
+            Assert.Contains("Saved.", Words(await ReadAsync(marked)));
         }
 
         foreach (var proxy in new[] { without, messaging })

@@ -27,8 +27,8 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   2. They write and release a new summary of the note.
 //   3. They post the withdrawal of the first summary again.
 // Expected result: Step 1: with no reason, 422 and "Not withdrawn: Say why, so the record shows it."; with it, the
-//   note's page says "Withdrawn: the summary is no longer shown in the portal.", shows the summary struck through
-//   with "Withdrawn by Dr. Colleague" and the reason, and offers "Write a summary for the patient" again. Step 2: the
+//   note's page says "Withdrawn. The patient no longer sees the summary in the portal.", shows the summary struck through
+//   with "Withdrawn by Dr. Colleague" and the reason, and offers "Write visit summary" again. Step 2: the
 //   new one is the standing one, released by Dr. Colleague. Step 3: the page says "Already withdrawn:" with no form,
 //   and the post is answered 409; the database has the first withdrawn by Dr. Colleague with the reason, and the
 //   second standing. Dr. Test's inbox has "A visit summary you released was withdrawn" with a link to the note and
@@ -46,7 +46,7 @@ public class TC_UC14_21_VisitSummaryWithdrawn(WebApps apps) : IClassFixture<WebA
         var note = await SignedNoteAsync(session.Client, patient);
         using (var released = await ReleaseAsync(session.Client, patient, note))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var first = await StandingAsync(apps, patient);
@@ -68,7 +68,7 @@ public class TC_UC14_21_VisitSummaryWithdrawn(WebApps apps) : IClassFixture<WebA
         using var withdrawn = await WithdrawAsync(other.Client, patient, note, first);
         var page = await ReadAsync(withdrawn);
         Assert.Equal(NotePath(patient, note), PathOf(withdrawn));
-        Assert.Contains("Withdrawn: the summary is no longer shown in the portal.", Words(page));
+        Assert.Contains("Withdrawn. The patient no longer sees the summary in the portal.", Words(page));
         Assert.Contains("data-summary=\"withdrawn\"", page);
         Assert.Contains($"<s>{TalkedAbout}</s>", page);
         Assert.Matches(@"Withdrawn by Dr. Colleague · \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC: Written for the wrong visit\.", Words(page));

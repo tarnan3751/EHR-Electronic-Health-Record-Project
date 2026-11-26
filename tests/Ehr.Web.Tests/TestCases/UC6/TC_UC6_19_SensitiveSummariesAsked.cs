@@ -42,12 +42,12 @@ public class TC_UC6_19_SensitiveSummariesAsked(WebApps apps) : IClassFixture<Web
         var sensitive = await SignedNoteAsync(session.Client, patient.Patient);
         using (var released = await ReleaseAsync(session.Client, patient.Patient, ordinary))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, sensitive, "We talked about something private.", sensitive: true))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var page = await PortalAsync(patient.Client);

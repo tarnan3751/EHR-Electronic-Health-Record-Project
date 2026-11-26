@@ -43,7 +43,7 @@ public class TC_UC6_18_WithdrawnAfterViewEmail(WebApps apps) : IClassFixture<Web
         async Task<Guid> ReleaseOneAsync()
         {
             using var released = await ReleaseAsync(session.Client, patient.Patient, note);
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
             return await StandingAsync(apps, patient.Patient);
         }
 
@@ -58,7 +58,7 @@ public class TC_UC6_18_WithdrawnAfterViewEmail(WebApps apps) : IClassFixture<Web
             post.Headers.Host = "attacker.example";
             post.Content = Form(("__RequestVerificationToken", Token(await shown.Content.ReadAsStringAsync(Cancel))), ("Reason", "Synthetic private reason."));
             using var withdrawn = await session.Client.SendAsync(post, Cancel);
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         var seenByPatient = await ReleaseOneAsync();
