@@ -1,4 +1,4 @@
-//! The EHR desktop app: a window over an encrypted local database (store.rs) that syncs with the servers in the
+//! The SwiftChart desktop app: a window over an encrypted local database (store.rs) that syncs with the servers in the
 //! background (sync.rs) while a clinician is signed in. The page (frontend/) calls the commands below and redraws on
 //! the "changed" event.
 //!
@@ -1067,7 +1067,7 @@ fn main() {
             restart_for_update,
         ]))
         .run(tauri::generate_context!())
-        .expect("failed to run the EHR desktop app");
+        .expect("failed to run the SwiftChart desktop app");
 }
 
 #[cfg(test)]

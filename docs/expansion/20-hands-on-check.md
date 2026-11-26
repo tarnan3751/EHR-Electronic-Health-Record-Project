@@ -89,13 +89,17 @@ Within 10 seconds the sync problem reads "Update needed: the clinic's server syn
 …"; open a chart: it opens; lock and unlock: it works. Delete `latest.json` and the file, and run the same command without
 the variable.
 
-**M6. Revoked, offline.** From `infra/compose`, `docker compose stop onprem-app cloud-app`. In SwiftChart open a chart,
-type a sentence under **New draft** and **Save draft**: it waits on this computer. Quit SwiftChart.
+**M6. Disabled, then revoked, offline in between.** From `infra/compose`, `docker compose stop onprem-app cloud-app`.
+In SwiftChart open a chart, type a sentence under **New draft** and **Save draft**: it waits on this computer.
 `docker compose start onprem-app cloud-app`, and once they're up, in Safari as the administrator at
-https://ehr.example.com:8443: **Staff**, the clinician's **Desktop sign-ins**. Note the count and the paragraph; choose
-**Revoke and delete**: the staff page says their desktop sign-ins are revoked.
+https://ehr.example.com:8443: **Staff**, **Disable** the clinician; the page says that what SwiftChart keeps on their
+computers stays there until their desktop sign-ins are revoked. Within about 10 seconds SwiftChart locks: "Signed out:
+the server ended this sign-in …", asking for the password and the code; nothing of the chart. Quit SwiftChart. In
+Safari, the clinician's **Desktop sign-ins**: note the count and both paragraphs (revoking works before or after
+disabling); choose **Revoke and delete**: the staff page says their desktop sign-ins are revoked. (This is the order
+the final review found skipped the wipe; revoking first works the same.)
 
-**M7. The wipe.** Open SwiftChart. It opens on the lock; within about 10 seconds the window shows only "Deleted: an
+**M7. The wipe.** Open SwiftChart. It opens on the lock; within a few seconds the window shows only "Deleted: an
 administrator revoked this computer's sign-in, so SwiftChart deleted everything it kept here: …", with **Quit
 SwiftChart** and the focus on it; nothing of the chart, or of your draft, anywhere. Then, in Terminal:
 
@@ -106,12 +110,15 @@ security find-generic-password -s io.github.tarnan3751.swiftchart -a server-sess
 ```
 
 No `ehr.db`, and each `security` says the item could not be found. In Safari, the audit page lists `desktop_revoked` by
-the administrator. The draft saved in M6 never reached the server: that is the loss the page warned of.
+the administrator. The draft saved in M6 never reached the server: that is the loss the page warned of. Also look,
+since the final review couldn't: `ls ~/Library/Saved\ Application\ State/ | grep -i swiftchart` (macOS may keep a
+picture of the window there: note whether anything is, and whether it shows a chart).
 
-**M8. After.** Choose **Quit SwiftChart**, and open it again: "Sign in to sync", empty. Sign in as the clinician again:
-it works (the account isn't disabled). To leave nothing behind, quit, drag SwiftChart to the Trash, and run the three
-lines in `docs/desktop-install.md` under "From a build named EHR", with `io.github.tarnan3751.swiftchart` in place of
-`com.example.ehr`. Cleaning up after older builds (`com.example.ehr`) is optional.
+**M8. After.** Choose **Quit SwiftChart**, and open it again: "Sign in to sync", empty. In Safari, **Enable** the
+clinician, then sign in as them in SwiftChart: it works. To leave nothing behind, quit, drag SwiftChart to the Trash,
+run the three lines in `docs/desktop-install.md` under "From a build named EHR", with `io.github.tarnan3751.swiftchart`
+in place of `com.example.ehr`, and remove `~/Library/WebKit/io.github.tarnan3751.swiftchart` and
+`~/Library/Caches/io.github.tarnan3751.swiftchart`. Cleaning up after older builds (`com.example.ehr`) is optional.
 
 ## Windows (a teammate's PC)
 
@@ -170,8 +177,9 @@ its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock:
 …". **Get it ready**, then **Restart now**: the installer's progress shows, SwiftChart starts again on the lock, and
 after unlocking says "SwiftChart 0.2.1.", with the charts as they were. Note whether SmartScreen or anything else asked.
 
-**W5. Revoked, and the wipe.** As the Mac's M6 and M7, in Edge as the administrator: stop the two apps, save a draft,
-quit SwiftChart, start them, revoke, open SwiftChart: "Deleted: …" within about 10 seconds. Then in PowerShell:
+**W5. Disabled, revoked, and the wipe.** As the Mac's M6 and M7, in Edge as the administrator: stop the two apps, save
+a draft, start them, disable the clinician (SwiftChart locks, "Signed out: …"), quit SwiftChart, revoke, open SwiftChart:
+"Deleted: …" within a few seconds. Then in PowerShell:
 
 ```
 Test-Path "$env:APPDATA\io.github.tarnan3751.swiftchart\ehr.db"
@@ -181,5 +189,11 @@ cmdkey /list:server-session.io.github.tarnan3751.swiftchart
 
 `False`, and each `cmdkey` lists nothing.
 
-**W6. Clean up.** **Quit SwiftChart**; Settings > Apps > Installed apps > SwiftChart > **Uninstall**, deleting its data;
-remove the hosts line; and, if the teammate wants, `docker compose --profile "*" down --volumes`.
+**W6. Clean up.** In Edge, **Enable** the clinician; sign in as them in SwiftChart once more, so it keeps a sign-in
+again. **Quit SwiftChart**; Settings > Apps > Installed apps > SwiftChart > **Uninstall**, deleting its data. Then look,
+since the final review couldn't: does the uninstaller leave the Credential Manager entries
+(`cmdkey /list:local-database-key.io.github.tarnan3751.swiftchart`)? If it does, note it, and remove each with
+`cmdkey /delete:local-database-key.io.github.tarnan3751.swiftchart` and
+`cmdkey /delete:server-session.io.github.tarnan3751.swiftchart`, noting whether `cmdkey /delete` works on them (the
+install notes rely on it for an old build's entries). Remove the hosts line; and, if the teammate wants,
+`docker compose --profile "*" down --volumes`.

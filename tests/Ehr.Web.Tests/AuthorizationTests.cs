@@ -20,6 +20,7 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("/admin/staff", "/sign-in")]
     [InlineData("/session", "/sign-in")]
     [InlineData("/admin/emergency-access/00000000-0000-0000-0000-000000000001", "/sign-in")]
+    [InlineData("/admin/staff/00000000-0000-0000-0000-000000000001/desktop", "/sign-in")]
     [InlineData("/passkeys", "/sign-in")]
     [InlineData("/portal", "/portal/sign-in")]
     [InlineData("/portal/session", "/portal/sign-in")]

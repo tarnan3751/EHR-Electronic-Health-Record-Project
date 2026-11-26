@@ -38,8 +38,8 @@ Nothing is published: there is no GitHub release. Two ways:
   meanwhile: whether that's allowed is the owner's call.
 - **From source**, on the computer it's for, from the repository at the commit you want:
   - **What must be installed:** what the README's **Setup** lists for the desktop app: Rust through rustup (the pinned
-    version installs itself), and the Tauri CLI 2.12.0, `cargo install tauri-cli --version 2.12.0 --locked` (or
-    `cargo binstall tauri-cli --version 2.12.0`). On Windows also Visual Studio Build Tools with "Desktop development
+    version installs itself), and the Tauri CLI 2.x as it says; CI uses 2.12.0, the version these steps were checked
+    with (`cargo install tauri-cli --version 2.12.0 --locked`). On Windows also Visual Studio Build Tools with "Desktop development
     with C++", and Strawberry Perl ahead of Git's Perl on `PATH` (the bundled OpenSSL's build refuses Git's).
   - **macOS**, in Terminal:
 
@@ -135,7 +135,7 @@ decision log, step 20). Nothing here prints the key.
    updates", has `latest.json`'s form, each signature being the contents of its `.sig` file). Each copy checks within a
    day, or at its next start.
 4. **To make every older copy update before it syncs again**, set `Ehr:Desktop:MinimumVersion` to the new version on
-   both servers (`EHR_DESKTOP_MINIMUM_VERSION` in the local stack).
+   both servers (`EHR_DESKTOP_MINIMUM_VERSION` in the local stack). Builds named EHR can't sync then (above).
 
 If the key is lost, no installed copy can be updated again: each is reinstalled by hand from a build with a new key, and
 keeps what it holds. If it leaks, see the decision log's entry for what to do.
@@ -144,7 +144,8 @@ keeps what it holds. If it leaks, see the decision log's entry for what to do.
 
 - **macOS:** the encrypted database in `~/Library/Application Support/io.github.tarnan3751.swiftchart/`; its key and the
   kept sign-in in the login Keychain, as items named `io.github.tarnan3751.swiftchart` (accounts `local-database-key`
-  and `server-session`).
+  and `server-session`); the web view's own data in `~/Library/WebKit/io.github.tarnan3751.swiftchart/` and
+  `~/Library/Caches/io.github.tarnan3751.swiftchart/` (nothing of a patient's: the page keeps nothing there).
 - **Windows:** the encrypted database in `%APPDATA%\io.github.tarnan3751.swiftchart\`; its key and the kept sign-in in
   Credential Manager, as Windows credentials named `local-database-key.io.github.tarnan3751.swiftchart` and
   `server-session.io.github.tarnan3751.swiftchart`; the web view's own data in
@@ -158,7 +159,8 @@ server, its key included; drafts and recordings it hadn't sent are lost (`docs/U
 Builds before the expansion plan's step 20 were named EHR, with the identifier `com.example.ehr`. A SwiftChart build
 doesn't see what they kept: it starts empty, signs in again, and downloads the offline charts again. Drafts and
 recordings an old copy hasn't sent stay in its own encrypted database, which only that old build can open. Nothing moves
-them across, so send them first:
+them across, so send them first, and before any minimum version is set on the servers: a build named EHR says no
+version, and a server with a minimum refuses to sync with it, so it couldn't send them then.
 
 1. Open the old build, sign in, and wait until it says nothing is waiting to be sent: no changes, drafts or recordings.
 2. Sign out, and quit it.

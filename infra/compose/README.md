@@ -223,9 +223,12 @@ folder:
 
 Each site answers with its own address for the file, so off-site copies fetch it from the cloud app. The signatures
 are made on the owner's Mac with the updater's private key, never here or in CI (`docs/desktop-install.md`).
-`EHR_DESKTOP_MINIMUM_VERSION`, set when starting the stack (`EHR_DESKTOP_MINIMUM_VERSION=0.2.1 docker compose -f
-compose.yaml -f compose.desktop-updates.yaml up -d --wait`), makes both apps refuse to sync with an older desktop
-build, which then offers the update; its lock and offline charts still work.
+`EHR_DESKTOP_MINIMUM_VERSION`, set when starting the stack, makes both apps refuse to sync with an older desktop build,
+which then offers the update; its lock and offline charts still work. A build named EHR, from before step 20, says no
+version and is refused too. On macOS:
+`EHR_DESKTOP_MINIMUM_VERSION=0.2.1 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait`; in
+PowerShell: `$env:EHR_DESKTOP_MINIMUM_VERSION = "0.2.1"; docker compose -f compose.yaml -f compose.desktop-updates.yaml
+up -d --wait; Remove-Item Env:EHR_DESKTOP_MINIMUM_VERSION`.
 
 ## Encryption
 
