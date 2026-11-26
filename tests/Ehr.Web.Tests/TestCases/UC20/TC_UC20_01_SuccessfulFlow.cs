@@ -30,7 +30,7 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 //   3. Open the chart, the inbox and the results page; sign in to the portal as the patient and open the results; read
 //      the patient's laboratory results through the FHIR API.
 //   4. Read the audit events about the patient whose source is the lab.
-// Expected result: Step 1: the page says "Lab connected:". Step 2: the first round is handed the order and files
+// Expected result: Step 1: the page says "Lab connected.". Step 2: the first round is handed the order and files
 //   nothing yet; the second files it. The value is the one the simulator's rules give this order with E11.9, above 5.6,
 //   collected a quarter of the way into its delay. Step 3: the order is resulted and listed as abnormal, to acknowledge;
 //   the inbox has "Results are in" for it, abnormal; the page shows the value with "High" and no form; the portal and
@@ -51,7 +51,7 @@ public class TC_UC20_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         // Step 1.
         var order = await SignedAsync(session.Client, patient, "lab", "Hemoglobin A1c", Cbc);
         await SettledAsync(apps, patient);
-        Assert.Contains("<span class=\"sc-notice__state\">Lab connected:</span>", await session.Client.GetStringAsync(Path(patient, order), Cancel));
+        Assert.Contains("<span class=\"sc-notice__state\">Lab connected.</span>", await session.Client.GetStringAsync(Path(patient, order), Cancel));
         var signed = DateTimeOffset.Parse(
             (await ProxyTests.QueryAsync(apps, "SELECT to_char(signed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM ehr.orders WHERE patient_id = @patient", patient)).Single(),
             CultureInfo.InvariantCulture);

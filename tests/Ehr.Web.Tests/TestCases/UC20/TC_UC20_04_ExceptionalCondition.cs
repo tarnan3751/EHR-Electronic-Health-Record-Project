@@ -44,7 +44,7 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 //      results are due.
 // Expected result: Step 1: 401 unauthorized each. Step 2: no door, each time (401, with no lab's answer, as for any
 //   address before sign-in), and nothing is forwarded to the clinic's server, link up or cut off. Step 3: no door,
-//   each. Step 4: 503 not-ready each, and the page has no "Lab connected"; with the hash back, it says "Lab connected:".
+//   each. Step 4: 503 not-ready each, and the page has no "Lab connected"; with the hash back, it says "Lab connected.".
 //   Until then no result is filed and no order handed over. Step 5: the lab is handed the TSH, then told it was
 //   discontinued and drops it; nothing is filed.
 // Creator: Tahseen Arnan
@@ -142,7 +142,7 @@ public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             await MigratedDatabase.ExecuteAsync(apps.Database.OwnerConnectionString, $"SELECT ehr.set_lab_key('{MigratedDatabase.LabKeyHash}')");
         }
 
-        Assert.Contains("<span class=\"sc-notice__state\">Lab connected:</span> the lab files this order's results here when they're ready",
+        Assert.Contains("<span class=\"sc-notice__state\">Lab connected.</span> The lab files these results here when they're ready",
             await session.Client.GetStringAsync(Path(patient, order), Cancel));
         Assert.Equal(["0"], await ResultsOnFileAsync(apps, patient));
         Assert.Equal(0, await apps.AuditEventsAsync("sent_to_lab", patientId: patient));

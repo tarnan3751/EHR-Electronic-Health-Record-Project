@@ -23,10 +23,10 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. Open the inbox.
 //   3. Follow "Open the results" and choose "Acknowledge results".
 //   4. Open the inbox and the chart.
-// Expected result: Step 1: the page says "Saved:"; hemoglobin is listed first with "Low" and its reference range,
-//   platelets after it with no flag; "Outside the reference range: 1 of 2 results"; the names, units and ranges are
+// Expected result: Step 1: the page says "Saved."; hemoglobin is listed first with "Low" and its reference range,
+//   platelets after it with no flag; "Abnormal. 1 of 2 results is outside the reference range"; the names, units and ranges are
 //   the clinic's own; the order is completed. Step 2: one "Result to acknowledge" item, "Results are in", tagged
-//   "Abnormal", with the patient's name and no value, and no "Mark done" button. Step 3: "Acknowledged:", then
+//   "Abnormal", with the patient's name and no value, and no "Mark done" button. Step 3: "Results acknowledged.", then
 //   "Acknowledged by" the clinician with the time; the acknowledgment is in the write audit under their account. Step
 //   4: the inbox is empty; the chart's Results section lists the order as abnormal and no longer "To acknowledge", and
 //   it is no longer among the active orders.
@@ -49,8 +49,8 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
 
         using var filed = await FileAsync(apps, session.Client, patient, order, (Platelets, "250"), (Hemoglobin, "9.1"));
         var page = await ReadAsync(filed);
-        Assert.Contains("Saved:", page);
-        Assert.Contains("Outside the reference range: 1 of 2 results, listed first.", Words(page));
+        Assert.Contains("Saved.", page);
+        Assert.Contains("Abnormal. 1 of 2 results is outside the reference range, listed first.", Words(page));
         Assert.True(page.IndexOf("Hemoglobin [Mass/volume]", StringComparison.Ordinal) < page.IndexOf("Platelets [#/volume]", StringComparison.Ordinal));
         Assert.Matches("(?s)data-result=\"abnormal\".*?9.1 g/dL.*?<span class=\"sc-tag sc-tag--warning\">Low</span>.*?12 to 17.5 g/dL", page);
         Assert.Matches("(?s)data-result=\"normal\".*?250 10\\*3/uL", page);
@@ -67,7 +67,7 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
 
         using var acknowledged = await AcknowledgeAsync(session.Client, patient, order);
         var after = await ReadAsync(acknowledged);
-        Assert.Contains("Acknowledged:", after);
+        Assert.Contains("Results acknowledged.", after);
         Assert.Matches($"data-acknowledged>Acknowledged by Dr. Test, \\d{{4}}-\\d{{2}}-\\d{{2}} \\d{{2}}:\\d{{2}} UTC\\.", after);
         Assert.DoesNotContain("data-acknowledge>", after);
         Assert.Equal([$"{clinician.Id}"], await ProxyTests.QueryAsync(apps,

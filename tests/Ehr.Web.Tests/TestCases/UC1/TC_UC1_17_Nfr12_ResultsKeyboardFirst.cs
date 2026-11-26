@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   3. Open the inbox. Press Tab until "Open the results" has the focus, and press Enter. Press Enter again:
 //      "Acknowledge results" already has the focus.
 // Expected result: Step 1 opens the results page with the cursor in the first test's field. Step 2 files all four:
-//   the page says "Saved:" and lists four results. Step 3 acknowledges: the page says "Acknowledged:" and the app
+//   the page says "Saved." and lists four results. Step 3 acknowledges: the page says "Results acknowledged." and the app
 //   bar's inbox count is gone. Every focused control shows the focus ring, and the page reports no script errors.
 // Creator: Tahseen Arnan
 //
@@ -63,7 +63,7 @@ public class TC_UC1_17_Nfr12_ResultsKeyboardFirst(WebApps apps) : IClassFixture<
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=filed", StringComparison.Ordinal));
-        Assert.Contains("Saved:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Saved.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Equal(4, await page.Locator("tr[data-result]").CountAsync());
 
         await page.GotoAsync($"{server.Url}/inbox");
@@ -74,7 +74,7 @@ public class TC_UC1_17_Nfr12_ResultsKeyboardFirst(WebApps apps) : IClassFixture<
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=acknowledged", StringComparison.Ordinal));
-        Assert.Contains("Acknowledged:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Results acknowledged.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Equal(0, await page.Locator("[data-inbox-count]").CountAsync());
 
         Assert.Equal(4, (await FiledAsync(apps, patient)).Count);
