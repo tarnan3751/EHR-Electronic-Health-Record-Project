@@ -245,6 +245,10 @@ public sealed class StaffSignIn(
             audit.Record(AuditActions.SignOut, actorId: id);
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        // Signing out only tells the browser to drop the cookie; the account read from it is still this request's. The
+        // rest of the request, the page that says "Signed out" included, is no longer signed in.
+        context.User = new ClaimsPrincipal(new ClaimsIdentity());
     }
 
     // An authenticator app's codes are typed with the spaces or dashes apps show them with. Adding a passkey takes one
