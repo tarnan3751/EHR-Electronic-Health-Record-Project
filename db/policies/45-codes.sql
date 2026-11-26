@@ -41,7 +41,7 @@ GRANT EXECUTE ON FUNCTION ehr.issue_patient_enrollment(uuid, uuid, text) TO ehr_
 -- its own found it without using it up, and the apps never called it: it goes, from a database that has it too.
 DROP FUNCTION IF EXISTS ehr.find_patient_enrollment(text, text);
 
--- Uses that enrollment up: it is marked redeemed, once, and answers as find does. Nothing for a code that is
+-- Uses that enrollment up: it is marked redeemed, once, and answers with its ID and its patient. Nothing for a code that is
 -- unknown, used or expired; of two calls with the same code, the second waits on the row and then gets nothing.
 CREATE OR REPLACE FUNCTION ehr.redeem_patient_enrollment(hash text, legacy text) RETURNS TABLE (id uuid, patient_id uuid)
     LANGUAGE sql
