@@ -93,6 +93,11 @@ namespace Ehr.Migrations
                         .HasColumnType("text")
                         .HasColumnName("concurrency_stamp");
 
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("display_name");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
@@ -124,7 +129,7 @@ namespace Ehr.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
-                    b.Property<Guid>("PatientId")
+                    b.Property<Guid?>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
 
@@ -1133,6 +1138,52 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AcknowledgedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("AcknowledgedBy")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("acknowledged_by")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_result_acknowledgments");
+
+                    b.HasIndex("AcknowledgedBy")
+                        .HasDatabaseName("ix_result_acknowledgments_acknowledged_by");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_result_acknowledgments_order_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_result_acknowledgments_patient_id");
+
+                    b.HasIndex("OrderId", "PatientId")
+                        .HasDatabaseName("ix_result_acknowledgments_order_id_patient_id");
+
+                    b.ToTable("result_acknowledgments", "ehr");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1883,6 +1934,11 @@ namespace Ehr.Migrations
                     b.HasKey("Id")
                         .HasName("pk_observations");
 
+                    b.HasIndex("OrderId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_observations_order_id_code")
+                        .HasFilter("order_id IS NOT NULL AND code IS NOT NULL");
+
                     b.HasIndex("OrderId", "PatientId")
                         .HasDatabaseName("ix_observations_order_id_patient_id");
 
@@ -2138,6 +2194,56 @@ namespace Ehr.Migrations
 
                             t.HasCheckConstraint("ck_proxy_grants_scope", "scope IN ('record', 'record-and-messages')");
                         });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Proxies.ProxyInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("GrantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("grant_id");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTimeOffset?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeemed_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_proxy_invitations");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_proxy_invitations_code_hash");
+
+                    b.HasIndex("GrantId")
+                        .HasDatabaseName("ix_proxy_invitations_grant_id");
+
+                    b.ToTable("proxy_invitations", "ehr");
                 });
 
             modelBuilder.Entity("Ehr.Data.QuickText", b =>
@@ -2532,7 +2638,6 @@ namespace Ehr.Migrations
                         .WithMany()
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_patient_users_patients_patient_id");
                 });
 
@@ -2680,6 +2785,24 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_orders_order_catalog_items_type_catalog_code");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Orders.ResultAcknowledgment", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("AcknowledgedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_acknowledgments_staff_users_acknowledged_by");
+
+                    b.HasOne("Ehr.Data.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_result_acknowledgments_orders_order_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
@@ -2889,6 +3012,16 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_proxy_grants_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Proxies.ProxyInvitation", b =>
+                {
+                    b.HasOne("Ehr.Data.Proxies.ProxyGrant", null)
+                        .WithMany()
+                        .HasForeignKey("GrantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_proxy_invitations_proxy_grants_grant_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Reference.OrderResultCode", b =>

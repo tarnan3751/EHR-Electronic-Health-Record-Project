@@ -111,6 +111,9 @@ CREATE OR REPLACE FUNCTION ehr.portal_may_message() RETURNS boolean
 -- theirs: the portal's "records you can view" list, before one is chosen. Row-level security gives a portal session
 -- one patient's row at a time, its own or the one it is acting for, so the names come from here: as the owner, who
 -- reads the two tables through policies of its own below, and only ever for the caller's own address.
+-- An earlier build of step 6 gave the names through a policy on ehr.patients and this function: both go, the policy
+-- first, since it depends on the function.
+DROP POLICY IF EXISTS patients_proxy_select ON ehr.patients;
 DROP FUNCTION IF EXISTS ehr.proxied_patient_ids();
 CREATE OR REPLACE FUNCTION ehr.proxied_records()
     RETURNS TABLE (grant_id uuid, patient_id uuid, given_name text, family_name text, scope text, include_sensitive boolean, expires_at timestamptz)
@@ -387,12 +390,42 @@ CREATE POLICY encounters_own_select ON ehr.encounters FOR SELECT
 
 -- Test results (PHI). Clinicians read every patient's. A patient reads only their own, and only once the result is
 -- released and finished (Observation.IssuedAt, ObservationStatus.Released): a result still being worked on, cancelled
--- or entered in error never reaches the portal, even through a bug in the app. No write policies, as for the chart.
+-- or entered in error never reaches the portal, even through a bug in the app. A clinician files results for a patient
+-- on their active panel; nothing updates or deletes one (10-grants.sql).
 ALTER TABLE ehr.observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.observations FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS observations_clinician_select ON ehr.observations;
 CREATE POLICY observations_clinician_select ON ehr.observations FOR SELECT USING ((SELECT ehr.is_clinician()));
+
+DROP POLICY IF EXISTS observations_panel_insert ON ehr.observations;
+CREATE POLICY observations_panel_insert ON ehr.observations FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = observations.patient_id AND a.ended_at IS NULL
+        )
+    );
+
+-- Acknowledgments of results (PHI). Clinicians read them, as they read the orders; a clinician with the patient on
+-- their active panel makes one, as themselves. Patients, admins and nobody see none. Never updated or deleted.
+ALTER TABLE ehr.result_acknowledgments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ehr.result_acknowledgments FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS result_acknowledgments_clinician_select ON ehr.result_acknowledgments;
+CREATE POLICY result_acknowledgments_clinician_select ON ehr.result_acknowledgments FOR SELECT USING ((SELECT ehr.is_clinician()));
+DROP POLICY IF EXISTS result_acknowledgments_panel_insert ON ehr.result_acknowledgments;
+CREATE POLICY result_acknowledgments_panel_insert ON ehr.result_acknowledgments FOR INSERT
+    WITH CHECK (
+        (SELECT ehr.is_clinician())
+        AND acknowledged_by = (SELECT ehr.current_user_id())
+        AND EXISTS (
+            SELECT 1 FROM ehr.patient_assignments a
+            WHERE a.clinician_id = (SELECT ehr.current_user_id())
+              AND a.patient_id = result_acknowledgments.patient_id AND a.ended_at IS NULL
+        )
+    );
 
 DROP POLICY IF EXISTS observations_own_released_select ON ehr.observations;
 CREATE POLICY observations_own_released_select ON ehr.observations FOR SELECT
@@ -603,7 +636,8 @@ CREATE POLICY clinical_notes_own_insert ON ehr.clinical_notes FOR INSERT
 -- clinician signs an order only as themselves and only for a patient on their active panel, the rule for writing notes;
 -- the signing trigger also locks, checks for a duplicate and sets the time (60-orders.sql). The one update is
 -- discontinuing an order, by the same rule: a clinician, for a patient on their active panel, recorded as themselves
--- (the trigger sets that before this check). Nothing deletes an order (10-grants.sql), so there is no policy for it.
+-- (the trigger sets that before this check). The other is the database's own: an order becomes completed when a
+-- result is filed for it, as the clinician filing it, who is on the patient's panel too (75-results.sql). Nothing deletes an order (10-grants.sql), so there is no policy for it.
 ALTER TABLE ehr.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ehr.orders FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS orders_clinician_select ON ehr.orders;
@@ -632,7 +666,8 @@ CREATE POLICY orders_panel_update ON ehr.orders FOR UPDATE
     )
     WITH CHECK (
         (SELECT ehr.is_clinician())
-        AND discontinuer_id = (SELECT ehr.current_user_id())
+        -- Discontinued, as themselves; or completed by its results (step 7), which names nobody as discontinuing it.
+        AND (discontinuer_id = (SELECT ehr.current_user_id()) OR (status = 'completed' AND discontinuer_id IS NULL))
         AND EXISTS (
             SELECT 1 FROM ehr.patient_assignments a
             WHERE a.clinician_id = (SELECT ehr.current_user_id())

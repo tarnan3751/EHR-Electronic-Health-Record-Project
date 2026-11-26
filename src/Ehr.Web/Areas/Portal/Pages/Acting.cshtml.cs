@@ -14,7 +14,7 @@ namespace Ehr.Web.Areas.Portal.Pages;
 [HandledOffSite]
 public class ActingModel(PhiReader phi) : PageModel
 {
-    public IActionResult OnGet() => RedirectToPage("/Access");
+    public IActionResult OnGet() => RedirectToPage("/Choose");
 
     public async Task<IActionResult> OnPostAsync(Guid grantId)
     {

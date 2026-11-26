@@ -40,7 +40,9 @@ public static class EhrPolicies
         options.AddPolicy(Patient, policy => policy
             .AddAuthenticationSchemes(AccountSchemes.Patient)
             .RequireAuthenticatedUser()
-            .RequireClaim(EhrClaims.PatientId));
+            // A portal account: a patient's, or a proxy-only one with no record of its own (step 6b). What either
+            // sees is decided page by page from PortalSubject, and by row-level security.
+            .RequireAssertion(context => context.User.IsPortalAccount()));
         options.AddPolicy(Desktop, policy => policy
             .AddAuthenticationSchemes(AccountSchemes.Desktop)
             .RequireAuthenticatedUser()

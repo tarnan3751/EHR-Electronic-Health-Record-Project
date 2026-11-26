@@ -49,6 +49,14 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Chart lists: clinicians add and change entries, and nothing deletes one. Their history is the database's to write.
         [("ehr_app", "allergy_intolerances")] = ["SELECT", "INSERT", "UPDATE"],
         // Messages: sent by insert, never edited; marking one read is a column grant.
+        [("ehr_app", "result_acknowledgments")] = ["SELECT", "INSERT"],
+        [("ehr_read", "result_acknowledgments")] = ["SELECT"],
+        // Step 6c: no privilege at all. Enrollment codes and invitations are reached only through the functions in
+        // db/policies/45-codes.sql, one code at a time (CodeLookupSecurityTests).
+        [("ehr_app", "patient_enrollments")] = [],
+        [("ehr_read", "patient_enrollments")] = [],
+        [("ehr_app", "proxy_invitations")] = [],
+        [("ehr_read", "proxy_invitations")] = [],
         [("ehr_app", "proxy_grants")] = ["SELECT", "INSERT"],
         [("ehr_read", "proxy_grants")] = ["SELECT"],
         [("ehr_app", "message_threads")] = ["SELECT", "INSERT"],
@@ -103,10 +111,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // A visit is created by checking a patient in for an appointment; nothing updates or deletes one.
         [("ehr_app", "encounters")] = ["SELECT", "INSERT"],
         [("ehr_read", "encounters")] = ["SELECT"],
-        [("ehr_app", "observations")] = ["SELECT"],
+        [("ehr_app", "observations")] = ["SELECT", "INSERT"],
         [("ehr_read", "observations")] = ["SELECT"],
-        [("ehr_app", "patient_enrollments")] = ["SELECT", "INSERT", "UPDATE"],
-        [("ehr_read", "patient_enrollments")] = ["SELECT"],
         // Read by column (ExpectedColumnPrivileges): every one but details, the values a write changed.
         [("ehr_app", "audit_events")] = ["INSERT"],
         [("ehr_read", "audit_events")] = [],

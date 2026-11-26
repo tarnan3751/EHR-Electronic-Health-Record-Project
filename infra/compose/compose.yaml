@@ -96,6 +96,9 @@ services:
     environment:
       <<: *web-app-env
       Ehr__Site: OnPrem
+      # The key portal enrollment codes are hashed with (HMAC-SHA-256), so a copy of the table can't be searched for
+      # codes. Only the on-prem app holds it: the cloud app forwards registration and has a copy of that table.
+      Ehr__Enrollment__Key: ${EHR_ENROLLMENT_KEY:?set it in infra/compose/.env}
       # Reads and writes the primary as ehr_app.
       ConnectionStrings__Ehr: "Host=onprem-db;Database=ehr;Username=ehr_app;Password=${EHR_APP_PASSWORD:?set it in infra/compose/.env};SSL Mode=VerifyFull;Root Certificate=/certs/rootCA.pem"
       # The first admin, created when there are no staff accounts yet. Optional: empty values skip it with a warning.

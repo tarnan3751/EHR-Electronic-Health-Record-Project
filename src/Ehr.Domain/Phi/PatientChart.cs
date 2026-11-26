@@ -37,6 +37,15 @@ public sealed record PatientChart(
     // The patient's appointments still to come, soonest first (FR-17): part of the same recorded read.
     public IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry> Upcoming { get; init; } = [];
 
+    // Whether the patient has any signed note, and any draft the reader may see: the page asks for those lists
+    // only when there is something in them.
+    public bool HasNotes { get; init; } = true;
+
+    public bool HasDrafts { get; init; } = true;
+
+    // Lab orders whose results are in (step 7): those still to acknowledge first, abnormal ones before the rest.
+    public IReadOnlyList<Ehr.Domain.Results.ResultedOrder> Resulted { get; init; } = [];
+
     // Set when the entry form sent the clinician here after saving an entry, and that entry is this patient's: what
     // the chart's "Saved:" notice says about it. Part of the same recorded read.
     public SavedEntry? Saved { get; init; }
@@ -67,7 +76,7 @@ public sealed record AppointmentDetail(Ehr.Domain.Scheduling.AppointmentEntry Ap
 // clinician, who may read patients; by ID alone for an admin, who may not), and where it came from.
 public sealed record InboxEntry(
     Guid Id, string Kind, string Summary, DateTimeOffset CreatedAt, DateTimeOffset? DoneAt, Guid? PatientId, string? PatientName, string? PatientMrn,
-    string? SourceTable, Guid? SourceId);
+    string? SourceTable, Guid? SourceId, bool Abnormal = false);
 
 public sealed record InboxPage(IReadOnlyList<InboxEntry> Items, bool More);
 

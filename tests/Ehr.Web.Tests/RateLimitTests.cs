@@ -62,6 +62,34 @@ public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
         Assert.NotEqual(KeyFor("192.0.2.10"), KeyFor("192.0.2.11"));
     }
 
+    // Step 6c: enrollment codes are short enough to type (12 characters, about 60 bits), so guessing is the risk. Wrong
+    // codes at registration are counted per client address like every other anonymous account POST, and past the
+    // limit the answer is the "Too many attempts" page, before the code is even looked at. There is no account to
+    // count against: none exists until a code is accepted, and a wrong code names no patient.
+    [Fact]
+    public async Task Wrong_enrollment_codes_are_limited_per_client_address()
+    {
+        await using var app = apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting("RateLimits:PermitLimit", "3"));
+        var client = app.CreateClient();
+        var form = await client.GetStringAsync("/portal/register", Cancel);
+        FormUrlEncodedContent Guess(int i) => Browser.Form(("__RequestVerificationToken", Browser.Token(form)), ("Input.Code", $"AAAA-BBBB-CC{i:00}"),
+            ("Input.Email", WebApps.NewEmail()), ("Input.Password", "a-patient-portal-password"), ("Input.Confirm", "a-patient-portal-password"));
+
+        for (var i = 0; i < 3; i++)
+        {
+            using var wrong = await client.PostAsync("/portal/register", Guess(i), Cancel);
+            Assert.Equal(HttpStatusCode.OK, wrong.StatusCode);
+            Assert.Contains("That enrollment code is not valid or has expired.", await wrong.Content.ReadAsStringAsync(Cancel));
+        }
+
+        using var refused = await client.PostAsync("/portal/register", Guess(3), Cancel);
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.Contains("Too many attempts. Wait a few minutes and try again.", await refused.Content.ReadAsStringAsync(Cancel));
+        // The invitation page is limited the same way.
+        using var invitation = await client.PostAsync("/portal/invitation", new FormUrlEncodedContent([]), Cancel);
+        Assert.Equal(HttpStatusCode.TooManyRequests, invitation.StatusCode);
+    }
+
     // The on-prem app doesn't count what the cloud app forwards, which the cloud app has limited already; anyone
     // else sending the header, or X-Forwarded-For, is counted by their own address.
     [Fact]

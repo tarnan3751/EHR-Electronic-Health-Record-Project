@@ -41,7 +41,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, BreakGlass 
             var (result, thread) = await messages.StartAsync(patientId, MessageSender.Staff, Subject!, Body!, HttpContext.RequestAborted);
             if (result == SendResult.Sent)
             {
-                await messages.NotifyPatientAsync(patientId, await phi.UnreadFromStaffAsync(patientId, HttpContext.RequestAborted), Links.Build(addresses.Value.PortalBaseUrl, Request, "/portal/messages"), HttpContext.RequestAborted);
+                await messages.NotifyPatientAsync(patientId, await phi.UnreadFromStaffAsync(patientId, HttpContext.RequestAborted), Links.Build(addresses.Value.PortalBaseUrl, "/portal/messages"), HttpContext.RequestAborted);
                 return RedirectToPage("Thread", new { patientId, threadId = thread, sent = true });
             }
 

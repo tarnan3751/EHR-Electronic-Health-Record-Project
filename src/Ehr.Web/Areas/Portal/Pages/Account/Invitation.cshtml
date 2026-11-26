@@ -1,0 +1,43 @@
+@page "/portal/invitation"
+@model InvitationModel
+@{
+    ViewData["Title"] = "Create your portal account";
+}
+<h1>Create your portal account</h1>
+@if (Model.State == "created")
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Created:</span> your account is ready. <a asp-page="SignIn">Sign in</a> with the email address the invitation was sent to and the password you just chose.</p>
+}
+else if (Model.State == "has-account")
+{
+    <p class="sc-notice sc-notice--info">You already have a portal account with this email address. <a asp-page="SignIn">Sign in</a> to see the record that was shared with you. If you've forgotten your password, you can <a asp-page="Forgot">reset it</a>.</p>
+}
+else if (Model.State == "invalid")
+{
+    <p class="sc-notice sc-notice--danger">This invitation link isn't valid any more. It works once and expires after 7 days. Ask the person who gave you access, or their clinic, to give it again.</p>
+    <p>Already have an account? <a asp-page="SignIn">Sign in</a>.</p>
+}
+else
+{
+    <p>Someone gave you access to their record. This creates an account for you to see it: it uses the email address the invitation was sent to, and it has no record of its own.</p>
+    <form method="post" class="sc-form">
+        <input type="hidden" asp-for="Input.Code">
+        <div class="sc-field">
+            <label asp-for="Input.Name" class="sc-field__label">Your name</label>
+            <input asp-for="Input.Name" class="sc-field__input" autocomplete="name" maxlength="100" required autofocus>
+            <span asp-validation-for="Input.Name" class="sc-field__error"></span>
+        </div>
+        <div class="sc-field">
+            <label asp-for="Input.Password" class="sc-field__label">Password</label>
+            <input asp-for="Input.Password" class="sc-field__input" type="password" autocomplete="new-password" required>
+            <span asp-validation-for="Input.Password" class="sc-field__error"></span>
+        </div>
+        <div class="sc-field">
+            <label asp-for="Input.Confirm" class="sc-field__label">Password, again</label>
+            <input asp-for="Input.Confirm" class="sc-field__input" type="password" autocomplete="new-password" required>
+            <span asp-validation-for="Input.Confirm" class="sc-field__error"></span>
+        </div>
+        <div asp-validation-summary="ModelOnly" class="sc-notice sc-notice--danger"></div>
+        <button class="sc-btn sc-btn--primary">Create account</button>
+    </form>
+}

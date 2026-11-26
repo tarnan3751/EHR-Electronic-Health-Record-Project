@@ -37,8 +37,7 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
         }
 
         // The account's old password, if it had one, has stopped working; the link is the only way back in.
-        SetupLink = Links.Build(links.Value.ClinicalBaseUrl, Request,
-            $"/sign-in/setup?user={member.Id}&token={Uri.EscapeDataString(reissued.Token!)}");
+        SetupLink = Links.Build(links.Value.ClinicalBaseUrl, $"/sign-in/setup?user={member.Id}&token={Uri.EscapeDataString(reissued.Token!)}");
         return null;
     });
 
@@ -109,8 +108,7 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
             var invitation = await accounts.InviteAsync(Input.Email!, Input.DisplayName!, roles, HttpContext.RequestAborted);
             if (invitation.Result.Succeeded)
             {
-                SetupLink = Links.Build(links.Value.ClinicalBaseUrl, Request,
-                    $"/sign-in/setup?user={invitation.User!.Id}&token={Uri.EscapeDataString(invitation.Token!)}");
+                SetupLink = Links.Build(links.Value.ClinicalBaseUrl, $"/sign-in/setup?user={invitation.User!.Id}&token={Uri.EscapeDataString(invitation.Token!)}");
                 ModelState.Clear();
                 Input = new InviteForm();
             }

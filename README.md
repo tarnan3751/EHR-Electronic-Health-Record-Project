@@ -32,9 +32,11 @@ Early foundation, with the first EHR feature: finding a patient and opening thei
 
 - Secure messages (FR-18): a patient writes to their care team from the portal, the message arrives in the inbox of each clinician who has them on their panel, and any of them replies from the conversation; clinicians can also start one from the chart. Every opening of a conversation is audited, the email about a reply says only that there is one, and the audit page never shows a message's text. See `docs/UC17.md` and `docs/UC6.md`.
 
-- Proxy access (FR-19): a patient gives a family member or carer access to their record in the portal, or the clinic records it, with a scope and always an end date. The proxy signs in with their own account and chooses whose record to view; the database checks on every query that the access is theirs and in force, holds back sensitive items and messages unless the access includes them, and records everything under the proxy's account and the patient. See `docs/UC18.md` and `docs/UC6.md`.
+- Proxy access (FR-19): a patient gives a family member or carer access to their record in the portal, or the clinic records it, with a scope and always an end date. The proxy signs in with their own account, which someone who isn't a patient creates from the emailed invitation, and chooses whose record to view; the database checks on every query that the access is theirs and in force, holds back sensitive items and messages unless the access includes them, and records everything under the proxy's account and the patient. See `docs/UC18.md` and `docs/UC6.md`.
 
-**Not built yet:** editing visits, the clinical workflows beyond finding patients, opening charts, orders and writing/signing notes, and completing an order with its result. `docs/expansion/PLAN.md` is the plan for these and the rest.
+- Results (the plan's step 7): a clinician files a lab order's results against it, the order becomes resulted, values outside their reference range are flagged and listed first, the clinician who signed the order finds them in their inbox, they or a colleague on the patient's care team acknowledges them, and the patient sees them in the portal. See `docs/UC1.md`.
+
+**Not built yet:** editing visits, sending orders to a lab or pharmacy, and the later steps of the plan. `docs/expansion/PLAN.md` is the plan for these and the rest.
 
 ## Layout
 
@@ -140,6 +142,15 @@ dotnet user-secrets set Ehr:Bootstrap:AdminPassword <a password of 12 or more ch
 ```
 
 The account is created at the next start if there are no staff accounts yet. The first sign-in asks for a new password and an authenticator app. Without a mail server configured (`Ehr:Smtp:Host`), the portal's emails are written to the console, and without a certificate in `Ehr:DataProtection:Certificate` and `Ehr:DataProtection:CertificateKey` (PEM files; the stack passes its own), the keys that protect cookies are stored in the clear, which the log says at startup.
+
+**Settings a deployment must give.** Run this way, in Development, the app fills in local values. Anywhere else it refuses to start without these, and says which one is missing:
+
+| Setting | What it is |
+|---|---|
+| `Ehr:Links:ClinicalBaseUrl` and `Ehr:Links:PortalBaseUrl` | The addresses people reach the clinical app and the portal at. Every link the app hands out (the emailed ones for password reset, confirmation and invitation, and the staff set-up link shown to an admin) is built from these and never from the request, whose Host header is its sender's to write. |
+| `Ehr:Enrollment:Key` | A secret of at least 32 characters that portal enrollment codes are hashed with, so a copy of the table can't be searched for codes. For the on-prem app only: the cloud app forwards registration and is not given it. Changing it makes codes already handed out stop working. |
+
+The local server stack sets them from `infra/compose/.env` (`EHR_ENROLLMENT_KEY`; the addresses are in `compose.yaml`).
 
 **In VS Code:** open the repository folder, then use Terminal → Run Task:
 

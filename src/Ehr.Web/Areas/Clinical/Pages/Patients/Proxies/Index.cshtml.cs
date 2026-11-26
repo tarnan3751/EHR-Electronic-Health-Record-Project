@@ -17,7 +17,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Proxies;
 // clinic records never sees sensitive items: only the patient allows that, in the portal, and the database refuses it
 // from anyone else.
 [ShownIfNotSaved(nameof(Email))]
-public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, ProxyAccess access, IOptions<SiteAddresses> addresses)
+public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, ProxyAccess access, ProxyInvitations invitations, IOptions<SiteAddresses> addresses)
     : MessagePage(assignments, breakGlass)
 {
     [BindProperty]
@@ -54,9 +54,13 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         if (errors.Count == 0)
         {
             var earlier = Grants.Where(g => g.RevokedAt is null && string.Equals(g.Email, Email!.Trim(), StringComparison.OrdinalIgnoreCase)).Select(g => g.Id);
-            if (await access.GiveAsync(patientId, earlier, Email!, Scope!, includeSensitive: false, Days, HttpContext.RequestAborted) == GiveResult.Given)
+            var (result, grant) = await access.GiveAsync(patientId, earlier, Email!, Scope!, includeSensitive: false, Days, HttpContext.RequestAborted);
+            if (result == GiveResult.Given)
             {
-                await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, Request, "/portal/access"), HttpContext.RequestAborted);
+                // The email's link lets someone with no portal account create one that sees only this record (step 6b).
+                var code = await invitations.IssueAsync(grant, HttpContext.RequestAborted);
+                await access.NotifyAsync(Email!, Links.Build(addresses.Value.PortalBaseUrl, "/portal/sign-in"),
+                    Links.Build(addresses.Value.PortalBaseUrl, $"/portal/invitation?code={code}"), HttpContext.RequestAborted);
                 return RedirectToPage(new { patientId, done = "recorded" });
             }
 

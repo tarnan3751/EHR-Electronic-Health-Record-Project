@@ -8,8 +8,8 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Ehr.Domain.Accounts;
 
-// A patient's sign-in to the portal: password, confirmed email, then the Patient cookie, which carries the one
-// patient the account belongs to. Every outcome goes in the audit log.
+// A sign-in to the portal: password, confirmed email, then the Patient cookie, which carries the patient the account
+// belongs to when it has one (a proxy-only account has none). Every outcome goes in the audit log.
 public sealed class PatientSignIn(
     UserManager<PatientUser> users, IUserClaimsPrincipalFactory<PatientUser> principals, AuditRecorder audit, EhrDbContext db)
 {

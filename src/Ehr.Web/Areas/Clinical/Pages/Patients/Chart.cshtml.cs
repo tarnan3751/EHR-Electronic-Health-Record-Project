@@ -206,8 +206,12 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         }
 
         Chart = chart;
-        Notes = await phi.NotesAsync(id, HttpContext.RequestAborted);
-        if (OnPanel)
+        if (chart.HasNotes)
+        {
+            Notes = await phi.NotesAsync(id, HttpContext.RequestAborted);
+        }
+
+        if (OnPanel && chart.HasDrafts)
         {
             Drafts = await phi.NoteDraftsAsync(id, HttpContext.RequestAborted);
         }

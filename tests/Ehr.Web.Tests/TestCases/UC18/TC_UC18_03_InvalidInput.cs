@@ -61,6 +61,11 @@ public class TC_UC18_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             }
         }
 
+        // An address a portal account couldn't have: refused here, so access is never given to one that can't accept it.
+        using var apostrophe = await PostFormAsync(patient.Client, "/portal/access", "/portal/access", ("Email", "o'brien@example.com"), ("Scope", "record"), ("Days", 90));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, apostrophe.StatusCode);
+        Assert.Contains("Enter an email address, like name@example.com.", await apostrophe.Content.ReadAsStringAsync(Cancel));
+
         Assert.Empty(await GrantsAsync(apps, patient.Patient));
         Assert.Equal(emails, apps.Emails.Sent.Count);
 

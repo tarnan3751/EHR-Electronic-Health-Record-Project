@@ -1,7 +1,7 @@
 @* The one page frame: the head every page needs, and an app bar that says who is signed in and where they can go.
    Staff see the clinic's links for their roles; a patient sees the portal's. Nobody signed in sees no app bar. *@
 @{
-    var isPatient = User.HasClaim(claim => claim.Type == EhrClaims.PatientId);
+    var isPatient = User.IsPortalAccount();
     var displayName = User.FindFirst(EhrClaims.DisplayName)?.Value ?? User.Identity?.Name;
     // The portal's pages, signed in or not: its account pages have no patient yet.
     var isPortal = isPatient || string.Equals(ViewContext.RouteData.Values["area"] as string, "Portal", StringComparison.Ordinal);
@@ -84,10 +84,14 @@
             <nav class="sc-appbar__nav" aria-label="Main">
                 @if (isPatient)
                 {
-                    <a asp-area="Portal" asp-page="/Index" class="sc-appbar__link" aria-current="@current("/Index")">@(acting is null ? "My record" : "Record")</a>
-                    <a asp-area="Portal" asp-page="/Results" class="sc-appbar__link" aria-current="@current("/Results")">Results</a>
-                    <a asp-area="Portal" asp-page="/Appointments" class="sc-appbar__link" aria-current="@current("/Appointments")">Appointments</a>
-                    @if (subject?.MayMessage != false)
+                    @* A proxy-only account that hasn't chosen a record has no record pages to go to (step 6b). *@
+                    @if (subject?.HasSubject != false)
+                    {
+                        <a asp-area="Portal" asp-page="/Index" class="sc-appbar__link" aria-current="@current("/Index")">@(acting is null ? "My record" : "Record")</a>
+                        <a asp-area="Portal" asp-page="/Results" class="sc-appbar__link" aria-current="@current("/Results")">Results</a>
+                        <a asp-area="Portal" asp-page="/Appointments" class="sc-appbar__link" aria-current="@current("/Appointments")">Appointments</a>
+                    }
+                    @if (subject?.HasSubject != false && subject?.MayMessage != false)
                     {
                         <a asp-area="Portal" asp-page="/Messages/Index" class="sc-appbar__link" aria-current="@current("/Messages/")">Messages</a>
                     }
@@ -136,8 +140,8 @@
         @* FR-19: a proxy is never left to wonder whose record is on screen. The band sits under the app bar on every
            portal page while the session is acting for someone, with the way back. *@
         <form method="post" asp-area="Portal" asp-page="/Acting" asp-page-handler="Mine" class="sc-notice sc-notice--info sc-notice--band sc-acting" data-acting>
-            <p><span class="sc-notice__state">Viewing as a proxy:</span> this is <strong>@acting.PatientName</strong>'s record, not your own.</p>
-            <button type="submit" class="sc-btn sc-btn--compact">Back to my own record</button>
+            <p><span class="sc-notice__state">Viewing as a proxy:</span> this is <strong>@acting.PatientName</strong>'s record@(subject!.OwnPatientId is null ? "." : ", not your own.")</p>
+            <button type="submit" class="sc-btn sc-btn--compact">@(subject!.OwnPatientId is null ? "Choose another record" : "Back to my own record")</button>
         </form>
     }
     @* The patient banner, on a page about a patient: directly under the app bar, and it stays put as the page scrolls. *@

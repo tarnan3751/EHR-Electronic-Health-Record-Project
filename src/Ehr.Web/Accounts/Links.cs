@@ -2,12 +2,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Ehr.Web.Accounts;
 
-// Absolute links the app hands out, built from the configured address of the site (SiteAddresses) when there is one,
-// since the on-prem app handles forms posted to the cloud site, and from the request itself otherwise.
+// Absolute links the app hands out, built from the configured address of the site (SiteAddresses) and nothing else:
+// never from the request, whose Host header is its sender's to choose. The address is checked at startup (Program.cs).
 public static class Links
 {
-    public static string Build(string? baseUrl, HttpRequest request, string path) =>
-        (string.IsNullOrEmpty(baseUrl) ? $"{request.Scheme}://{request.Host}" : baseUrl.TrimEnd('/')) + path;
+    public static string Build(string? baseUrl, string path) =>
+        string.IsNullOrEmpty(baseUrl)
+            ? throw new InvalidOperationException($"{Ehr.Domain.Accounts.SiteAddresses.Section} has no address for this link.")
+            : baseUrl.TrimEnd('/') + path;
 
     // Only a path on this site, never somewhere else, as the place to go after signing in.
     public static string Local(IUrlHelper url, string? returnUrl, string fallback) =>
