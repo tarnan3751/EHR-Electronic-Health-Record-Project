@@ -14,7 +14,7 @@
     <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to the signed note</a></p>
 </div>
 <h1>Add an addendum</h1>
-<p class="sc-prose">The note, signed @Model.Note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC, can't be changed. An addendum is a new text shown after it, signed as you with the time. It can't be edited or removed.</p>
+<p class="sc-prose">The note, signed @Clinic.Format(Model.Note.SignedAt), can't be changed. An addendum is a new text shown after it, signed as you with the time. It can't be edited or removed.</p>
 @if (!OnPrem.IsReachable)
 {
     @* UC 2: reached by Back or a tab opened before the outage. Nothing to sign with until the server is back. *@

@@ -1230,6 +1230,7 @@ mod tests {
                     sensitive_not_kept: 0,
                     allergy_status: None,
                     notes: vec![],
+                    clinic_time_zone: None,
                 }],
             )
             .unwrap();

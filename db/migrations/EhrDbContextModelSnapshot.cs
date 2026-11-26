@@ -596,6 +596,22 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Lab.LabKey", b =>
+                {
+                    b.Property<string>("KeyHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key_hash");
+
+                    b.HasKey("KeyHash")
+                        .HasName("pk_lab_keys");
+
+                    b.ToTable("lab_keys", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_lab_keys_key_hash", "key_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Messaging.Message", b =>
                 {
                     b.Property<Guid>("Id")

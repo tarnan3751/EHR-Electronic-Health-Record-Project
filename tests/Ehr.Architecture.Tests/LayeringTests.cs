@@ -9,7 +9,8 @@ using static ArchUnitNET.Fluent.ArchRuleDefinition;
 namespace Ehr.Architecture.Tests;
 
 // Each layer calls only the one below it: the web host uses the domain, the domain uses the data layer, and nothing
-// looks up. A type that did would also be a type the lower layer's tests can't cover.
+// looks up. A type that did would also be a type the lower layer's tests can't cover. The simulated lab stands outside,
+// as a lab's system does.
 public class LayeringTests
 {
     static readonly ArchUnitNET.Domain.Architecture Architecture = new ArchLoader()
@@ -27,4 +28,11 @@ public class LayeringTests
         Types().That().ResideInAssembly(typeof(PhiReader).Assembly)
             .Should().NotDependOnAny(Types().That().ResideInAssembly(typeof(Ehr.Web.Site).Assembly))
             .Check(Architecture);
+
+    // The simulated lab (the expansion plan's step 12) is a lab's system: it reaches the app over HTTP only, as a real
+    // one would, and shares only the contract's source file, compiled into it. So it uses none of the app's layers.
+    [Fact]
+    public void The_simulated_lab_knows_nothing_of_the_app() =>
+        Assert.DoesNotContain(typeof(Ehr.Lab.Simulator.LabSimulator).Assembly.GetReferencedAssemblies(),
+            reference => reference.Name is "Ehr.Web" or "Ehr.Domain" or "Ehr.Data");
 }

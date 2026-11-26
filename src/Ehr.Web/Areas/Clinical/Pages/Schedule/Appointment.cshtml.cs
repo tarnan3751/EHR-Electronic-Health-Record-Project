@@ -15,7 +15,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Schedule;
 // The database holds each change to those moves and refuses anything else (db/policies/80-appointments.sql). An
 // appointment that someone else changed first isn't changed again: the page says so.
 [ShownIfNotSaved(nameof(Reason), nameof(CancelReason))]
-public class AppointmentModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, Appointments appointments) : PageModel
+public class AppointmentModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, Appointments appointments, Ehr.Domain.Time.ClinicTime clinic) : PageModel
 {
     [BindProperty]
     public string? Day { get; set; }
@@ -70,7 +70,7 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
         }
 
         var errors = new Dictionary<string, string>();
-        var start = AppointmentForm.Check(Day, Time, Minutes, Reason, errors);
+        var start = AppointmentForm.Check(clinic, Day, Time, Minutes, Reason, errors);
         if (errors.Count == 0)
         {
             var result = await appointments.RescheduleAsync(appointmentId, Version, start!.Value, Minutes, Reason!, HttpContext.RequestAborted);
@@ -148,8 +148,8 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
         }
 
         var appointment = Detail.Appointment;
-        Day = appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        Time = appointment.StartsAt.UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture);
+        Day = clinic.Day(appointment.StartsAt);
+        Time = clinic.Plain(appointment.StartsAt, "HH:mm");
         Minutes = appointment.Minutes;
         Reason = appointment.Reason;
         Version = appointment.Version;

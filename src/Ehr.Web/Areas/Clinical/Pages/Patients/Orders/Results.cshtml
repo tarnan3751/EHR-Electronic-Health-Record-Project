@@ -23,7 +23,7 @@
     <p><a asp-page="/Inbox/Index">Inbox</a></p>
 </div>
 <h1>Results: @order.Display</h1>
-<p class="sc-muted">Ordered by @order.SignedBy, @order.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+<p class="sc-muted">Ordered by @order.SignedBy, @Clinic.Format(order.SignedAt).</p>
 @if (Model.Done is "filed")
 {
     <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Saved:</span> the results are filed, and the patient can see them in the portal. @order.SignedBy has them in their inbox to acknowledge.</p>
@@ -65,7 +65,7 @@ else
                             }
                         </td>
                         <td class="sc-table__mono">@test.Range @(test.Range.Length > 0 ? test.Unit : null)</td>
-                        <td class="sc-table__mono">@test.CollectedAt!.Value.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</td>
+                        <td class="sc-table__mono">@Clinic.Format(test.CollectedAt!.Value)</td>
                     </tr>
                 }
             </tbody>
@@ -87,7 +87,7 @@ else
     <h2>Acknowledgment</h2>
     @if (order.AcknowledgedAt is { } when)
     {
-        <p data-acknowledged>Acknowledged by @order.AcknowledgedBy, @when.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+        <p data-acknowledged>Acknowledged by @order.AcknowledgedBy, @Clinic.Format(when).</p>
     }
     else if (canWrite)
     {
@@ -110,6 +110,11 @@ else
 @if (order.OpenToResults)
 {
     <h2>@(filed.Count == 0 ? "Enter results" : "Enter the remaining results")</h2>
+    @if (Model.LabConnected)
+    {
+        @* Step 12: a connected lab files these itself. The form stays, for when it can't. *@
+        <p class="sc-notice sc-notice--info" data-lab-connected><span class="sc-notice__state">Lab connected:</span> the lab files this order's results here when they're ready, and the clinician who signed it finds them in the inbox. Enter results below only if the lab can't send them.</p>
+    }
     @if (!Model.OnPanel)
     {
         <p class="sc-muted">Add this patient to your panel to enter results.</p>
@@ -143,7 +148,7 @@ else
                 first = false;
             }
             <div class="sc-field">
-                <label for="result-collected">Sample collected (UTC) <span>(required)</span></label>
+                <label for="result-collected">Sample collected (@Clinic.ClockName) <span>(required)</span></label>
                 <input id="result-collected" class="sc-field__input" type="datetime-local" name="CollectedAt" value="@Model.CollectedAt" required
                        aria-invalid="@(Model.Errors.ContainsKey("CollectedAt") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("CollectedAt") ? "result-collected-error" : null)">
                 @if (Model.Errors.TryGetValue("CollectedAt", out var collectedError))

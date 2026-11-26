@@ -23,7 +23,7 @@
 }
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
-    <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd")">That day's schedule</a></p>
+    <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@Clinic.Day(appointment.StartsAt)">That day's schedule</a></p>
 </div>
 <h1>Appointment: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Gone)
@@ -36,7 +36,7 @@ else if (saved is not null && Model.Errors.Count == 0)
 }
 <section class="sc-panel" aria-label="Appointment">
     <dl class="record">
-        <dt>When</dt><dd>@appointment.StartsAt.UtcDateTime.ToString("dddd, MMMM d, yyyy"), @AppointmentForm.Time(appointment)</dd>
+        <dt>When</dt><dd>@Clinic.Plain(appointment.StartsAt, "dddd, MMMM d, yyyy"), @AppointmentForm.Time(Clinic, appointment)</dd>
         <dt>With</dt><dd>@appointment.Clinician</dd>
         <dt>Reason</dt><dd>@appointment.Reason</dd>
         <dt>Status</dt><dd><span class="sc-tag" data-appointment-status="@appointment.Status">@AppointmentStatus.Names[appointment.Status]</span>@if (appointment.CancelReason is { } why) {<text> @why</text>}</dd>

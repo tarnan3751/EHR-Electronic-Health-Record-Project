@@ -12,6 +12,12 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Playwright" />
+    <!-- The FHIR API's answers checked against the R4 specification, offline (FhirConformance.cs). -->
+    <PackageReference Include="Hl7.Fhir.R4" />
+    <PackageReference Include="Hl7.Fhir.Specification.Data.R4" />
+    <PackageReference Include="Firely.Fhir.Validation.R4" />
+    <!-- UCUM, to check every unit the reference data and the seed record (UcumTests.cs). -->
+    <PackageReference Include="Fhir.Metrics" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +25,8 @@
     <ProjectReference Include="..\Ehr.Testing\Ehr.Testing.csproj" />
     <!-- The benchmark's app, which must never write a Data Protection key (BenchmarkTests). -->
     <ProjectReference Include="..\..\bench\Ehr.Bench\Ehr.Bench.csproj" />
+    <!-- The simulated lab, run in process against the app as a lab's system (TestCases/UC20, LabSimulatorTests). -->
+    <ProjectReference Include="..\..\src\Ehr.Lab.Simulator\Ehr.Lab.Simulator.csproj" />
   </ItemGroup>
 
 </Project>

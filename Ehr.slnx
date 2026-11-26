@@ -10,6 +10,7 @@
     <Project Path="src/Ehr.Data/Ehr.Data.csproj" />
     <Project Path="src/Ehr.Design/Ehr.Design.csproj" />
     <Project Path="src/Ehr.Domain/Ehr.Domain.csproj" />
+    <Project Path="src/Ehr.Lab.Simulator/Ehr.Lab.Simulator.csproj" />
     <Project Path="src/Ehr.Web/Ehr.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">

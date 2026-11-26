@@ -102,6 +102,10 @@ GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 -- readable by an app session with nobody signed in, every row of it. They are reached only through the functions in
 -- 45-codes.sql, which run as the tables' owner and answer for one code at a time.
 
+-- The lab's key, as its hash (step 12). Internal, and with no grant at all to the runtime roles: a lab is let in by the
+-- functions in 76-lab.sql, which find the hash they are given here as the table's owner, so a session that can't name
+-- the hash can't use them, and none can read it.
+
 -- Audit events. Restricted: row-level security is enabled and forced, in the policy files that follow; no trigger,
 -- since nothing audits the audit. Append-only: no UPDATE and no DELETE for anyone at runtime. The write-audit
 -- trigger inserts as the table's owner; the app role inserts read and sign-in events.

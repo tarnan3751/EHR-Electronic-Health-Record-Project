@@ -10,7 +10,8 @@ namespace Ehr.Web;
 // about the failure, the request or the patient goes on them, and the exception is logged, as any unhandled one is.
 //
 // Only a browser's page requests get these. The APIs keep their bare statuses, which the desktop app and the cloud app's
-// audit shipper read, and so does an htmx request, which request-errors.js answers. In Development a failure still shows
+// audit shipper read, and so does an htmx request, which request-errors.js answers; the FHIR API answers with its own
+// OperationOutcome (Api/Fhir, FhirApi.UseFhirErrors). In Development a failure still shows
 // the developer exception page. Program.cs puts this after the cloud app's forwarding, so forwarded responses and the
 // cloud app's own "Not saved" page pass by untouched.
 public static class ErrorPages
@@ -30,7 +31,8 @@ public static class ErrorPages
         });
 
     static bool IsPageRequest(HttpContext context) =>
-        !context.Request.Path.StartsWithSegments(AccountSchemes.ApiPath) && !context.Request.Headers.ContainsKey("HX-Request");
+        !context.Request.Path.StartsWithSegments(AccountSchemes.ApiPath) && !context.Request.Path.StartsWithSegments(AccountSchemes.FhirPath)
+        && !context.Request.Headers.ContainsKey("HX-Request");
 
     // A chart, or the reason it asks for: /patients/{id}, /patients/{id}/reason.
     static bool IsChart(PathString path) => path.StartsWithSegments("/patients", out var rest) && rest.Value is { Length: > 1 };

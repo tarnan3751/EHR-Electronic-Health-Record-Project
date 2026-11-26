@@ -820,6 +820,7 @@ mod tests {
             sensitive_not_kept: 0,
             allergy_status: None,
             notes: vec![],
+            clinic_time_zone: None,
         };
         store.replace_panel(clinician, &[chart]).unwrap();
         assert!(
@@ -877,6 +878,7 @@ mod tests {
             sensitive_not_kept: 0,
             allergy_status: None,
             notes: vec![],
+            clinic_time_zone: None,
         };
 
         // The draft exists: written on the chart and saved by the server as version 1, before going offline.
@@ -1377,6 +1379,7 @@ mod tests {
             sensitive_not_kept: 0,
             allergy_status: None,
             notes: vec![],
+            clinic_time_zone: None,
         }
     }
 }

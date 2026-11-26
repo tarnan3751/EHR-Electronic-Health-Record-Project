@@ -285,17 +285,19 @@ public sealed class Trend
     };
 
     // What the chart shows, in a sentence, for a reader who can't see it.
-    public string Summary
+    public string Summary => SummaryOn(at => at.UtcDateTime.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture));
+
+    // The same sentence with its two days as the clinic's calendar has them (step 10d), for clinician pages.
+    public string SummaryIn(Ehr.Domain.Time.ClinicTime clinic) => SummaryOn(at => clinic.Plain(at, "MMM d, yyyy"));
+
+    string SummaryOn(Func<DateTimeOffset, string> day)
     {
-        get
-        {
-            var (first, last) = (Points[0], Points[^1]);
-            var change = last.Value == first.Value ? "the same as" : last.Value > first.Value ? "up from" : "down from";
-            return $"{Title}: {Points.Count} values from {first.At.UtcDateTime:MMM d, yyyy} to {last.At.UtcDateTime:MMM d, yyyy}. "
-                + $"Latest {last.Value:0.####}{(Unit is null ? "" : " " + Unit)}, {change} {first.Value:0.####}."
-                + (HasRange ? IsScreening ? $" Needs follow-up at or above {High:0.####}{(Unit is null ? "" : " " + Unit)}." : $" Reference range {RangeText}." : "")
-                + (RangesDiffer ? " That range is for the latest reading; earlier ones are marked against the range for the patient's age then." : "");
-        }
+        var (first, last) = (Points[0], Points[^1]);
+        var change = last.Value == first.Value ? "the same as" : last.Value > first.Value ? "up from" : "down from";
+        return $"{Title}: {Points.Count} values from {day(first.At)} to {day(last.At)}. "
+            + $"Latest {last.Value:0.####}{(Unit is null ? "" : " " + Unit)}, {change} {first.Value:0.####}."
+            + (HasRange ? IsScreening ? $" Needs follow-up at or above {High:0.####}{(Unit is null ? "" : " " + Unit)}." : $" Reference range {RangeText}." : "")
+            + (RangesDiffer ? " That range is for the latest reading; earlier ones are marked against the range for the patient's age then." : "");
     }
 
     // Always with a point for the decimal, whatever the server's language: these go into SVG attributes.

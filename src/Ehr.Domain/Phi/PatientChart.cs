@@ -229,3 +229,20 @@ public sealed record OrderForm(Patient Patient, IReadOnlyList<AllergyIntolerance
 // UC 1: a patient's discontinued orders as their page lists them, with the banner's allergies, already recorded as one
 // read of the patient. More is set when there are more than the page asked for.
 public sealed record DiscontinuedOrders(Patient Patient, IReadOnlyList<AllergyIntolerance> Allergies, IReadOnlyList<DiscontinuedOrder> Orders, bool More);
+
+// Entries of one kind for one patient, as the FHIR API reads them (the expansion plan's step 11), already recorded as
+// one read of the patient. Total counts every entry that matched, of which Entries holds up to the limit asked for;
+// SensitiveLeftOut counts the sensitive ones left out because they weren't asked for.
+public sealed record PatientEntries<T>(IReadOnlyList<T> Entries, int Total)
+{
+    public int SensitiveLeftOut { get; init; }
+}
+
+// A test result or vital sign for the FHIR API, and whether its unit is the UCUM unit the reference data gives its code
+// (ehr.observation_codes), which is what lets the API call it a UCUM unit.
+public sealed record ObservationEntry(Observation Observation, bool UcumUnit)
+{
+    // For a blood pressure, whose entry is its reading (step 9c): this is the systolic value, and this the diastolic of
+    // the same reading.
+    public ObservationEntry? Diastolic { get; init; }
+}

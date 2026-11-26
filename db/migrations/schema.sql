@@ -2072,3 +2072,15 @@ VALUES ('20261127061000_ChildrenRanges', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+CREATE TABLE ehr.lab_keys (
+    key_hash character varying(64) NOT NULL,
+    CONSTRAINT pk_lab_keys PRIMARY KEY (key_hash),
+    CONSTRAINT ck_lab_keys_key_hash CHECK (key_hash ~ '^[0-9a-f]{64}$')
+);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127070100_LabKeys', '10.0.13');
+
+COMMIT;
+

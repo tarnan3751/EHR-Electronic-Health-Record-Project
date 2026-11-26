@@ -40,7 +40,7 @@
 </div>
 @if (Model.EmergencyUntil is { } until)
 {
-    <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Emergency access:</span> this patient is not on your panel. Your access and the reason you gave are recorded for review. It lasts until @until.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+    <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Emergency access:</span> this patient is not on your panel. Your access and the reason you gave are recorded for review. It lasts until @Clinic.Format(until).</p>
 }
 @* The notices after an action take the focus (data-focus-on-load, js/patient-search.js), so the keyboard and a
    screen reader start from what just happened. *@
@@ -50,11 +50,11 @@
 }
 @if (Model.SignedOrder is { } signed && Model.Chart.ReplacedName is { } replaced)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order changed:</span> <strong>@signed.Display</strong> replaces <strong>@replaced</strong>, @signed.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC. The order it replaces is listed under this chart's discontinued orders.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order changed:</span> <strong>@signed.Display</strong> replaces <strong>@replaced</strong>, @Clinic.Format(signed.SignedAt). The order it replaces is listed under this chart's discontinued orders.</p>
 }
 else if (Model.SignedOrder is { } newOrder)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order signed:</span> <strong>@newOrder.Display</strong>, @newOrder.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order signed:</span> <strong>@newOrder.Display</strong>, @Clinic.Format(newOrder.SignedAt).</p>
 }
 @* After the entry form saved an entry. A sensitive one the chart leaves out isn't named: the notice says where it is. *@
 @if (Model.Chart.Saved is { Hidden: true } hiddenSave)
@@ -144,7 +144,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             <ul class="sc-list">
                 @foreach (var note in Model.Notes)
                 {
-                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @note.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</a>@if (note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</li>
+                    <li><a asp-page="Notes/View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@note.Id">Signed note · @Clinic.Format(note.SignedAt)</a>@if (note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</li>
                 }
             </ul>
         }
@@ -183,7 +183,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 {
                     <li>
                         <strong>@order.Display</strong> (@Ehr.Domain.Orders.OrderForms.TypeNames[order.Type])
-                        @Ehr.Domain.Orders.OrderForms.Summary(order.Type, order.Details) · signed @order.SignedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC
+                        @Ehr.Domain.Orders.OrderForms.Summary(order.Type, order.Details) · signed @Clinic.Format(order.SignedAt)
                         @if (Model.OnPanel && OnPrem.IsReachable)
                         {
                             @* A signed order is never edited: "Change" signs a new order in its place, and "Discontinue…"
@@ -245,7 +245,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         }
                         @if (resulted.ResultedAt is { } at)
                         {
-                            <span class="sc-muted">· @at.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                            <span class="sc-muted">· @Clinic.Day(at)</span>
                         }
                     </li>
                 }
@@ -280,7 +280,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         {
                             <span class="sc-tag sc-tag--info">New</span>
                         }
-                        <span class="sc-muted">· @thread.LastMessageAt.UtcDateTime.ToString("yyyy-MM-dd")</span>
+                        <span class="sc-muted">· @Clinic.Day(thread.LastMessageAt)</span>
                     </li>
                 }
             </ul>
@@ -318,7 +318,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         {
                             <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
                         }
-                        <span class="sc-muted">· @vital.TakenAt.UtcDateTime.ToString("yyyy-MM-dd") UTC</span>
+                        <span class="sc-muted">· @Clinic.Day(vital.TakenAt)</span>
                     </li>
                 }
             </ul>
@@ -352,9 +352,9 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var appointment in Model.Chart.Upcoming)
                 {
                     <li>
-                        <strong>@appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</strong> · @appointment.Minutes minutes · @appointment.Clinician
+                        <strong>@Clinic.Format(appointment.StartsAt)</strong> · @appointment.Minutes minutes · @appointment.Clinician
                         <br>@appointment.Reason
-                        <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @appointment.StartsAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm")">Open</a></span>
+                        <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @Clinic.Format(appointment.StartsAt)">Open</a></span>
                     </li>
                 }
             </ul>
@@ -388,7 +388,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
         else if (Model.NoKnownAllergies is { } none)
         {
-            <p>No known allergies (recorded @none.RecordedAt.UtcDateTime.ToString("yyyy-MM-dd")@(Model.Chart.NoKnownAllergiesRecordedBy is { } recorder ? $" by {recorder}" : "")).</p>
+            <p>No known allergies (recorded @Clinic.Day(none.RecordedAt)@(Model.Chart.NoKnownAllergiesRecordedBy is { } recorder ? $" by {recorder}" : "")).</p>
         }
         else
         {
@@ -482,7 +482,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             var latest = Model.Chart.Visits[0];
             <p class="latest-visit">
-                Latest visit, @latest.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd"):
+                Latest visit, @Clinic.Day(latest.PeriodStart):
                 blood pressure @(Model.BloodPressure(latest) ?? "not taken"), heart rate @(Model.HeartRate(latest) ?? "not taken").
             </p>
             <div class="sc-table-wrap">
@@ -494,7 +494,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         @foreach (var visit in Model.Chart.Visits)
                         {
                             <tr>
-                                <td class="sc-table__mono">@visit.PeriodStart.UtcDateTime.ToString("yyyy-MM-dd")</td>
+                                <td class="sc-table__mono">@Clinic.Day(visit.PeriodStart)</td>
                                 <td>@visit.Reason</td>
                                 <td>@Model.BloodPressure(visit)</td>
                                 <td>@Model.HeartRate(visit)</td>
