@@ -59,8 +59,8 @@ public static class DesktopApi
         }
 
         var device = string.IsNullOrWhiteSpace(request.Device) ? "desktop" : request.Device.Trim();
-        // One transaction, for the account's hold once its password is checked (DesktopSessions, step 19.1's final
-        // review). Not cancellable once done, as a page's (DatabaseTransactionFilter).
+        // One transaction, for the account's hold once its password is checked (StaffSignIn.CheckPasswordAsync, steps
+        // 19.1 and 19.2). Not cancellable once done, as a page's (DatabaseTransactionFilter).
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var signIn = await sessions.SignInAsync(request.Email!, request.Password!, request.Code!, device, cancellationToken);
         await transaction.CommitAsync(CancellationToken.None);
@@ -122,15 +122,18 @@ public static class DesktopApi
     // A vital sign as the desktop app's contract carries it: a whole number.
     static short? Whole(decimal? value) => value is { } v ? (short)Math.Round(v) : null;
 
-    static async Task<IResult> UnlockAsync(UnlockRequest request, ClaimsPrincipal user, DesktopSessions sessions, CancellationToken cancellationToken)
+    static async Task<IResult> UnlockAsync(UnlockRequest request, ClaimsPrincipal user, DesktopSessions sessions, EhrDbContext db, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(request.Password))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["password"] = ["Enter the password."] });
         }
 
-        // The policy has just authenticated the token, so its session is in the principal.
+        // The policy has just authenticated the token, so its session is in the principal. One transaction, for the
+        // account's hold once the password is checked, as at the sign-in (step 19.2).
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var outcome = await sessions.UnlockAsync(Guid.Parse(user.FindFirstValue(DesktopTokenHandler.SessionClaim)!), request.Password, cancellationToken);
+        await transaction.CommitAsync(CancellationToken.None);
         return outcome switch
         {
             DesktopUnlockOutcome.Unlocked => Results.NoContent(),

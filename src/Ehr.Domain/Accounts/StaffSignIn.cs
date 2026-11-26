@@ -21,7 +21,13 @@ public sealed class StaffSignIn(
     public const int RecoveryCodes = 8;
 
     // The first factor. A wrong password and an unknown address get the same answer, so the page never says which
-    // addresses have accounts. Failures count towards the lockout.
+    // addresses have accounts. Failures count towards the lockout. The password is checked first, with nothing held,
+    // its hash being slow; then the account is held and read again (StaffUserLock) before anything is counted, reset or
+    // recorded (step 19.2), so passwords sent at once for one account are counted one after another, never lost to the
+    // account's concurrency stamp: the fifth wrong one locks it, and the rest are refused as locked. A right password
+    // whose account changed between its check and the hold (a reissued or a new password) is answered as a wrong one,
+    // counting nothing: the password checked is no longer the account's. The account stays held for the rest of the
+    // request, for the desktop app's sign-in, which goes on to the code (DesktopSessions).
     public async Task<PasswordCheck> CheckPasswordAsync(string email, string password, CancellationToken cancellationToken)
     {
         var user = await users.FindByEmailAsync(email);
@@ -30,17 +36,29 @@ public sealed class StaffSignIn(
             return new(PasswordOutcome.Failed, null);
         }
 
-        if (await users.IsLockedOutAsync(user))
+        if (await LockedOutAsync(user, cancellationToken))
         {
-            await RecordAsync(AuditActions.SignInFailed, user, "locked out", cancellationToken);
             return new(PasswordOutcome.LockedOut, null);
         }
 
-        if (!await users.CheckPasswordAsync(user, password))
+        var right = await users.CheckPasswordAsync(user, password);
+        var (stamp, hash) = (user.SecurityStamp, user.PasswordHash);
+        await HoldAccountAsync(user, cancellationToken);
+        if (await LockedOutAsync(user, cancellationToken))
+        {
+            return new(PasswordOutcome.LockedOut, null);
+        }
+
+        if (!right)
         {
             await users.AccessFailedAsync(user);
             await RecordAsync(AuditActions.SignInFailed, user, "wrong password", cancellationToken);
             return new(await users.IsLockedOutAsync(user) ? PasswordOutcome.LockedOut : PasswordOutcome.Failed, null);
+        }
+
+        if (user.SecurityStamp != stamp || user.PasswordHash != hash)
+        {
+            return new(PasswordOutcome.Failed, null);
         }
 
         await users.ResetAccessFailedCountAsync(user);

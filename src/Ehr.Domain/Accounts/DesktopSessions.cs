@@ -46,18 +46,12 @@ public sealed class DesktopSessions(
             return new(check.Outcome == PasswordOutcome.LockedOut ? DesktopSignInOutcome.LockedOut : DesktopSignInOutcome.Refused);
         }
 
-        // Held and read again once its password is checked, as the web's code page holds it (step 19.1's final review):
-        // sign-ins racing each other or an administrator's action on the account are checked one after another, never
-        // failing on a stale account with a 500, and one whose account changed since its password was checked (a reset,
-        // a reissued password, a disabling) is refused, nothing counted, as the web goes back to the password.
+        // The password check held the account and read it again once the password was checked (StaffSignIn, step 19.2),
+        // as the web's code page holds it: sign-ins racing each other or an administrator's action on the account are
+        // checked one after another, never failing on a stale account with a 500; one whose account changed since its
+        // password was checked (a reset, a reissued password, a disabling) was refused, nothing counted; and one whose
+        // account was locked out meanwhile was refused as locked, before its code is checked here.
         var user = check.User!;
-        var stamp = user.SecurityStamp;
-        await signIn.HoldAccountAsync(user, cancellationToken);
-        if (user.SecurityStamp != stamp)
-        {
-            return new(DesktopSignInOutcome.Refused);
-        }
-
         if (user.MustChangePassword || !user.TwoFactorEnabled || await users.GetAuthenticatorKeyAsync(user) is null)
         {
             return new(DesktopSignInOutcome.NotSetUp);
@@ -121,18 +115,36 @@ public sealed class DesktopSessions(
 
     // The password the app's lock asks for (step 19a), checked for the account whose session it is, as the sign-in's
     // password step checks it (StaffSignIn): a wrong one counts towards the account's lockout. The session was
-    // authenticated just before, so it is good and its account isn't locked out. Each unlock and each refusal is
-    // recorded, with the session's device.
+    // authenticated just before, so it was good and its account not locked out then. As at the password step (step
+    // 19.2), the password is checked with nothing held, then the account held and read again before anything is counted
+    // or recorded: wrong passwords sent at once are each counted, the fifth locks the account, and the rest are refused
+    // as locked; a right one whose account changed in between is refused, counting nothing. Each unlock and each
+    // refusal is recorded, with the session's device.
     public async Task<DesktopUnlockOutcome> UnlockAsync(Guid sessionId, string password, CancellationToken cancellationToken)
     {
         var session = await db.DesktopSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId, cancellationToken);
         var user = (await users.FindByIdAsync(session.StaffUserId.ToString()))!;
-        if (!await users.CheckPasswordAsync(user, password))
+        var right = await users.CheckPasswordAsync(user, password);
+        var (stamp, hash) = (user.SecurityStamp, user.PasswordHash);
+        await signIn.HoldAccountAsync(user, cancellationToken);
+        if (await users.IsLockedOutAsync(user))
+        {
+            audit.Record(AuditActions.SignInFailed, reason: "locked out", actorId: user.Id, details: Details(session));
+            await db.SaveChangesAsync(cancellationToken);
+            return DesktopUnlockOutcome.LockedOut;
+        }
+
+        if (!right)
         {
             await users.AccessFailedAsync(user);
             audit.Record(AuditActions.SignInFailed, reason: "wrong password", actorId: user.Id, details: Details(session));
             await db.SaveChangesAsync(cancellationToken);
             return await users.IsLockedOutAsync(user) ? DesktopUnlockOutcome.LockedOut : DesktopUnlockOutcome.Refused;
+        }
+
+        if (user.SecurityStamp != stamp || user.PasswordHash != hash)
+        {
+            return DesktopUnlockOutcome.Refused;
         }
 
         await users.ResetAccessFailedCountAsync(user);

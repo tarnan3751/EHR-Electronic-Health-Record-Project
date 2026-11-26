@@ -408,6 +408,125 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
     }
 
+    const string LockedWords = "This account is locked after too many failed attempts. Try again in 15 minutes.";
+
+    // Step 19.2: ten wrong passwords sent at once for one account, ten times over. Each password is checked, then the
+    // account held and read again before anything is counted: five are counted and recorded as wrong, the fifth locking
+    // the account and answered as locked, as it always was; the other five are refused and recorded as locked, never a
+    // 500; and then the right password is refused as locked. Before, nine of ten answered 500, one was counted and
+    // recorded, and the account wasn't locked.
+    [Fact]
+    public async Task Wrong_passwords_sent_at_once_are_each_counted_and_the_fifth_locks_the_account()
+    {
+        for (var run = 0; run < 10; run++)
+        {
+            var account = await apps.CreateStaffAsync($"Dr. Passwords At Once {run}", StaffRoles.Clinician);
+
+            var answers = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => PasswordStepAsync(account, "not-the-password-at-all")));
+
+            Assert.True(answers.All(a => a.Status == HttpStatusCode.OK), $"Run {run}: {string.Join(", ", answers.Select(a => (int)a.Status))}.");
+            Assert.Equal((4, 6), (answers.Count(a => a.Words.Contains("Wrong email or password.", StringComparison.Ordinal)), answers.Count(a => a.Words.Contains(LockedWords, StringComparison.Ordinal))));
+            var reasons = await ReasonsAsync(account);
+            Assert.Equal((5, 5), (reasons.Count(r => r == "wrong password"), reasons.Count(r => r == "locked out")));
+            var right = await PasswordStepAsync(account, account.Password);
+            Assert.Equal("/sign-in", right.Path);
+            Assert.Contains(LockedWords, right.Words);
+        }
+    }
+
+    // Step 19.2: the right password among nine wrong ones, all at once, ten times over. It is checked in its turn: it goes
+    // on to the code if its turn comes before the fifth wrong one, or is refused as locked; never a 500, and each
+    // refusal is recorded once. (A right password still resets the count of wrong ones, as it always has: step 19's open
+    // point.) Before, most of them answered 500.
+    [Fact]
+    public async Task A_right_password_among_wrong_ones_at_once_is_answered_in_its_turn()
+    {
+        for (var run = 0; run < 10; run++)
+        {
+            var account = await apps.CreateStaffAsync($"Dr. Right Among Wrong {run}", StaffRoles.Clinician);
+
+            var answers = await Task.WhenAll(Enumerable.Range(0, 10).Select(i => PasswordStepAsync(account, i == 4 ? account.Password : "not-the-password-at-all")));
+
+            Assert.True(answers.All(a => a.Status == HttpStatusCode.OK), $"Run {run}: {string.Join(", ", answers.Select(a => (int)a.Status))}.");
+            Assert.True(answers[4].Path == CodePage || answers[4].Words.Contains(LockedWords, StringComparison.Ordinal), $"Run {run}: the right password at {answers[4].Path}.");
+            var refused = answers.Where(a => a.Path == "/sign-in").ToList();
+            Assert.Equal(answers.Length - (answers[4].Path == CodePage ? 1 : 0), refused.Count);
+            Assert.All(refused, a => Assert.True(a.Words.Contains("Wrong email or password.", StringComparison.Ordinal) || a.Words.Contains(LockedWords, StringComparison.Ordinal)));
+            Assert.Equal(refused.Count, (await ReasonsAsync(account)).Count);
+        }
+    }
+
+    // Step 19.2: the right password, its hash checked, then waiting for the account behind an administrator's password
+    // reissue, or ahead of it. Behind it, the password checked is no longer the account's: it is answered as a wrong
+    // one, and nothing is counted or recorded. Ahead of it, it goes on to the code, and the reissue then sends the code
+    // back to the password (step 19.1). Before, behind the reissue, it went on to the code all the same.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_right_password_racing_a_reissue_never_outlives_it(bool reissueFirst)
+    {
+        var admin = await apps.CreateStaffAsync($"Reissues During Password {reissueFirst}", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        var account = await apps.CreateStaffAsync($"Dr. Password During Reissue {reissueFirst}", StaffRoles.Clinician);
+        // A wrong password first, so the account has a count for the right one to reset (and, before, a write to wait on).
+        Assert.Contains("Wrong email or password.", (await PasswordStepAsync(account, "not-the-password-at-all")).Words);
+        var jar = new CookieContainer();
+        var client = Client(apps.OnPrem, jar);
+        var signInToken = Token(await client.GetStringAsync("/sign-in", Cancel));
+        var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
+        Task<HttpResponseMessage> Password() => client.PostAsync(
+            "/sign-in", Form(("Input.Email", account.Email), ("Input.Password", account.Password), ("__RequestVerificationToken", signInToken)), Cancel);
+        Task<HttpResponseMessage> Reissue() => adminSession.Client.PostAsync(
+            "/admin/staff?handler=Reissue", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel);
+
+        Task<HttpResponseMessage> stepping, reissuing;
+        await using (var hold = await HoldAccountAsync(apps, account.Id))
+        {
+            if (reissueFirst)
+            {
+                reissuing = Reissue();
+                await WaitingForLocksAsync(apps, 1);
+                stepping = Password();
+            }
+            else
+            {
+                stepping = Password();
+                await WaitingForLocksAsync(apps, 1);
+                reissuing = Reissue();
+            }
+
+            await WaitingForLocksAsync(apps, 2);
+            await hold.Transaction.CommitAsync(Cancel);
+        }
+
+        using var step = await stepping;
+        using var reissued = await reissuing;
+        Assert.Contains("/sign-in/setup?user=", await ReadAsync(reissued));
+        if (reissueFirst)
+        {
+            Assert.Equal("/sign-in", PathOf(step));
+            Assert.Contains("Wrong email or password.", Words(await ReadAsync(step)));
+            Assert.Equal(new[] { "wrong password" }, await ReasonsAsync(account));
+            Assert.Equal(1, (await AccountOfAsync(account)).AccessFailedCount);
+        }
+        else
+        {
+            Assert.Equal(CodePage, PathOf(step));
+            using var code = await PostFormAsync(client, CodePage, step, ("Code", Totp.Code(account.AuthenticatorKey)));
+            Assert.Equal("/sign-in", PathOf(code));
+        }
+
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+    }
+
+    // A password step from a browser of its own: its status, where it lands, and what the page says.
+    async Task<(HttpStatusCode Status, string Path, string Words)> PasswordStepAsync(StaffAccount account, string password)
+    {
+        var client = Client(apps.OnPrem, new CookieContainer());
+        using var response = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", password));
+        return (response.StatusCode, PathOf(response), Words(await response.Content.ReadAsStringAsync(Cancel)));
+    }
+
     // The fields of a passkey's answer for this password step, as passkeys.js sends them.
     static async Task<(string, object)[]> PasskeyAnswerAsync(HttpClient client, string codePage, TestAuthenticator authenticator)
     {
