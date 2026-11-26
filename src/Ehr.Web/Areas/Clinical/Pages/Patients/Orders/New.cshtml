@@ -219,7 +219,7 @@ else
         // A refill's item is fixed (step 13d): the medication's own product, nothing to search for.
         var fixedItem = name == "Item" && Model.Form.Refill is not null;
         <div class="sc-field">
-            <label for="@id">@label @if (required) { <span>(required)</span> }</label>
+            <label for="@id">@label@if (required) {<text> <span>(required)</span></text>}</label>
             <input id="@id" class="sc-field__input" name="@(name == "Item" ? "Item" : $"Details[{name}]")" value="@value" list="@list" maxlength="@OrderForms.MaximumLength"
                    autocomplete="off" required="@required" aria-invalid="@(error is null ? null : "true")" autofocus="@(name == Focused())" readonly="@fixedItem"
                    data-code-search="@(name == "Item" && !fixedItem ? $"order-{Model.KnownType}" : null)"
