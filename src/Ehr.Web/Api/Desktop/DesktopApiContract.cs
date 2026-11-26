@@ -8,8 +8,11 @@ public sealed record SignInRequest(string? Email, string? Password, string? Code
 // Token is what the app keeps, and sends as "Authorization: Bearer <token>"; it is never shown again.
 public sealed record SignInResponse(string Token, DateTimeOffset ExpiresAt, string DisplayName, OfflineAccess OfflineAccess);
 
-// Why a sign-in was refused, in words for the person.
+// Why a sign-in or an unlock was refused, in words for the person.
 public sealed record Refusal(string Problem);
+
+// The password the app's lock asks for (step 19a). No email: the account is the token's.
+public sealed record UnlockRequest(string? Password);
 
 public sealed record OfflineAccess(Guid ClinicianId, long ExpiresUnixSeconds);
 

@@ -1,7 +1,7 @@
 [package]
 name = "ehr-desktop"
-version = "0.1.0"
-description = "EHR desktop app: Tauri shell, encrypted local SQLite, sync client"
+version = "0.2.0"
+description = "SwiftChart desktop app: Tauri shell, encrypted local SQLite, sync client"
 edition = "2024"
 publish = false
 
@@ -25,6 +25,10 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"
 # The local database's key: 32 random bytes from the OS, kept as hex in the credential store.
 getrandom = "0.3"
 hex = "0.4"
+# The lock's slow hash of the password, kept in the encrypted store (src/unlock.rs).
+argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "password-hash"] }
+# Updates (src/updates.rs): checked from the servers built in, installed only if signed with the key in tauri.conf.json.
+tauri-plugin-updater = "2.14.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The "keychain" store works for apps that are not code-signed with a provisioning profile.
@@ -32,3 +36,10 @@ apple-native-keyring-store = { version = "1", features = ["keychain"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = "1"
+
+# The hash takes about 1.6 s unoptimized: optimized, development builds and `cargo test` unlock as quickly as a release.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

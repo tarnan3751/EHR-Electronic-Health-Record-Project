@@ -7,10 +7,10 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 
 // Test Case ID: TC-UC12-07
 // Purpose / scenario: An admin reviewing the audit log sees that a sensitive item changed, and who changed it, but
-//   never its values, while the values of an ordinary change are still shown. Marking an item sensitive later hides
-//   the values of its earlier events as well.
+//   never its values. Marking an item sensitive later hides the values of its earlier events as well. (Since step 18a
+//   the values of an ordinary change aren't shown either: TC-UC12-09 checks what is shown of one instead.)
 // Type: Functional (alternative flow)
-// Requirements: FR-31, proposed FR-39
+// Requirements: FR-31, proposed FR-39, FR-40 and FR-65
 // Use case: UC 12, Emergency access and the audit log (the admin's audit view)
 // Preconditions: A clinician is signed in on the on-site app with the patient on their panel. An admin is signed in.
 // Inputs and system conditions: POST /patients/{id}/diagnoses and /patients/{id}/medications as the clinician; GET
@@ -23,11 +23,11 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 //   2. As the admin, open the audit log for the patient.
 //   3. As the clinician, mark the medication sensitive.
 //   4. As the admin, open the audit log for the patient again.
-// Expected result: Step 2: the page shows the hypertension insert with its values ("Essential (primary)
-//   hypertension"), and the sertraline insert with its values; the anxiety insert is listed with the clinician's name,
-//   the "Sensitive" tag and "A sensitive item changed. Its values aren't shown here.", and "anxiety" appears nowhere
-//   on the page. The history copies say their values aren't shown. Step 4: "sertraline" appears nowhere on the page
-//   either; its events are still listed, by the same clinician; hypertension's values are still shown.
+// Expected result: Step 2: the anxiety insert is listed with the clinician's name, the "Sensitive" tag and "A
+//   sensitive item changed. Its values aren't shown here.", and "anxiety" appears nowhere on the page; nor, since step
+//   18a, do "hypertension" or "sertraline", whose inserts aren't sensitive. The history copies say their values aren't
+//   shown. Step 4: the medication's events are listed as a sensitive item's, by the same clinician, and "sertraline"
+//   still appears nowhere.
 // Creator: Tahseen Arnan
 public class TC_UC12_07_SensitiveValuesHidden(WebApps apps) : IClassFixture<WebApps>
 {
@@ -47,8 +47,8 @@ public class TC_UC12_07_SensitiveValuesHidden(WebApps apps) : IClassFixture<WebA
         var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("The Values Reviewer", StaffRoles.Admin));
 
         var page = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}", Cancel);
-        Assert.Contains("Essential (primary) hypertension", page);
-        Assert.Contains("sertraline 50 MG Oral Tablet", page);
+        Assert.DoesNotContain("hypertension", page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sertraline", page, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("anxiety", page, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("F41.1", page);
         Assert.Contains("<span class=\"sc-tag sc-tag--warning\">Sensitive</span> <span>A sensitive item changed. Its values aren't shown here.</span>", page);
@@ -63,7 +63,7 @@ public class TC_UC12_07_SensitiveValuesHidden(WebApps apps) : IClassFixture<WebA
         var after = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}", Cancel);
         Assert.DoesNotContain("sertraline", after, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("anxiety", after, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Essential (primary) hypertension", after);
+        Assert.DoesNotContain("hypertension", after, StringComparison.OrdinalIgnoreCase);
         // The anxiety insert, and the medication's insert and update.
         Assert.Equal(3, System.Text.RegularExpressions.Regex.Matches(after, "A sensitive item changed").Count);
         Assert.Contains($"medication_statements {medication}", Words(after));

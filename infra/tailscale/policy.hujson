@@ -1,0 +1,72 @@
+// SwiftChart's Tailscale access rules (the tailnet policy file), for a real deployment (infra/deploy/README.md).
+//
+// UNTESTED AGAINST A NETWORK. Nobody has applied this file to a tailnet: there is no account (the expansion plan's step
+// 21, the owner's decision 18a). `dotnet run infra/tailscale/check.cs` (CI runs it) checks only that it parses, uses only
+// the sections and shapes below, names nothing it doesn't define, that every opening is accepted by a test, and that
+// no two tests contradict each other. Whether Tailscale accepts it, and whether its tests pass under Tailscale's own
+// evaluation, is known only once it is applied.
+// The syntax follows Tailscale's public docs, read on 2026-11-25 (tailscale.com/kb/1324/grants, kb/1337/policy-syntax).
+//
+// Who reaches what, over Tailscale:
+//   - staff devices the clinic manages (tagged by an administrator) reach the staff site on the clinic server and on
+//     the cloud server, on 443;
+//   - the cloud server reaches the clinic server on 5432 (the replica's and Barman's streams, and the monitoring
+//     exporter's login), on 443 (the cloud app forwarding saves and shipping the audit events of off-site reads) and on
+//     9100 (the clinic host's disk and memory, for monitoring);
+//   - the clinic server starts nothing towards the cloud server;
+//   - administrators reach SSH on both servers, on 22; the monitoring pages are on each server's 127.0.0.1 only, reached
+//     through SSH;
+//   - nothing else: Tailscale refuses what no grant allows.
+// Patients never use Tailscale: they reach the portal on the cloud server's public address, which this file doesn't
+// govern. The off-site staff site shares that address and port with the portal (one app), so it answers there too,
+// behind its sign-in (password and authenticator code), as the course design's off-site path; a staff site reachable
+// only over Tailscale would need a proxy or the app to tell the two apart, which isn't built.
+// The addresses are the synthetic example.com ones: the real administrators' are written in when the owner applies it.
+{
+  "groups": {
+    "group:admins": ["admin@example.com"],
+  },
+
+  // Only administrators may tag a device, so a staff member signing in on a device of their own doesn't make it one.
+  "tagOwners": {
+    "tag:clinic-server": ["group:admins"],
+    "tag:cloud-server": ["group:admins"],
+    "tag:staff-device": ["group:admins"],
+  },
+
+  "grants": [
+    // Staff devices: the staff site, on the clinic server and on the cloud server.
+    {"src": ["tag:staff-device"], "dst": ["tag:clinic-server", "tag:cloud-server"], "ip": ["tcp:443"]},
+    // The cloud server to the clinic: replication, backups and the exporter's login; forwarding and audit shipping; the
+    // clinic host's metrics.
+    {"src": ["tag:cloud-server"], "dst": ["tag:clinic-server"], "ip": ["tcp:5432", "tcp:443", "tcp:9100"]},
+    // Administrators: SSH to both servers.
+    {"src": ["group:admins"], "dst": ["tag:clinic-server", "tag:cloud-server"], "ip": ["tcp:22"]},
+  ],
+
+  "tests": [
+    {
+      "src": "tag:staff-device",
+      "proto": "tcp",
+      "accept": ["tag:clinic-server:443", "tag:cloud-server:443"],
+      "deny": ["tag:clinic-server:5432", "tag:clinic-server:9100", "tag:clinic-server:22", "tag:cloud-server:22", "tag:cloud-server:5432"],
+    },
+    {
+      "src": "tag:cloud-server",
+      "proto": "tcp",
+      "accept": ["tag:clinic-server:5432", "tag:clinic-server:443", "tag:clinic-server:9100"],
+      "deny": ["tag:clinic-server:22"],
+    },
+    {
+      "src": "tag:clinic-server",
+      "proto": "tcp",
+      "deny": ["tag:cloud-server:5432", "tag:cloud-server:443", "tag:cloud-server:22", "tag:cloud-server:9100"],
+    },
+    {
+      "src": "admin@example.com",
+      "proto": "tcp",
+      "accept": ["tag:clinic-server:22", "tag:cloud-server:22"],
+      "deny": ["tag:clinic-server:5432", "tag:clinic-server:9100"],
+    },
+  ],
+}

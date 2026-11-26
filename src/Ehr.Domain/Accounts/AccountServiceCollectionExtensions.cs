@@ -15,8 +15,8 @@ namespace Ehr.Domain.Accounts;
 public static class AccountServiceCollectionExtensions
 {
     // Accounts, sign-in and authorization: Identity for the two kinds of account, each with its own store and its own
-    // cookie; the policies attached to the areas; and the services the pages call. The host adds the AuditSource and,
-    // on the on-prem site, AdminBootstrap.
+    // cookie; staff passkeys; the policies attached to the areas; and the services the pages call. The host adds the
+    // AuditSource, the checked PasskeySettings and, on the on-prem site, AdminBootstrap.
     public static IServiceCollection AddEhrAccounts(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<BootstrapOptions>(configuration.GetSection(BootstrapOptions.Section));
@@ -39,16 +39,30 @@ public static class AccountServiceCollectionExtensions
 
         // The explicit store types matter: the default registration would give both kinds of account the same claim,
         // login and token entities, which can only map to one table. ProtectedTokenStore encrypts the authenticator key
-        // and recovery codes before they are saved; the host configures where Data Protection keeps its keys.
+        // and recovery codes before they are saved; the host configures where Data Protection keeps its keys. Only staff
+        // accounts have passkeys (step 19): the patient store's passkey type is mapped to no table.
         services.AddDataProtection();
         services.AddIdentityCore<StaffUser>()
-            .AddUserStore<ProtectedTokenStore<StaffUser, StaffUserClaim, StaffUserLogin, StaffUserToken>>()
+            .AddUserStore<ProtectedTokenStore<StaffUser, StaffUserClaim, StaffUserLogin, StaffUserToken, StaffUserPasskey>>()
             .AddClaimsPrincipalFactory<StaffClaimsPrincipalFactory>()
             .AddDefaultTokenProviders();
         services.AddIdentityCore<PatientUser>()
-            .AddUserStore<ProtectedTokenStore<PatientUser, PatientUserClaim, PatientUserLogin, PatientUserToken>>()
+            .AddUserStore<ProtectedTokenStore<PatientUser, PatientUserClaim, PatientUserLogin, PatientUserToken, IdentityUserPasskey<Guid>>>()
             .AddClaimsPrincipalFactory<PatientClaimsPrincipalFactory>()
             .AddDefaultTokenProviders();
+
+        // A passkey in place of the authenticator code, for staff only (step 19). Identity's own handler makes and checks
+        // the ceremonies, called directly (StaffPasskeys): SignInManager's passkey methods keep their state in Identity's
+        // two-factor cookie and sign in without the password. The person must be verified by the device (a PIN, a
+        // fingerprint, a face) both when a passkey is made and whenever it is used, and only the staff sites' own
+        // addresses may make or use one (PasskeySettings).
+        services.AddScoped<IPasskeyHandler<StaffUser>, PasskeyHandler<StaffUser>>();
+        services.AddOptions<IdentityPasskeyOptions>().Configure<PasskeySettings>((options, passkeys) =>
+        {
+            options.ServerDomain = passkeys.Domain;
+            options.UserVerificationRequirement = "required";
+            options.ValidateOrigin = context => ValueTask.FromResult(!context.CrossOrigin && passkeys.Allows(context.Origin));
+        });
 
         services.AddAuthentication(AccountSchemes.Default)
             .AddPolicyScheme(AccountSchemes.Default, "Staff or patient cookie, by path",
@@ -93,6 +107,7 @@ public static class AccountServiceCollectionExtensions
         services.AddScoped<PhiReader>();
         services.AddScoped<StaffSignIn>();
         services.AddScoped<StaffAccounts>();
+        services.AddScoped<StaffPasskeys>();
         services.AddScoped<DesktopSessions>();
         services.AddScoped<PatientSignIn>();
         services.AddScoped<PatientRegistration>();

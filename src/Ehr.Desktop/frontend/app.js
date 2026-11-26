@@ -1,5 +1,7 @@
 // The desktop screen. It makes no network calls (AGENTS.md): it asks the Rust side through its commands
 // (src-tauri/src/main.rs), and redraws when the Rust side says something changed. Phrases go in as text, never HTML.
+// The lock (the expansion plan's step 19a, at the end) covers it without clearing anything; Rust decides when. After
+// the remote wipe (step 20), it shows only that everything here was deleted.
 'use strict';
 
 const { invoke } = window.__TAURI__.core;
@@ -40,11 +42,26 @@ async function call(command, args) {
 
 async function refresh() {
   const view = await call('view');
+  if (view?.deleted) {
+    showDeleted(view.deletedProblem);
+    return;
+  }
   if (view) {
+    serverAnswered = view.status.server != null;
+    applyLock(view.lock);
+    // Under the lock, and while a sign-in the server ended waits for the lock (after a recording), the page stays
+    // exactly as it is, for the same clinician to come back to.
+    if (locked || view.lock.sessionOver) return;
     const signedIn = view.status.account != null;
     renderStatus(view.status, view.waiting);
+    byId('version').textContent = `SwiftChart ${view.version}.`;
+    renderUpdate(view.update);
     renderAccount(view.status.account);
+    show(byId('sign-in-notice'), view.signedOutBecause);
+    byId('sign-in-servers').textContent = `Signs in to: ${view.servers.map(host).join(', ')}`;
     renderOfflineAccess(view.offlineAvailable, signedIn);
+    chartsUpdated = view.chartsUpdated;
+    renderChartsUpdated();
     byId('clinical-waiting').textContent = view.clinicalWaiting
       ? `${view.clinicalWaiting} draft or recording changes need sync or review.`
       : 'No draft or recording changes waiting.';
@@ -72,6 +89,37 @@ function renderStatus(status, waiting) {
   byId('checked').textContent = checked ? `Checked at ${new Date(status.checkedAt).toLocaleTimeString()}.` : '';
   show(byId('sync-problem'), status.problem);
 }
+
+// An update (src-tauri/src/updates.rs), which the Rust side gives only while the window is unlocked and nothing is
+// recording: offered, being got ready, ready for a restart, or not installed. Each notice starts with its state word.
+const updateWords = {
+  offered: (update) => ['Update available:', ` SwiftChart ${update.version}. Get it ready, and it installs when you restart SwiftChart; nothing you've saved is affected.`],
+  downloading: (update) => ['Getting it ready:', ` SwiftChart ${update.version} is being downloaded and its signature checked.`],
+  ready: (update) => ['Ready:', ` SwiftChart ${update.version} is ready to install. Save what you're typing, then choose Restart now: restarting closes this window.`],
+  failed: (update) => ['Not installed:', ` ${update.problem}`],
+};
+
+function renderUpdate(update) {
+  byId('update').hidden = !update;
+  if (!update) return;
+  const [state, words] = updateWords[update.state](update);
+  const text = byId('update-text');
+  text.className = `sc-notice sc-notice--${update.state === 'failed' ? 'warning' : 'info'}`;
+  text.replaceChildren(el('span', { className: 'sc-notice__state', textContent: state }), words);
+  byId('update-accept').hidden = update.state !== 'offered';
+  byId('update-dismiss').hidden = update.state !== 'offered' && update.state !== 'failed';
+  byId('update-restart').hidden = update.state !== 'ready';
+}
+
+byId('update-accept').addEventListener('click', async () => {
+  await call('accept_update');
+  refresh();
+});
+byId('update-dismiss').addEventListener('click', async () => {
+  await call('dismiss_update');
+  refresh();
+});
+byId('update-restart').addEventListener('click', () => call('restart_for_update'));
 
 // Signed out, the page offers to sign in, and the phrases can be read but not changed (renderPhrases).
 function renderAccount(account) {
@@ -297,16 +345,21 @@ signInForm.addEventListener('submit', async (event) => {
   await refresh();
 });
 
-byId('sign-out').addEventListener('click', async () => {
+// Signing out closes the offline charts, and anything typed on them goes. The lock offers it too.
+async function signOut() {
   offlineSigningOut = true;
   renderOfflineAccess(false, false);
   try {
     await call('sign_out');
   } finally {
     offlineSigningOut = false;
+    // The answer to the sign-out the person asked for, so it may take the lock away.
+    applyLock(await invoke('lock_state'), true);
     await refresh();
   }
-});
+}
+
+byId('sign-out').addEventListener('click', signOut);
 
 const downloadPanel = byId('download-panel');
 const draftForm = byId('clinical-draft');
@@ -317,6 +370,9 @@ let chartRequest = 0;
 let panelRequest = 0;
 let editingDraft = null;
 let recording = null;
+// When the offline charts were last downloaded (view.chartsUpdated), and how many there are.
+let chartsUpdated = null;
+let panelSize = 0;
 
 function resetDraftEditor() {
   editingDraft = null;
@@ -327,8 +383,14 @@ function resetDraftEditor() {
 
 byId('cancel-draft-edit').addEventListener('click', resetDraftEditor);
 
+// A recording holds the lock off while it lasts (src-tauri/src/lock.rs), and counts as activity.
+function holdLock(active) {
+  invoke('recording', { active }).catch(() => {});
+}
+
 function cancelRecording() {
   if (!recording) return;
+  holdLock(false);
   recording.cancelled = true;
   if (recording.recorder && recording.recorder.state !== 'inactive') recording.recorder.stop();
   recording = null;
@@ -364,6 +426,7 @@ function renderOfflineAccess(available, signedIn) {
     loadPanel();
   } else {
     panelRequest++;
+    panelSize = 0;
     byId('offline-panel').replaceChildren();
     byId('offline-message').textContent = '';
     clearChart();
@@ -371,9 +434,12 @@ function renderOfflineAccess(available, signedIn) {
 }
 
 async function loadPanel() {
+  if (locked) return;
   const request = ++panelRequest;
   const panel = await call('offline_panel');
   if (!offlineAvailable || request !== panelRequest || !panel) return;
+  panelSize = panel.length;
+  renderChartsUpdated();
   const list = byId('offline-panel');
   list.replaceChildren(...panel.map((patient) =>
     el('li', {}, button(`${patient.name} · MRN ${patient.mrn}`, () => openChart(patient.id), 'sc-btn sc-btn--quiet')),
@@ -382,6 +448,17 @@ async function loadPanel() {
     list.append(el('li', { className: 'sc-muted', textContent: 'No charts downloaded. Add patients to your panel in the web app, then download here.' }));
   }
   if (selectedPatient && !panel.some((patient) => patient.id === selectedPatient)) clearChart();
+}
+
+// "Offline charts last updated …", on the clinic's clock when the charts named it. Only Download my charts refreshes
+// them, so this says how old the copy is; charts downloaded by a build that didn't record it say so.
+function chartsUpdatedText(updated) {
+  if (updated) return `Offline charts last updated ${clinicStamp(new Date(updated.at).toISOString(), updated.clinicTimeZone)}.`;
+  return panelSize ? 'When these charts were downloaded isn\'t recorded: download them again to record it.' : '';
+}
+
+function renderChartsUpdated() {
+  byId('charts-updated').textContent = chartsUpdatedText(chartsUpdated);
 }
 
 function chartSection(title, rows, none = 'None recorded.') {
@@ -428,6 +505,7 @@ function signedNotes(notes, zone) {
 }
 
 async function openChart(patient, reset = true) {
+  if (locked) return;
   if (reset) clearChart();
   const request = ++chartRequest;
   const result = await call('offline_chart', { patient });
@@ -580,6 +658,7 @@ byId('record-audio').addEventListener('click', async () => {
         message.textContent = saved === undefined ? 'Recording could not be saved.' : 'Recording saved on this device.';
         if (saved !== undefined) await openChart(patient, false);
       } finally {
+        holdLock(false);
         if (recording === capture) {
           recording = null;
           control.textContent = 'Record audio';
@@ -588,6 +667,7 @@ byId('record-audio').addEventListener('click', async () => {
       }
     });
     recorder.start();
+    holdLock(true);
     timer = setTimeout(() => {
       if (recorder.state === 'recording') recorder.stop();
     }, 60_000);
@@ -595,6 +675,7 @@ byId('record-audio').addEventListener('click', async () => {
     control.disabled = false;
     message.textContent = 'Recording for up to 60 seconds.';
   } catch {
+    holdLock(false);
     stream?.getTracks().forEach((track) => track.stop());
     if (recording === capture) {
       recording = null;
@@ -605,5 +686,228 @@ byId('record-audio').addEventListener('click', async () => {
 });
 
 byId('sync-now').addEventListener('click', () => call('sync_now'));
+
+// The lock (the expansion plan's step 19a; src-tauri/src/lock.rs decides when, and main.rs refuses the offline charts
+// while it's up). Locked, the app bar and the page are inert and out of sight, kept exactly as they were, typed text,
+// scroll and focus and all, and the lock panel fills the window; nothing under it redraws until it opens. Signing out
+// from it is the one thing that clears the page.
+const lockForm = byId('lock-form');
+const warning = byId('lock-warning');
+let locked = false;
+let focusBeforeLock = null;
+let countdown = null;
+// Whether the last sync round reached a server, for the words of the banner after the 12 hours.
+let serverAnswered = false;
+// The newest view of the lock shown (LockView.generation): an older one, computed before a lock, is dropped.
+let lockGeneration = -1;
+// Everything here was deleted (showDeleted): nothing else is ever shown again.
+let deleted = false;
+
+// The lock's view from the Rust side (LockView in main.rs). Anything may lock the window, but only `uncover` may open
+// it: the lock's own events, and the answers to unlocking, locking now and signing out (step 19a's final review). A
+// view the page asked for along the way, such as the one with each redraw, never does.
+function applyLock(view, uncover = false) {
+  if (deleted || view.generation < lockGeneration) return;
+  lockGeneration = view.generation;
+  renderSignInNeeded(view);
+  if (view.state === 'locked') {
+    closeWarning();
+    if (!locked) lockWindow();
+    renderLock(view);
+    return;
+  }
+  if (locked) {
+    if (!uncover) return;
+    unlockWindow();
+  }
+  if (view.state === 'warning') openWarning(view);
+  else closeWarning();
+}
+
+// applyLock with the right to open the window, and a redraw if it did.
+function applyLockAndRedraw(view) {
+  const wasLocked = locked;
+  applyLock(view, true);
+  if (wasLocked && !locked) refresh();
+}
+
+function lockWindow() {
+  locked = true;
+  focusBeforeLock = document.activeElement;
+  for (const part of [byId('app-bar'), byId('page')]) part.inert = true;
+  document.body.classList.add('desktop-locked');
+  byId('lock').hidden = false;
+  lockForm.reset();
+  show(byId('lock-problem'), null);
+  lockForm.elements.password.focus();
+}
+
+function unlockWindow() {
+  locked = false;
+  byId('lock').hidden = true;
+  lockForm.reset();
+  document.body.classList.remove('desktop-locked');
+  for (const part of [byId('app-bar'), byId('page')]) part.inert = false;
+  if (focusBeforeLock?.isConnected) focusBeforeLock.focus();
+  focusBeforeLock = null;
+}
+
+// Why it locked, as the lock says it: each starts with its state word (docs/brand).
+const lockReasons = {
+  idle: (view) => ['Locked:', ` nothing was done here for ${view.idleMinutes} minutes.`],
+  started: () => ['Locked:', ' SwiftChart opens locked while a clinician is signed in.'],
+  asked: () => ['Locked:', ' this window was locked.'],
+  longest: () => ['Locked:', ' a sign-in lasts at most 12 hours.'],
+  wrongPasswords: () => ['Locked:', ' too many wrong passwords were typed here.'],
+  ended: () => ['Signed out:', ' the server ended this sign-in: your password was changed, your account was locked or disabled, or it is 30 days since you signed in.'],
+  offlineEnded: () => ['Locked:', ' the offline charts open for 30 days after a sign-in, and yours have passed. Nothing on this computer was deleted.'],
+};
+
+const lockHow = {
+  password: 'Enter your password to unlock. What you typed is kept, and sync carries on.',
+  signIn: 'Enter your password and the code from your authenticator app. If the clinic\'s server can\'t be reached, your password alone opens the offline charts. What you typed is kept.',
+  signedOut: 'Sign in again with your password and the code from your authenticator app to come back to this window as you left it.',
+};
+
+function renderLock(view) {
+  const [state, words] = lockReasons[view.why](view);
+  const why = byId('lock-why');
+  why.className = `sc-notice sc-notice--${view.need === 'signedOut' ? 'warning' : 'info'}`;
+  why.replaceChildren(el('span', { className: 'sc-notice__state', textContent: state }), words);
+  byId('lock-title').textContent = view.why === 'ended' ? 'Signed out' : 'Locked';
+  byId('lock-how').textContent = view.why === 'wrongPasswords'
+    ? 'Enter your password and the code from your authenticator app, once the clinic\'s server can be reached. Nothing on this computer was deleted, and what you typed is kept.'
+    : lockHow[view.need];
+  const full = view.need !== 'password';
+  byId('lock-code-field').hidden = !full;
+  byId('lock-submit').textContent = full ? 'Sign in' : 'Unlock';
+  byId('lock-account').textContent = view.account ?? 'a clinician';
+  // How old the offline copy is, prominently when nothing will refresh it until a full sign-in.
+  const updated = chartsUpdatedText(view.chartsUpdated);
+  const charts = byId('lock-charts');
+  charts.hidden = !updated;
+  charts.className = full ? 'sc-notice sc-notice--warning' : 'sc-status';
+  charts.textContent = full && updated ? `${updated} Nothing is brought back until you sign in again.` : updated;
+}
+
+// After the 12 hours, opened with the password alone: say a full sign-in is needed, and how old the charts are.
+function renderSignInNeeded(view) {
+  const needed = view.signInEnded && (view.state === 'unlocked' || view.state === 'warning');
+  byId('sign-in-needed').hidden = !needed;
+  if (!needed) return;
+  byId('sign-in-needed-text').replaceChildren(
+    el('span', { className: 'sc-notice__state', textContent: serverAnswered ? 'Sign in again:' : 'Offline:' }),
+    serverAnswered
+      ? ' a sign-in lasts at most 12 hours, and a server is answering. If signing in says the clinic\'s server can\'t be reached, your password alone still opens the offline charts.'
+      : ' a sign-in with your code is needed as soon as the clinic\'s server can be reached.',
+    ` ${chartsUpdatedText(view.chartsUpdated)} Drafts and recordings are saved on this computer and sent after you sign in.`,
+  );
+}
+
+function openWarning(view) {
+  byId('lock-warning-idle').hidden = view.last;
+  byId('lock-warning-last').hidden = !view.last;
+  byId('lock-stay').hidden = view.last;
+  byId('lock-keep-working').hidden = !view.last;
+  // The countdown is shown, not announced; the Rust side decides the end.
+  const ends = Date.now() + view.left * 1000;
+  const tick = () => {
+    const left = Math.max(0, Math.round((ends - Date.now()) / 1000));
+    const shown = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    for (const place of warning.querySelectorAll('[data-countdown]')) place.textContent = shown;
+  };
+  tick();
+  clearInterval(countdown);
+  countdown = setInterval(tick, 1000);
+  if (!warning.open) {
+    warning.showModal();
+    byId(view.last ? 'lock-keep-working' : 'lock-stay').focus();
+  }
+}
+
+function closeWarning() {
+  clearInterval(countdown);
+  countdown = null;
+  if (warning.open) warning.close();
+}
+
+// Activity: a key, a click or tap, the wheel or typing, never mouse movement; told to the Rust side at most once every
+// 10 seconds, so the lock may come up to 10 seconds early.
+let activityTold = 0;
+for (const type of ['keydown', 'pointerdown', 'wheel', 'input']) {
+  document.addEventListener(type, () => {
+    if (locked || Date.now() - activityTold < 10_000) return;
+    activityTold = Date.now();
+    invoke('activity').catch(() => {});
+  }, { capture: true, passive: true });
+}
+
+async function stay() {
+  activityTold = Date.now();
+  await invoke('activity');
+  applyLock(await invoke('lock_state'));
+}
+
+byId('lock-stay').addEventListener('click', stay);
+byId('lock-keep-working').addEventListener('click', stay);
+warning.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  stay();
+});
+byId('lock-now').addEventListener('click', async () => applyLockAndRedraw(await invoke('lock_now')));
+byId('sign-in-now').addEventListener('click', async () => applyLockAndRedraw(await invoke('lock_now')));
+byId('lock-sign-out').addEventListener('click', signOut);
+
+// An administrator revoked this computer's sign-in, and the Rust side deleted everything SwiftChart kept here, then
+// loaded this page again, so nothing it showed is kept (the expansion plan's step 20; src-tauri/src/wipe.rs). Only this
+// fills the window, as the lock does, and quitting is all there is to do. `problem` says what couldn't be deleted:
+// starting again finishes it.
+function showDeleted(problem) {
+  deleted = true;
+  closeWarning();
+  for (const part of [byId('app-bar'), byId('page')]) part.inert = true;
+  document.body.classList.add('desktop-locked');
+  byId('lock').hidden = true;
+  byId('deleted-title').textContent = problem ? 'Not finished' : 'Deleted';
+  byId('deleted-text').replaceChildren(
+    el('span', { className: 'sc-notice__state', textContent: problem ? 'Not finished:' : 'Deleted:' }),
+    problem
+      ? ` an administrator revoked this computer's sign-in, and SwiftChart couldn't delete everything it keeps here (${problem}). Quit SwiftChart and start it again to finish.`
+      : ' an administrator revoked this computer\'s sign-in, so SwiftChart deleted everything it kept here: the offline charts, drafts and recordings not yet sent, and its key. Quit SwiftChart; when it starts again it is empty, and you can sign in.',
+  );
+  byId('deleted').hidden = false;
+  byId('quit').focus();
+}
+
+byId('quit').addEventListener('click', () => invoke('quit'));
+
+lockForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submit = byId('lock-submit');
+  submit.disabled = true;
+  try {
+    const view = await invoke('unlock', { password: lockForm.elements.password.value, code: lockForm.elements.code.value });
+    show(byId('lock-problem'), null);
+    applyLockAndRedraw(view);
+  } catch (problem) {
+    lockForm.elements.password.value = '';
+    show(byId('lock-problem'), String(problem));
+    // What opens it may have changed: the code too, after the 12 hours.
+    applyLock(await invoke('lock_state'));
+    lockForm.elements.password.focus();
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+// Coming back to the window: the Rust side may have locked it meanwhile. Asking can only lock it.
+const askLock = async () => applyLock(await invoke('lock_state'));
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) askLock();
+});
+window.addEventListener('focus', askLock);
+listen('lock', ({ payload }) => applyLockAndRedraw(payload));
 listen('changed', refresh);
+// A page loaded again holds no recording.
+holdLock(false);
 refresh();

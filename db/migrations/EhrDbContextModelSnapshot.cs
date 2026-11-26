@@ -48,6 +48,10 @@ namespace Ehr.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
 
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by");
+
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -66,6 +70,9 @@ namespace Ehr.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_desktop_sessions");
+
+                    b.HasIndex("RevokedBy")
+                        .HasDatabaseName("ix_desktop_sessions_revoked_by");
 
                     b.HasIndex("StaffUserId")
                         .HasDatabaseName("ix_desktop_sessions_staff_user_id");
@@ -406,6 +413,26 @@ namespace Ehr.Migrations
                         .HasDatabaseName("ix_staff_user_logins_user_id");
 
                     b.ToTable("staff_user_logins", "ehr");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Accounts.StaffUserPasskey", b =>
+                {
+                    b.Property<byte[]>("CredentialId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("bytea")
+                        .HasColumnName("credential_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("CredentialId")
+                        .HasName("pk_staff_user_passkeys");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_staff_user_passkeys_user_id");
+
+                    b.ToTable("staff_user_passkeys", "ehr");
                 });
 
             modelBuilder.Entity("Ehr.Data.Accounts.StaffUserToken", b =>
@@ -821,7 +848,7 @@ namespace Ehr.Migrations
                         {
                             t.HasCheckConstraint("ck_inbox_items_form_alert_sensitive", "kind <> 'form-alert' OR sensitive");
 
-                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert')");
+                            t.HasCheckConstraint("ck_inbox_items_kind", "kind IN ('message', 'result', 'refill-request', 'emergency-access-review', 'addendum', 'summary-withdrawn', 'form-alert', 'unrouted-result')");
 
                             t.HasCheckConstraint("ck_inbox_items_source", "(source_table IS NULL) = (source_id IS NULL)");
                         });
@@ -3648,6 +3675,12 @@ namespace Ehr.Migrations
                 {
                     b.HasOne("Ehr.Data.Accounts.StaffUser", null)
                         .WithMany()
+                        .HasForeignKey("RevokedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_desktop_sessions_staff_users_revoked_by");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
                         .HasForeignKey("StaffUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -3711,6 +3744,59 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_staff_user_logins_staff_users_user_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Accounts.StaffUserPasskey", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_staff_user_passkeys_staff_users_user_id");
+
+                    b.OwnsOne("Microsoft.AspNetCore.Identity.IdentityPasskeyData", "Data", b1 =>
+                        {
+                            b1.Property<byte[]>("StaffUserPasskeyCredentialId");
+
+                            b1.Property<byte[]>("AttestationObject")
+                                .IsRequired();
+
+                            b1.Property<byte[]>("ClientDataJson")
+                                .IsRequired();
+
+                            b1.Property<DateTimeOffset>("CreatedAt");
+
+                            b1.Property<bool>("IsBackedUp");
+
+                            b1.Property<bool>("IsBackupEligible");
+
+                            b1.Property<bool>("IsUserVerified");
+
+                            b1.Property<string>("Name");
+
+                            b1.Property<byte[]>("PublicKey")
+                                .IsRequired();
+
+                            b1.Property<long>("SignCount");
+
+                            b1.PrimitiveCollection<string>("Transports");
+
+                            b1.HasKey("StaffUserPasskeyCredentialId");
+
+                            b1.ToTable("staff_user_passkeys", "ehr");
+
+                            b1
+                                .ToJson("data")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StaffUserPasskeyCredentialId")
+                                .HasConstraintName("fk_staff_user_passkeys_staff_user_passkeys_credential_id");
+                        });
+
+                    b.Navigation("Data")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Ehr.Data.Accounts.StaffUserToken", b =>

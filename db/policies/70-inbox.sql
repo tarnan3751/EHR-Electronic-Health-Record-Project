@@ -16,8 +16,10 @@ BEGIN
     END IF;
 
     -- An order's results are done by acknowledging them, which records who and when (75-results.sql): that marks
-    -- the item done as the tables' owner. The apps, by the role they connect as, never tick one off directly.
-    IF OLD.kind = 'result' AND OLD.source_table = 'orders' AND current_user IN ('ehr_app', 'ehr_read') THEN
+    -- the item done as the tables' owner. The apps, by the role they connect as, never tick one off directly: not a
+    -- clinician's, nor an administrator's for results no clinician could receive (step 18a), which only a clinician's
+    -- acknowledgment ends, whatever the administrator has done about it.
+    IF OLD.kind IN ('result', 'unrouted-result') AND OLD.source_table = 'orders' AND current_user IN ('ehr_app', 'ehr_read') THEN
         RAISE EXCEPTION 'Results are acknowledged on their own page, not marked done' USING ERRCODE = '23514';
     END IF;
 

@@ -1,5 +1,9 @@
 //! Chart snapshots downloaded for one clinician, stored in the same encrypted
-//! database as their drafts.
+//! database as their drafts, and when they were downloaded, which the app shows
+//! beside them: only "Download my charts" refreshes them (the expansion plan's
+//! step 19a).
+
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{Connection, OptionalExtension, Result, params};
 use serde::{Deserialize, Serialize};
@@ -13,6 +17,13 @@ const SCHEMA: &str = "
         mrn TEXT NOT NULL,
         chart TEXT NOT NULL,
         PRIMARY KEY (clinician_id, patient_id)
+    );
+    -- When each clinician's panel was last downloaded, in milliseconds since 1970 by this computer's clock, and the
+    -- clinic's time zone its charts came with, to show that time in.
+    CREATE TABLE IF NOT EXISTS offline_chart_downloads (
+        clinician_id TEXT PRIMARY KEY,
+        downloaded_at INTEGER NOT NULL,
+        clinic_time_zone TEXT
     );
 ";
 
@@ -114,6 +125,15 @@ pub struct Visit {
     pub heart_rate_per_minute: Option<i16>,
 }
 
+/// When a clinician's offline charts were last downloaded: `at` in milliseconds since 1970, shown in the clinic's
+/// time zone when the charts named one.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Updated {
+    pub at: i64,
+    pub clinic_time_zone: Option<String>,
+}
+
 #[derive(Serialize)]
 pub struct ChartSummary {
     pub id: String,
@@ -143,7 +163,37 @@ pub fn replace_panel(connection: &mut Connection, owner: Uuid, panel: &[Chart]) 
             params![owner, chart.id.to_string(), chart.name, chart.mrn, json],
         )?;
     }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| {
+            i64::try_from(since.as_millis()).unwrap_or(i64::MAX)
+        });
+    let zone = panel
+        .iter()
+        .find_map(|chart| chart.clinic_time_zone.clone());
+    tx.execute(
+        "INSERT INTO offline_chart_downloads (clinician_id, downloaded_at, clinic_time_zone) VALUES (?1, ?2, ?3)
+         ON CONFLICT (clinician_id) DO UPDATE SET downloaded_at = excluded.downloaded_at,
+             clinic_time_zone = excluded.clinic_time_zone",
+        params![owner, now, zone],
+    )?;
     tx.commit()
+}
+
+/// When this clinician's charts were last downloaded; none for charts downloaded before this was kept, or never.
+pub fn updated(connection: &Connection, owner: Uuid) -> Result<Option<Updated>> {
+    connection
+        .query_row(
+            "SELECT downloaded_at, clinic_time_zone FROM offline_chart_downloads WHERE clinician_id = ?1",
+            [owner.to_string()],
+            |row| {
+                Ok(Updated {
+                    at: row.get(0)?,
+                    clinic_time_zone: row.get(1)?,
+                })
+            },
+        )
+        .optional()
 }
 
 pub fn panel(connection: &Connection, owner: Uuid) -> Result<Vec<ChartSummary>> {
@@ -191,6 +241,37 @@ pub fn get(connection: &Connection, owner: Uuid, patient: Uuid) -> Result<Option
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The expansion plan's step 19a: downloading a panel records when, with the clinic's time zone its charts came
+    /// with, for that clinician only, and a later download moves it on.
+    #[test]
+    fn a_download_records_when_it_was_made() {
+        let mut db = Connection::open_in_memory().unwrap();
+        initialize(&db).unwrap();
+        let (owner, colleague) = (Uuid::now_v7(), Uuid::now_v7());
+        let chart: Chart = serde_json::from_str(
+            r#"{"id":"018f0000-0000-7000-8000-000000000001","name":"Synthetic Patient","mrn":"SYN1","birthDate":"1980-01-01",
+            "gender":"unknown","allergies":[],"medications":[],"conditions":[],"visits":[],"clinicTimeZone":"America/Chicago"}"#,
+        )
+        .unwrap();
+        assert_eq!(updated(&db, owner).unwrap(), None);
+
+        let before = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        replace_panel(&mut db, owner, &[chart]).unwrap();
+        let first = updated(&db, owner).unwrap().unwrap();
+        assert!(i64::try_from(before).unwrap() <= first.at);
+        assert_eq!(first.clinic_time_zone.as_deref(), Some("America/Chicago"));
+        assert_eq!(updated(&db, colleague).unwrap(), None);
+
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        replace_panel(&mut db, owner, &[]).unwrap();
+        let second = updated(&db, owner).unwrap().unwrap();
+        assert!(second.at > first.at);
+        assert_eq!(second.clinic_time_zone, None);
+    }
 
     /// The expansion plan's step 10: a chart copy carries signed notes and their addenda, and a copy stored before
     /// they were sent (no `notes` at all) still reads, as a chart with none.

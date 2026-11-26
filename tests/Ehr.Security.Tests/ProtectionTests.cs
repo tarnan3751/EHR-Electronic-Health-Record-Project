@@ -37,6 +37,8 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["patient_user_claims"] = Protection.Internal,
         ["patient_user_logins"] = Protection.Internal,
         ["patient_user_tokens"] = Protection.Internal,
+        // Step 19: a staff account's passkeys, read and updated by a sign-in before anyone is signed in.
+        ["staff_user_passkeys"] = Protection.Internal,
         // Every sync request looks its session up before anyone is signed in.
         ["desktop_sessions"] = Protection.Internal,
         ["patients"] = Protection.Phi,

@@ -1,0 +1,31 @@
+# How the monitoring profile's probes ask (prometheus.yml): HTTPS only, the certificate verified against the stack's
+# root and nothing else, no redirect followed, and only 200 counts. The cloud app's two sites share its address, so each
+# has a module naming it in the TLS handshake.
+modules:
+  https_200:
+    prober: http
+    timeout: 10s
+    http: &https
+      method: GET
+      valid_status_codes: [200]
+      follow_redirects: false
+      fail_if_not_ssl: true
+      preferred_ip_protocol: ip4
+      tls_config:
+        ca_file: /certs/rootCA.pem
+  https_200_off_site:
+    prober: http
+    timeout: 10s
+    http:
+      <<: *https
+      tls_config:
+        ca_file: /certs/rootCA.pem
+        server_name: ehr-remote.example.com
+  https_200_portal:
+    prober: http
+    timeout: 10s
+    http:
+      <<: *https
+      tls_config:
+        ca_file: /certs/rootCA.pem
+        server_name: portal.example.com

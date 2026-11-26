@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Ehr.Data.Accounts;
 using Ehr.Testing;
@@ -407,6 +408,54 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
         Assert.Equal(signed, first.EnumerateArray().Concat(rest.EnumerateArray()).Select(o => o.GetProperty("id").GetGuid()));
     }
 
+    // Step 21: a session of the on-prem app's role left idle in a transaction that has taken a transaction ID, as its
+    // first write does, holds back the hand-over, which stops short of the oldest transaction still running. The role's
+    // idle limit (db/policies/00-roles.sql) ends that session after a minute, rolling its transaction back, and the lab
+    // is then handed what was held back. This test waits out the real minute; it holds nothing back outside this class,
+    // whose database is its own and whose tests run one at a time.
+    [Fact]
+    public async Task A_session_left_idle_in_a_transaction_is_ended_after_a_minute_and_no_longer_holds_back_the_lab()
+    {
+        var (clinician, patient) = await PanelAsync();
+        var since = await NowAsync();
+
+        await using var idle = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(App) { Pooling = false }.ConnectionString);
+        await idle.OpenAsync(Cancel);
+        var pid = idle.ProcessID;
+        await using var transaction = await idle.BeginTransactionAsync(Cancel);
+        await using (var write = new NpgsqlCommand("SELECT pg_current_xact_id()", idle, transaction))
+        {
+            await write.ExecuteScalarAsync(Cancel);
+        }
+
+        var idleFor = Stopwatch.StartNew();
+
+        // Signed after the idle session's transaction began, so held back: not handed over while it lasts.
+        var order = Guid.CreateVersion7();
+        await Accounts.ExecuteAsync(App, clinician, Order, ("id", order), ("patient", patient), ("type", "lab"), ("code", "SYN-LAB-005"));
+        var (_, _, held) = await HandOverAsync(Key, since);
+        Assert.DoesNotContain(order, held.EnumerateArray().Select(o => o.GetProperty("id").GetGuid()));
+
+        while ((await AsSuperuserAsync("SELECT count(*)::text FROM pg_stat_activity WHERE pid = @pid", ("pid", pid))).Single() != "0"
+            && idleFor.Elapsed < TimeSpan.FromSeconds(90))
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(250), Cancel);
+        }
+
+        // Ended by the server at the minute, not before, and its next command is told why.
+        Assert.InRange(idleFor.Elapsed, TimeSpan.FromSeconds(59), TimeSpan.FromSeconds(90));
+        await using (var next = new NpgsqlCommand("SELECT 1", idle, transaction))
+        {
+            var ended = await Assert.ThrowsAsync<PostgresException>(() => next.ExecuteScalarAsync(Cancel));
+            // idle_in_transaction_session_timeout, which Npgsql's PostgresErrorCodes doesn't name.
+            Assert.Equal("25P03", ended.SqlState);
+        }
+
+        await SettledAsync(patient);
+        var (_, _, handed) = await HandOverAsync(Key, since);
+        Assert.Contains(order, handed.EnumerateArray().Select(o => o.GetProperty("id").GetGuid()));
+    }
+
     [Fact]
     public async Task A_lab_filing_follows_the_clinicians_rules_completes_the_order_tells_its_signer_and_names_the_lab()
     {
@@ -588,19 +637,48 @@ public class LabSecurityTests(MigratedDatabase database) : IClassFixture<Migrate
             (await EventsAsync(patient)).Where(e => !e.StartsWith("insert orders", StringComparison.Ordinal) && !e.StartsWith("insert patient", StringComparison.Ordinal)));
     }
 
-    // Step 7's rule, unchanged for the lab: the signer is told; when they can't be, the patient's panel is; with nobody
-    // on the panel either, nobody is, and the result is still filed. (For Tahseen: whether admins should be told then.)
+    // Step 7's rule for the lab: the signer is told; when they can't be, the patient's panel is; and since step 18a, with
+    // nobody on the panel either, every administrator whose account isn't disabled is, once, by an item that names the
+    // patient by ID and nothing of the test, which the apps never tick off and a clinician's acknowledgment closes. The
+    // result is filed all the same.
     [Fact]
-    public async Task A_result_for_a_patient_on_no_panel_whose_signer_left_is_filed_and_reaches_no_inbox()
+    public async Task A_result_for_a_patient_on_no_panel_whose_signer_left_reaches_every_administrator_once()
     {
         var (clinician, patient) = await PanelAsync();
+        var admin = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        var disabled = await Accounts.StaffAsync(database, StaffRoles.Admin);
+        await Accounts.LockOutAsync(database, disabled);
         var order = await SignAsync(clinician, patient);
         await Accounts.ExecuteAsync(database.SuperuserConnectionString, null, "UPDATE ehr.patient_assignments SET ended_at = now() WHERE patient_id = @patient", ("patient", patient));
         await Accounts.LockOutAsync(database, clinician);
 
         Assert.Equal("filed", await FileAsync(Key, order, Hemoglobin));
-        Assert.Equal(["completed 0"], await AsSuperuserAsync(
-            "SELECT (SELECT status FROM ehr.orders WHERE id = @order) || ' ' || (SELECT count(*) FROM ehr.inbox_items WHERE source_id = @order)", ("order", order)));
+        // A second part of the results: the order was completed by the first, so nobody is told again.
+        Assert.Equal("filed", await FileAsync(Key, order, [("777-3", 250m, "10*3/uL")]));
+        Assert.Equal(["completed"], await AsSuperuserAsync("SELECT status FROM ehr.orders WHERE id = @order", ("order", order)));
+        var items = await AsSuperuserAsync(
+            "SELECT recipient_id || ' ' || kind || ' ' || patient_id || ' ' || source_table || ' ' || summary || ' ' || sensitive FROM ehr.inbox_items WHERE source_id = @order",
+            ("order", order));
+        // Each administrator in the database whose account isn't disabled, the fixture's others too, and nobody else.
+        var expected = await AsSuperuserAsync(
+            """
+            SELECT id || ' unrouted-result ' || @patient || ' orders Results are in, and no clinician can receive them false'
+            FROM ehr.staff_users WHERE roles @> ARRAY['Admin'] AND (lockout_end IS NULL OR lockout_end < now() + interval '10 years')
+            """,
+            ("patient", patient));
+        Assert.Equal(expected.Order(), items.Order());
+        Assert.Contains(items, item => item.StartsWith(admin.ToString(), StringComparison.Ordinal));
+        Assert.DoesNotContain(items, item => item.StartsWith(disabled.ToString(), StringComparison.Ordinal) || item.StartsWith(clinician.ToString(), StringComparison.Ordinal));
+
+        // The apps never tick one off, the administrator's own included.
+        await RefusedAsync(PostgresErrorCodes.CheckViolation, () => Accounts.ExecuteAsync(App, admin,
+            "UPDATE ehr.inbox_items SET done_at = now() WHERE source_id = @order AND recipient_id = @me", ("order", order), ("me", admin)));
+
+        // A clinician takes the patient onto their panel and acknowledges the results: every administrator's item is done.
+        var colleague = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        await Accounts.AssignAsync(database, colleague, patient);
+        await Accounts.ExecuteAsync(App, colleague, Acknowledge, ("order", order), ("patient", patient), ("by", colleague));
+        Assert.Equal(["0"], await AsSuperuserAsync("SELECT count(*) FROM ehr.inbox_items WHERE source_id = @order AND done_at IS NULL", ("order", order)));
     }
 
     [Fact]

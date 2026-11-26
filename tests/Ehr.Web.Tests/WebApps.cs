@@ -14,6 +14,7 @@ using Ehr.Web.Api.Desktop;
 using Ehr.Web.Api.Dictation;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -54,7 +55,8 @@ public sealed class WebApps : IAsyncLifetime
 
     public WebApplicationFactory<Program> Cloud { get; private set; } = null!;
 
-    // The cloud app with its link to the on-prem app down.
+    // The cloud app with its link to the on-prem app down. It starts knowing so (App's unreachable), as a cloud app is a
+    // moment after it starts.
     public WebApplicationFactory<Program> CloudCutOff { get; private set; } = null!;
 
     // The cloud app linked to an on-prem app that can be made to fail. While PrimaryDown is set, the on-prem app still
@@ -83,7 +85,7 @@ public sealed class WebApps : IAsyncLifetime
 
     public DictationSidecarStub Dictation { get; } = new();
 
-    // The sign-in cookies' clock, which a test of a session's end moves on (step 18).
+    // The sign-in cookies' clock, which a test of a session's end moves on (step 18), and the desktop token's (step 19a).
     public ShiftedClock Clock { get; } = new();
 
     // Rather than 20 seconds, so the test of a service that doesn't answer is quick.
@@ -98,6 +100,13 @@ public sealed class WebApps : IAsyncLifetime
     public const string CloudAuditKey = "a-cloud-audit-key-for-the-tests-only";
     // The key enrollment codes are hashed with: both apps hold the same one.
     public const string EnrollmentKey = "tests-only-enrollment-code-key-0123456789";
+
+    // The passkeys' domain and the staff sites' addresses under it (step 19), as Ehr:Passkeys gives them.
+    public const string PasskeyDomain = "example.test";
+
+    public const string OnSiteOrigin = "https://ehr.example.test";
+
+    public const string OffSiteOrigin = "https://ehr-remote.example.test";
 
     // Each cloud app keeps its audit queue in its own folder under this one.
     public string CloudAuditRoot { get; } = Path.Combine(Path.GetTempPath(), $"ehr-cloud-audit-{Guid.NewGuid():N}");
@@ -121,7 +130,8 @@ public sealed class WebApps : IAsyncLifetime
         var link = new RecordingLink(OnPrem.Server.CreateHandler(), Forwarded);
         var readOnly = Database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
         Cloud = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(link)));
-        CloudCutOff = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())));
+        CloudCutOff = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(new CutOffLink())),
+            unreachable: true);
         faultLink = new FaultLink(OnPrem.Server.CreateHandler());
         CloudPrimaryDrill = new App(Site.Cloud, readOnly, Emails, this, onPrem: new OnPremApp("https://onprem.test", new HttpMessageInvoker(faultLink)));
     }
@@ -184,6 +194,14 @@ public sealed class WebApps : IAsyncLifetime
         var key = (await users.GetAuthenticatorKeyAsync(user))!;
         await users.SetTwoFactorEnabledAsync(user, true);
         return new(user.Id, email, StaffPassword, key);
+    }
+
+    // New recovery codes for the account, as its enrolment makes and shows them: five characters, a dash, five more.
+    public async Task<IReadOnlyList<string>> RecoveryCodesAsync(StaffAccount account)
+    {
+        await using var scope = OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        return [.. (await users.GenerateNewTwoFactorRecoveryCodesAsync((await users.FindByIdAsync(account.Id.ToString()))!, StaffSignIn.RecoveryCodes))!];
     }
 
     // A staff account that has set its password but not enrolled an authenticator yet: invited, with its setup done.
@@ -458,7 +476,7 @@ public sealed class WebApps : IAsyncLifetime
 
     sealed class App(
         Site site, string connectionString, RecordingEmailSender emails, WebApps apps, OnPremApp? onPrem = null, bool bootstrapAdmin = false,
-        string? environment = null, DictationSidecar? dictation = null)
+        string? environment = null, DictationSidecar? dictation = null, bool unreachable = false)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -485,6 +503,10 @@ public sealed class WebApps : IAsyncLifetime
                 .UseSetting("Ehr:Clinic:TimeZone", "UTC")
                 // Listening to a visit, off unless switched on: on here, for the tests of it (AmbientSwitchTests turn it off).
                 .UseSetting(Ehr.Web.Ambient.AmbientListening.Setting, "true")
+                // Passkeys (step 19), as the stack sets them: one parent domain, and the two staff sites under it.
+                .UseSetting("Ehr:Passkeys:Domain", PasskeyDomain)
+                .UseSetting("Ehr:Passkeys:Origins:0", OnSiteOrigin)
+                .UseSetting("Ehr:Passkeys:Origins:1", OffSiteOrigin)
                 .UseSetting("Ehr:CloudAudit:Directory", Path.Combine(apps.CloudAuditRoot, Guid.NewGuid().ToString("N")))
                 // Every test client has the same address, so the limits are out of reach (RateLimitTests lowers them).
                 .UseSetting("RateLimits:PermitLimit", "1000000")
@@ -513,6 +535,9 @@ public sealed class WebApps : IAsyncLifetime
                     services.PostConfigure<CookieAuthenticationOptions>(scheme, options => options.TimeProvider = apps.Clock);
                 }
 
+                // The desktop token's 12 hours (step 19a) run on the same clock.
+                services.PostConfigure<AuthenticationSchemeOptions>(AccountSchemes.Desktop, options => options.TimeProvider = apps.Clock);
+
                 if (onPrem is not null)
                 {
                     services.AddSingleton(onPrem);
@@ -521,6 +546,16 @@ public sealed class WebApps : IAsyncLifetime
                 if (dictation is not null)
                 {
                     services.AddSingleton(dictation);
+                }
+
+                // A cloud app learns that the on-prem app can't be reached at its audit shipper's first check-in, on a
+                // thread of its own once the app has started; on a busy machine a test's first request could come
+                // before it and find the clinic reachable. The app with its link down starts as it is a moment later.
+                if (unreachable)
+                {
+                    var status = new OnPremStatus();
+                    status.Report(reachable: false);
+                    services.AddSingleton(status);
                 }
             });
         }

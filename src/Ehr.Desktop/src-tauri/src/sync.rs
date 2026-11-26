@@ -7,8 +7,20 @@
 //!
 //! Signing in and out are here too. The session a sign-in returns is kept in the credential store (key.rs), so it
 //! outlasts the app. Every sync request carries its token: signed out, a round sends nothing, and a server that
-//! refuses the token (401) ends the session here too.
+//! refuses the token (401) ends the session here too, unless it says the sign-in's 12 hours are over ("Ehr-Sign-In:
+//! ended", the expansion plan's step 19a): then the session and its offline copy are kept, and nothing more is sent
+//! until a full sign-in. An ended session opens nothing, but its token is kept, not forgotten, until the person signs
+//! out here or signs in again (step 20's final review): a round then only presents it, every 5 minutes (main.rs), and
+//! applies nothing, so that an administrator who revokes it afterwards, after disabling the account, say, still
+//! reaches this computer. Either way main.rs hears of it (take_ending) and locks the window. A 401 that says an
+//! administrator revoked the sign-in ("Ehr-Sign-In: revoked", step 20) keeps the session too, and main.rs deletes
+//! everything the app keeps here, the session last (wipe.rs): nothing else ever leads there. Every request says the
+//! app's version (Ehr-Desktop-Version); a server that refuses it as too old (426, step 20's minimum version) is a
+//! problem like any other here, said in its words, and main.rs checks for the update at once. So is the lock's check of
+//! the password at the server (unlock), and the lock's full sign-in (sign_in_answer), which say when no server could
+//! answer, so the lock can check the password on this computer instead.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -23,15 +35,35 @@ use crate::api::{PullResponse, PushRequest, PushResponse, Refusal, Session, Sign
 use crate::key;
 use crate::store::{self, Store};
 
-/// The on-prem app on the clinic network, then the cloud app over the internet. EHR_SYNC_SERVERS, separated by
-/// commas, replaces them.
-const DEFAULT_SERVERS: &str = "https://ehr.example.com:8443,https://ehr-remote.example.com:9443";
+/// The servers this build was made for, in the order they're tried, separated by commas: EHR_BUILD_SERVERS as it was
+/// when the app was compiled, or without it the local server stack's, the on-prem app on the clinic network, then the
+/// cloud app over the internet. A release build uses these and nothing else, so it can't be started pointing at someone
+/// else's server (the expansion plan's step 20); a development build takes EHR_SYNC_SERVERS in their place. HTTPS only
+/// in a release build. A sign-in is tied to the servers it was made with (main.rs): started with others, the app
+/// forgets it before anything is sent.
+const BUILT_IN_SERVERS: &str = match option_env!("EHR_BUILD_SERVERS") {
+    Some(servers) => servers,
+    None => "https://ehr.example.com:8443,https://ehr-remote.example.com:9443",
+};
 const PATH: &str = "/api/sync/quick-texts";
 const SIGN_IN: &str = "/api/desktop/sign-in";
 const SIGN_OUT: &str = "/api/desktop/sign-out";
+const UNLOCK: &str = "/api/desktop/unlock";
+/// On a 401, says the token was refused only because the sign-in's 12 hours are over ("ended"), or because an
+/// administrator revoked it ("revoked") (DesktopTokenHandler.cs).
+const SIGN_IN_HEADER: &str = "ehr-sign-in";
+/// The app's version, on every request, for the server's minimum (src/Ehr.Web/Api/Desktop/DesktopUpdates.cs).
+const VERSION_HEADER: &str = "ehr-desktop-version";
+/// How long the lock waits for a server to check the password before it checks it here.
+const UNLOCK_WAIT: Duration = Duration::from_secs(5);
 const OFFLINE_PANEL: &str = "/api/desktop/offline-panel";
 /// The most the server takes in one push (QuickTextSync.MaxOperations).
 const BATCH: usize = 100;
+/// What an ended session's round asks for: changes since a watermark no transaction reaches, so nothing comes back.
+const PROBE: &str = "/api/sync/quick-texts?since=18446744073709551615";
+/// Said of an ended session: the window's lock asks for a full sign-in (main.rs).
+const ENDED: &str = "Signed out: the server ended this sign-in. Sign in again with your password and the code from \
+                     your authenticator app; nothing on this computer opens until you do.";
 
 pub struct Sync {
     http: Client,
@@ -40,6 +72,56 @@ pub struct Sync {
     saved: Entry,
     /// The session, as saved; none while signed out.
     session: Mutex<Option<Session>>,
+    /// How the server last ended the sign-in or the session, until main.rs takes it.
+    ending: Mutex<Option<Ending>>,
+    /// A server refused this version as too old (426), until main.rs takes it.
+    update_required: AtomicBool,
+}
+
+/// How the server ended things, for the lock (main.rs).
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Ending {
+    /// The sign-in's 12 hours are over: the session is kept, and a full sign-in is needed.
+    SignIn,
+    /// The session is over: ended here, opening nothing, its token kept for a later revocation to reach.
+    Session,
+    /// An administrator revoked the sign-in: everything the app keeps here is to be deleted (main.rs). The session is
+    /// kept until then, so a start after a crash halfway is told again.
+    Revoked,
+}
+
+/// What the server said of the lock's password.
+#[derive(Debug, PartialEq)]
+pub enum Unlock {
+    Unlocked,
+    /// A wrong password, or the account is now locked out: in words for the person. Never checked here after this.
+    Refused(String),
+    /// The sign-in's 12 hours are over.
+    SignInEnded,
+    /// The session is over.
+    SessionOver,
+    /// An administrator revoked the sign-in.
+    Revoked,
+    /// No server could check it.
+    Unreachable,
+}
+
+/// Why a sign-in didn't happen.
+#[derive(Debug, PartialEq)]
+pub enum SignInFailure {
+    /// A server answered no.
+    Refused(String),
+    /// None answered, or the one that did couldn't complete it (a 5xx: the cloud app answers 503 while the clinic's
+    /// server can't be reached).
+    Unreachable(String),
+}
+
+impl From<SignInFailure> for String {
+    fn from(failure: SignInFailure) -> String {
+        match failure {
+            SignInFailure::Refused(problem) | SignInFailure::Unreachable(problem) => problem,
+        }
+    }
 }
 
 /// How a round went. `server` answered, if any did; `problem` says why the round didn't finish. Changes not sent
@@ -56,8 +138,14 @@ enum Failure {
     Unreachable(String),
     /// The server refused the session (401): it expired or was revoked, or the account is locked out.
     SessionEnded,
+    /// The server refused the token (401) only because the sign-in's 12 hours are over.
+    SignInEnded,
+    /// The server refused the token (401) because an administrator revoked it.
+    Revoked,
     /// The server answered, but not with what the round needed.
     Problem(String),
+    /// The server refused this version as too old (426), saying so.
+    UpdateRequired(String),
 }
 
 impl From<store::Error> for Failure {
@@ -67,24 +155,32 @@ impl From<store::Error> for Failure {
 }
 
 impl Sync {
-    pub fn from_environment(saved: Entry) -> Result<Sync, String> {
-        let servers =
-            std::env::var("EHR_SYNC_SERVERS").unwrap_or_else(|_| DEFAULT_SERVERS.to_owned());
-        Sync::new(
-            servers
-                .split(',')
-                .map(str::trim)
-                .filter(|server| !server.is_empty())
-                .map(str::to_owned)
-                .collect(),
-            saved,
-        )
+    /// `version` is the app's, which every request says.
+    pub fn from_environment(saved: Entry, version: &str) -> Result<Sync, String> {
+        let release = !cfg!(debug_assertions);
+        let servers = servers_for(std::env::var("EHR_SYNC_SERVERS").ok(), release);
+        Sync::new(parse_servers(&servers, release)?, saved, version)
+    }
+
+    /// The servers, in the order they're tried.
+    pub fn servers(&self) -> &[String] {
+        &self.servers
     }
 
     /// HTTPS is checked against the OS's trusted certificates, as a browser would. `saved` is where the session is
-    /// kept; the one in it, if any, carries on.
-    pub fn new(servers: Vec<String>, saved: Entry) -> Result<Sync, String> {
+    /// kept; the one in it, if any, carries on. `version` goes with every request.
+    pub fn new(servers: Vec<String>, saved: Entry, version: &str) -> Result<Sync, String> {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            VERSION_HEADER,
+            reqwest::header::HeaderValue::from_str(version)
+                .map_err(|_| format!("{version} isn't a version"))?,
+        );
+        // Only the servers named answer: a redirect to another host is an answer from that host, which could carry the
+        // remote wipe's marker (step 20's final review), so none is followed.
         let http = Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .default_headers(headers)
             .connect_timeout(Duration::from_secs(3))
             .timeout(Duration::from_secs(20))
             .build()
@@ -99,7 +195,57 @@ impl Sync {
             servers,
             saved,
             session,
+            ending: Mutex::new(None),
+            update_required: AtomicBool::new(false),
         })
+    }
+
+    /// The clinician the kept session is for, however old it is; none while signed out.
+    pub fn clinician(&self) -> Option<Uuid> {
+        self.session()
+            .as_ref()
+            .and_then(|session| session.offline_access.as_ref())
+            .map(|access| access.clinician_id)
+    }
+
+    /// Until when the kept session lets the offline copy be opened without a sign-in, by this computer's clock; none
+    /// while signed out, or for a session from a server too old to say.
+    pub fn offline_until(&self) -> Option<SystemTime> {
+        self.session()
+            .as_ref()?
+            .offline_access
+            .as_ref()
+            .map(|access| UNIX_EPOCH + Duration::from_secs(access.expires_unix_seconds))
+    }
+
+    /// How the server last ended the sign-in or the session, once.
+    pub fn take_ending(&self) -> Option<Ending> {
+        self.ending
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+    }
+
+    /// Whether a server refused this version as too old since this was last asked.
+    pub fn take_update_required(&self) -> bool {
+        self.update_required.swap(false, Ordering::SeqCst)
+    }
+
+    fn ended(&self, ending: Ending) {
+        *self.ending.lock().unwrap_or_else(PoisonError::into_inner) = Some(ending);
+    }
+
+    /// Forgets the kept session here only: the server ends it at its 12 hours.
+    pub fn forget_kept(&self) -> Result<(), String> {
+        match self.token() {
+            Some(token) => self.forget(&token),
+            None => Ok(()),
+        }
+    }
+
+    /// The server ended the kept session: it opens nothing, and a round only presents its token.
+    pub fn session_ended(&self) -> bool {
+        self.session().as_ref().is_some_and(|session| session.ended)
     }
 
     /// The name of the clinician signed in, for the page; none while signed out.
@@ -125,6 +271,9 @@ impl Sync {
             .as_ref()
             .filter(|current| token.is_none_or(|token| token == current.token.as_str()))
             .ok_or_else(|| "Sign in as a clinician to use offline charts.".to_owned())?;
+        if current.ended {
+            return Err(ENDED.to_owned());
+        }
         let access = current.offline_access.as_ref().ok_or_else(|| {
             "Sign out and sign in on the updated server to use offline charts.".to_owned()
         })?;
@@ -150,8 +299,23 @@ impl Sync {
             })
             .await?;
         if response.status() == StatusCode::UNAUTHORIZED {
-            let _ = self.forget(&token);
+            if revoked(&response) {
+                self.ended(Ending::Revoked);
+                return Err(REVOKED.to_owned());
+            }
+            if sign_in_ended(&response) {
+                self.ended(Ending::SignIn);
+                return Err(
+                    "Sign in again to download charts: a sign-in lasts at most 12 hours."
+                        .to_owned(),
+                );
+            }
+            self.end(&token);
             return Err("The session ended. Sign in again to download charts.".to_owned());
+        }
+        if response.status() == StatusCode::UPGRADE_REQUIRED {
+            self.update_required.store(true, Ordering::SeqCst);
+            return Err(refusal(response).await);
         }
         if !response.status().is_success() {
             return Err(format!(
@@ -169,6 +333,18 @@ impl Sync {
     /// Signs in with the first server that answers, and keeps the session. That server's answer stands: trying the
     /// next with the same code would count as a second attempt. Err says why not, for the page to show the person.
     pub async fn sign_in(&self, email: &str, password: &str, code: &str) -> Result<(), String> {
+        self.sign_in_answer(email, password, code)
+            .await
+            .map_err(String::from)
+    }
+
+    /// sign_in, saying whether a server refused it or none could complete it.
+    pub async fn sign_in_answer(
+        &self,
+        email: &str,
+        password: &str,
+        code: &str,
+    ) -> Result<(), SignInFailure> {
         let device = format!("{} desktop", std::env::consts::OS);
         let sign_in = SignIn {
             email,
@@ -178,41 +354,96 @@ impl Sync {
         };
         let response = self
             .first_answer(|server| self.http.post(format!("{server}{SIGN_IN}")).json(&sign_in))
-            .await?;
+            .await
+            .map_err(SignInFailure::Unreachable)?;
 
         let status = response.status();
         if !status.is_success() {
-            return Err(match response.json::<Refusal>().await {
+            let problem = match response.json::<Refusal>().await {
                 Ok(refusal) => refusal.problem,
                 Err(_) => format!("Couldn't sign in: the server answered {status}."),
+            };
+            return Err(if status.is_server_error() {
+                SignInFailure::Unreachable(problem)
+            } else {
+                SignInFailure::Refused(problem)
             });
         }
         let session: Session = response.json().await.map_err(|error| {
-            format!(
+            SignInFailure::Refused(format!(
                 "Couldn't sign in: the server's answer wasn't understood ({}).",
                 reason(&error)
-            )
+            ))
         })?;
 
         let mut current = self.session();
-        key::save_session(&self.saved, &session)?;
+        key::save_session(&self.saved, &session).map_err(SignInFailure::Refused)?;
         *current = Some(session);
         Ok(())
     }
 
+    /// The lock's password, checked by the first server that answers, for the session's own account
+    /// (/api/desktop/unlock): its answer stands, so a wrong password is never checked again here. A server that can't
+    /// check it (a 5xx) is passed over, and with none that can, Unreachable says to check it on this computer.
+    pub async fn unlock(&self, password: &str) -> Unlock {
+        let Some(token) = self.token() else {
+            return Unlock::SessionOver;
+        };
+        for server in &self.servers {
+            let sent = self
+                .http
+                .post(format!("{server}{UNLOCK}"))
+                .bearer_auth(&token)
+                .timeout(UNLOCK_WAIT)
+                .json(&serde_json::json!({ "password": password }))
+                .send()
+                .await;
+            let Ok(response) = sent else { continue };
+            let status = response.status();
+            if status.is_success() {
+                return Unlock::Unlocked;
+            }
+            if status == StatusCode::UNAUTHORIZED {
+                if revoked(&response) {
+                    self.ended(Ending::Revoked);
+                    return Unlock::Revoked;
+                }
+                if sign_in_ended(&response) {
+                    self.ended(Ending::SignIn);
+                    return Unlock::SignInEnded;
+                }
+                self.end(&token);
+                return Unlock::SessionOver;
+            }
+            if status.is_server_error() {
+                continue;
+            }
+            return Unlock::Refused(match response.json::<Refusal>().await {
+                Ok(refusal) => refusal.problem,
+                Err(_) => format!("Couldn't unlock: the server answered {status}."),
+            });
+        }
+        Unlock::Unreachable
+    }
+
     /// Ends the session on the first server that answers, if any does, then forgets it here whatever the answer: a
-    /// server that can't be reached, or has already ended the session, doesn't keep the person signed in.
+    /// server that can't be reached, or has already ended the session, doesn't keep the person signed in. One that says
+    /// an administrator revoked it is told to main.rs instead, which deletes everything here, the session last.
     pub async fn sign_out(&self) -> Result<(), String> {
         let Some(token) = self.token() else {
             return Ok(());
         };
-        let _ = self
+        let answered = self
             .first_answer(|server| {
                 self.http
                     .post(format!("{server}{SIGN_OUT}"))
                     .bearer_auth(&token)
             })
             .await;
+        if answered.is_ok_and(|response| revoked(&response)) {
+            self.ended(Ending::Revoked);
+            return Ok(());
+        }
         self.forget(&token)
     }
 
@@ -225,6 +456,9 @@ impl Sync {
                 ),
             };
         };
+        if self.session_ended() {
+            return self.probe(&token).await;
+        }
         let mut unreachable = Vec::new();
         let mut answered = None;
         for server in &self.servers {
@@ -239,15 +473,37 @@ impl Sync {
                     unreachable.push(format!("{server} ({reason})"))
                 }
                 Err(Failure::SessionEnded) => {
-                    // Gone from memory either way. An entry the credential store couldn't delete is refused again at
-                    // the next launch, and deleted then.
-                    let _ = self.forget(&token);
+                    // Ended, its token kept for a revocation to reach (step 20's final review).
+                    self.end(&token);
                     return Report {
                         server: Some(server.clone()),
                         problem: Some("The session ended: sign in again to sync.".to_owned()),
                     };
                 }
+                Err(Failure::Revoked) => {
+                    // The session stays until everything else here is deleted (main.rs, wipe.rs).
+                    self.ended(Ending::Revoked);
+                    return Report {
+                        server: Some(server.clone()),
+                        problem: Some(REVOKED.to_owned()),
+                    };
+                }
+                Err(Failure::SignInEnded) => {
+                    self.ended(Ending::SignIn);
+                    return Report {
+                        server: Some(server.clone()),
+                        problem: Some(
+                            "Sign in again: a sign-in lasts at most 12 hours. Nothing is sent or brought back until \
+                             you do, and what you save here waits on this computer."
+                                .to_owned(),
+                        ),
+                    };
+                }
                 Err(Failure::Problem(problem)) => {
+                    answered.get_or_insert((server, problem));
+                }
+                Err(Failure::UpdateRequired(problem)) => {
+                    self.update_required.store(true, Ordering::SeqCst);
                     answered.get_or_insert((server, problem));
                 }
             }
@@ -591,6 +847,39 @@ impl Sync {
         }
     }
 
+    /// An ended session's round: its token presented to each server in turn, as a round tries them, until one gives an
+    /// answer other than a 5xx, for nothing but what it says of it. Only the remote wipe's marker changes anything
+    /// (main.rs); nothing is sent, and nothing brought back is applied, whatever the answer. So with the clinic's server
+    /// answering 503, the cloud app is asked too.
+    async fn probe(&self, token: &str) -> Report {
+        let mut unreachable = Vec::new();
+        for server in &self.servers {
+            let sent = self
+                .http
+                .get(format!("{server}{PROBE}"))
+                .bearer_auth(token)
+                .send()
+                .await;
+            match sent {
+                Ok(response) if !response.status().is_server_error() => {
+                    if response.status() == StatusCode::UNAUTHORIZED && revoked(&response) {
+                        self.ended(Ending::Revoked);
+                    }
+                    return Report {
+                        server: Some(server.clone()),
+                        problem: Some(ENDED.to_owned()),
+                    };
+                }
+                Ok(response) => unreachable.push(format!("{server} ({})", response.status())),
+                Err(error) => unreachable.push(format!("{server} ({})", reason(&error))),
+            }
+        }
+        Report {
+            server: None,
+            problem: Some(couldnt_connect(&unreachable)),
+        }
+    }
+
     /// Sends the request `to` makes for each server in turn, until one answers. Err says why none did.
     async fn first_answer(&self, to: impl Fn(&str) -> RequestBuilder) -> Result<Response, String> {
         let mut unreachable = Vec::new();
@@ -611,6 +900,18 @@ impl Sync {
         self.session().as_ref().map(|session| session.token.clone())
     }
 
+    /// The server refused `token`, not saying it was revoked: the session is marked ended, here and in the credential
+    /// store, and told to main.rs, unless a sign-in has replaced it since `token` was sent. An entry the credential store
+    /// couldn't write is ended in memory all the same, and refused again at the next launch.
+    fn end(&self, token: &str) {
+        let mut current = self.session();
+        if let Some(session) = current.as_mut().filter(|session| session.token == token) {
+            session.ended = true;
+            let _ = key::save_session(&self.saved, session);
+            self.ended(Ending::Session);
+        }
+    }
+
     /// Forgets the session, here and in the credential store, unless a sign-in has replaced it since `token` was sent.
     fn forget(&self, token: &str) -> Result<(), String> {
         let mut current = self.session();
@@ -621,7 +922,35 @@ impl Sync {
             return Ok(());
         }
         *current = None;
-        key::forget_session(&self.saved)
+        key::delete(&self.saved)
+    }
+}
+
+/// The built-in servers, or in a development build those `variable` names (EHR_SYNC_SERVERS), when it's set.
+fn servers_for(variable: Option<String>, release: bool) -> String {
+    match variable {
+        Some(servers) if !release => servers,
+        _ => BUILT_IN_SERVERS.to_owned(),
+    }
+}
+
+/// The servers a comma-separated list names. `https_only`, in a release build: a plain-HTTP server, which anything on
+/// this computer could stand in for, is refused, and the app can't sync until the list is put right.
+fn parse_servers(list: &str, https_only: bool) -> Result<Vec<String>, String> {
+    let servers: Vec<String> = list
+        .split(',')
+        .map(str::trim)
+        .filter(|server| !server.is_empty())
+        .map(str::to_owned)
+        .collect();
+    match servers
+        .iter()
+        .find(|server| https_only && !server.starts_with("https://"))
+    {
+        Some(server) => Err(format!(
+            "The servers' list names {server}: this app connects to HTTPS servers only."
+        )),
+        None => Ok(servers),
     }
 }
 
@@ -645,7 +974,16 @@ async fn answer<T: DeserializeOwned>(
 
     let status = response.status();
     if status == StatusCode::UNAUTHORIZED {
-        return Err(Failure::SessionEnded);
+        return Err(if revoked(&response) {
+            Failure::Revoked
+        } else if sign_in_ended(&response) {
+            Failure::SignInEnded
+        } else {
+            Failure::SessionEnded
+        });
+    }
+    if status == StatusCode::UPGRADE_REQUIRED {
+        return Err(Failure::UpdateRequired(refusal(response).await));
     }
     if !status.is_success() {
         return Err(Failure::Problem(format!(
@@ -659,6 +997,34 @@ async fn answer<T: DeserializeOwned>(
         ))
     })
 }
+
+/// What a server that refuses this version as too old says, in its words (DesktopUpdates.cs).
+async fn refusal(response: Response) -> String {
+    match response.json::<Refusal>().await {
+        Ok(refusal) => refusal.problem,
+        Err(_) => "Update needed: the server syncs only with a newer SwiftChart.".to_owned(),
+    }
+}
+
+/// A 401 that says the token was refused only because the sign-in's 12 hours are over.
+fn sign_in_ended(response: &Response) -> bool {
+    response
+        .headers()
+        .get(SIGN_IN_HEADER)
+        .is_some_and(|value| value == "ended")
+}
+
+/// A 401 that says an administrator revoked the sign-in: the remote wipe's marker, and the only thing that leads to it.
+fn revoked(response: &Response) -> bool {
+    response
+        .headers()
+        .get(SIGN_IN_HEADER)
+        .is_some_and(|value| value == "revoked")
+}
+
+/// What a round or a download says when the server answers with the remote wipe's marker, until main.rs has deleted
+/// everything and the window says so.
+const REVOKED: &str = "Revoked: an administrator revoked this computer's sign-in.";
 
 /// The innermost cause, which names what actually went wrong: "Connection refused", an untrusted certificate.
 fn reason(error: &reqwest::Error) -> String {
@@ -686,6 +1052,10 @@ mod tests {
 
     /// A status for `FakeServer` to close the connection without answering.
     const HANG_UP: u16 = 0;
+    /// A status for `FakeServer` to answer 401 saying the sign-in's 12 hours are over, as DesktopTokenHandler does.
+    const SIGN_IN_ENDED: u16 = 1401;
+    /// A status for `FakeServer` to answer 401 saying an administrator revoked the sign-in, as DesktopTokenHandler does.
+    const REVOKED_STATUS: u16 = 2401;
 
     /// One request as the fake server saw it: the method and path, the Authorization header, then the body.
     type Request = (String, Option<String>, String);
@@ -711,9 +1081,14 @@ mod tests {
                     if status == HANG_UP {
                         continue;
                     }
+                    let (status, header) = match status {
+                        SIGN_IN_ENDED => (401, "Ehr-Sign-In: ended\r\n"),
+                        REVOKED_STATUS => (401, "Ehr-Sign-In: revoked\r\n"),
+                        _ => (status, ""),
+                    };
                     write!(
                         &stream,
-                        "HTTP/1.1 {status} Fake\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\
+                        "HTTP/1.1 {status} Fake\r\n{header}Content-Type: application/json\r\nContent-Length: {}\r\n\
                          Connection: close\r\n\r\n{json}",
                         json.len()
                     )
@@ -816,7 +1191,7 @@ mod tests {
     /// The entry the client keeps its session in.
     fn saved_entry(credentials: &mock::Store) -> Entry {
         credentials
-            .build("com.example.ehr", "server-session", None)
+            .build(crate::key::SERVICE, "server-session", None)
             .unwrap()
     }
 
@@ -830,6 +1205,7 @@ mod tests {
         Sync::new(
             servers.iter().map(|server| (*server).to_owned()).collect(),
             saved_entry(credentials),
+            "0.2.0",
         )
         .unwrap()
     }
@@ -1033,9 +1409,11 @@ mod tests {
         assert_eq!(store::lock(&store).pending(10).unwrap().len(), 1);
     }
 
-    /// The server answers 401 when the session has expired or been revoked, or the account is locked out.
+    /// The server answers 401 when the session has expired or ended, or the account is locked out. Since step 20's final
+    /// review the session is ended here, not forgotten: it opens nothing, and its token is kept for a later revocation to
+    /// reach; the next round only presents it, and applies nothing.
     #[tokio::test]
-    async fn a_refused_session_is_forgotten() {
+    async fn a_refused_session_is_ended_and_its_token_kept() {
         let refuses = FakeServer::start(|_| (401, "{}".to_owned()));
         let applies = FakeServer::start(server_that_applies);
         let store = memory_store();
@@ -1057,15 +1435,451 @@ mod tests {
             applies.requests().is_empty(),
             "not tried with a refused token"
         );
-        assert_eq!(client.account(), None);
-        assert_eq!(saved(&credentials), None);
-        assert_eq!(next.server, None, "signed out now");
-        assert_eq!(refuses.requests().len(), 1);
+        let mut ended = session();
+        ended["ended"] = json!(true);
+        assert_eq!(saved(&credentials), Some(ended), "kept, and ended");
+        assert!(client.session_ended());
+        assert_eq!(client.account().as_deref(), Some("Dr. Example"));
+        assert_eq!(client.take_ending(), Some(Ending::Session));
+        assert_eq!(next.problem.as_deref(), Some(ENDED));
+        assert_eq!(
+            refuses.requests()[1],
+            (
+                format!("GET {PROBE}"),
+                Some("Bearer the-token".to_owned()),
+                String::new()
+            ),
+            "only presented"
+        );
+        assert_eq!(refuses.requests().len(), 2);
+        assert!(applies.requests().is_empty());
         assert_eq!(
             store::lock(&store).pending(10).unwrap().len(),
             1,
             "the change stays here"
         );
+    }
+
+    /// TC-UC7-12 (proposed FR-69): only the remote wipe's marker leads to the wipe. A round answered with it keeps the
+    /// session (deleted last, by main.rs) and says so, sending nothing more; so do a chart download and the lock's check
+    /// of the password. Beside it, a plain 401 ends the session, keeping its token, the 12-hour marker keeps it for a full
+    /// sign-in, and a 426, which a server below whose minimum version this app is answers, is a problem like any other.
+    #[tokio::test]
+    async fn only_the_revoked_marker_leads_to_the_wipe() {
+        let store = memory_store();
+        store::lock(&store).add(".mine", "Waiting").unwrap();
+        let answering = |status: u16| {
+            let server = FakeServer::start(move |_| (status, "{}".to_owned()));
+            let credentials = credentials(Some(offline_session()));
+            let client = client_with(&[&server.url], &credentials);
+            (server, credentials, client)
+        };
+
+        let (server, credentials, client) = answering(REVOKED_STATUS);
+        let report = client.round(&store).await;
+        assert_eq!(report.problem.as_deref(), Some(REVOKED));
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert_eq!(
+            saved(&credentials),
+            Some(offline_session()),
+            "kept until the wipe"
+        );
+        assert_eq!(server.requests().len(), 1, "nothing sent after the answer");
+        let Err(problem) = client.download_panel().await else {
+            panic!("a download with a revoked sign-in");
+        };
+        assert_eq!(problem, REVOKED);
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert_eq!(client.unlock("a password").await, Unlock::Revoked);
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+
+        for (status, ending, kept) in [
+            (401, Some(Ending::Session), true),
+            (SIGN_IN_ENDED, Some(Ending::SignIn), true),
+            (426, None, true),
+        ] {
+            let (_server, credentials, client) = answering(status);
+            client.round(&store).await;
+            assert_eq!(client.take_ending(), ending, "{status}");
+            assert_eq!(saved(&credentials).is_some(), kept, "{status}");
+        }
+        assert_eq!(store::lock(&store).pending(10).unwrap().len(), 1);
+    }
+
+    /// TC-UC8-12 (proposed FR-70): every request says the app's version, and a server that refuses it as too old (426)
+    /// is a problem in its own words, for a round and a chart download, which keeps the session and tells main.rs to
+    /// check for the update; nothing else does.
+    #[tokio::test]
+    async fn a_server_that_refuses_this_version_says_why_and_asks_for_the_update() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&heard);
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut head = String::new();
+                let mut reader = BufReader::new(&stream);
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line.trim().is_empty() {
+                        break;
+                    }
+                    head.push_str(&line.to_ascii_lowercase());
+                }
+                seen.lock().unwrap().push(head);
+                let body = r#"{"problem":"Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later."}"#;
+                write!(
+                    stream,
+                    "HTTP/1.1 426 Upgrade Required\r\nEhr-Desktop-Minimum: 0.3.0\r\nContent-Type: application/json\r\n\
+                     Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .unwrap();
+            }
+        });
+        let store = memory_store();
+        let credentials = credentials(Some(offline_session()));
+        let client = client_with(&[&url], &credentials);
+
+        let report = client.round(&store).await;
+        let problem =
+            "Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later.";
+        assert_eq!(report.problem.as_deref(), Some(problem));
+        assert!(client.take_update_required());
+        assert!(!client.take_update_required(), "once");
+        let Err(download) = client.download_panel().await else {
+            panic!("a download refused for the version");
+        };
+        assert_eq!(download, problem);
+        assert!(client.take_update_required());
+        assert_eq!(client.take_ending(), None);
+        assert_eq!(saved(&credentials), Some(offline_session()));
+        assert!(
+            heard
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|head| head.contains("ehr-desktop-version: 0.2.0"))
+        );
+    }
+
+    /// Step 20's final review, the defect: an account disabled, or its password or authenticator changed, before an
+    /// administrator revokes it. The token is refused plainly first: the session ends here and opens nothing, and its
+    /// token is kept. The administrator then revokes it, and the next round, presenting the token, hears so, and the
+    /// wipe follows (main.rs). Nothing is ever forgotten in between.
+    #[tokio::test]
+    async fn a_revocation_made_after_the_session_ended_still_reaches_it() {
+        let answers = Arc::new(Mutex::new(0));
+        let counted = Arc::clone(&answers);
+        let server = FakeServer::start(move |_| {
+            let mut answered = counted.lock().unwrap();
+            *answered += 1;
+            (
+                if *answered == 1 { 401 } else { REVOKED_STATUS },
+                "{}".to_owned(),
+            )
+        });
+        let store = memory_store();
+        let credentials = credentials(Some(offline_session()));
+        let client = client_with(&[&server.url], &credentials);
+
+        client.round(&store).await;
+        assert_eq!(client.take_ending(), Some(Ending::Session));
+        assert!(
+            !client.offline_available(),
+            "an ended session opens nothing"
+        );
+        assert_eq!(
+            client.with_clinician(None, |_| Ok(())),
+            Err(ENDED.to_owned())
+        );
+
+        client.round(&store).await;
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert!(saved(&credentials).is_some(), "kept until the wipe ends");
+    }
+
+    /// Step 20's final review: an ended session is forgotten when the person signs out here, or replaced by a new full
+    /// sign-in; a sign-out the server answers with the remote wipe's marker is told to main.rs, which wipes, the session
+    /// kept until then.
+    #[tokio::test]
+    async fn an_ended_session_goes_at_a_sign_out_or_a_new_sign_in() {
+        let mut ended = offline_session();
+        ended["ended"] = json!(true);
+
+        let refuses = FakeServer::start(|_| (401, "{}".to_owned()));
+        let credentials_out = credentials(Some(ended.clone()));
+        let out = client_with(&[&refuses.url], &credentials_out);
+        assert_eq!(out.sign_out().await, Ok(()));
+        assert_eq!(saved(&credentials_out), None);
+        assert_eq!(out.take_ending(), None);
+
+        let signs_in = FakeServer::start(|_| (200, session().to_string()));
+        let credentials_in = credentials(Some(ended.clone()));
+        let again = client_with(&[&signs_in.url], &credentials_in);
+        assert!(again.session_ended());
+        again
+            .sign_in("clinician@example.com", "a password", "123456")
+            .await
+            .unwrap();
+        assert_eq!(saved(&credentials_in), Some(session()));
+        assert!(!again.session_ended());
+
+        let revoked = FakeServer::start(|_| (REVOKED_STATUS, "{}".to_owned()));
+        let credentials_revoked = credentials(Some(ended.clone()));
+        let wiped = client_with(&[&revoked.url], &credentials_revoked);
+        assert_eq!(wiped.sign_out().await, Ok(()));
+        assert_eq!(wiped.take_ending(), Some(Ending::Revoked));
+        assert_eq!(saved(&credentials_revoked), Some(ended));
+    }
+
+    /// Step 20's re-check: an ended session's probe goes on to the next server when one answers 5xx, as a round does, so
+    /// a revocation reaches it through the cloud app while the clinic's server answers 503.
+    #[tokio::test]
+    async fn an_ended_sessions_probe_goes_past_a_server_that_cant_answer() {
+        let failing = FakeServer::start(|_| (503, "{}".to_owned()));
+        let revoking = FakeServer::start(|_| (REVOKED_STATUS, "{}".to_owned()));
+        let mut ended = offline_session();
+        ended["ended"] = json!(true);
+        let credentials = credentials(Some(ended));
+        let client = client_with(
+            &[&nothing_there(), &failing.url, &revoking.url],
+            &credentials,
+        );
+
+        let report = client.round(&memory_store()).await;
+
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert_eq!(report.server.as_deref(), Some(revoking.url.as_str()));
+        assert_eq!(failing.requests().len(), 1);
+    }
+
+    /// Step 20's final review: a redirect is an answer from another host, and is never followed, so the remote wipe's
+    /// marker can come only from the servers named.
+    #[tokio::test]
+    async fn a_redirect_to_another_host_is_never_followed() {
+        let elsewhere = FakeServer::start(|_| (REVOKED_STATUS, "{}".to_owned()));
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let target = elsewhere.url.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let _ = read_request(&stream);
+                write!(
+                    stream,
+                    "HTTP/1.1 307 Temporary Redirect\r\nLocation: {target}{PATH}\r\nContent-Length: 0\r\n\
+                     Connection: close\r\n\r\n"
+                )
+                .unwrap();
+            }
+        });
+        let store = memory_store();
+        let signed_in = credentials(Some(offline_session()));
+        let client = client_with(&[&url], &signed_in);
+
+        client.round(&store).await;
+        let mut ended = offline_session();
+        ended["ended"] = json!(true);
+        let ended_credentials = credentials(Some(ended));
+        let ended_client = client_with(&[&url], &ended_credentials);
+        ended_client.round(&store).await;
+
+        assert_eq!(client.take_ending(), None);
+        assert_eq!(ended_client.take_ending(), None);
+        assert!(elsewhere.requests().is_empty(), "never asked");
+    }
+
+    /// A session with offline charts, signed in a while ago.
+    fn offline_session() -> Value {
+        let mut session = session();
+        session["offlineAccess"] = json!({ "clinicianId": "018f0000-0000-7000-8000-0000000000c1", "expiresUnixSeconds": 4_102_444_800u64 });
+        session
+    }
+
+    /// TC-UC8-08 (proposed FR-68, FR-24): a token refused because the sign-in's 12 hours are over keeps the session and
+    /// the offline charts open on this computer, says a sign-in is needed, and tells the lock once; nothing is sent.
+    #[tokio::test]
+    async fn an_ended_sign_in_keeps_the_session_and_says_so() {
+        let server = FakeServer::start(|_| (SIGN_IN_ENDED, "{}".to_owned()));
+        let store = memory_store();
+        store::lock(&store).add(".mine", "Waiting").unwrap();
+        let credentials = credentials(Some(offline_session()));
+        let client = client_with(&[&server.url], &credentials);
+
+        let report = client.round(&store).await;
+
+        assert_eq!(report.server.as_deref(), Some(server.url.as_str()));
+        assert!(
+            report
+                .problem
+                .unwrap()
+                .starts_with("Sign in again: a sign-in lasts at most 12 hours.")
+        );
+        assert_eq!(client.take_ending(), Some(Ending::SignIn));
+        assert_eq!(client.take_ending(), None, "once");
+        assert_eq!(saved(&credentials), Some(offline_session()));
+        assert!(client.offline_available());
+        assert_eq!(store::lock(&store).pending(10).unwrap().len(), 1);
+        let Err(problem) = client.download_panel().await else {
+            panic!("a download with an ended sign-in");
+        };
+        assert!(problem.starts_with("Sign in again to download charts"));
+        assert_eq!(client.take_ending(), Some(Ending::SignIn));
+        assert!(client.offline_available());
+    }
+
+    /// TC-UC7-10 (proposed FR-68): the lock's password goes to the first server that can check it, with the session's
+    /// token and nothing else; a server's no stands, and the next isn't asked; one that can't check it (a 5xx) is
+    /// passed over; with none, the answer says to check it on this computer.
+    #[tokio::test]
+    async fn the_lock_asks_the_server_and_its_no_stands() {
+        let accepts = FakeServer::start(|_| (204, String::new()));
+        let refuses =
+            FakeServer::start(|_| (403, json!({ "problem": "Wrong password." }).to_string()));
+        let cant = FakeServer::start(|_| (503, "{}".to_owned()));
+        let hangs_up = FakeServer::start(|_| (HANG_UP, String::new()));
+
+        assert_eq!(
+            client(&[&accepts.url]).unlock("a password").await,
+            Unlock::Unlocked
+        );
+        assert_eq!(
+            accepts.requests(),
+            [(
+                format!("POST {UNLOCK}"),
+                Some("Bearer the-token".to_owned()),
+                json!({ "password": "a password" }).to_string()
+            )]
+        );
+        assert_eq!(
+            client(&[&refuses.url, &accepts.url])
+                .unlock("a guess")
+                .await,
+            Unlock::Refused("Wrong password.".to_owned())
+        );
+        assert_eq!(accepts.requests().len(), 1, "not asked after a no");
+        assert_eq!(
+            client(&[&cant.url, &accepts.url])
+                .unlock("a password")
+                .await,
+            Unlock::Unlocked
+        );
+        assert_eq!(
+            client(&[&nothing_there(), &hangs_up.url, &cant.url])
+                .unlock("a password")
+                .await,
+            Unlock::Unreachable
+        );
+        assert_eq!(
+            client_with(&[&accepts.url], &credentials(None))
+                .unlock("a password")
+                .await,
+            Unlock::SessionOver
+        );
+    }
+
+    /// TC-UC7-10: the server's word on the session reaches the lock: the 12-hour end keeps the session, any other 401
+    /// forgets it.
+    #[tokio::test]
+    async fn the_lock_hears_how_the_server_ended_things() {
+        let ended = FakeServer::start(|_| (SIGN_IN_ENDED, "{}".to_owned()));
+        let over = FakeServer::start(|_| (401, "{}".to_owned()));
+
+        let credentials_kept = credentials(Some(session()));
+        let kept = client_with(&[&ended.url], &credentials_kept);
+        assert_eq!(kept.unlock("a password").await, Unlock::SignInEnded);
+        assert_eq!(kept.take_ending(), Some(Ending::SignIn));
+        assert_eq!(saved(&credentials_kept), Some(session()));
+
+        let credentials_gone = credentials(Some(session()));
+        let gone = client_with(&[&over.url], &credentials_gone);
+        assert_eq!(gone.unlock("a password").await, Unlock::SessionOver);
+        assert_eq!(gone.take_ending(), Some(Ending::Session));
+        assert!(gone.session_ended(), "ended, its token kept");
+    }
+
+    /// TC-UC7-10: the lock's full sign-in says whether a server refused it, which stands, or none could complete it.
+    #[tokio::test]
+    async fn a_sign_in_says_whether_it_was_refused_or_couldnt_be_made() {
+        let refuses = FakeServer::start(|_| {
+            (
+                401,
+                json!({ "problem": "Wrong email, password or code." }).to_string(),
+            )
+        });
+        let cant = FakeServer::start(|_| {
+            (
+                503,
+                "Not saved: the on-prem server can't be reached.".to_owned(),
+            )
+        });
+        let client = |server: &str| client_with(&[server], &credentials(None));
+
+        assert_eq!(
+            client(&refuses.url)
+                .sign_in_answer("clinician@example.com", "a guess", "123456")
+                .await,
+            Err(SignInFailure::Refused(
+                "Wrong email, password or code.".to_owned()
+            ))
+        );
+        assert!(matches!(
+            client(&cant.url)
+                .sign_in_answer("clinician@example.com", "a password", "123456")
+                .await,
+            Err(SignInFailure::Unreachable(_))
+        ));
+        assert!(matches!(
+            client(&nothing_there())
+                .sign_in_answer("clinician@example.com", "a password", "123456")
+                .await,
+            Err(SignInFailure::Unreachable(_))
+        ));
+    }
+
+    /// The final review of step 19a: a server named over plain HTTP is refused in a release build, which is how
+    /// from_environment reads the list there, so nothing on this computer can stand in for a server unauthenticated.
+    #[test]
+    fn a_release_build_takes_https_servers_only() {
+        let list = "https://ehr.example.com:8443, http://127.0.0.1:9";
+        assert!(
+            parse_servers(list, true)
+                .unwrap_err()
+                .contains("http://127.0.0.1:9")
+        );
+        assert_eq!(
+            parse_servers(
+                "https://ehr.example.com:8443,,https://ehr-remote.example.com:9443",
+                true
+            ),
+            Ok(vec![
+                "https://ehr.example.com:8443".to_owned(),
+                "https://ehr-remote.example.com:9443".to_owned()
+            ])
+        );
+        assert_eq!(
+            parse_servers(list, false).unwrap().len(),
+            2,
+            "development builds"
+        );
+    }
+
+    /// The expansion plan's step 20: a release build uses the servers it was built for whatever EHR_SYNC_SERVERS says, so
+    /// nobody can start it pointing at a server of theirs; a development build takes the variable when it's set.
+    #[test]
+    fn a_release_build_uses_only_its_built_in_servers() {
+        let elsewhere = || Some("https://someone-else.example.net".to_owned());
+        assert_eq!(servers_for(elsewhere(), true), BUILT_IN_SERVERS);
+        assert_eq!(servers_for(None, true), BUILT_IN_SERVERS);
+        assert_eq!(
+            servers_for(elsewhere(), false),
+            "https://someone-else.example.net"
+        );
+        assert_eq!(servers_for(None, false), BUILT_IN_SERVERS);
+        assert!(parse_servers(BUILT_IN_SERVERS, true).is_ok());
     }
 
     /// The server answers 403 when the account isn't a clinician's.

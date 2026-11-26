@@ -55,7 +55,7 @@ namespace Ehr.Bench;
 // app's own settings instead, as `dotnet run --project src/Ehr.Web` does, against a primary already seeded with as many
 // patients. Either way it creates a clinician of its own, with a random password nobody keeps, puts 100 of the seeded
 // patients on their panel, signs six orders for each of them and discontinues two (UC 1), so the chart it measures lists active orders,
-// signs in with password and authenticator code like a browser, and locks the account at the end; and an administrator of its own, the same way, to review emergency access (step 18). It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
+// signs in with password and authenticator code like a browser, and locks the account at the end; and an administrator of its own, the same way, to review emergency access (step 18) and read a patient's audit log (step 18a). It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
 //
 // UC 2, off-site (Tahseen Arnan): then the same requests, in the same order, to the cloud app (OffSiteApp), reading as
 // ehr_read with its link to the on-prem app down, as in an on-site outage, with the same session. Each row's name starts
@@ -288,6 +288,9 @@ internal static partial class RenderBenchmark
                     // long it has, staff and portal.
                     results.Add(await MeasureAsync(client, times, "Session keep-alive, staff", typing: false, () => "/session"));
                     results.Add(await MeasureAsync(portal, times, "Session keep-alive, portal", typing: false, () => "/portal/session"));
+                    // A staff member's own passkeys (step 19): the clinician has none, so the page is its list read and
+                    // the add form.
+                    results.Add(await MeasureAsync(client, times, "Passkeys, the staff member's own", typing: false, () => "/passkeys"));
                     // Reviewing emergency access (step 18): the clinician's year of emergency accesses (FillPanelHistoryAsync),
                     // half of them reviewed. The review page of any of them, and the audit page's list of those waiting. A
                     // generator of its own.
@@ -300,6 +303,12 @@ internal static partial class RenderBenchmark
                             () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
                         results.Add(await MeasureAsync(admin, times, "Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
                     }
+
+                    // The audit log of a patient with a signed note (step 18a): its writes, the note's and its draft's among
+                    // them, each listed by the names of the fields it changed, worked out from what the trigger stored.
+                    var auditRandom = new Random(20261125);
+                    results.Add(await MeasureAsync(admin, times, "Audit, a patient with a signed note", typing: false,
+                        () => $"/admin/audit?Patient={noted[auditRandom.Next(noted.Count)].Patient}"));
 
                     // The review of a dictation (UC 13), in English and, since the expansion plan's step 17, in Spanish, each
                     // English sentence beside the Spanish it was translated from: staged on new drafts of the patients with
@@ -625,6 +634,10 @@ internal static partial class RenderBenchmark
             results.Add(await MeasureAsync(admin, times, "Off-site, Emergency access review, an ended access", typing: false,
                 () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
             results.Add(await MeasureAsync(admin, times, "Off-site, Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
+            // The audit log of a patient with a signed note (step 18a), with the same generator's draws as on-site.
+            var auditRandom = new Random(20261125);
+            results.Add(await MeasureAsync(admin, times, "Off-site, Audit, a patient with a signed note", typing: false,
+                () => $"/admin/audit?Patient={noted[auditRandom.Next(noted.Count)].Patient}"));
             // Last: the dictation reviews, staged now, after every row that reads those patients' drafts.
             var reviewed = await stageReviews();
             results.AddRange(await MeasureReviewsAsync(client, times, "Off-site, ", reviewed));
@@ -2263,7 +2276,10 @@ internal static partial class RenderBenchmark
                     .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
                     // A lab is connected, as in the tests' databases (step 12), and may ask as fast as the rows do.
                     .UseSetting("Ehr:Lab:Key", MigratedDatabase.LabKey)
-                    .UseSetting("RateLimits:LabRequestsPerMinute", "1000000");
+                    .UseSetting("RateLimits:LabRequestsPerMinute", "1000000")
+                    // Staff passkeys (step 19), as the stack has them, so their page is measured and every page's app
+                    // bar links to it.
+                    .UseSetting("Ehr:Passkeys:Domain", "localhost").UseSetting("Ehr:Passkeys:Origins:0", "https://localhost");
             }
         }
     }
@@ -2290,6 +2306,7 @@ internal static partial class RenderBenchmark
                 .UseSetting("Ehr:Links:ClinicalBaseUrl", "https://localhost").UseSetting("Ehr:Links:PortalBaseUrl", "https://localhost")
                 .UseSetting("Ehr:Clinic:TimeZone", "America/Chicago").UseSetting("Ehr:Clinic:TimeZoneAbbreviations", "CST,CDT")
                 .UseSetting("Ehr:Enrollment:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
+                .UseSetting("Ehr:Passkeys:Domain", "localhost").UseSetting("Ehr:Passkeys:Origins:0", "https://localhost")
                 .UseSetting("Logging:LogLevel:Default", "Warning")
                 .UseSetting("Logging:LogLevel:Microsoft.AspNetCore.DataProtection", "Critical")
                 .UseSetting("Logging:LogLevel:Ehr.Web.CloudAudit.CloudAuditShipper", "Error")

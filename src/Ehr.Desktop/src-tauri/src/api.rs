@@ -78,8 +78,9 @@ pub struct SignIn<'a> {
     pub device: &'a str,
 }
 
-/// What a sign-in returns, kept in the credential store (key.rs) until the session ends. Every sync request carries
-/// `token`. `expires_at` is kept but not acted on: the server says when a session is over, with a 401.
+/// What a sign-in returns, kept in the credential store (key.rs) until the person signs out here or signs in again.
+/// Every sync request carries `token`. `expires_at` is kept but not acted on: the server says when a session is over,
+/// with a 401.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
@@ -89,6 +90,16 @@ pub struct Session {
     // Older servers and previously saved sessions lack this data. Quick text still works.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offline_access: Option<OfflineAccess>,
+    /// The server refused the token, without saying an administrator revoked it (the account disabled, its password or
+    /// authenticator changed, the 30 days over): the session opens nothing here any more, but the token is kept and
+    /// presented now and then, so that a revocation made afterwards still reaches this computer (the expansion plan's
+    /// step 20, its final review).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub ended: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 #[derive(Serialize, Deserialize)]

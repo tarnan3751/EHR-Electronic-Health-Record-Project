@@ -13,7 +13,7 @@
 --                  the pair (ehr.drug_interactions: DDInter, the ONC list, an FDA label), so a warning can say where
 --                  it comes from.
 -- against_sensitive says the medication it names is marked sensitive on the chart: the clinician ordering is told its
--- name, and what is kept on the order is not (60-orders.sql), since an order's audit details are open to admins.
+-- name, and what is kept on the order, and so in its write audit, is not (60-orders.sql).
 -- Only coded data can be checked: an allergy or a medication typed without a code is not seen here, and the order
 -- form says so. It runs as the caller, under row-level security: a clinician, who reads the chart anyway. Anyone
 -- else sees no allergies and no medications, and gets no rows.

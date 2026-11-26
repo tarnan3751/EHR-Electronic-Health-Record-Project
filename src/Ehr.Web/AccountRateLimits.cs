@@ -6,8 +6,9 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Ehr.Web;
 
-// RateLimits: how many anonymous account POSTs (sign-in, register, forgot, resend, reset, confirm, the desktop app's
-// sign-in) one address may make per window, how many account emails one recipient may get per hour
+// RateLimits: how many account POSTs (sign-in, register, forgot, resend, reset, confirm, the desktop app's sign-in, and
+// its lock's password, step 19a; and a signed-in staff member's on their passkeys page, which check an authenticator
+// code, step 19) one address may make per window, how many account emails one recipient may get per hour
 // (CappedEmailSender), and how many requests the lab's door takes a minute: those with the lab's key, and, apart, all
 // the others (step 12). The defaults are for production; the tests raise them, since all their clients share one
 // address.
@@ -31,7 +32,7 @@ public sealed class RateLimitOptions
     public int LabKeylessRequestsPerMinute { get; set; } = 30;
 }
 
-// Limits the anonymous account POSTs per client address, a fixed window each, and the lab's door in two windows, one
+// Limits the account POSTs per client address, a fixed window each, and the lab's door in two windows, one
 // for the requests that present the lab's key and one for all the others, and nothing else. The address is the socket's (Connection.RemoteIpAddress), never X-Forwarded-For, which anyone can send. The cloud app limits before it
 // forwards (Program.cs), so off-site clients are counted there by their own address, and the on-prem app doesn't count
 // what the cloud app forwards (ForwardedHeader). Over the limit: 429 with a page saying so, or JSON on /api.
@@ -40,7 +41,7 @@ public static class AccountRateLimits
     static readonly string[] AccountPaths =
     [
         "/sign-in", "/portal/sign-in", "/portal/register", "/portal/forgot", "/portal/resend", "/portal/reset",
-        "/portal/confirm", "/portal/invitation", "/api/desktop/sign-in",
+        "/portal/confirm", "/portal/invitation", "/api/desktop/sign-in", "/api/desktop/unlock", "/passkeys",
     ];
 
     // The header the cloud app puts on a request it forwards, so the on-prem app doesn't count every off-site client

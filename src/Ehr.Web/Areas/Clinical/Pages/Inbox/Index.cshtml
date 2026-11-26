@@ -91,6 +91,12 @@ else
                                 @* Step 13d: where it gets answered, which is what marks it done. *@
                                 <a asp-page="/Patients/Refills/Review" asp-route-patientId="@item.PatientId" asp-route-requestId="@item.SourceId" data-inbox-source>Review the request</a>
                             }
+                            @if (item.Kind == InboxItemKind.UnroutedResult && item.SourceTable == "orders" && item.DoneAt is null)
+                            {
+                                @* Step 18a: what an administrator can do. Only a clinician adds a patient to their own patients, and
+                                   only a clinician with the patient on their panel acknowledges results; that marks this done. *@
+                                <p class="sc-muted" data-inbox-unrouted-note>Ask a clinician to add this patient to their patients and acknowledge the results. That marks this done for every administrator.</p>
+                            }
                             @if (User.IsInRole(StaffRoles.Admin) && item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses")
                             {
                                 @* Step 18: where it gets reviewed, which is what marks it done, for every administrator. *@
@@ -119,9 +125,10 @@ else
                         {
                             <td>
                                 @* An order's results are done by acknowledging them on their own page, which records who and
-                                   when, a refill request by answering it (step 13d), and an emergency access by reviewing it (step
-                                   18). Anything else, a result item with no order behind it included, is marked done here. *@
-                                @if (OnPrem.IsReachable && !(item.Kind == InboxItemKind.Result && item.SourceTable == "orders")
+                                   when, an administrator's item for results no clinician could receive too (step 18a), a refill
+                                   request by answering it (step 13d), and an emergency access by reviewing it (step 18). Anything
+                                   else, a result item with no order behind it included, is marked done here. *@
+                                @if (OnPrem.IsReachable && !((item.Kind is InboxItemKind.Result or InboxItemKind.UnroutedResult) && item.SourceTable == "orders")
                                      && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests")
                                      && !(item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses"))
                                 {

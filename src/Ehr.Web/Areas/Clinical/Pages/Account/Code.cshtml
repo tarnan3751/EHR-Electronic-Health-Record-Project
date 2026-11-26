@@ -3,7 +3,27 @@
 @{
     ViewData["Title"] = "Enter your code";
 }
+@if (Model.OffersPasskey)
+{
+    @section Scripts {
+        <script src="~/_content/Ehr.Design/js/passkeys.js" defer></script>
+    }
+}
 <h1>Enter your code</h1>
+@if (Model.OffersPasskey)
+{
+    @* Shown by passkeys.js where this browser can use a passkey; without it, the page is the code alone. *@
+    <form method="post" asp-page-handler="Options" class="sc-form" data-passkey-use hidden>
+        <p>Use a passkey you added: this device, your phone or a security key.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" data-passkey-problem hidden></p>
+        <button class="sc-btn">Use a passkey</button>
+    </form>
+    <form method="post" asp-page-handler="Passkey" data-passkey-finish hidden>
+        <input type="hidden" asp-for="ReturnUrl">
+        <input type="hidden" name="credential">
+        <input type="hidden" name="state">
+    </form>
+}
 <p>Enter the code from your authenticator app, or one of your recovery codes.</p>
 <form method="post" class="sc-form">
     <input type="hidden" asp-for="ReturnUrl">
@@ -12,6 +32,7 @@
         <input asp-for="Code" class="sc-field__input sc-field__input--mono" autocomplete="one-time-code" required autofocus>
         <span asp-validation-for="Code" class="sc-field__error"></span>
     </div>
-    <div asp-validation-summary="ModelOnly" class="sc-notice sc-notice--danger"></div>
+    @* An alert, so a refused code or passkey is announced wherever the focus is (on "Use a passkey", for one). *@
+    <div asp-validation-summary="ModelOnly" class="sc-notice sc-notice--danger" role="alert"></div>
     <button class="sc-btn sc-btn--primary">Sign in</button>
 </form>
