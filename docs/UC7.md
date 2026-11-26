@@ -233,8 +233,8 @@ only: the page has no permission for the updater.
   long.
 - **TC-UC7-12** (`src-tauri/src/sync.rs`, `wipe.rs`, `main.rs`): only the remote wipe's marker leads to the wipe: a
   round answered with it keeps the session to be deleted last, says so and sends nothing more, as a chart download and
-  the lock's check do; beside it a plain 401 forgets the session, the 12-hour marker keeps it, and a 426 is a problem
-  like any other; the wipe deletes the database's files after closing it, then its key, and a second run finds nothing
+  the lock's check do; beside it a plain 401 ends the session, keeping its token, the 12-hour marker keeps it, and a
+  426 is a problem like any other; the wipe deletes the database's files after closing it, then its key, and a second run finds nothing
   and is fine; and it runs only for a sign-in whose lock's record names the servers the app has, never with no record
   or other servers.
 - **TC-UC7-13** (`src-tauri/src/lock.rs`, `main.rs`): when the 30 days pass the window locks for a full sign-in only,

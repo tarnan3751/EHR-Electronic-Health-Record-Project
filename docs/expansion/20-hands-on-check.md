@@ -89,15 +89,16 @@ Within 10 seconds the sync problem reads "Update needed: the clinic's server syn
 …"; open a chart: it opens; lock and unlock: it works. Delete `latest.json` and the file, and run the same command without
 the variable.
 
-**M6. Disabled, then revoked, offline in between.** From `infra/compose`, `docker compose stop onprem-app cloud-app`.
-In SwiftChart open a chart, type a sentence under **New draft** and **Save draft**: it waits on this computer.
-`docker compose start onprem-app cloud-app`, and once they're up, in Safari as the administrator at
-https://ehr.example.com:8443: **Staff**, **Disable** the clinician; the page says that what SwiftChart keeps on their
-computers stays there until their desktop sign-ins are revoked. Within about 10 seconds SwiftChart locks: "Signed out:
-the server ended this sign-in …", asking for the password and the code; nothing of the chart. Quit SwiftChart. In
-Safari, the clinician's **Desktop sign-ins**: note the count and both paragraphs (revoking works before or after
-disabling); choose **Revoke and delete**: the staff page says their desktop sign-ins are revoked. (This is the order
-the final review found skipped the wipe; revoking first works the same.)
+**M6. Disabled, then revoked.** From `infra/compose`, `docker compose stop onprem-app cloud-app`. In SwiftChart open a
+chart, type a sentence under **New draft** and **Save draft**: it waits on this computer. Quit SwiftChart (Cmd+Q), so
+nothing is sent when the servers come back. `docker compose start onprem-app cloud-app`, and once they're up, in
+Safari as the administrator at https://ehr.example.com:8443: **Staff**, **Disable** the clinician; the page says that
+what SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked, and to revoke them now.
+Open SwiftChart: it opens on the lock, and within a few seconds the lock reads "Signed out: the server ended this
+sign-in …", asking for the password and the code; nothing of the chart. Don't sign out (that would drop what the
+revocation needs to reach this computer); quit it. In Safari, the clinician's **Desktop sign-ins**: note the count and
+both paragraphs; choose **Revoke and delete**: the staff page says their desktop sign-ins are revoked. (This is the
+order the final review found skipped the wipe; revoking first works the same.)
 
 **M7. The wipe.** Open SwiftChart. It opens on the lock; within a few seconds the window shows only "Deleted: an
 administrator revoked this computer's sign-in, so SwiftChart deleted everything it kept here: …", with **Quit
@@ -178,8 +179,8 @@ its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock:
 after unlocking says "SwiftChart 0.2.1.", with the charts as they were. Note whether SmartScreen or anything else asked.
 
 **W5. Disabled, revoked, and the wipe.** As the Mac's M6 and M7, in Edge as the administrator: stop the two apps, save
-a draft, start them, disable the clinician (SwiftChart locks, "Signed out: …"), quit SwiftChart, revoke, open SwiftChart:
-"Deleted: …" within a few seconds. Then in PowerShell:
+a draft, quit SwiftChart, start the apps, disable the clinician, open SwiftChart (it locks: "Signed out: …"), quit it
+without signing out, revoke, open SwiftChart again: "Deleted: …" within a few seconds. Then in PowerShell:
 
 ```
 Test-Path "$env:APPDATA\io.github.tarnan3751.swiftchart\ehr.db"

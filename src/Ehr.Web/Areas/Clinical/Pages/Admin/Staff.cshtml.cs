@@ -56,7 +56,7 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
         // before or after (DesktopSignIns, the expansion plan's step 20).
         Message = $"{member.DisplayName} is disabled and can no longer sign in."
             + (member.Roles.Contains(StaffRoles.Clinician)
-                ? " What SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked, which can be done now or later."
+                ? " What SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked: revoke them now, since a sign-out on one of those computers in the meantime leaves it out of reach."
                 : "");
         return null;
     });

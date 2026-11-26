@@ -83,7 +83,7 @@ pub struct Sync {
 pub enum Ending {
     /// The sign-in's 12 hours are over: the session is kept, and a full sign-in is needed.
     SignIn,
-    /// The session is over, and forgotten here.
+    /// The session is over: ended here, opening nothing, its token kept for a later revocation to reach.
     Session,
     /// An administrator revoked the sign-in: everything the app keeps here is to be deleted (main.rs). The session is
     /// kept until then, so a start after a crash halfway is told again.
@@ -847,27 +847,36 @@ impl Sync {
         }
     }
 
-    /// An ended session's round: its token presented to the first server that answers, for nothing but what it says
-    /// of it. Only the remote wipe's marker changes anything (main.rs); nothing is sent, and nothing brought back is
-    /// applied, whatever the answer.
+    /// An ended session's round: its token presented to each server in turn, as a round tries them, until one gives an
+    /// answer other than a 5xx, for nothing but what it says of it. Only the remote wipe's marker changes anything
+    /// (main.rs); nothing is sent, and nothing brought back is applied, whatever the answer. So with the clinic's server
+    /// answering 503, the cloud app is asked too.
     async fn probe(&self, token: &str) -> Report {
-        match self
-            .first_answer(|server| self.http.get(format!("{server}{PROBE}")).bearer_auth(token))
-            .await
-        {
-            Ok(response) => {
-                if response.status() == StatusCode::UNAUTHORIZED && revoked(&response) {
-                    self.ended(Ending::Revoked);
+        let mut unreachable = Vec::new();
+        for server in &self.servers {
+            let sent = self
+                .http
+                .get(format!("{server}{PROBE}"))
+                .bearer_auth(token)
+                .send()
+                .await;
+            match sent {
+                Ok(response) if !response.status().is_server_error() => {
+                    if response.status() == StatusCode::UNAUTHORIZED && revoked(&response) {
+                        self.ended(Ending::Revoked);
+                    }
+                    return Report {
+                        server: Some(server.clone()),
+                        problem: Some(ENDED.to_owned()),
+                    };
                 }
-                Report {
-                    server: Some(response.url().origin().ascii_serialization()),
-                    problem: Some(ENDED.to_owned()),
-                }
+                Ok(response) => unreachable.push(format!("{server} ({})", response.status())),
+                Err(error) => unreachable.push(format!("{server} ({})", reason(&error))),
             }
-            Err(problem) => Report {
-                server: None,
-                problem: Some(problem),
-            },
+        }
+        Report {
+            server: None,
+            problem: Some(couldnt_connect(&unreachable)),
         }
     }
 
@@ -1453,7 +1462,7 @@ mod tests {
 
     /// TC-UC7-12 (proposed FR-69): only the remote wipe's marker leads to the wipe. A round answered with it keeps the
     /// session (deleted last, by main.rs) and says so, sending nothing more; so do a chart download and the lock's check
-    /// of the password. Beside it, a plain 401 forgets the session as always, the 12-hour marker keeps it for a full
+    /// of the password. Beside it, a plain 401 ends the session, keeping its token, the 12-hour marker keeps it for a full
     /// sign-in, and a 426, which a server below whose minimum version this app is answers, is a problem like any other.
     #[tokio::test]
     async fn only_the_revoked_marker_leads_to_the_wipe() {
@@ -1624,6 +1633,27 @@ mod tests {
         assert_eq!(wiped.sign_out().await, Ok(()));
         assert_eq!(wiped.take_ending(), Some(Ending::Revoked));
         assert_eq!(saved(&credentials_revoked), Some(ended));
+    }
+
+    /// Step 20's re-check: an ended session's probe goes on to the next server when one answers 5xx, as a round does, so
+    /// a revocation reaches it through the cloud app while the clinic's server answers 503.
+    #[tokio::test]
+    async fn an_ended_sessions_probe_goes_past_a_server_that_cant_answer() {
+        let failing = FakeServer::start(|_| (503, "{}".to_owned()));
+        let revoking = FakeServer::start(|_| (REVOKED_STATUS, "{}".to_owned()));
+        let mut ended = offline_session();
+        ended["ended"] = json!(true);
+        let credentials = credentials(Some(ended));
+        let client = client_with(
+            &[&nothing_there(), &failing.url, &revoking.url],
+            &credentials,
+        );
+
+        let report = client.round(&memory_store()).await;
+
+        assert_eq!(client.take_ending(), Some(Ending::Revoked));
+        assert_eq!(report.server.as_deref(), Some(revoking.url.as_str()));
+        assert_eq!(failing.requests().len(), 1);
     }
 
     /// Step 20's final review: a redirect is an answer from another host, and is never followed, so the remote wipe's

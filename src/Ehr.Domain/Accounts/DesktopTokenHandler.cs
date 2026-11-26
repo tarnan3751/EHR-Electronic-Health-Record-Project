@@ -14,8 +14,8 @@ namespace Ehr.Domain.Accounts;
 // the base handler's answer: 401, with no redirect, since the app is not a browser. A token refused only because its
 // sign-in is 12 hours old (the expansion plan's step 19a) says so in SignInHeader, so the app asks for a full sign-in and
 // keeps its offline copy. A token an administrator revoked says so there too (step 20), and the app deletes everything
-// it keeps on that computer: the remote wipe. Every other refusal means the session is over, and the app forgets it,
-// keeping what it holds.
+// it keeps on that computer: the remote wipe. Every other refusal means the session is over: the app keeps what it holds,
+// opens nothing until a full sign-in, and keeps the token, so that a revocation made afterwards still reaches it.
 public sealed class DesktopTokenHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder,
     DesktopSessions sessions, IUserClaimsPrincipalFactory<StaffUser> principals)

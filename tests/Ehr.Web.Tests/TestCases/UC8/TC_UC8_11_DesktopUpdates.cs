@@ -12,7 +12,7 @@ namespace Ehr.Web.Tests.TestCases.UC8;
 //   update too: only the entry for the platform asked about, its file's address on the site that was asked, and the
 //   file itself; nothing for a platform with none, nothing with no folder, and no file outside the folder or the
 //   release's own list, nor a link in the folder to a file outside it; a latest.json written wrong gives nothing, not an
-//   error (step 20's final review).
+//   error, nor one with a key twice (step 20's final review and its re-check).
 // Type: Functional (successful flow)
 // Requirements: proposed FR-70
 // Use case: UC 8, Sync the desktop app
@@ -25,10 +25,10 @@ namespace Ehr.Web.Tests.TestCases.UC8;
 //   1. Ask each site for darwin-aarch64's update, then fetch the file it names.
 //   2. Ask for linux-x86_64's; fetch latest.json, a file not there, a name reaching out of the folder, and a link in the
 //      folder to a file outside it.
-//   3. Ask the app with no folder; then write latest.json wrong and ask again.
+//   3. Ask the app with no folder; then write latest.json wrong three ways and ask again each time.
 // Expected result: Step 1: 200, version 0.2.1, the notes, darwin-aarch64's signature alone, and its file at
 //   https://localhost/api/desktop/updates/files/SwiftChart.app.tar.gz, whose bytes come back. Step 2: 204, then 404
-//   each time. Step 3: 204, and 204.
+//   each time. Step 3: 204, and 204 each time.
 // Creator: Tahseen Arnan
 public sealed class TC_UC8_11_DesktopUpdates(WebApps apps) : IClassFixture<WebApps>, IDisposable
 {
@@ -97,7 +97,11 @@ public sealed class TC_UC8_11_DesktopUpdates(WebApps apps) : IClassFixture<WebAp
             Assert.Equal(HttpStatusCode.NoContent, nothing.StatusCode);
         }
 
-        foreach (var wrong in new[] { "{ \"version\": \"0.2.1\", \"platforms\": ", """{ "platforms": { "darwin-aarch64": { "url": 7 } } }""" })
+        foreach (var wrong in new[]
+        {
+            "{ \"version\": \"0.2.1\", \"platforms\": ", """{ "platforms": { "darwin-aarch64": { "url": 7 } } }""",
+            """{ "version": "0.2.1", "version": "0.2.2", "platforms": {} }""",
+        })
         {
             await File.WriteAllTextAsync(Path.Combine(folder, "latest.json"), wrong, Cancel);
             using var unreadable = await CreateClient(onPrem, handleCookies: false).GetAsync("/api/desktop/updates/darwin-aarch64/0.2.0", Cancel);

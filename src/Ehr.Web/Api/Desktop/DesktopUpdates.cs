@@ -89,7 +89,7 @@ public static class DesktopUpdates
             entry = release["platforms"]?[platform] as JsonObject;
             name = entry?["url"]?.GetValue<string>();
         }
-        catch (Exception problem) when (problem is JsonException or InvalidOperationException or NullReferenceException)
+        catch (Exception problem) when (problem is JsonException or InvalidOperationException or NullReferenceException or ArgumentException)
         {
             // A release put up by hand, written wrong: no update until it's put right, which the log says.
             loggers.CreateLogger(typeof(DesktopUpdates)).LogWarning("The desktop updates' {Manifest} can't be read: {Problem}", Manifest, problem.Message);
