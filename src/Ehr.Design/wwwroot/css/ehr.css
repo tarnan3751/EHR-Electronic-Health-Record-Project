@@ -790,6 +790,72 @@
         accent-color: var(--primary);
     }
 
+    /* A question answered by choosing one of its answers (a pre-visit form, step 13e): a fieldset whose legend is the
+       question, and each answer a whole-width label with its radio button, as tall as a portal control. The arrow keys
+       move between a question's answers; the focus ring is the radio button's own. */
+    .sc-choice {
+        border: 0;
+        padding: 0;
+        margin: 0 0 var(--space-6);
+        max-width: var(--width-reading);
+    }
+
+    .sc-choice > legend {
+        padding: 0;
+        margin-bottom: var(--space-2);
+        font-size: inherit;
+        line-height: inherit;
+        font-weight: 600;
+    }
+
+    .sc-choice__option {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        min-height: var(--control-height-portal);
+        margin-top: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        cursor: pointer;
+    }
+
+    .sc-choice__option:has(input:checked) {
+        border-color: var(--primary);
+        background: var(--surface-subtle);
+    }
+
+    .sc-choice__option input {
+        flex: none;
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        accent-color: var(--primary);
+    }
+
+    /* A form's answers: each question, then the answer chosen beneath it, at every width. A question is a sentence, so
+       a two-column list of facts (dl.record) would give it the whole width and squeeze the answer. */
+    .sc-answers {
+        max-width: var(--width-reading);
+        margin: 0 0 var(--space-6);
+    }
+
+    .sc-answers > dt {
+        color: var(--ink-muted);
+    }
+
+    .sc-answers > dd {
+        margin: var(--space-1) 0 var(--space-4);
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .sc-answers__score {
+        color: var(--ink-muted);
+        font-weight: 400;
+    }
+
     /* Notice. It starts with its state, so the color only supports the words. */
     .sc-notice {
         border-radius: var(--radius-md);
@@ -1221,7 +1287,8 @@
         border-radius: var(--radius-lg);
     }
 
-    /* A plain list of record lines, one per row. */
+    /* A plain list of record lines, one per row. A word too long for the line, such as an email address on a phone,
+       wraps inside it. */
     .sc-list {
         list-style: none;
         padding: 0;
@@ -1231,6 +1298,7 @@
         margin: 0;
         padding: var(--space-2) 0;
         border-bottom: 1px solid var(--line);
+        overflow-wrap: anywhere;
     }
 
     .sc-list > li:last-child {
@@ -1780,6 +1848,83 @@
 }
 
 @layer pages {
+    /* On paper (docs/brand: Printed pages). Any page prints as its content: no app bar, button or anything marked
+       sc-screen-only. The bands under the app bar stay, without their buttons, since the paper must say what they say:
+       whose record it is when a proxy prints it, and that the copy may be behind the clinic's server off-site. Its ink is the brand navy on no ground, whatever the theme on screen: the color tokens are set
+       again for the page, to the brand's own colors, which no theme changes, or to nothing, so a dark screen doesn't print
+       light text. Tables aren't clipped or scrolled, a row or an entry isn't split across pages, and a heading stays with
+       what follows it. Nothing here applies on screen. */
+    @media print {
+        /* The page's own ground is the paper's, in the light scheme: tokens.css sets the scheme on the root outside the
+           layers, so only an important declaration here wins over it. */
+        :root {
+            color-scheme: light !important;
+        }
+
+        .sc-app {
+            --surface: transparent;
+            --surface-subtle: transparent;
+            --surface-raised: transparent;
+            --line: color-mix(in srgb, var(--brand-navy) 25%, transparent);
+            --line-strong: color-mix(in srgb, var(--brand-navy) 50%, transparent);
+            --ink: var(--brand-navy);
+            --ink-muted: var(--brand-navy);
+            --accent-ink: var(--brand-navy);
+            --danger: var(--brand-navy);
+            --warning: var(--brand-navy);
+            --success: var(--brand-navy);
+            --info: var(--brand-navy);
+            --status-unknown: var(--brand-navy);
+            --danger-soft: transparent;
+            --warning-soft: transparent;
+            --success-soft: transparent;
+            --info-soft: transparent;
+            --accent-soft: transparent;
+            --row-flagged: transparent;
+            --shadow-float: none;
+            --shadow-dialog: none;
+        }
+
+        .sc-appbar,
+        .sc-skip,
+        .sc-screen-only,
+        .sc-btn,
+        button {
+            display: none;
+        }
+
+        .sc-page,
+        .sc-page--reading,
+        .sc-page--form {
+            max-width: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .sc-banner,
+        .sc-table th {
+            position: static;
+        }
+
+        .sc-table-wrap {
+            overflow: visible;
+        }
+
+        tr,
+        dl.record,
+        .sc-results > li,
+        .sc-result {
+            break-inside: avoid;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            break-after: avoid;
+        }
+    }
+
     /* The "Not saved" page: what was typed, kept to copy, each entry in a read-only box under its name. */
     .sc-kept label {
         display: flex;
@@ -1931,6 +2076,20 @@
         margin-bottom: 0;
     }
 
+    /* A portal card with nothing to open (a visit summary, or the placeholder of a withdrawn one): the brand guide's
+       card padding on the card itself, where the results page puts it on a card's summary line and body. */
+    .sc-result--plain {
+        padding: var(--space-4) var(--space-6);
+    }
+
+    .sc-result--plain > :first-child {
+        margin-top: 0;
+    }
+
+    .sc-result--plain > :last-child {
+        margin-bottom: 0;
+    }
+
     @media (max-width: 40rem) {
         .sc-app--portal dl.record {
             grid-template-columns: 1fr;
@@ -1947,6 +2106,10 @@
 
         .sc-result__body {
             padding: 0 var(--space-4) var(--space-4);
+        }
+
+        .sc-result--plain {
+            padding: var(--space-4);
         }
 
         .sc-app--portal .sc-panel {

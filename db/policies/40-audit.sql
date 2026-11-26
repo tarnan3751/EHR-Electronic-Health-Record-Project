@@ -127,6 +127,8 @@ AS $$
     WHERE e.id = ANY(event_ids) AND (SELECT ehr.is_admin()) AND NOT e.sensitive
       -- Nor the text of what a patient and their care team wrote to each other.
       AND e.table_name IS DISTINCT FROM 'chart_history' AND e.table_name IS DISTINCT FROM 'messages' AND e.table_name IS DISTINCT FROM 'message_threads'
+      -- Nor a refill request's (step 13d): the medication asked for, the patient's note and the care team's answer.
+      AND e.table_name IS DISTINCT FROM 'refill_requests'
       AND e.details IS NOT NULL
 $$;
 REVOKE ALL ON FUNCTION ehr.shown_audit_details(uuid[]) FROM PUBLIC;
@@ -189,6 +191,14 @@ CREATE OR REPLACE TRIGGER note_addenda_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.note_addenda
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
+CREATE OR REPLACE TRIGGER visit_summaries_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.visit_summaries
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER refill_requests_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.refill_requests
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
 CREATE OR REPLACE TRIGGER ai_note_reviews_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.ai_note_reviews
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
@@ -218,6 +228,14 @@ CREATE OR REPLACE TRIGGER messages_audit
 
 CREATE OR REPLACE TRIGGER appointments_audit
     AFTER INSERT OR UPDATE OR DELETE ON ehr.appointments
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER questionnaire_requests_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.questionnaire_requests
+    FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
+
+CREATE OR REPLACE TRIGGER questionnaire_responses_audit
+    AFTER INSERT OR UPDATE OR DELETE ON ehr.questionnaire_responses
     FOR EACH ROW EXECUTE FUNCTION ehr.record_write();
 
 CREATE OR REPLACE TRIGGER inbox_items_audit

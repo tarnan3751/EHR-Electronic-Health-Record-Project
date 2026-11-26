@@ -112,7 +112,7 @@ GRANT SELECT ON ehr.result_acknowledgments TO ehr_read;
 GRANT INSERT ON ehr.audit_events TO ehr_app;
 -- Every column but details, which holds the values a write changed: admins get those through
 -- ehr.shown_audit_details (40-audit.sql), which never gives a sensitive item's.
-GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, sensitive) ON ehr.audit_events TO ehr_app, ehr_read;
+GRANT SELECT (id, occurred_at, actor_id, action, table_name, row_id, patient_id, source, reason, sensitive, part) ON ehr.audit_events TO ehr_app, ehr_read;
 
 GRANT SELECT, INSERT, UPDATE ON ehr.clinical_drafts TO ehr_app;
 
@@ -132,6 +132,23 @@ GRANT UPDATE (sensitive, sensitive_reason) ON ehr.clinical_notes TO ehr_app;
 GRANT SELECT, INSERT ON ehr.note_addenda TO ehr_app;
 GRANT UPDATE (sensitive, sensitive_reason) ON ehr.note_addenda TO ehr_app;
 GRANT SELECT ON ehr.note_addenda TO ehr_read;
+
+-- Visit summaries (step 13a): what a clinician writes for the patient from a signed note. PHI: row-level security, the
+-- write-audit trigger and the trigger that holds every change follow (52-visit-summaries.sql). A clinician releases
+-- one (INSERT). The UPDATEs the apps make are withdrawing it, with a reason, and marking it sensitive or unmarking it,
+-- with a reason, as for an addendum, on those columns alone: who and when, and whether a mark is inherited, are the
+-- database's. Never DELETE. The portal reads them on either server.
+GRANT SELECT, INSERT ON ehr.visit_summaries TO ehr_app;
+GRANT UPDATE (withdrawn_reason, sensitive, sensitive_reason) ON ehr.visit_summaries TO ehr_app;
+GRANT SELECT ON ehr.visit_summaries TO ehr_read;
+
+-- Refill requests (step 13d): a patient's ask to renew a medication. PHI: row-level security, the write-audit trigger
+-- and the trigger that holds every change follow (77-refill-requests.sql). A patient or their proxy asks (INSERT). The
+-- one UPDATE the apps make is the answer, on these two columns alone: the order that approves it, or the message that
+-- declines it; its state, who and when, what was ordered and its sensitivity are the database's. Never DELETE.
+GRANT SELECT, INSERT ON ehr.refill_requests TO ehr_app;
+GRANT UPDATE (order_id, decline_message) ON ehr.refill_requests TO ehr_app;
+GRANT SELECT ON ehr.refill_requests TO ehr_read;
 
 -- UC 1 (Tahseen Arnan). The catalog of what can be ordered: not PHI, grants only, seeded by its migration and read by
 -- both apps. Nothing at runtime changes it.
@@ -170,6 +187,13 @@ GRANT SELECT, INSERT ON ehr.appointments TO ehr_app;
 GRANT UPDATE (starts_at, minutes, reason, status, cancel_reason, encounter_id) ON ehr.appointments TO ehr_app;
 GRANT SELECT ON ehr.appointments TO ehr_read;
 GRANT INSERT ON ehr.encounters TO ehr_app;
+
+-- Pre-visit forms (step 13e): a clinician's request that a patient fill in a questionnaire before an appointment, and
+-- the answers. PHI, and sensitive items always: row-level security and the write-audit trigger follow. A clinician
+-- asks and a portal session answers: INSERT, which a trigger holds to what each may do and fills in itself
+-- (85-pre-visit-forms.sql). Never UPDATE or DELETE: a form is a record.
+GRANT SELECT, INSERT ON ehr.questionnaire_requests, ehr.questionnaire_responses TO ehr_app;
+GRANT SELECT ON ehr.questionnaire_requests, ehr.questionnaire_responses TO ehr_read;
 
 -- The staff inbox: what needs a staff member's action. PHI: row-level security and the write-audit trigger follow.
 -- Read by its recipient. The one change is marking an item done: UPDATE on that column alone, and a trigger sets the

@@ -73,6 +73,11 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     // What needs a staff member's action (PHI: an item names a patient).
     public DbSet<Inbox.InboxItem> InboxItems => Set<Inbox.InboxItem>();
 
+    // Pre-visit forms (the expansion plan's step 13e; PHI, and sensitive items): the requests and their answers.
+    public DbSet<Forms.QuestionnaireRequest> QuestionnaireRequests => Set<Forms.QuestionnaireRequest>();
+
+    public DbSet<Forms.QuestionnaireResponse> QuestionnaireResponses => Set<Forms.QuestionnaireResponse>();
+
     // The rest of the reference data (Ehr.Data.Reference): not PHI.
     public DbSet<Reference.ObservationCode> ObservationCodes => Set<Reference.ObservationCode>();
 
@@ -100,6 +105,12 @@ public class EhrDbContext(DbContextOptions<EhrDbContext> options) : DbContext(op
     public DbSet<ClinicalNote> ClinicalNotes => Set<ClinicalNote>();
 
     public DbSet<NoteAddendum> NoteAddenda => Set<NoteAddendum>();
+
+    // What a clinician wrote for the patient from a signed note (step 13a): PHI, and the portal's way to a note.
+    public DbSet<VisitSummary> VisitSummaries => Set<VisitSummary>();
+
+    // A patient's ask to renew a medication, and the care team's answer (step 13d): PHI.
+    public DbSet<RefillRequest> RefillRequests => Set<RefillRequest>();
 
     // UC 1: the orders clinicians sign, PHI like the chart (read them only through the PHI reader), and the catalog of
     // what can be ordered, which isn't.

@@ -57,19 +57,32 @@ public class OrderResultCode
     public required string ObservationCode { get; set; }
 }
 
-// A questionnaire a patient fills in before a visit: PHQ-9 and GAD-7, each by its LOINC panel code. The definition is
-// one JSON document: the items with their LOINC codes and texts, the answers with their scores, and the score's
-// severity bands.
+// A questionnaire a patient fills in before a visit: PHQ-9 and GAD-7, each by its LOINC panel code, worded as their
+// authors' forms are (the expansion plan's step 13e). Its rows are hand-written in db/reference/36-questionnaires.sql,
+// which describes the definition's shape and cites each source.
 public class Questionnaire
 {
     public required string Code { get; set; }
 
     public required string Title { get; set; }
 
+    // One JSON document: the prompt, the questions with their LOINC codes and texts, the lists of answers with their
+    // scores, the total, its severity bands, the score that needs follow-up, and the authors' attribution line.
     public required string Definition { get; set; }
 
     // The notice its owner asks for, from LOINC's EXTERNAL_COPYRIGHT_NOTICE.
     public string? Copyright { get; set; }
+}
+
+// The notices a questionnaire's alert question may name (its definition's help): the portal words each (FormNotices in
+// the web app) and shows it with an answer to that question that needs review. A definition naming any other fails
+// QuestionnaireDefinitionTests, and FormNotices lacking words for one fails the web tests.
+public static class QuestionnaireHelp
+{
+    // Thoughts of self-harm: what to do now, and the crisis line.
+    public const string SelfHarm = "self-harm";
+
+    public static readonly string[] All = [SelfHarm];
 }
 
 // An ingredient of a drug product, both by RxNorm code: what a medication is made of, for checking it against

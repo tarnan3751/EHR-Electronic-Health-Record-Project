@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Ehr.Web.Areas.Clinical.Pages.Account;
 
 // The first step of a staff sign-in: the password. The account then goes on to whatever it still owes, and to its
-// second factor (StaffSignIn.NextStepAsync), carried between the steps by the StaffPending cookie.
+// second factor (StaffSignIn.NextStepAsync), carried between the steps by the StaffPending cookie. ReturnUrl is carried
+// along, and the step that ends the sign-in goes on to its page without its query, but for a patient search's criteria
+// (Links.LocalPage, SearchQuery.Parameters): a link can't ask through sign-in for sensitive items, here or in the portal.
 public class SignInModel(StaffSignIn signIn) : PageModel
 {
     [BindProperty]
@@ -19,7 +21,7 @@ public class SignInModel(StaffSignIn signIn) : PageModel
     public string? Message { get; set; }
 
     public IActionResult OnGet() =>
-        User.Identity?.IsAuthenticated == true ? LocalRedirect(Links.Local(Url, ReturnUrl, "/")) : Page();
+        User.Identity?.IsAuthenticated == true ? LocalRedirect(Links.LocalPage(Url, ReturnUrl, "/", Patients.SearchQuery.Parameters)) : Page();
 
     public async Task<IActionResult> OnPostAsync()
     {

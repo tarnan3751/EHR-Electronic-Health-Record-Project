@@ -94,7 +94,7 @@ public class LabDoorTests(WebApps apps) : IClassFixture<WebApps>
     {
         var (_, patient, session) = await OnPanelAsync(apps);
         var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
-        var collected = DateTimeOffset.UtcNow.AddMinutes(-20);
+        DateTimeOffset collected = (await apps.Database.NowAsync()).AddMinutes(-20);
         collected = collected.AddTicks(-(collected.Ticks % TimeSpan.TicksPerMillisecond));
         var chicago = collected.ToOffset(TimeSpan.FromHours(-6)).ToString("yyyy-MM-ddTHH:mm:ss.fffffffzzz", CultureInfo.InvariantCulture);
         Assert.EndsWith("-06:00", chicago, StringComparison.Ordinal);
@@ -127,8 +127,8 @@ public class LabDoorTests(WebApps apps) : IClassFixture<WebApps>
             Assert.EndsWith("Z", Assert.Single(body.GetProperty("orders").EnumerateArray()).GetProperty("signedAt").GetString(), StringComparison.Ordinal);
 
             var lab = new LabSimulator(Client(apps.OnPrem), LabSettings.Default, _ => { }, since);
-            Assert.Equal(new LabRound(1, 0, 0, 1), await lab.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(-1), Cancel));
-            Assert.Equal(new LabRound(0, 1, 0, 0), await lab.RunOnceAsync(DateTimeOffset.UtcNow.AddMinutes(1), Cancel));
+            Assert.Equal(new LabRound(1, 0, 0, 1), await lab.RunOnceAsync((await apps.Database.NowAsync()).AddMinutes(-1), Cancel));
+            Assert.Equal(new LabRound(0, 1, 0, 0), await lab.RunOnceAsync((await apps.Database.NowAsync()).AddMinutes(1), Cancel));
             Assert.Contains(await FiledAsync(apps, patient), row => row.StartsWith("3016-3 ", StringComparison.Ordinal) && row.EndsWith(" high", StringComparison.Ordinal));
             Assert.Equal("completed", await StatusAsync(apps, patient));
             Assert.Equal("America/Chicago", await SessionTimeZoneAsync());

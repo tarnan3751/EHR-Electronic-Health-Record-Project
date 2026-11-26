@@ -47,14 +47,26 @@ public class PortalSubjectTests
     // session's patient's own (PhiReader.ThreadAsync takes the patient from the session; row-level security returns
     // nothing else). A grant is found only among those the signed-in account gave for its own record, or those
     // addressed to it that are in force (PhiReader.ProxyGrantsAsync and ProxiedRecordAsync, and row-level security).
+    // A pre-visit form (step 13e) is found only among the session's patient's own, and only with sensitive items
+    // (PhiReader.PortalFormAsync takes the patient from the session; row-level security returns nothing else).
     // Adding a name here is a change to who can reach what: it needs line-by-line review.
-    static readonly string[] RecordsOfTheSessionsPatient = ["threadId", "grantId"];
+    static readonly string[] RecordsOfTheSessionsPatient = ["threadId", "grantId", "requestId"];
 
     // The exception above is no wider than it says: every handler that takes a thread reads it for the session's patient.
     [Fact]
     public void A_portal_handler_that_takes_a_thread_reads_it_for_the_sessions_patient()
     {
         var models = PortalPageModels.Where(model => model.GetMethods().Any(method => method.GetParameters().Any(p => p.Name == "threadId"))).ToList();
+
+        Assert.NotEmpty(models);
+        Assert.All(models, model => Assert.NotNull(model.GetProperty("PatientId", BindingFlags.NonPublic | BindingFlags.Instance)));
+    }
+
+    // And every handler that takes a pre-visit form reads it for the session's patient (step 13e).
+    [Fact]
+    public void A_portal_handler_that_takes_a_form_reads_it_for_the_sessions_patient()
+    {
+        var models = PortalPageModels.Where(model => model.GetMethods().Any(method => method.GetParameters().Any(p => p.Name == "requestId"))).ToList();
 
         Assert.NotEmpty(models);
         Assert.All(models, model => Assert.NotNull(model.GetProperty("PatientId", BindingFlags.NonPublic | BindingFlags.Instance)));

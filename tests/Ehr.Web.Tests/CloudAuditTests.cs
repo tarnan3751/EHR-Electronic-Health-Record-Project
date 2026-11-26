@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Ehr.Data.Audit;
+using Ehr.Domain.Phi;
 using Ehr.Web.Api.Audit;
 using Ehr.Web.CloudAudit;
 using Ehr.Web.Forwarding;
@@ -270,6 +271,16 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("a sign-out with no actor")]
     [InlineData("a sign-out of an empty patient")]
     [InlineData("a hand-over to the lab")]
+    [InlineData("a download of another row")]
+    [InlineData("a download from another table")]
+    [InlineData("a download of a signed note")]
+    [InlineData("a download of a visit summary")]
+    [InlineData("a view of who viewed with a row")]
+    [InlineData("a view of who viewed as sensitive")]
+    [InlineData("a part nothing records")]
+    [InlineData("a part of another kind of read")]
+    [InlineData("a read's part on a download")]
+    [InlineData("a part on a sign-out")]
     public async Task Only_reads_of_one_patient_by_a_signed_in_account_are_taken(string what)
     {
         var good = Event(Guid.CreateVersion7());
@@ -325,6 +336,51 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
                 bad.TableName = "orders";
                 bad.RowId = Guid.CreateVersion7();
                 break;
+            // A portal download (step 13b) is of one patient's record, as a read of the patient is, and nothing else.
+            case "a download of another row":
+                bad.Action = AuditActions.Download;
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            case "a download from another table":
+                bad.Action = AuditActions.DownloadSensitive;
+                bad.TableName = "observations";
+                break;
+            // Shapes a read may have and a download may not: a download is of the record, never of one row in it.
+            case "a download of a signed note":
+                bad.Action = AuditActions.Download;
+                bad.TableName = "clinical_notes";
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            case "a download of a visit summary":
+                bad.Action = AuditActions.DownloadSensitive;
+                bad.TableName = "visit_summaries";
+                bad.RowId = Guid.CreateVersion7();
+                break;
+            // The portal's "Who viewed my record" (step 13c) is a read of the patient's part of the log, which names
+            // no row, and only a plain read.
+            case "a view of who viewed with a row":
+                bad = ViewsEvent(Guid.CreateVersion7());
+                bad.RowId = bad.PatientId;
+                break;
+            case "a view of who viewed as sensitive":
+                bad = ViewsEvent(Guid.CreateVersion7());
+                bad.Action = AuditActions.ReadSensitive;
+                break;
+            // Which part of the record a read was for (step 13c2): only one the PHI reader records that kind of read with.
+            case "a part nothing records":
+                bad.Part = "notes";
+                break;
+            case "a part of another kind of read":
+                bad.Part = AuditParts.Views;
+                break;
+            case "a read's part on a download":
+                bad.Action = AuditActions.Download;
+                bad.Part = AuditParts.Chart;
+                break;
+            case "a part on a sign-out":
+                bad = SignOutEvent();
+                bad.Part = AuditParts.Chart;
+                break;
         }
 
         using var response = await PostAsync(what == "null" ? [good, null] : [good, bad], WebApps.CloudAuditKey);
@@ -350,6 +406,54 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.True(await RecordedAsync(staff.Id));
         Assert.True(await RecordedAsync(patient.Id));
+    }
+
+    [Fact]
+    public async Task A_view_of_who_viewed_the_record_is_taken_in_its_one_shape()
+    {
+        var view = ViewsEvent(Guid.CreateVersion7());
+
+        using var response = await PostAsync([view], WebApps.CloudAuditKey);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(await RecordedAsync(view.Id));
+    }
+
+    // Each kind of read with each part the PHI reader records it with, and with none, as a cloud app older than step 13c2
+    // queued it: all taken, each with its part.
+    [Fact]
+    public async Task Each_read_is_taken_with_a_part_it_is_recorded_with_or_none()
+    {
+        var events = new List<AuditEvent>();
+        foreach (var ((action, table), parts) in CloudAuditEvents.Parts)
+        {
+            foreach (var part in parts.Append(null))
+            {
+                var read = table == PhiReader.AuditTable ? ViewsEvent(Guid.CreateVersion7()) : Event(Guid.CreateVersion7());
+                read.Action = action;
+                read.TableName = table;
+                read.RowId = table == PhiReader.PatientsTable ? read.PatientId : table == PhiReader.AuditTable ? null : Guid.CreateVersion7();
+                read.Part = part;
+                events.Add(read);
+            }
+        }
+
+        using var response = await PostAsync([.. events], WebApps.CloudAuditKey);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await using var connection = await apps.OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand("SELECT id, part FROM ehr.audit_events WHERE id = ANY(@ids)", connection);
+        command.Parameters.AddWithValue("ids", events.Select(e => e.Id).ToArray());
+        var recorded = new Dictionary<Guid, string?>();
+        await using (var reader = await command.ExecuteReaderAsync(Cancel))
+        {
+            while (await reader.ReadAsync(Cancel))
+            {
+                recorded[reader.GetGuid(0)] = reader.IsDBNull(1) ? null : reader.GetString(1);
+            }
+        }
+
+        Assert.Equal(events.ToDictionary(e => e.Id, e => e.Part), recorded);
     }
 
     [Fact]
@@ -431,6 +535,15 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
         TableName = "patients",
         RowId = patient,
     };
+
+    // The portal's "Who viewed my record" as the PHI reader records it (step 13c): the patient's part of the log, no row.
+    static AuditEvent ViewsEvent(Guid patient)
+    {
+        var view = Event(patient);
+        view.TableName = "audit_events";
+        view.RowId = null;
+        return view;
+    }
 
     // Whether the event with this ID is in the audit log, read as the superuser.
     async Task<bool> RecordedAsync(Guid id)

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Notes;
 using Ehr.Domain.Patients;
@@ -9,9 +10,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Ehr.Web.Areas.Clinical.Pages.Patients.Notes;
 
 // Marking a signed note, or one of its addenda, sensitive after signing, or unmarking it, with a reason (the expansion
-// plan's step 10b). The text never changes. A clinician with the patient on their panel marks; only the person who
-// made it sensitive, or the note's signer, unmarks: the page says so instead of offering a form to anyone else, and the
-// database refuses them whatever is posted. Off-site the post is forwarded to the clinic's server.
+// plan's step 10b); or one of its visit summaries, under the same rules (step 13a). The text never changes. A clinician
+// with the patient on their panel marks; only the person who made it sensitive, or the note's signer, unmarks: the page
+// says so instead of offering a form to anyone else, and the database refuses them whatever is posted. Off-site the
+// post is forwarded to the clinic's server.
 [ShownIfNotSaved(nameof(Reason))]
 public class SensitivityModel(PhiReader phi, PatientAssignments assignments, BreakGlass breakGlass, ClinicalNotes notes)
     : PatientNotePage(phi, assignments, breakGlass)
@@ -21,6 +23,10 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
     // The addendum, when it is one and not the note itself.
     [BindProperty(SupportsGet = true)]
     public Guid? Addendum { get; set; }
+
+    // The visit summary, when it is one (step 13a).
+    [BindProperty(SupportsGet = true)]
+    public Guid? Summary { get; set; }
 
     [BindProperty]
     public string? Reason { get; set; }
@@ -34,14 +40,19 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
 
     public AddendumEntry? Entry { get; private set; }
 
+    public VisitSummaryEntry? SummaryEntry { get; private set; }
+
+    // Whether the note or an addendum is sensitive: a summary can't be unmarked then (step 13a).
+    public bool SourcesSensitive { get; private set; }
+
     // Whether it is sensitive now: the page offers the other.
     public bool Sensitive { get; private set; }
 
     // Whether the signed-in clinician may unmark it: they made it sensitive, or they signed the note.
     public bool MayUnmark { get; private set; }
 
-    // An addendum can't be unmarked while its note is sensitive.
-    public bool HeldByNote => Entry is not null && Note.Sensitive;
+    // An addendum can't be unmarked while its note is sensitive, nor a summary while the note or an addendum is.
+    public bool HeldByNote => (Entry is not null && Note.Sensitive) || (SummaryEntry is not null && SourcesSensitive);
 
     public bool IsSigner { get; private set; }
 
@@ -63,12 +74,12 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
 
         var result = mark == Sensitive
             ? new SensitivityResult(StatusCodes.Status409Conflict, [mark ? "It is already marked sensitive. Nothing was changed." : "It is already unmarked. Nothing was changed."])
-            : await notes.SetSensitivityAsync(patientId, noteId, Addendum, mark, Reason, HttpContext.RequestAborted);
+            : await notes.SetSensitivityAsync(patientId, noteId, Addendum, mark, Reason, HttpContext.RequestAborted, Summary);
         if (result.Status == StatusCodes.Status200OK)
         {
             // What was just marked is shown to the person who marked it, as a recorded view.
-            return RedirectToPage("View", null, new { patientId, noteId, done = mark ? "marked" : "unmarked", sensitive = mark && Addendum is not null ? true : (bool?)null },
-                Addendum is null ? null : "addenda");
+            return RedirectToPage("View", null, new { patientId, noteId, done = mark ? "marked" : "unmarked", sensitive = mark && (Addendum ?? Summary) is not null ? true : (bool?)null },
+                Addendum is not null ? "addenda" : Summary is not null ? "summary" : null);
         }
 
         Errors = result.Errors;
@@ -78,7 +89,7 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
 
     async Task<IActionResult?> LoadAsync(Guid patientId, Guid noteId)
     {
-        if (await LoadPatientAsync(patientId) is { } denied)
+        if (await LoadPatientAsync(patientId, AuditParts.VisitNote) is { } denied)
         {
             return denied;
         }
@@ -105,6 +116,17 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
 
             Entry = entry;
             (Sensitive, MayUnmark) = (entry.Sensitive, me == (entry.SensitiveMarkedBy ?? entry.AuthorId) || me == note.SignerId);
+        }
+        else if (Summary is { } summary)
+        {
+            if (await Phi.NoteSummaryAsync(note, summary, HttpContext.RequestAborted) is not { } entry)
+            {
+                return NotFound();
+            }
+
+            SummaryEntry = entry;
+            SourcesSensitive = await Phi.NoteSourcesSensitiveAsync(note, HttpContext.RequestAborted);
+            (Sensitive, MayUnmark) = (entry.Sensitive, me == (entry.SensitiveMarkedBy ?? entry.ReleasedById) || me == note.SignerId);
         }
         else
         {

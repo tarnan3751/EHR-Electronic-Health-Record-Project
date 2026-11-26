@@ -186,6 +186,6 @@ public class TC_UC19_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(R4.OperationOutcome.IssueSeverity.Warning,
             Assert.IsType<R4.OperationOutcome>(bundle.Entry.Single(e => e.Search?.Mode == R4.Bundle.SearchEntryMode.Outcome).Resource).Issue.Single().Severity);
         // The oldest, taken 601 hours ago, is the one left out.
-        Assert.True(found.Min(o => Assert.IsType<R4.FhirDateTime>(o.Effective).ToDateTimeOffset(TimeSpan.Zero)) > DateTimeOffset.UtcNow.AddHours(-601));
+        Assert.True(found.Min(o => Assert.IsType<R4.FhirDateTime>(o.Effective).ToDateTimeOffset(TimeSpan.Zero)) > (DateTimeOffset)(await apps.Database.NowAsync()).AddHours(-601));
     }
 }

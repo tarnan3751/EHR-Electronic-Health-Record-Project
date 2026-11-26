@@ -18,10 +18,19 @@
 --   3. for a replacement (replaces_order_id), refuses one whose replaced order isn't an active order of the same
 --      patient and type. The change is finished by discontinuing that order in the same transaction, which
 --      ehr.check_order_replacement() checks at commit.
---   4. refuses an active order for an item the patient already has an active order for, unless it gives a reason. The
---      order a replacement replaces doesn't count: it is discontinued in the same transaction. Two submissions at once
---      can't both get through: the second waited at the lock. The error is unique_violation (23505), which
---      Ehr.Domain.Orders.ClinicalOrders turns into the order form's warning.
+--   4. refuses an active order for a product the patient already has an active order for, unless it gives a reason.
+--      The same product is the same catalog item or, for a medication, another item for the same RxNorm product: an
+--      item's standard_code where its standard_system is 'rxnorm', which for RxNorm's own items is their code. The
+--      clinic's common item and RxNorm's (SYN-MED-001 "Lisinopril 10 mg tablet" and 314076 "lisinopril 10 MG Oral
+--      Tablet") are one drug at one strength, which a clinician may pick either way and a refill's approval (step
+--      13d, 77-refill-requests.sql) always picks as RxNorm's; another strength is another product. The lookup
+--      probes the catalog by its primary key for the new item, and for a patient's few active orders for each of
+--      theirs; with hundreds of active orders PostgreSQL reads the catalog once instead (about 6 ms for 13,500 items:
+--      standard_code has no index), at signing only. The order a
+--      replacement replaces doesn't count: it is discontinued in the same transaction. Two submissions at once can't
+--      both get through: the second waited at the lock. The error is unique_violation (23505), which
+--      Ehr.Domain.Orders.ClinicalOrders turns into the order form's warning; PhiReader's order form finds the same
+--      orders, so the warning and the refusal agree.
 --   5. sets the signing time to the clock's, as signing a note does, whatever the client sent: an order that waited
 --      at the lock is signed after the one it waited for. The signer is the column's default, the
 --      signed-in user, and the row-level security policy refuses any other.
@@ -29,6 +38,8 @@ CREATE OR REPLACE FUNCTION ehr.sign_order() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path = pg_catalog, pg_temp
 AS $$
+DECLARE
+    ordered_product text;
 BEGIN
     IF current_setting('transaction_isolation') <> 'read committed' THEN
         RAISE EXCEPTION 'An order is signed in a READ COMMITTED transaction' USING ERRCODE = '0A000';
@@ -51,11 +62,20 @@ BEGIN
         END IF;
     END IF;
 
+    IF NEW.type = 'medication' THEN
+        SELECT i.standard_code INTO ordered_product
+        FROM ehr.order_catalog_items i
+        WHERE i.code = NEW.catalog_code AND i.type = 'medication' AND i.standard_system = 'rxnorm';
+    END IF;
     IF coalesce(NEW.duplicate_reason, '') !~ '[^[:space:]]'
        AND EXISTS (
            SELECT 1 FROM ehr.orders o
-           WHERE o.patient_id = NEW.patient_id AND o.catalog_code = NEW.catalog_code AND o.status = 'active'
-             AND o.id IS DISTINCT FROM NEW.replaces_order_id) THEN
+           WHERE o.patient_id = NEW.patient_id AND o.status = 'active' AND o.id IS DISTINCT FROM NEW.replaces_order_id
+             AND (o.catalog_code = NEW.catalog_code
+                  OR (ordered_product IS NOT NULL AND o.type = 'medication' AND EXISTS (
+                      SELECT 1 FROM ehr.order_catalog_items i
+                      WHERE i.code = o.catalog_code AND i.type = 'medication' AND i.standard_system = 'rxnorm'
+                        AND i.standard_code = ordered_product)))) THEN
         RAISE EXCEPTION 'The patient already has an active order for this item; give a reason to order it again'
             USING ERRCODE = '23505';
     END IF;

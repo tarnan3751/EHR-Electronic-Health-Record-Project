@@ -1,3 +1,4 @@
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
@@ -36,7 +37,7 @@ public class DictateModel(PhiReader phi, PatientAssignments assignments) : PageM
             return RedirectToPage("Chart", Search.ChartRouteValues(id));
         }
 
-        var header = await phi.HeaderAsync(id, HttpContext.RequestAborted);
+        var header = await phi.HeaderAsync(id, AuditParts.NoteDraft, HttpContext.RequestAborted);
         if (header is null)
         {
             return NotFound();
@@ -51,7 +52,7 @@ public class DictateModel(PhiReader phi, PatientAssignments assignments) : PageM
             if (draft is null) return NotFound();
             if (await phi.SignedDraftAsync(idOfDraft, id, HttpContext.RequestAborted) is { } signed)
                 return RedirectToPage("Notes/View", new { patientId = id, noteId = signed.Id });
-            var review = (await phi.AiReviewsAsync(idOfDraft, HttpContext.RequestAborted))
+            var review = (await phi.AiReviewsAsync(idOfDraft, AuditParts.NoteDraft, HttpContext.RequestAborted))
                 .FirstOrDefault(r => r.State is AiReviewStates.Pending or AiReviewStates.Recording);
             if (review is not null)
                 return RedirectToPage("Notes/Review", new { patientId = id, draftId = idOfDraft, reviewId = review.Id });

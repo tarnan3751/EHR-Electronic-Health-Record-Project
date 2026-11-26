@@ -1,0 +1,147 @@
+@page "/portal/refills"
+@using Ehr.Data.Patients
+@using Ehr.Domain.Refills
+@model RefillsModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    ViewData["Title"] = "Renew a medication";
+    var own = Model.Own;
+}
+@* Step 13d. No ID anywhere: a medication is named by its protected reference, and a request by nothing at all. *@
+<h1>Renew a medication</h1>
+@if (Model.Refills is not { } refills)
+{
+    <p class="sc-notice sc-notice--danger">@(own ? "Your medications are" : "Medications are") not available right now. Contact the clinic if this continues.</p>
+}
+else
+{
+    @if (Model.Sent)
+    {
+        <p class="sc-notice sc-notice--success" role="status" data-refill-sent><span class="sc-notice__state">Sent:</span> the care team will answer your request here.</p>
+    }
+    @if (Model.MaySeeSensitive && refills.SensitiveHidden > 0)
+    {
+        @* Left out until asked for (docs/brand: sensitive items). Asking is a link, a read the cloud app answers too. *@
+        <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @refills.SensitiveHidden @(refills.SensitiveHidden == 1 ? "item is" : "items are") not shown. <a asp-page="/Refills" asp-route-sensitive="true">Show sensitive items</a></p>
+    }
+    else if (Model.MaySeeSensitive && refills.SensitiveShown && (refills.Medications.Any(m => m.Sensitive) || refills.Requests.Any(r => r.Sensitive)))
+    {
+        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="/Refills">Hide sensitive items</a></p>
+    }
+
+    <section aria-labelledby="refills-ask">
+        <h2 id="refills-ask">Ask to renew</h2>
+        @if (Model.Errors.Count > 0 && !(OnPrem.IsReachable && refills.HasCareTeam && refills.Medications.Count > 0))
+        {
+            @* Refused, and no form to mark: what became of the post, before what the page says now. *@
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> @string.Join(" ", Model.Errors.Values)</p>
+        }
+        @if (!OnPrem.IsReachable)
+        {
+            <p class="sc-notice sc-notice--warning" data-refill-form="read-only"><span class="sc-notice__state">Read-only:</span> requests can't be sent until the clinic's server is back.</p>
+        }
+        else if (!refills.HasCareTeam)
+        {
+            <p class="sc-notice sc-notice--info" data-refill-form="no-care-team"><span class="sc-notice__state">No care team yet:</span> nobody at the clinic would see a request. Call the clinic to renew a medication.</p>
+        }
+        else if (refills.Medications.Count == 0)
+        {
+            <p class="sc-muted" data-refill-form="none">@(own ? "None of your medications can be renewed here right now." : "None of the medications can be renewed here right now.")</p>
+        }
+        else
+        {
+            var medicationError = Model.Errors.GetValueOrDefault("Medication");
+            var noteError = Model.Errors.GetValueOrDefault("Note");
+            <form method="post" class="sc-form" data-refill-form="ask">
+                @if (Model.Errors.Count > 0)
+                {
+                    <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> fix what is marked below and send again.</p>
+                }
+                <fieldset class="sc-stack" aria-describedby="@(medicationError is null ? null : "refill-medication-error")">
+                    <legend>Medication</legend>
+                    @foreach (var (medication, index) in refills.Medications.Select((m, i) => (m, i)))
+                    {
+                        <label class="sc-check" for="refill-medication-@index">
+                            <input type="radio" id="refill-medication-@index" name="Medication" value="@Model.Reference(medication.Id)" required checked="@(medication.Id == Model.Chosen)"
+                                   aria-invalid="@(medicationError is null ? null : "true")">
+                            <span>@medication.Display@if (medication.Dosage is { } dosage) { <br><span class="sc-muted">@dosage</span> }@if (medication.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</span>
+                        </label>
+                    }
+                    @if (medicationError is not null)
+                    {
+                        <p class="sc-field__error" id="refill-medication-error">@medicationError</p>
+                    }
+                </fieldset>
+                <div class="sc-field">
+                    <label for="refill-note">Anything the care team should know <span>(optional)</span></label>
+                    <textarea id="refill-note" class="sc-field__input" name="Note" rows="3" maxlength="@RefillRequests.MaxNoteLength"
+                              aria-invalid="@(noteError is null ? null : "true")" aria-describedby="@(noteError is null ? null : "refill-note-error")">@Model.Note</textarea>
+                    @if (noteError is not null)
+                    {
+                        <p class="sc-field__error" id="refill-note-error">@noteError</p>
+                    }
+                </div>
+                <div class="sc-actions">
+                    <button type="submit" class="sc-btn sc-btn--primary">Send request</button>
+                </div>
+            </form>
+        }
+        <p class="sc-muted">A medication that isn't listed can't be renewed here: call the clinic. Requests are read during clinic hours; for an emergency, call your local emergency number.</p>
+    </section>
+
+    <section aria-labelledby="refills-requests">
+        <h2 id="refills-requests">@(own ? "Your requests" : "Requests")</h2>
+        @if (refills.Requests.Count == 0)
+        {
+            <p class="sc-muted">No requests yet.</p>
+        }
+        else
+        {
+            <ul class="sc-results">
+                @foreach (var request in refills.Requests)
+                {
+                    <li class="sc-result sc-result--plain" data-refill="@request.Status">
+                        <h3>@request.MedicationDisplay</h3>
+                        <p>
+                            @switch (request.Status)
+                            {
+                                case RefillRequestStatus.Completed:
+                                    <span class="sc-tag sc-tag--success">Approved</span>
+                                    break;
+                                case RefillRequestStatus.Rejected:
+                                    <span class="sc-tag sc-tag--danger">Declined</span>
+                                    break;
+                                default:
+                                    <span class="sc-tag">Waiting</span>
+                                    break;
+                            }
+                            @if (request.Sensitive)
+                            {
+                                <span class="sc-tag sc-tag--warning">Sensitive</span>
+                            }
+                            <span class="sc-muted">Asked @request.RequestedAt.UtcDateTime.ToString("MMM d, yyyy") UTC@(request.Asked switch { "you" => " by you", "proxy" => " by someone you share your record with", _ => "" })</span>
+                        </p>
+                        @if (request.Note is { } note)
+                        {
+                            <p class="sc-note__text" data-refill-note>@note</p>
+                        }
+                        @if (request.Status == RefillRequestStatus.Completed)
+                        {
+                            <p data-refill-answer>Approved @request.DecidedAt!.Value.UtcDateTime.ToString("MMM d, yyyy") UTC: your care team ordered @request.OrderedDisplay.</p>
+                        }
+                        else if (request.Status == RefillRequestStatus.Rejected)
+                        {
+                            <p data-refill-answer>Declined @request.DecidedAt!.Value.UtcDateTime.ToString("MMM d, yyyy") UTC. Your care team says:</p>
+                            <p class="sc-note__text" data-refill-message>@request.DeclineMessage</p>
+                        }
+                        else
+                        {
+                            <p class="sc-muted">Waiting for the care team to answer.</p>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+<p><a asp-page="/Index">@(own ? "Back to my record" : "Back to the record")</a></p>

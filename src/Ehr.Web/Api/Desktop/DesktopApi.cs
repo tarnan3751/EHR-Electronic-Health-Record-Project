@@ -85,8 +85,9 @@ public static class DesktopApi
             // The contract is unchanged: the vital signs are read from the observations taken at the visit (step 9).
             chart.Visits.Select(v => new CachedVisit(v.PeriodStart, v.Reason, Whole(chart.VisitVitals.GetValueOrDefault(v.Id)?.Systolic),
                 Whole(chart.VisitVitals.GetValueOrDefault(v.Id)?.Diastolic), Whole(chart.VisitVitals.GetValueOrDefault(v.Id)?.HeartRate))).ToList(),
-            // The offline copy never holds sensitive items: the chart read left them out, and says how many.
-            chart.SensitiveHidden + chart.SensitiveNotesHidden,
+            // The offline copy never holds sensitive items: the chart read left them out, and says how many. Pre-visit
+            // forms (step 13e), sensitive items all, are never in the chart and are counted too.
+            chart.SensitiveHidden + chart.SensitiveNotesHidden + chart.Forms,
             // "No known allergies" is its own state, not an allergy in the list.
             chart.Allergies.Any(a => a.Code != AllergyIntolerance.NoKnownAllergy) ? "listed" : chart.Allergies.Count > 0 ? "none-known" : "not-recorded",
             // Signed notes and their addenda (step 10); sensitive ones were left out by the read, and are counted above.

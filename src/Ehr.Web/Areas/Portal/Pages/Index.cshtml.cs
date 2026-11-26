@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Ehr.Data.Audit;
 using Ehr.Data.Patients;
 using Ehr.Domain.Accounts;
 using Ehr.Domain.Phi;
@@ -25,7 +26,15 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
 
     public bool MayMessage => subject.MayMessage;
 
-    // How many messages from the care team the patient hasn't opened (FR-18), part of the same page view.
+    // Pre-visit forms (step 13e), every one a sensitive item: the link is the patient's, and a proxy's whose access
+    // includes sensitive items, whether or not the record has any forms, so it hints at nothing; a proxy without them
+    // never sees it. With it, how many can be filled in now.
+    public bool MaySeeForms => subject.Acting is null || subject.Acting.IncludeSensitive;
+
+    public int OpenForms { get; private set; }
+
+    // How many messages from the care team the patient hasn't opened (FR-18), part of the same page view: read only
+    // when the session may message, so a proxy whose access leaves messages out is told nothing about them.
     public int UnreadMessages { get; private set; }
 
     public async Task OnGetAsync()
@@ -33,11 +42,15 @@ public class IndexModel(PortalSubject subject, PhiReader phi) : PageModel
         // PHI: not kept by the browser, so Back after signing out on a shared computer doesn't show it again.
         Response.Headers.CacheControl = "no-store";
         var patientId = subject.PatientId;
-        var appointments = await phi.AppointmentsAsync(patientId, past: 0, HttpContext.RequestAborted);
+        var appointments = await phi.AppointmentsAsync(patientId, past: 0, AuditParts.Home, HttpContext.RequestAborted);
         Patient = appointments?.Patient;
         Upcoming = [.. (appointments?.Upcoming ?? []).Take(3)];
-        // A proxy whose grant doesn't include messages sees none (FR-19), so none are counted.
-        if (Patient is not null && subject.MayMessage)
+        if (Patient is not null && MaySeeForms)
+        {
+            OpenForms = await phi.OpenFormsAsync(patientId, HttpContext.RequestAborted);
+        }
+
+        if (Patient is not null && MayMessage)
         {
             UnreadMessages = await phi.UnreadFromStaffAsync(patientId, HttpContext.RequestAborted);
         }

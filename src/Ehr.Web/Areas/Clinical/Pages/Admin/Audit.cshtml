@@ -18,6 +18,16 @@
         </select>
     </div>
     <div class="sc-field">
+        <label asp-for="Part" class="sc-field__label">Part of the record</label>
+        <select asp-for="Part" class="sc-field__input">
+            <option value="">Any</option>
+            @foreach (var part in AuditParts.All)
+            {
+                <option value="@part">@part</option>
+            }
+        </select>
+    </div>
+    <div class="sc-field">
         <label asp-for="Actor" class="sc-field__label">Staff account</label>
         <select asp-for="Actor" class="sc-field__input">
             <option value="">Anyone</option>
@@ -53,7 +63,7 @@ else
     <div class="sc-table-wrap">
         <table class="sc-table">
             <thead>
-                <tr><th>When (UTC)</th><th>Who</th><th>What</th><th>Patient</th><th>Row</th><th>Reason and details</th></tr>
+                <tr><th>When (UTC)</th><th>Who</th><th>What</th><th>Patient</th><th>Row</th><th>Part</th><th>Reason and details</th></tr>
             </thead>
             <tbody>
                 @foreach (var e in Model.Log.Events)
@@ -73,6 +83,16 @@ else
                         @if (e.TableName is { } table)
                         {
                             <td class="sc-table__id">@table @e.RowId</td>
+                        }
+                        else
+                        {
+                            <td class="sc-table__muted">—</td>
+                        }
+                        @* Which part of the record a read was for (step 13c2): none for any other event, or a read recorded
+                           before that step. *@
+                        @if (e.Part is { } part)
+                        {
+                            <td class="sc-table__mono">@part</td>
                         }
                         else
                         {

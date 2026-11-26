@@ -1,0 +1,144 @@
+@page "/patients/{patientId:guid}/forms"
+@using Ehr.Data.Scheduling
+@using Ehr.Domain.Forms
+@model Ehr.Web.Areas.Clinical.Pages.Patients.Forms.IndexModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@{
+    // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
+    ViewData["UseHtmx"] = false;
+    var patient = Model.Forms.Patient;
+    // A page title names no form: it is a sensitive item (docs/brand: sensitive items).
+    ViewData["Title"] = $"Pre-visit forms: {patient.FamilyName}, {patient.GivenName}";
+}
+@section Banner {
+    <partial name="_PatientBanner" model="new PatientBanner(patient)" />
+}
+<div class="sc-pagehead">
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+</div>
+<h1>Pre-visit forms: @patient.FamilyName, @patient.GivenName</h1>
+@if (Model.Asked)
+{
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Form asked for:</span> the patient can fill it in from @PreVisitForms.OpenDays days before the appointment until it ends. An answer that needs review reaches your inbox.</p>
+}
+@if (Model.Forms.SensitiveShown)
+{
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="Index" asp-route-patientId="@patient.Id">Hide sensitive items</a></p>
+}
+else if (Model.Forms.Hidden > 0)
+{
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @Model.Forms.Hidden pre-visit @(Model.Forms.Hidden == 1 ? "form is" : "forms are") not shown. <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true">Show sensitive items</a></p>
+}
+
+@* Asking comes first: the cursor starts in it (NFR-12). *@
+<h2>Ask for a form</h2>
+@if (!Model.OnPanel)
+{
+    <p class="sc-muted">Add this patient to your panel to ask for a pre-visit form.</p>
+}
+else if (!OnPrem.IsReachable)
+{
+    <p class="sc-muted">Asking for a pre-visit form needs the clinic's server.</p>
+}
+else if (Model.Forms.Upcoming.Count == 0)
+{
+    <p class="sc-muted">No booked appointment to ask for a form before. Book one from the chart first.</p>
+}
+else
+{
+    <form method="post" asp-page-handler="Ask" asp-route-patientId="@patient.Id" asp-route-sensitive="@(Model.Sensitive ? "true" : null)" class="sc-form">
+        @if (Model.Error is { } error)
+        {
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not asked:</span> @error</p>
+        }
+        <p class="sc-muted">The patient fills it in from @PreVisitForms.OpenDays days before the appointment until it ends. Forms aren't watched as they arrive: an answer that needs review reaches the inbox of the appointment's clinician and the patient's care team.</p>
+        <div class="sc-field">
+            <label for="form-appointment">Appointment</label>
+            <select id="form-appointment" class="sc-field__input" name="AppointmentId" required autofocus>
+                @foreach (var appointment in Model.Forms.Upcoming)
+                {
+                    <option value="@appointment.Id" selected="@(appointment.Id == Model.AppointmentId)">@Clinic.Format(appointment.StartsAt) with @appointment.Clinician</option>
+                }
+            </select>
+        </div>
+        <div class="sc-field">
+            <label for="form-questionnaire">Questionnaire</label>
+            <select id="form-questionnaire" class="sc-field__input" name="Questionnaire" required>
+                @foreach (var (code, title) in Model.Questionnaires)
+                {
+                    <option value="@code" selected="@(code == Model.Questionnaire)">@title</option>
+                }
+            </select>
+        </div>
+        <div class="sc-actions"><button class="sc-btn sc-btn--primary">Ask the patient to fill it in</button></div>
+    </form>
+}
+
+@if (Model.Forms.SensitiveShown)
+{
+    @if (Model.Trends.Count > 0)
+    {
+        <h2>Scores over time</h2>
+        <div class="sc-trends">
+            @foreach (var trend in Model.Trends)
+            {
+                <partial name="_Trend" model="trend" />
+            }
+        </div>
+    }
+
+    <h2>Forms by visit</h2>
+    @if (Model.Forms.Forms.Count == 0)
+    {
+        <p class="sc-muted">No pre-visit forms have been asked for.</p>
+    }
+    @foreach (var visit in Model.Forms.Forms.GroupBy(form => form.AppointmentId))
+    {
+        var first = visit.First();
+        <section class="sc-panel" id="appointment-@visit.Key" aria-labelledby="appointment-@visit.Key-title" data-form-visit>
+            <h3 class="sc-panel__title" id="appointment-@visit.Key-title">@Clinic.Format(first.AppointmentStartsAt) with @first.AppointmentClinician <span class="sc-tag">@AppointmentStatus.Names[first.AppointmentStatus]</span></h3>
+            <ul class="sc-list">
+                @foreach (var form in visit)
+                {
+                    <li data-form="@form.QuestionnaireCode">
+                        <strong>@form.Title</strong> <span class="sc-tag sc-tag--warning">Sensitive</span>
+                        @if (form.Response is { } answered)
+                        {
+                            <br>
+                            @if (answered.Score is { } score)
+                            {
+                                <span data-form-score>Score @score@(form.Definition.Max is { } max ? $" of {max}" : "")@(answered.Band is { } band ? $" · {band}" : "")</span>
+                            }
+                            @if (answered.FollowUp)
+                            {
+                                <text> </text><span class="sc-tag sc-tag--warning" data-form-follow-up>Needs follow-up</span>
+                            }
+                            @if (answered.Alert)
+                            {
+                                @* An alert question answered so that it needs review, such as the PHQ-9's question 9 (step 13e). *@
+                                @foreach (var (number, _) in form.Definition.NeedingReview(answered.Answers))
+                                {
+                                    <text> </text><span class="sc-tag sc-tag--danger" data-form-alert>An answer needs review: question @number</span>
+                                }
+                            }
+                            <br><span class="sc-muted">Answered @Clinic.Format(answered.AnsweredAt) by @(answered.ByProxy ? $"{answered.Proxy}, not the patient" : "the patient")</span>
+                            <span class="sc-list__actions"><a asp-page="Response" asp-route-patientId="@patient.Id" asp-route-responseId="@answered.Id" aria-label="Answers: @form.Title, @Clinic.Format(answered.AnsweredAt)">Answers</a></span>
+                        }
+                        else if (form.ClosedAt(DateTimeOffset.UtcNow))
+                        {
+                            <br><span class="sc-muted">Not answered. Closed.</span>
+                        }
+                        else
+                        {
+                            @* Checked in with the visit in progress: open until 12 hours after the scheduled end, or the visit's end. *@
+                            <br><span class="sc-muted">Not answered yet: open from @Clinic.Format(form.OpensAt) until @Clinic.Format(form.ClosesAt)@(form.VisitUnderWay ? ", while the visit is in progress" : "").</span>
+                        }
+                        <br><span class="sc-muted">Asked by @form.RequestedBy, @Clinic.Format(form.RequestedAt)</span>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+    @* Where each band comes from (docs/expansion/reference-data.md, "Pre-visit questionnaires"). *@
+    <p class="sc-muted" data-form-bands>PHQ-9 bands: Kroenke et al. 2001. GAD-7 bands: the authors' instruction manual; "Below mild" (under 5) is this clinic's wording, since the paper that names that band could not be read. Needs follow-up: 10 or more, from the authors' manual.</p>
+}

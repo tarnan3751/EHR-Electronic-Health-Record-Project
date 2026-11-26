@@ -9,7 +9,7 @@ namespace Ehr.Security.Tests;
 // like ExpectedPrivileges: changing one means changing both, and a reviewer sees both.
 public class ProtectionTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    enum Protection
+    internal enum Protection
     {
         // Row-level security enabled and forced, and every write recorded by trigger (db/policies/40-audit.sql).
         Phi,
@@ -21,7 +21,7 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         Internal,
     }
 
-    static readonly Dictionary<string, Protection> ExpectedProtection = new()
+    internal static readonly Dictionary<string, Protection> ExpectedProtection = new()
     {
         ["quick_texts"] = Protection.Internal,
         ["data_protection_keys"] = Protection.Internal,
@@ -48,6 +48,9 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["chart_history"] = Protection.Phi,
         ["inbox_items"] = Protection.Phi,
         ["appointments"] = Protection.Phi,
+        // Pre-visit forms (step 13e): sensitive items always.
+        ["questionnaire_requests"] = Protection.Phi,
+        ["questionnaire_responses"] = Protection.Phi,
         ["proxy_grants"] = Protection.Phi,
         ["result_acknowledgments"] = Protection.Phi,
         ["message_threads"] = Protection.Phi,
@@ -65,6 +68,8 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["ai_field_proposals"] = Protection.Phi,
         ["clinical_notes"] = Protection.Phi,
         ["note_addenda"] = Protection.Phi,
+        ["visit_summaries"] = Protection.Phi,
+        ["refill_requests"] = Protection.Phi,
         ["clinical_drafts"] = Protection.Phi,
         ["encounters"] = Protection.Phi,
         ["orders"] = Protection.Phi,

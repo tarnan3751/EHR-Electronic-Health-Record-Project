@@ -107,6 +107,19 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "clinical_notes")] = ["SELECT"],
         [("ehr_app", "note_addenda")] = ["SELECT", "INSERT"],
         [("ehr_read", "note_addenda")] = ["SELECT"],
+        // Step 13a: a visit summary is released, never edited or deleted. Withdrawing it is a column grant
+        // (ExpectedColumnPrivileges).
+        [("ehr_app", "visit_summaries")] = ["SELECT", "INSERT"],
+        [("ehr_read", "visit_summaries")] = ["SELECT"],
+        // Step 13d: a refill request is asked for, never edited or deleted. Answering it is a column grant
+        // (ExpectedColumnPrivileges).
+        [("ehr_app", "refill_requests")] = ["SELECT", "INSERT"],
+        [("ehr_read", "refill_requests")] = ["SELECT"],
+        // Step 13e: a pre-visit form is asked for and answered, never changed or deleted.
+        [("ehr_app", "questionnaire_requests")] = ["SELECT", "INSERT"],
+        [("ehr_read", "questionnaire_requests")] = ["SELECT"],
+        [("ehr_app", "questionnaire_responses")] = ["SELECT", "INSERT"],
+        [("ehr_read", "questionnaire_responses")] = ["SELECT"],
         [("ehr_app", "clinical_drafts")] = ["SELECT", "INSERT", "UPDATE"],
         // UC 14 adds replica draft reads under the same private-author/active-panel RLS as the primary.
         [("ehr_read", "clinical_drafts")] = ["SELECT"],
@@ -295,13 +308,17 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Step 10b: marking a signed note or addendum sensitive, or unmarking it.
         [("ehr_app", "clinical_notes", "UPDATE")] = ["sensitive", "sensitive_reason"],
         [("ehr_app", "note_addenda", "UPDATE")] = ["sensitive", "sensitive_reason"],
+        // Step 13a: withdrawing a visit summary, and marking it sensitive or unmarking it, each with a reason.
+        [("ehr_app", "visit_summaries", "UPDATE")] = ["sensitive", "sensitive_reason", "withdrawn_reason"],
+        // Step 13d: answering a refill request, by the order that approves it or the message that declines it.
+        [("ehr_app", "refill_requests", "UPDATE")] = ["decline_message", "order_id"],
         // Step 9b: marking a vital sign entered in error.
         [("ehr_app", "observations", "UPDATE")] = ["entered_in_error_reason", "status"],
         // Marking an inbox item done.
         [("ehr_app", "inbox_items", "UPDATE")] = ["done_at"],
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.
-        [("ehr_app", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
-        [("ehr_read", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
+        [("ehr_app", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
+        [("ehr_read", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
     };
 
     async Task AssertExactPrivilegesAsync()

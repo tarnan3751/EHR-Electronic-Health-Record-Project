@@ -15,6 +15,10 @@ public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
     [BindProperty(SupportsGet = true)]
     public string? Action { get; set; }
 
+    // Reads for one part of the record (AuditParts), or any.
+    [BindProperty(SupportsGet = true)]
+    public string? Part { get; set; }
+
     [BindProperty(SupportsGet = true)]
     public Guid? Actor { get; set; }
 
@@ -46,7 +50,8 @@ public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
             Actor,
             Patient,
             From is { } from ? new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null,
-            Before ?? (To is { } to ? new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null));
+            Before ?? (To is { } to ? new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) : null),
+            Part);
         Log = await log.ReadAsync(filter, HttpContext.RequestAborted);
     }
 
@@ -57,6 +62,11 @@ public class AuditModel(AuditLog log, StaffAccounts accounts) : PageModel
         if (Action is { Length: > 0 })
         {
             route["Action"] = Action;
+        }
+
+        if (Part is { Length: > 0 })
+        {
+            route["Part"] = Part;
         }
 
         if (Actor is { } actor)

@@ -29,6 +29,8 @@ static class FhirRequests
         public Guid Anxiety { get; init; }
         public Guid HemoglobinA1c { get; init; }
         public Guid Thyrotropin { get; init; }
+        // When the two results were collected and released, so a test can name their day as the record shows it.
+        public DateTimeOffset ResultsAt { get; init; }
         // The set of vital signs, each value's ID by LOINC code, and when it was taken ("yyyy-MM-ddTHH:mm:ss", UTC).
         public IReadOnlyDictionary<string, Guid> Vitals { get; init; } = new Dictionary<string, Guid>();
 
@@ -67,7 +69,7 @@ static class FhirRequests
             VALUES (@id, @patient, @code, @display, 'active', '2021-05-01')
             """;
 
-        var taken = DateTime.UtcNow.AddMinutes(-30);
+        var taken = (await apps.Database.NowAsync()).AddMinutes(-30);
         using (var recorded = await VitalTests.RecordAtAsync(session.Client, patient, taken.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture),
             (VitalSign.Systolic, "128"), (VitalSign.Diastolic, "82"), (VitalSign.HeartRate, "72"), (VitalSign.Temperature, "36.8"),
             (VitalSign.RespiratoryRate, "16"), (VitalSign.OxygenSaturation, "97"), (VitalSign.Weight, "70.5"), (VitalSign.Height, "172")))
@@ -108,6 +110,7 @@ static class FhirRequests
             HemoglobinA1c = await apps.InsertResultAsync(patient, "Hemoglobin A1c", "4548-4", 6.9m, "%", 4.0m, 5.6m, effective, effective,
                 note: "Synthetic: we'll talk about this at your next visit."),
             Thyrotropin = await apps.InsertResultAsync(patient, "Thyroid stimulating hormone", "3016-3", 2.1m, "mIU/L", 0.4m, 4.0m, effective, effective),
+            ResultsAt = effective,
             Vitals = vitals,
             Reading = reading,
             VitalsAt = new DateTime(taken.Year, taken.Month, taken.Day, taken.Hour, taken.Minute, 0).ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture),
