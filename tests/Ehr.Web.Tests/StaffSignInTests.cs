@@ -519,6 +519,106 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
     }
 
+    // Step 19.2: an enrolment's page, or its code, at once with an administrator's authenticator reset, ten times over.
+    // The enrolment holds the account first now, as the reset does: no deadlock and no 500, the reset always answered,
+    // and the account never left enrolled once the reset has answered. Before, the two took the account and its key in
+    // opposite orders and deadlocked, nearly every time, and when the reset was the side lost the enrolment went on and
+    // signed in, on an account its administrator had been answered with a 500.
+    [Theory]
+    [InlineData("page")]
+    [InlineData("code")]
+    public async Task An_enrolment_racing_a_reset_never_deadlocks(string step)
+    {
+        var admin = await apps.CreateStaffAsync($"Resets During Enrolment {step}", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        for (var run = 0; run < 10; run++)
+        {
+            var account = await apps.CreateStaffWithoutAuthenticatorAsync($"Dr. Enrols As Reset {step} {run}", StaffRoles.Clinician);
+            var (client, enrol) = await AtEnrolmentAsync(account, step);
+            var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
+
+            var posts = await Task.WhenAll(enrol(), adminSession.Client.PostAsync(
+                "/admin/staff?handler=ResetAuthenticator", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel));
+
+            Assert.True(posts.All(p => p.StatusCode == HttpStatusCode.OK), $"Run {run}: {string.Join(", ", posts.Select(p => (int)p.StatusCode))}.");
+            Assert.Contains("will set up an authenticator app again", Words(await ReadAsync(posts[1])));
+            Array.ForEach(posts, p => p.Dispose());
+            Assert.False((await AccountOfAsync(account)).TwoFactorEnabled, $"Run {run}: enrolled after the reset answered.");
+            apps.Clock.Pass(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(5));
+            using var later = await client.GetAsync("/patients", Cancel);
+            Assert.Equal("/sign-in", PathOf(later));
+        }
+    }
+
+    // Step 19.2: the same with the order forced, each way, for an authenticator reset and a password reissue. The action
+    // first: the enrolment goes back to the password. The enrolment first: it is shown its key or enrolled, and the
+    // action then applies, ending the new session at its next account check. Before, an enrolment waiting behind a
+    // reset deadlocked with it, and its code waiting behind a reset or a reissue answered 500.
+    [Theory]
+    [InlineData("page", "ResetAuthenticator", true)]
+    [InlineData("page", "ResetAuthenticator", false)]
+    [InlineData("code", "ResetAuthenticator", true)]
+    [InlineData("code", "ResetAuthenticator", false)]
+    [InlineData("page", "Reissue", true)]
+    [InlineData("page", "Reissue", false)]
+    [InlineData("code", "Reissue", true)]
+    [InlineData("code", "Reissue", false)]
+    public async Task An_enrolment_and_an_administrators_action_in_either_order(string step, string action, bool actionFirst)
+    {
+        var admin = await apps.CreateStaffAsync($"{action} Enrolment Admin {step} {actionFirst}", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        var account = await apps.CreateStaffWithoutAuthenticatorAsync($"Dr. Enrolment {action} {step} {actionFirst}", StaffRoles.Clinician);
+        var (client, enrol) = await AtEnrolmentAsync(account, step);
+        var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
+        Task<HttpResponseMessage> Act() => adminSession.Client.PostAsync(
+            $"/admin/staff?handler={action}", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel);
+
+        var posted = new Task<HttpResponseMessage>[2];
+        await using (var hold = await HoldAccountAsync(apps, account.Id))
+        {
+            posted[actionFirst ? 1 : 0] = actionFirst ? Act() : enrol();
+            await WaitingForLocksAsync(apps, 1);
+            posted[actionFirst ? 0 : 1] = actionFirst ? enrol() : Act();
+            await WaitingForLocksAsync(apps, 2);
+            await hold.Transaction.CommitAsync(Cancel);
+        }
+
+        using var enrolled = await posted[0];
+        using var acted = await posted[1];
+
+        Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK), (enrolled.StatusCode, acted.StatusCode));
+        Assert.Contains(action == "Reissue" ? "/sign-in/setup?user=" : "will set up an authenticator app again", Words(await ReadAsync(acted)));
+        Assert.Equal(actionFirst ? "/sign-in" : "/sign-in/enroll", PathOf(enrolled));
+        var user = await AccountOfAsync(account);
+        Assert.True(action == "Reissue" ? user.PasswordHash is null : !user.TwoFactorEnabled, "The action didn't apply.");
+        apps.Clock.Pass(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(5));
+        using var later = await client.GetAsync("/patients", Cancel);
+        Assert.Equal("/sign-in", PathOf(later));
+    }
+
+    // An account owing its enrolment, its password step taken in a browser of its own, and the enrolment's next request
+    // in that browser: loading the page, or, with the page loaded, its current code.
+    async Task<(HttpClient Client, Func<Task<HttpResponseMessage>> Enrol)> AtEnrolmentAsync(StaffAccount account, string step)
+    {
+        var jar = new CookieContainer();
+        var client = Client(apps.OnPrem, jar);
+        var token = Token(await client.GetStringAsync("/sign-in", Cancel));
+        using (var password = await Client(apps.OnPrem, jar, followRedirects: false).PostAsync(
+            "/sign-in", Form(("Input.Email", account.Email), ("Input.Password", account.Password), ("__RequestVerificationToken", token)), Cancel))
+        {
+            Assert.Equal("/sign-in/enroll", password.Headers.Location?.ToString().Split('?')[0]);
+        }
+
+        if (step == "page")
+        {
+            return (client, () => client.GetAsync("/sign-in/enroll", Cancel));
+        }
+
+        var page = await client.GetStringAsync("/sign-in/enroll", Cancel);
+        var key = AuthenticatorSecret().Match(page).Groups[1].Value;
+        return (client, () => client.PostAsync("/sign-in/enroll", Form(("Code", Totp.Code(key)), ("__RequestVerificationToken", Token(page))), Cancel));
+    }
+
     // A password step from a browser of its own: its status, where it lands, and what the page says.
     async Task<(HttpStatusCode Status, string Path, string Words)> PasswordStepAsync(StaffAccount account, string password)
     {
