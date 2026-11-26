@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
+using static Ehr.Web.Tests.PasskeyFlows;
 
 namespace Ehr.Web.Tests;
 
@@ -100,6 +101,128 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         var reasons = await ReasonsAsync(account);
         Assert.Equal(5, reasons.Count(r => r == "wrong code"));
         Assert.Equal(Sent - 5, reasons.Count(r => r == "locked out"));
+    }
+
+    // Step 19.1, the final review's probe: the same passkey answer sent twice at once, from one password step, signs in
+    // once. The second is checked against the count the first has just stored, and refused as an answer used again is
+    // (decision 2). Before, both read the count before they held the account, and both signed in, in 24 of 24 runs.
+    [Fact]
+    public async Task The_same_passkey_answer_sent_twice_at_once_signs_in_once()
+    {
+        for (var run = 0; run < 10; run++)
+        {
+            var account = await apps.CreateStaffAsync($"Dr. Twice At Once {run}", StaffRoles.Clinician);
+            using var authenticator = new TestAuthenticator();
+            using (var added = await AddAsync((await SignInAsync(apps.OnPrem, account)).Client, account, authenticator))
+            {
+                Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+            }
+
+            var (client, codePage) = await PasswordAsync(apps.OnPrem, account);
+            using var optionsResponse = await OptionsToSignInAsync(client, codePage);
+            var (options, state) = await ReadyAsync(optionsResponse);
+            var credential = authenticator.Get(options, WebApps.OnSiteOrigin);
+
+            var answers = await Task.WhenAll(Enumerable.Range(0, 2).Select(async _ =>
+            {
+                using var response = await PasskeyAsync(client, codePage, credential, state);
+                return (Path: PathOf(response), Words: Words(await ReadAsync(response)));
+            }));
+
+            Assert.True(answers.Count(a => a.Path == "/patients") == 1, $"Run {run}: signed in {answers.Count(a => a.Path == "/patients")} times.");
+            Assert.Single(answers, a => a.Words.Contains("That passkey didn't work.", StringComparison.Ordinal));
+            // The add's sign-in, with the code, and one with the passkey.
+            Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+            Assert.Equal(1u, (await StoredPasskeyAsync(account)).SignCount);
+        }
+    }
+
+    // Step 19.1, the final review's probe with the order forced: a passkey post waits for the account while the passkey's
+    // stored count goes up. Held, it reads the count as stored then, and is refused; the count stays. Before, it had
+    // read the count before it waited, signed in, and wrote its own lower count over the stored one.
+    [Fact]
+    public async Task A_passkey_waiting_for_the_account_is_checked_against_its_count_as_stored_then()
+    {
+        var account = await apps.CreateStaffAsync("Dr. Count Raised", StaffRoles.Clinician);
+        using var authenticator = new TestAuthenticator();
+        using (var added = await AddAsync((await SignInAsync(apps.OnPrem, account)).Client, account, authenticator))
+        {
+            Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+        }
+
+        var (client, codePage) = await PasswordAsync(apps.OnPrem, account);
+        using var optionsResponse = await OptionsToSignInAsync(client, codePage);
+        var (options, state) = await ReadyAsync(optionsResponse);
+        var credential = authenticator.Get(options, WebApps.OnSiteOrigin);
+
+        Task<HttpResponseMessage> posting;
+        await using (var hold = await HoldAccountAsync(apps, account.Id))
+        {
+            posting = PasskeyAsync(client, codePage, credential, state);
+            await WaitingForLocksAsync(apps, 1);
+            // As another sign-in with the same passkey would leave it, far past this answer's count of 1.
+            await using (var raise = new Npgsql.NpgsqlCommand(
+                "UPDATE ehr.staff_user_passkeys SET data = jsonb_set(data, '{SignCount}', '50') WHERE user_id = @id", hold.Connection, hold.Transaction))
+            {
+                raise.Parameters.AddWithValue("id", account.Id);
+                Assert.Equal(1, await raise.ExecuteNonQueryAsync(Cancel));
+            }
+
+            await hold.Transaction.CommitAsync(Cancel);
+        }
+
+        using var refused = await posting;
+
+        Assert.Equal(CodePage, PathOf(refused));
+        Assert.Contains("That passkey didn't work.", Words(await ReadAsync(refused)));
+        Assert.Equal(50u, (await StoredPasskeyAsync(account)).SignCount);
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+        Assert.Equal(new[] { "passkey refused" }, await ReasonsAsync(account));
+    }
+
+    // Step 19.1, found by reading: the old app's code posted as an administrator's authenticator reset commits. The post
+    // decided the account's next step, reading its authenticator key, before the reset, and holds the account after it:
+    // it is sent back to the password before any code is checked, and nothing signs in, then or after the next account
+    // check. Before, the code was checked against the key read before the reset, and signed in under the security stamp
+    // the reset had just set, so the session outlived the reset.
+    [Fact]
+    public async Task A_code_posted_as_a_reset_commits_signs_nobody_in()
+    {
+        var admin = await apps.CreateStaffAsync("Resets During A Code", StaffRoles.Admin);
+        var adminSession = await SignInAsync(apps.OnPrem, admin);
+        var account = await apps.CreateStaffAsync("Dr. Code During Reset", StaffRoles.Clinician);
+        var (client, codePage) = await PasswordAsync(apps.OnPrem, account);
+        var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
+
+        Task<HttpResponseMessage> resetting, posting;
+        await using (var hold = await HoldAccountAsync(apps, account.Id))
+        {
+            resetting = adminSession.Client.PostAsync("/admin/staff?handler=ResetAuthenticator", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel);
+            await WaitingForLocksAsync(apps, 1);
+            posting = client.PostAsync(CodePage, Form(("Code", Totp.Code(account.AuthenticatorKey)), ("__RequestVerificationToken", Token(codePage))), Cancel);
+            await WaitingForLocksAsync(apps, 2);
+            await hold.Transaction.CommitAsync(Cancel);
+        }
+
+        using (var reset = await resetting)
+        {
+            Assert.Contains("will set up an authenticator app again at their next sign-in.", Words(await ReadAsync(reset)));
+        }
+
+        using var posted = await posting;
+        var then = PathOf(posted);
+        apps.Clock.Pass(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(5));
+        using var later = await client.GetAsync("/patients", Cancel);
+
+        Assert.Equal(("/sign-in", "/sign-in"), (then, PathOf(later)));
+        Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
+    }
+
+    async Task<UserPasskeyInfo> StoredPasskeyAsync(StaffAccount account)
+    {
+        await using var scope = apps.OnPrem.Services.CreateAsyncScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
+        return Assert.Single(await users.GetPasskeysAsync((await users.FindByIdAsync(account.Id.ToString()))!));
     }
 
     // Why the account's sign-ins failed, as the audit log says.
