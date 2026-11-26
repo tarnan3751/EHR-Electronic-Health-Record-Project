@@ -887,7 +887,7 @@ mod tests {
             .unwrap();
         let credentials = mock::Store::new().unwrap();
         let entry = credentials
-            .build("com.example.ehr", "server-session", None)
+            .build(crate::key::SERVICE, "server-session", None)
             .unwrap();
         entry
             .set_password(

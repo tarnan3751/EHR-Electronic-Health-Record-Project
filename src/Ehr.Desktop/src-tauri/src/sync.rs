@@ -1015,7 +1015,7 @@ mod tests {
     /// The entry the client keeps its session in.
     fn saved_entry(credentials: &mock::Store) -> Entry {
         credentials
-            .build("com.example.ehr", "server-session", None)
+            .build(crate::key::SERVICE, "server-session", None)
             .unwrap()
     }
 
