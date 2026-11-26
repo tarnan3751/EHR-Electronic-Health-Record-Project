@@ -47,7 +47,7 @@ public static class DesktopApi
         return endpoints;
     }
 
-    static async Task<IResult> SignInAsync(SignInRequest request, DesktopSessions sessions, CancellationToken cancellationToken)
+    static async Task<IResult> SignInAsync(SignInRequest request, DesktopSessions sessions, EhrDbContext db, CancellationToken cancellationToken)
     {
         var missing = new Dictionary<string, string[]>();
         Require(missing, "email", request.Email);
@@ -59,7 +59,11 @@ public static class DesktopApi
         }
 
         var device = string.IsNullOrWhiteSpace(request.Device) ? "desktop" : request.Device.Trim();
+        // One transaction, for the account's hold once its password is checked (DesktopSessions, step 19.1's final
+        // review). Not cancellable once done, as a page's (DatabaseTransactionFilter).
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var signIn = await sessions.SignInAsync(request.Email!, request.Password!, request.Code!, device, cancellationToken);
+        await transaction.CommitAsync(CancellationToken.None);
         return signIn.Outcome switch
         {
             DesktopSignInOutcome.SignedIn => Results.Ok(new SignInResponse(
