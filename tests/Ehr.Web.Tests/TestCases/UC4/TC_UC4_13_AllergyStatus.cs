@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   4. As the second clinician, open the chart with a reason, and post "Record no known allergies".
 // Expected result: Step 1: the chart's allergy list and, separately, the banner say "No allergy information
 //   recorded", the list offers "Record no known allergies", and the offline copy says "not-recorded" with no
-//   allergies. Step 2: the chart says "Saved: no known allergies recorded for this patient.", its list "No known
+//   allergies. Step 2: the chart says "Saved. This patient has no known allergies.", its list "No known
 //   allergies (recorded <date> by Dr. Allergy Status)" and the banner "No known allergies"; the button is gone, the
 //   offline copy says "none-known" with no allergies, and the write audit has an insert by the clinician. Step 3: the
 //   list and, separately, the banner show Peanut, "No known allergies" is gone and its row is inactive, and the
@@ -64,7 +64,7 @@ public class TC_UC4_13_AllergyStatus(WebApps apps) : IClassFixture<WebApps>
         var inserts = await apps.AuditEventsAsync(AuditActions.Insert, clinician.Id, patient);
         using var recorded = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", $"/patients/{patient}");
         var none = await ReadAsync(recorded);
-        Assert.Contains("Saved: no known allergies recorded for this patient.", Words(none));
+        Assert.Contains("Saved. This patient has no known allergies.", Words(none));
         Assert.Matches(@"<p>No known allergies \(recorded \d{4}-\d{2}-\d{2} by Dr\. Allergy Status\)\.</p>", AllergyList(none));
         Assert.Contains("<span class=\"sc-allergy\">No known allergies</span>", Banner(none));
         Assert.DoesNotContain("No allergy information recorded", none);
@@ -91,7 +91,7 @@ public class TC_UC4_13_AllergyStatus(WebApps apps) : IClassFixture<WebApps>
 
         // With an allergy recorded, the database refuses "No known allergies": the post saves nothing.
         using var refused = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", $"/patients/{patient}");
-        Assert.Contains("Not saved: an allergy is recorded for this patient, so \"No known allergies\" wasn't recorded.", Words(await ReadAsync(refused)));
+        Assert.Contains("Not saved. This patient has an allergy on record, listed below.", Words(await ReadAsync(refused)));
         Assert.Equal(2, (await RowsAsync(apps, "allergy_intolerances", patient, "display")).Count);
 
         // Emergency access reads the chart and changes nothing.

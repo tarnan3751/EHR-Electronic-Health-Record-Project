@@ -92,7 +92,7 @@ public class TC_UC4_12_Nfr12_EntryKeyboardFirst(WebApps apps) : IClassFixture<We
         Assert.Contains("Essential (primary) hypertension", await page.Locator("#chart-diagnoses ~ ul").TextContentAsync());
         // The chart's notice has the focus, so the keyboard and a screen reader start from what was saved.
         await page.WaitForFunctionAsync("document.activeElement?.matches('[data-saved]') === true");
-        Assert.Contains("Saved: Essential (primary) hypertension is listed under Diagnoses.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Contains("Saved. Essential (primary) hypertension is listed under Diagnoses.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
 
         Assert.Equal(["Essential (primary) hypertension I10"], await RowsAsync(apps, "conditions", patient, "concat_ws(' ', display, code)"));
         Assert.Empty(errors);

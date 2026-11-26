@@ -43,7 +43,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Expected result: Step 1: the GAD-7, though it scores 21, puts nothing in any inbox; the PHQ-9 puts one item in each
 //   of the two clinicians' inboxes and no one else's, and no email is sent. Step 2: the item is first, before the older
 //   one, as "Pre-visit form to review", "A pre-visit form has an answer that needs review", tagged "Needs review",
-//   linking to the answers. Step 3: both charts say "Needs review: a pre-visit form has an answer for you to review."
+//   linking to the answers. Step 3: both charts say "Needs review. A pre-visit form has an answer for you to review."
 //   Step 4: the clinician's chart no longer says so; the colleague's still does. Step 5 (after the colleague marks theirs
 //   done too): the covering clinician's inbox holds the item; its link shows the answers with "Not on your panel:
 //   Synthetic Booked is on the panel of Dr. Forms Colleague, Dr. Forms Nine, and the chart opens to you only under emergency access, which
@@ -97,7 +97,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
             Assert.DoesNotContain(never, Text(inbox), StringComparison.Ordinal);
         }
 
-        const string Notice = "Needs review: a pre-visit form has an answer for you to review.";
+        const string Notice = "Needs review. A pre-visit form has an answer for you to review.";
         Assert.Contains(Notice, Text(await visit.Session.Client.GetStringAsync($"/patients/{visit.Patient}", Cancel)));
         Assert.Contains(Notice, Text(await colleague.Client.GetStringAsync($"/patients/{visit.Patient}", Cancel)));
 

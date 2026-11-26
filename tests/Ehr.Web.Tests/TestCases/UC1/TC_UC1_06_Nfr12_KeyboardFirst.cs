@@ -42,7 +42,7 @@ public partial class TC_UC1_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture
 
         // The shortcut, announced to assistive technology, with no accesskey for a browser's own chord to trip over.
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Matches("<a [^>]*data-new-order aria-keyshortcuts=\"Alt\\+Shift\\+O\"[^>]*>New order</a>", chart);
+        Assert.Matches("<a [^>]*data-new-order aria-keyshortcuts=\"Alt\\+Shift\\+O\"[^>]*>New order <kbd class=\"sc-kbd\" aria-hidden=\"true\">Alt\\+Shift\\+O</kbd></a>", chart);
         Assert.DoesNotContain("accesskey", chart);
 
         var page = await session.Client.GetStringAsync(FormPath(patient, "medication"), Cancel);

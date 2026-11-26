@@ -79,7 +79,7 @@ public partial class TC_UC12_05_Nfr06_Encryption(WebApps apps) : IClassFixture<W
 
         var html = await ReadAsync(chart);
         Assert.Contains("Readonly, Wren", html);
-        Assert.Contains("can't be changed while the clinic's server can't be reached", html);
+        Assert.Contains("can't be changed until the clinic's server is back", html);
         Assert.True(chart.Headers.CacheControl?.NoStore);
     }
 

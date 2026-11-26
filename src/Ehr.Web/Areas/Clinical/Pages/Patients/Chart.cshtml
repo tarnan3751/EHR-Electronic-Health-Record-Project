@@ -24,7 +24,7 @@
     <div class="sc-actions">
         @if (!OnPrem.IsReachable)
         {
-            <p class="sc-muted">Your panel can't be changed while the clinic's server can't be reached.</p>
+            <p class="sc-muted">Your patients can't be changed until the clinic's server is back.</p>
         }
         else if (Model.OnPanel)
         {
@@ -47,41 +47,41 @@
 @if (Model.Chart.FormToReview)
 {
     @* Step 13e: a pre-visit form in this clinician's inbox has an answer to review. No questionnaire, answer or score. *@
-    <p class="sc-notice sc-notice--danger" data-form-review><span class="sc-notice__state">Needs review:</span> a pre-visit form has an answer for you to review. <a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" asp-route-sensitive="true">Open pre-visit forms</a></p>
+    <p class="sc-notice sc-notice--danger" data-form-review><span class="sc-notice__state">Needs review.</span> A pre-visit form has an answer for you to review. <a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" asp-route-sensitive="true">Open pre-visit forms</a></p>
 }
 @* The notices after an action take the focus (data-focus-on-load, js/patient-search.js), so the keyboard and a
    screen reader start from what just happened. *@
 @if (Model.Chart.ConfirmsDiscontinued)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order discontinued:</span> <strong>@Model.Chart.DiscontinuedName</strong> is listed under this chart's discontinued orders.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order discontinued.</span> <strong>@Model.Chart.DiscontinuedName</strong> is under discontinued orders.</p>
 }
 @if (Model.SignedOrder is { } signed && Model.Chart.ReplacedName is { } replaced)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order changed:</span> <strong>@signed.Display</strong> replaces <strong>@replaced</strong>, @Clinic.Format(signed.SignedAt). The order it replaces is listed under this chart's discontinued orders.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order changed.</span> <strong>@signed.Display</strong> replaces <strong>@replaced</strong>, signed @Clinic.Format(signed.SignedAt). The old order is under discontinued orders.</p>
 }
 else if (Model.SignedOrder is { } newOrder)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order signed:</span> <strong>@newOrder.Display</strong>, @Clinic.Format(newOrder.SignedAt).</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order signed.</span> <strong>@newOrder.Display</strong> is under active orders, signed @Clinic.Format(newOrder.SignedAt).</p>
 }
 @* After the entry form saved an entry. A sensitive one the chart leaves out isn't named: the notice says where it is. *@
 @if (Model.Chart.Saved is { Hidden: true } hiddenSave)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved:</span> the @Ehr.Domain.Patients.ChartListWords.Lists[hiddenSave.Table].One is sensitive, so it is kept with the sensitive items.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved.</span> The @Ehr.Domain.Patients.ChartListWords.Lists[hiddenSave.Table].One is sensitive, so it's hidden with the other sensitive items.</p>
 }
 else if (Model.Chart.Saved is { } saved)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved:</span> <strong>@saved.Display</strong>@ChartModel.SavedWhere(saved)</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved.</span> <strong>@saved.Display</strong>@ChartModel.SavedWhere(saved)</p>
 }
 @switch (Model.NoKnownAllergiesNotice)
 {
     case "saved":
-        <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved:</span> no known allergies recorded for this patient.</p>
+        <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved.</span> This patient has no known allergies.</p>
         break;
     case "allergy-recorded":
-        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved:</span> an allergy is recorded for this patient, so "No known allergies" wasn't recorded. Their allergies are listed below.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> This patient has an allergy on record, listed below.</p>
         break;
     case "refused":
-        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved:</span> you can't change this patient's allergies now, so nothing was recorded.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> You can't change this patient's allergies now.</p>
         break;
 }
 
@@ -111,6 +111,96 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
 <p><a asp-page="Lists/History" asp-all-route-data="historyRoute">History of allergies, medications and diagnoses</a></p>
 
 <div class="sc-chart">
+    @* Allergies, medications and diagnoses: added and changed for a patient on the clinician's panel while the clinic's
+       server can be reached (Lists/Entry). Nothing is deleted; an entry that no longer applies gets another status. *@
+    <section class="sc-panel" aria-labelledby="chart-allergies">
+        <h2 class="sc-panel__title" id="chart-allergies">Allergies</h2>
+        @{ AddLink("allergies", "Add allergy"); }
+        @if (Model.KnownAllergies.Count > 0)
+        {
+            <ul class="sc-list">
+                @foreach (var allergy in Model.KnownAllergies)
+                {
+                    <li id="allergy-@allergy.Id">
+                        <strong>@allergy.Display</strong>@if (allergy.Reaction is { } reaction) { <text>: @reaction</text> }
+                        @if (allergy.Criticality == AllergyCriticality.High)
+                        {
+                            <span class="sc-tag sc-tag--danger">High risk</span>
+                        }
+                        @{ EditLink("allergies", allergy.Id, allergy.Display); }
+                    </li>
+                }
+            </ul>
+        }
+        else if (Model.NoKnownAllergies is { } none)
+        {
+            <p>No known allergies (recorded @Clinic.Day(none.RecordedAt)@(Model.Chart.NoKnownAllergiesRecordedBy is { } recorder ? $" by {recorder}" : "")).</p>
+        }
+        else
+        {
+            <p class="sc-muted">No allergy information recorded.</p>
+            @if (Model.OnPanel && OnPrem.IsReachable)
+            {
+                @* Asked and none: recorded as an entry of its own, which adding an allergy later clears. *@
+                <form method="post" asp-page-handler="NoKnownAllergies" asp-all-route-data="Model.SensitiveRouteData()">
+                    <button class="sc-btn sc-btn--compact" data-no-known-allergies>Record no known allergies</button>
+                </form>
+            }
+        }
+    </section>
+
+    <section class="sc-panel" aria-labelledby="chart-medications">
+        <h2 class="sc-panel__title" id="chart-medications">Medications</h2>
+        @{ AddLink("medications", "Add medication"); }
+        @if (Model.Chart.Medications.Count > 0)
+        {
+            <ul class="sc-list">
+                @foreach (var medication in Model.Chart.Medications)
+                {
+                    <li>
+                        <strong>@medication.Display</strong>@if (medication.Dosage is { } dosage) { <text>: @dosage</text> }
+                        @if (medication.Sensitive)
+                        {
+                            <span class="sc-tag sc-tag--warning">Sensitive</span>
+                        }
+                        @{ EditLink("medications", medication.Id, medication.Display); }
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="sc-muted">No active medications.</p>
+        }
+    </section>
+
+    <section class="sc-panel" aria-labelledby="chart-diagnoses">
+        <h2 class="sc-panel__title" id="chart-diagnoses">Diagnoses</h2>
+        @{ AddLink("diagnoses", "Add diagnosis"); }
+        @if (Model.Chart.Conditions.Count > 0)
+        {
+            <ul class="sc-list">
+                @foreach (var condition in Model.Chart.Conditions)
+                {
+                    <li>
+                        <strong>@condition.Display</strong>
+                        @if (condition.Code is { } diagnosisCode) { <text>(@diagnosisCode)</text> }
+                        @if (condition.OnsetDate is { } onset) { <text> since @onset.ToString("yyyy-MM-dd")</text> }
+                        @if (condition.Sensitive)
+                        {
+                            <span class="sc-tag sc-tag--warning">Sensitive</span>
+                        }
+                        @{ EditLink("diagnoses", condition.Id, condition.Display); }
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="sc-muted">No active diagnoses.</p>
+        }
+    </section>
+
     <section class="sc-panel" aria-labelledby="chart-notes">
         <h2 class="sc-panel__title" id="chart-notes">Clinical notes</h2>
         @* UC 9 and UC 10: dictate a note for this patient, offered as "New note" is: for a patient on the clinician's panel,
@@ -123,23 +213,23 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         @if (Model.OnPanel && OnPrem.IsReachable)
         {
             <div class="sc-actions">
-                <a asp-page="Dictate" asp-all-route-data="dictateRoute" class="sc-btn" data-dictate-link>Dictate a note</a>
+                <form method="post" asp-page-handler="NewNote"><button class="sc-btn sc-btn--compact">New note</button></form>
+                <a asp-page="Dictate" asp-all-route-data="dictateRoute" class="sc-btn sc-btn--compact" data-dictate-link>Dictate a note</a>
                 @* Step 16: listening to a visit, when the clinic has it switched on, at the clinic only, and not in what the
                    cloud app forwards here. *@
                 @if (Listening.Enabled && Ehr.Web.Forwarding.ClinicNetwork.AtTheClinic(HttpContext.Request, NoteWrites))
                 {
-                    <a asp-page="Listen" asp-all-route-data="dictateRoute" class="sc-btn" data-listen-link>Listen to the visit</a>
+                    <a asp-page="Listen" asp-all-route-data="dictateRoute" class="sc-btn sc-btn--compact" data-listen-link>Listen to the visit</a>
                 }
-                <form method="post" asp-page-handler="NewNote"><button class="sc-btn">New note</button></form>
             </div>
         }
         else if (!Model.OnPanel)
         {
-            <p class="sc-muted">Add this patient to your panel to write a note.</p>
+            <p class="sc-muted">To write a note, add this patient to My patients.</p>
         }
         else
         {
-            <p class="sc-muted">New notes and signing require the clinic server. Saved notes remain readable.</p>
+            <p class="sc-muted">New notes and signing need the clinic's server. Saved notes remain readable.</p>
         }
         @if (Model.Drafts.Count > 0)
         {
@@ -163,7 +253,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
         else
         {
-            <p class="sc-muted">@(Model.Chart.SensitiveNotesHidden > 0 ? "No other signed notes." : "No signed notes recorded.")</p>
+            <p class="sc-muted">@(Model.Chart.SensitiveNotesHidden > 0 ? "No other signed notes." : "No signed notes.")</p>
         }
     </section>
 
@@ -176,13 +266,12 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             var orderRoute = Model.Search.RouteData();
             orderRoute["id"] = Model.Patient.Id.ToString();
             <p class="sc-actions">
-                <a asp-page="Orders/New" asp-all-route-data="orderRoute" class="sc-btn" data-new-order aria-keyshortcuts="Alt+Shift+O">New order</a>
-                <kbd class="sc-kbd sc-muted">Alt+Shift+O</kbd>
+                <a asp-page="Orders/New" asp-all-route-data="orderRoute" class="sc-btn sc-btn--compact" data-new-order aria-keyshortcuts="Alt+Shift+O">New order <kbd class="sc-kbd" aria-hidden="true">Alt+Shift+O</kbd></a>
             </p>
         }
         else if (!Model.OnPanel)
         {
-            <p class="sc-muted">Add this patient to your panel to place an order.</p>
+            <p class="sc-muted">To place an order, add this patient to My patients.</p>
         }
         else
         {
@@ -266,7 +355,75 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
         else
         {
-            <p class="sc-muted">No results.</p>
+            <p class="sc-muted">No results yet.</p>
+        }
+    </section>
+
+    @* Vital signs (step 9): the newest value of each sign, from the chart's one query of the patient's vital signs. Every set, the trends and recording are on the vital signs page. *@
+    <section class="sc-panel" aria-labelledby="chart-vitals">
+        <h2 class="sc-panel__title" id="chart-vitals">Vital signs</h2>
+        @if (Model.Chart.LatestVitals.Count == 0)
+        {
+            <p class="sc-muted">No vital signs.</p>
+        }
+        else
+        {
+            @* A list, not a table: the panel is a third of the page. Short names, as on the entry form. *@
+            <ul class="sc-list" data-latest-vitals>
+                @foreach (var vital in Model.Chart.LatestVitals)
+                {
+                    <li>
+                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range, or a
+                           child's at or above its screening value (step 9d). *@
+                        <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
+                        @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
+                        @foreach (var flag in vital.Flags)
+                        {
+                            <span class="sc-tag sc-tag--warning">@flag</span>
+                        }
+                        @* Up or down against the reading before it (step 9b), in a shape and in words. *@
+                        @if (vital.Direction is { } direction)
+                        {
+                            <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
+                        }
+                        <span class="sc-muted">· @Clinic.Day(vital.TakenAt)</span>
+                    </li>
+                }
+            </ul>
+        }
+        <p><a asp-page="Vitals/Index" asp-route-patientId="@Model.Patient.Id" data-vitals>Flowsheet, trends and recording</a></p>
+    </section>
+
+    @* Appointments still to come (FR-17), part of the chart's one recorded read; booked for a patient on the
+       clinician's panel while the clinic's server can be reached. *@
+    <section class="sc-panel" aria-labelledby="chart-appointments">
+        <h2 class="sc-panel__title" id="chart-appointments">Appointments</h2>
+        @if (Model.OnPanel && OnPrem.IsReachable)
+        {
+            var bookRoute = Model.Search.RouteData();
+            bookRoute["id"] = Model.Patient.Id.ToString();
+            <p class="sc-actions"><a asp-page="/Schedule/New" asp-all-route-data="bookRoute" class="sc-btn sc-btn--compact" data-book-appointment>Book appointment</a></p>
+        }
+        else if (Model.OnPanel)
+        {
+            <p class="sc-muted">Booking an appointment needs the clinic's server.</p>
+        }
+        @if (Model.Chart.Upcoming.Count > 0)
+        {
+            <ul class="sc-list">
+                @foreach (var appointment in Model.Chart.Upcoming)
+                {
+                    <li>
+                        <strong>@Clinic.Format(appointment.StartsAt)</strong> · @appointment.Minutes minutes · @appointment.Clinician
+                        <br>@appointment.Reason
+                        <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @Clinic.Format(appointment.StartsAt)">Open</a></span>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p class="sc-muted">No upcoming appointments.</p>
         }
     </section>
 
@@ -304,178 +461,13 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
     </section>
 
-    @* Vital signs (step 9): the newest value of each sign, from the chart's one query of the patient's vital signs. Every set, the trends and recording are on the vital signs page. *@
-    <section class="sc-panel" aria-labelledby="chart-vitals">
-        <h2 class="sc-panel__title" id="chart-vitals">Vital signs</h2>
-        @if (Model.Chart.LatestVitals.Count == 0)
-        {
-            <p class="sc-muted">No vital signs recorded.</p>
-        }
-        else
-        {
-            @* A list, not a table: the panel is a third of the page. Short names, as on the entry form. *@
-            <ul class="sc-list" data-latest-vitals>
-                @foreach (var vital in Model.Chart.LatestVitals)
-                {
-                    <li>
-                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range, or a
-                           child's at or above its screening value (step 9d). *@
-                        <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
-                        @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
-                        @foreach (var flag in vital.Flags)
-                        {
-                            <span class="sc-tag sc-tag--warning">@flag</span>
-                        }
-                        @* Up or down against the reading before it (step 9b), in a shape and in words. *@
-                        @if (vital.Direction is { } direction)
-                        {
-                            <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
-                        }
-                        <span class="sc-muted">· @Clinic.Day(vital.TakenAt)</span>
-                    </li>
-                }
-            </ul>
-        }
-        <p><a asp-page="Vitals/Index" asp-route-patientId="@Model.Patient.Id" data-vitals>Flowsheet, trends and recording</a></p>
-    </section>
-
-    @* Who can use the portal for this patient (FR-19): on its own page, read when it is opened. *@
-    <section class="sc-panel" aria-labelledby="chart-proxies">
-        <h2 class="sc-panel__title" id="chart-proxies">Proxy access</h2>
-        <p><a asp-page="Proxies/Index" asp-route-patientId="@Model.Patient.Id" data-proxies>Who can use the portal for this patient</a></p>
-    </section>
-
-    @* Appointments still to come (FR-17), part of the chart's one recorded read; booked for a patient on the
-       clinician's panel while the clinic's server can be reached. *@
-    <section class="sc-panel" aria-labelledby="chart-appointments">
-        <h2 class="sc-panel__title" id="chart-appointments">Appointments</h2>
-        @if (Model.OnPanel && OnPrem.IsReachable)
-        {
-            var bookRoute = Model.Search.RouteData();
-            bookRoute["id"] = Model.Patient.Id.ToString();
-            <p class="sc-actions"><a asp-page="/Schedule/New" asp-all-route-data="bookRoute" class="sc-btn sc-btn--compact" data-book-appointment>Book appointment</a></p>
-        }
-        else if (Model.OnPanel)
-        {
-            <p class="sc-muted">Booking an appointment needs the clinic's server.</p>
-        }
-        @if (Model.Chart.Upcoming.Count > 0)
-        {
-            <ul class="sc-list">
-                @foreach (var appointment in Model.Chart.Upcoming)
-                {
-                    <li>
-                        <strong>@Clinic.Format(appointment.StartsAt)</strong> · @appointment.Minutes minutes · @appointment.Clinician
-                        <br>@appointment.Reason
-                        <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @Clinic.Format(appointment.StartsAt)">Open</a></span>
-                    </li>
-                }
-            </ul>
-        }
-        else
-        {
-            <p class="sc-muted">No appointments booked.</p>
-        }
-        @* Step 13e: the forms asked for before visits, each a sensitive item, on their own page; only how many here. *@
-        <p><a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" data-forms>Pre-visit forms@(Model.Chart.Forms > 0 ? $" ({Model.Chart.Forms})" : "")</a></p>
-    </section>
-
-    @* Allergies, medications and diagnoses: added and changed for a patient on the clinician's panel while the clinic's
-       server can be reached (Lists/Entry). Nothing is deleted; an entry that no longer applies gets another status. *@
-    <section class="sc-panel" aria-labelledby="chart-allergies">
-        <h2 class="sc-panel__title" id="chart-allergies">Allergies</h2>
-        @{ AddLink("allergies", "Add allergy"); }
-        @if (Model.KnownAllergies.Count > 0)
-        {
-            <ul class="sc-list">
-                @foreach (var allergy in Model.KnownAllergies)
-                {
-                    <li id="allergy-@allergy.Id">
-                        <strong>@allergy.Display</strong>@if (allergy.Reaction is { } reaction) { <text>: @reaction</text> }
-                        @if (allergy.Criticality == AllergyCriticality.High)
-                        {
-                            <span class="sc-tag sc-tag--danger">High risk</span>
-                        }
-                        @{ EditLink("allergies", allergy.Id, allergy.Display); }
-                    </li>
-                }
-            </ul>
-        }
-        else if (Model.NoKnownAllergies is { } none)
-        {
-            <p>No known allergies (recorded @Clinic.Day(none.RecordedAt)@(Model.Chart.NoKnownAllergiesRecordedBy is { } recorder ? $" by {recorder}" : "")).</p>
-        }
-        else
-        {
-            <p class="sc-muted">No allergy information recorded.</p>
-            @if (Model.OnPanel && OnPrem.IsReachable)
-            {
-                @* Asked and none: recorded as an entry of its own, which adding an allergy later clears. *@
-                <form method="post" asp-page-handler="NoKnownAllergies" asp-all-route-data="Model.SensitiveRouteData()">
-                    <button class="sc-btn sc-btn--compact" data-no-known-allergies>Record no known allergies</button>
-                </form>
-            }
-        }
-    </section>
-
-    <section class="sc-panel" aria-labelledby="chart-medications">
-        <h2 class="sc-panel__title" id="chart-medications">Medications</h2>
-        @{ AddLink("medications", "Add medication"); }
-        @if (Model.Chart.Medications.Count > 0)
-        {
-            <ul class="sc-list">
-                @foreach (var medication in Model.Chart.Medications)
-                {
-                    <li>
-                        <strong>@medication.Display</strong>@if (medication.Dosage is { } dosage) { <text>: @dosage</text> }
-                        @if (medication.Sensitive)
-                        {
-                            <span class="sc-tag sc-tag--warning">Sensitive</span>
-                        }
-                        @{ EditLink("medications", medication.Id, medication.Display); }
-                    </li>
-                }
-            </ul>
-        }
-        else
-        {
-            <p class="sc-muted">No active medications recorded.</p>
-        }
-    </section>
-
-    <section class="sc-panel" aria-labelledby="chart-diagnoses">
-        <h2 class="sc-panel__title" id="chart-diagnoses">Diagnoses</h2>
-        @{ AddLink("diagnoses", "Add diagnosis"); }
-        @if (Model.Chart.Conditions.Count > 0)
-        {
-            <ul class="sc-list">
-                @foreach (var condition in Model.Chart.Conditions)
-                {
-                    <li>
-                        <strong>@condition.Display</strong>
-                        @if (condition.Code is { } diagnosisCode) { <text>(@diagnosisCode)</text> }
-                        @if (condition.OnsetDate is { } onset) { <text> since @onset.ToString("yyyy-MM-dd")</text> }
-                        @if (condition.Sensitive)
-                        {
-                            <span class="sc-tag sc-tag--warning">Sensitive</span>
-                        }
-                        @{ EditLink("diagnoses", condition.Id, condition.Display); }
-                    </li>
-                }
-            </ul>
-        }
-        else
-        {
-            <p class="sc-muted">No active diagnoses recorded.</p>
-        }
-    </section>
-
+    @* The patient's use of the portal: the code to register, who can use it for them, and the forms asked for before visits. *@
     <section class="sc-panel" aria-labelledby="chart-portal">
         <h2 class="sc-panel__title" id="chart-portal">Patient portal</h2>
         @if (Model.EnrollmentCode is { } code)
         {
             <section class="sc-notice sc-notice--info">
-                <p>Give the patient this code. It lets them register for the portal once, within 14 days, and isn't shown again.</p>
+                <p>Give the patient this code to register for the portal. It works once, for 14 days, and isn't shown again.</p>
                 <p class="mono-code">@code</p>
             </section>
         }
@@ -486,9 +478,13 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         else
         {
             <form method="post" asp-page-handler="Enroll" asp-all-route-data="Model.Search.RouteData()">
-                <button class="sc-btn">Issue an enrollment code</button>
+                <button class="sc-btn sc-btn--compact">Issue an enrollment code</button>
             </form>
         }
+        @* Who can use the portal for this patient (FR-19): on its own page, read when it is opened. *@
+        <p><a asp-page="Proxies/Index" asp-route-patientId="@Model.Patient.Id" data-proxies>Who can use the portal for this patient</a></p>
+        @* Step 13e: the forms asked for before visits, each a sensitive item, on their own page; only how many here. *@
+        <p><a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" data-forms>Pre-visit forms@(Model.Chart.Forms > 0 ? $" ({Model.Chart.Forms})" : "")</a></p>
     </section>
 
     <section class="sc-panel sc-panel--wide" aria-labelledby="chart-visits">
@@ -521,7 +517,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
         else
         {
-            <p class="sc-muted">No visits recorded.</p>
+            <p class="sc-muted">No visits.</p>
         }
     </section>
 </div>

@@ -143,7 +143,7 @@ public class OrderTests(WebApps apps) : IClassFixture<WebApps>
         using var opened = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));
         var chart = await ReadAsync(opened);
         Assert.DoesNotContain("data-new-order", chart);
-        Assert.Contains("Add this patient to your panel to place an order.", chart);
+        Assert.Contains("To place an order, add this patient to My patients.", chart);
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, covering.Id, patient);
         var noRedirects = Client(apps.OnPrem, session.Jar, followRedirects: false);
@@ -273,9 +273,9 @@ public class OrderTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await OrdersAsync(apps, patient));
 
         // And the chart confirms a discontinuation only of an order of this patient's that is discontinued.
-        Assert.Contains("Order discontinued:", Words(await session.Client.GetStringAsync($"/patients/{patient}?discontinued={order}", Cancel)));
-        Assert.DoesNotContain("Order discontinued:", Words(await session.Client.GetStringAsync($"/patients/{patient}?discontinued={theirs}", Cancel)));
-        Assert.DoesNotContain("Order discontinued:", Words(await session.Client.GetStringAsync($"/patients/{patient}?discontinued={Guid.NewGuid()}", Cancel)));
+        Assert.Contains("Order discontinued.", Words(await session.Client.GetStringAsync($"/patients/{patient}?discontinued={order}", Cancel)));
+        Assert.DoesNotContain("Order discontinued.", Words(await session.Client.GetStringAsync($"/patients/{patient}?discontinued={theirs}", Cancel)));
+        Assert.DoesNotContain("Order discontinued.", Words(await session.Client.GetStringAsync($"/patients/{patient}?discontinued={Guid.NewGuid()}", Cancel)));
     }
 
     // The order form lists the clinic's common items, and finds the rest of the catalog, LOINC's lab orders and RxNorm's

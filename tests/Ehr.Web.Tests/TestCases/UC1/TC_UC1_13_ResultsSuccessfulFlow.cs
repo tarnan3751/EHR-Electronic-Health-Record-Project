@@ -42,7 +42,7 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
         var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Matches($"<a [^>]*data-enter-results[^>]*href=\"{Path(patient, order)}\"[^>]*>Enter results</a>", chart);
-        Assert.Contains("No results.", chart);
+        Assert.Contains("No results yet.", chart);
         var empty = await session.Client.GetStringAsync(Path(patient, order), Cancel);
         Assert.Contains("No results yet.", empty);
         Assert.Contains("Hemoglobin [Mass/volume] in Blood <span>(g/dL; reference 12 to 17.5)</span>", empty);

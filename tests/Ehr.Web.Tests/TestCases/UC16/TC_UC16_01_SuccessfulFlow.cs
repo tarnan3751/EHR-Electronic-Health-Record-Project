@@ -39,7 +39,7 @@ public class TC_UC16_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         var (clinician, patient, session) = await ClinicianAsync(apps, "Dr. Schedule One");
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Matches($"<a [^>]*data-book-appointment[^>]*href=\"{NewPath(patient)}\"[^>]*>Book appointment</a>", chart);
-        Assert.Contains("No appointments booked.", chart);
+        Assert.Contains("No upcoming appointments.", chart);
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(NewPath(patient), Cancel);

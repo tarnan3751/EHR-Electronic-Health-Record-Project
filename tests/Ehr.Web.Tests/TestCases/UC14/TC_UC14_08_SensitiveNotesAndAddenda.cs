@@ -46,7 +46,7 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         // With only a sensitive note, the chart doesn't say there are none.
         var only = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
         Assert.Contains("No other signed notes.", only);
-        Assert.DoesNotContain("No signed notes recorded.", only);
+        Assert.DoesNotContain("No signed notes.", only);
         var ordinary = await SignedNoteAsync(session.Client, patient);
         Task<long> ViewsAsync() => apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient);
         var views = await ViewsAsync();
