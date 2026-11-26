@@ -16,7 +16,7 @@ namespace Ehr.Web.Tests;
 public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
-    static readonly NoteContent Synthetic = new("Synthetic history: cough for two days.", "Synthetic assessment: viral illness.", "Synthetic plan: rest and follow-up.");
+    static readonly NoteContent Synthetic = new("Synthetic subjective: cough for two days.", "Synthetic objective: chest clear, temperature 37.9.", "Synthetic assessment: viral illness.", "Synthetic plan: rest and follow-up.");
 
     sealed record DraftPage(Session Session, Guid Patient, Guid Draft, string Path, string Token);
 
@@ -42,7 +42,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         using var request = new HttpRequestMessage(HttpMethod.Post, page.Path + (handler == "Sign" ? "/confirm" : "?handler=" + handler));
         request.Headers.Add("HX-Request", "true");
         request.Content = Form([("__RequestVerificationToken", page.Token), ("Version", version),
-            ("History", content.History), ("Assessment", content.Assessment), ("Plan", content.Plan), .. extra]);
+            ("Subjective", content.Subjective), ("Objective", content.Objective), ("Assessment", content.Assessment), ("Plan", content.Plan), .. extra]);
         return await (client ?? page.Session.Client).SendAsync(request, Cancel);
     }
 
@@ -51,14 +51,15 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
 
     // TC-UC14-01: the chart creates a private server draft; a later request reopens the saved structured content.
     [Fact]
-    public async Task Create_save_reopen_and_chart_link_preserve_all_three_fields()
+    public async Task Create_save_reopen_and_chart_link_preserve_all_four_sections()
     {
         var page = await CreateAsync();
         using var saved = await PostAsync(page, "Save", 1);
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         Assert.Equal(2, (await JsonAsync(saved)).GetProperty("version").GetInt64());
         var html = await page.Session.Client.GetStringAsync(page.Path, Cancel);
-        Assert.Contains(Synthetic.History, html);
+        Assert.Contains(Synthetic.Subjective, html);
+        Assert.Contains(Synthetic.Objective, html);
         Assert.Contains(Synthetic.Assessment, html);
         Assert.Contains(Synthetic.Plan, html);
         Assert.Contains("Saved", html);
@@ -101,9 +102,9 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         using var retry = await PostAsync(page, "Sign", 2, extra: [("Confirmed", true)]);
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
         Assert.Equal(url, (await JsonAsync(retry)).GetProperty("url").GetString());
-        using var edit = await PostAsync(page, "Save", 3, new("Changed", "Changed", "Changed"));
+        using var edit = await PostAsync(page, "Save", 3, new("Changed", "Changed", "Changed", "Changed"));
         Assert.Equal(HttpStatusCode.Conflict, edit.StatusCode);
-        Assert.Contains(Synthetic.History, await page.Session.Client.GetStringAsync(url, Cancel));
+        Assert.Contains(Synthetic.Subjective, await page.Session.Client.GetStringAsync(url, Cancel));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignNote, signer, page.Patient));
     }
 
@@ -112,16 +113,17 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
     public async Task Incomplete_draft_is_saved_but_signing_is_rejected_and_preserves_it()
     {
         var page = await CreateAsync();
-        using var save = await PostAsync(page, "Save", 1, new("Synthetic history", "", ""));
+        using var save = await PostAsync(page, "Save", 1, new("Synthetic subjective", "", "", ""));
         Assert.Equal(HttpStatusCode.OK, save.StatusCode);
         using var sign = await PostAsync(page, "Sign", 2, extra: [("Confirmed", true)]);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, sign.StatusCode);
         var errors = await sign.Content.ReadAsStringAsync(Cancel);
+        Assert.Contains("Enter Objective before signing", errors);
         Assert.Contains("Enter Assessment before signing", errors);
         Assert.Contains("Enter Plan before signing", errors);
         Assert.Equal(0, (await SignedAsync(page.Draft)).Count);
         var html = await page.Session.Client.GetStringAsync(page.Path, Cancel);
-        Assert.Contains("Synthetic history", html);
+        Assert.Contains("Synthetic subjective", html);
         Assert.Contains("value=\"2\"", html);
     }
 
@@ -177,7 +179,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
     {
         var page = await CreateAsync();
         using var save = await PostAsync(page, "Save", 1);
-        using var stale = await PostAsync(page, "Save", 1, new("Stale", "Stale", "Stale"));
+        using var stale = await PostAsync(page, "Save", 1, new("Stale", "Stale", "Stale", "Stale"));
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
         var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => PostAsync(page, "Sign", 2, extra: [("Confirmed", true)])));
         try
@@ -198,7 +200,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
     {
         var page = await CreateAsync();
         using var review = await PostAsync(page, "Review", 1);
-        using var change = await PostAsync(page, "Save", 2, new("New history", Synthetic.Assessment, Synthetic.Plan));
+        using var change = await PostAsync(page, "Save", 2, Synthetic with { Subjective = "New subjective" });
         using var sign = await PostAsync(page, "Sign", 2, extra: [("Confirmed", true)]);
         Assert.Equal(HttpStatusCode.Conflict, sign.StatusCode);
         Assert.Equal(0, (await SignedAsync(page.Draft)).Count);
@@ -221,7 +223,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(0, (await SignedAsync(page.Draft)).Count);
             // Cloud can reopen the draft even while primary writes are unavailable; its reads are queued.
             var html = await cutOff.GetStringAsync(page.Path, Cancel);
-            Assert.Contains(Synthetic.History, html);
+            Assert.Contains(Synthetic.Subjective, html);
             var queued = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue).Events;
             Assert.Contains(queued, e => e.TableName == "clinical_drafts" && e.RowId == page.Draft);
         }
@@ -261,7 +263,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         using var signed = await PostAsync(page, "Sign", 2, extra: [("Confirmed", true)]);
         var url = (await JsonAsync(signed)).GetProperty("url").GetString()!;
         var client = Client(apps.Cloud, page.Session.Jar);
-        Assert.Contains(Synthetic.History, await client.GetStringAsync(url, Cancel));
+        Assert.Contains(Synthetic.Subjective, await client.GetStringAsync(url, Cancel));
         Assert.Contains("Signed note", await client.GetStringAsync($"/patients/{page.Patient}", Cancel));
         await apps.ShipCloudAuditAsync();
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, patientId: page.Patient, source: AuditSources.Cloud) > 0);

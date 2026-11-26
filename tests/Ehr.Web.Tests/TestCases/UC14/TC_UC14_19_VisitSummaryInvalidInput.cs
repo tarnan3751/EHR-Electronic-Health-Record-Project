@@ -16,11 +16,11 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Requirements: proposed FR-55
 // Use case: UC 14, Review and sign a clinical note
 // Preconditions: The clinician is signed in on the on-site app with the patient on their panel and has signed a note
-//   whose history is "Synthetic history: dry cough, quartzwing pattern, nocturnal.". The patient has a portal account.
+//   whose Subjective is "Synthetic subjective: dry cough, quartzwing pattern, nocturnal.". The patient has a portal account.
 // Inputs and system conditions: POST /patients/{id}/notes/{note}/summary, once for each input below.
 // Test data: In What we found, each of: "E11.9", "E119" (a diagnosis code with or without its dot), "860975" (an
 //   RxNorm code), "4548-4" (a LOINC code), "QE1QX6B99R" (a UNII), "SYN-LAB-001" (the clinic's own order code), a UUID,
-//   the patient's MRN, and the note's history pasted whole; then an empty What happens next, and a What we talked about
+//   the patient's MRN, and the note's Subjective pasted whole; then an empty What happens next, and a What we talked about
 //   of 4,001 characters. Last, all three parts as "Vitamin B12 and A1c are fine. Take 500 mg twice a day, vitamin D
 //   50,000 units weekly, 1-2 tablets as needed; back on 2026-11-21. Wear an N95 mask.".
 // Steps:
@@ -39,7 +39,7 @@ public class TC_UC14_19_VisitSummaryInvalidInput(WebApps apps) : IClassFixture<W
     {
         var (_, patient, session) = await OnPanelAsync(apps);
         var (email, _) = await apps.CreatePatientAccountAsync(patient);
-        var note = await SignedNoteAsync(session.Client, patient, history: NoteHistory);
+        var note = await SignedNoteAsync(session.Client, patient, subjective: NoteSubjective);
         var mrn = WebApps.MrnOf(patient);
         const string identifier = "0193a5c2-7e4b-7c1d-9f2e-3b4a5c6d7e8f";
 
@@ -53,7 +53,7 @@ public class TC_UC14_19_VisitSummaryInvalidInput(WebApps apps) : IClassFixture<W
             ("We ordered SYN-LAB-001.", "“SYN-LAB-001” in What we found is one of the clinic's order codes. Say what was ordered in plain words."),
             ($"See {identifier}.", $"“{identifier}” in What we found looks like an internal identifier. Leave it out."),
             ($"Your number is {mrn.ToUpperInvariant()}.", $"“{mrn.ToUpperInvariant()}” in What we found is the patient's medical record number. Leave it out."),
-            (NoteHistory, "What we found repeats the note's History word for word. Write it for the patient in your own words."),
+            (NoteSubjective, "What we found repeats the note's Subjective word for word. Write it for the patient in your own words."),
         })
         {
             using var refused = await ReleaseAsync(session.Client, patient, note, found: found);

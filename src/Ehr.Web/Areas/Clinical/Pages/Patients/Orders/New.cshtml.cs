@@ -33,6 +33,15 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Orders;
 // order with no request, and approves it from the request's page again. The patient is then told by email, as on a
 // decline.
 //
+// An order the clinician's dictation proposed (the expansion plan's step 15) is this form too (?proposal=<proposal>), from
+// the dictation's review: the clinician's words are shown at the top, marked in the sentence they were said in, and
+// nothing is filled in from them; the type, the item and every detail are the clinician's, with every check of an order.
+// "Sign order" signs it and decides the proposal with it, in one transaction, and goes back to the review; the database
+// holds the proposal to an order signed now by this clinician. If the proposal was decided first, in another tab, nothing
+// is saved, the order included, and the form says so. It opens one order: anything else the words name is ordered from
+// the chart. The proposal's ID is a query a link carries, which a sign-in drops, as a refill request's is: after one, the
+// clinician is on a new order with no proposal, and opens it from the review again.
+//
 // The same rule as the chart's "New note": only for a patient on the clinician's panel. Anyone else, a clinician under
 // emergency access included, is sent back to the chart before anything about the patient is read. Off-site, the cloud
 // app forwards the post to the on-prem app; js/orders.js posts it with fetch, so when that fails the form stays filled.
@@ -86,6 +95,20 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
 
     // Set when the request was answered first, or can no longer be approved: why, to say so.
     public SignRefusal? RefillRefused { get; private set; }
+
+    // Step 15: the order the clinician's dictation proposed, from the query string, and how its review shows it.
+    [BindProperty(SupportsGet = true)]
+    public Guid? Proposal { get; set; }
+
+    public Notes.ProposedFromDictation? Proposed { get; private set; }
+
+    // Set when the proposal was decided first, in another tab: nothing was saved.
+    public bool ProposalDecided { get; private set; }
+
+    // Where the proposal's review is, to go back to it.
+    public string? ReviewLink => Proposed is { } proposed
+        ? Url.Page("/Patients/Notes/Review", new { patientId = proposed.Row.PatientId, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId })
+        : null;
 
     public OrderForm Form { get; private set; } = null!;
 
@@ -187,7 +210,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         }
 
         var (order, refusal) = await orders.SignAsync(id, item!, OrderForms.Details(type, Details), Form.Duplicates.Count > 0 ? reason : null,
-            HttpContext.RequestAborted, Replaces, changeReason, Form.Warnings.Any(OrderSafetyText.NeedsReason) ? safetyReason : null, Refill);
+            HttpContext.RequestAborted, Replaces, changeReason, Form.Warnings.Any(OrderSafetyText.NeedsReason) ? safetyReason : null, Refill, Proposal);
         if (refusal == SignRefusal.Gone)
         {
             return NoLongerActive();
@@ -196,6 +219,11 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         if (refusal is SignRefusal.Answered or SignRefusal.NotRenewable)
         {
             return RefillNotApproved(refusal.Value);
+        }
+
+        if (refusal == SignRefusal.ProposalDecided)
+        {
+            return ProposalNotDecided();
         }
 
         if (refusal == SignRefusal.Unsafe)
@@ -222,7 +250,13 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         }
 
         string url;
-        if (Refill is { } approved)
+        if (Proposed is { } proposed)
+        {
+            // Back to the review, with the cursor on the next proposal waiting there.
+            url = Url.Page("/Patients/Notes/Review",
+                new { patientId = id, draftId = proposed.DraftId, reviewId = proposed.Row.ReviewId, decided = proposed.Row.Id })!;
+        }
+        else if (Refill is { } approved)
         {
             // The link is the configured portal's home, never built from this request (step 6c), and names nothing.
             await refills.NotifyAnsweredAsync(id, Links.Build(addresses.Value.PortalBaseUrl, "/portal"), HttpContext.RequestAborted);
@@ -254,6 +288,14 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         return Page();
     }
 
+    // Nothing saved, the order included: the dictation's proposal was decided first, in another tab.
+    PageResult ProposalNotDecided()
+    {
+        ProposalDecided = true;
+        Response.StatusCode = StatusCodes.Status409Conflict;
+        return Page();
+    }
+
     // Nothing saved: the order to change was discontinued or changed first. What was entered stays, to copy.
     PageResult NoLongerActive()
     {
@@ -270,18 +312,36 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
             return RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
         }
 
-        // A refill is approved by a medication order, which replaces none.
-        if (Refill is not null && (Replaces is not null || (Type ?? OrderType.Medication) != OrderType.Medication))
+        // A refill is approved by a medication order, which replaces none. An order a dictation proposed is a new order of
+        // its own: no change, and no refill.
+        if (Refill is not null && (Replaces is not null || (Type ?? OrderType.Medication) != OrderType.Medication)
+            || Proposal is not null && (Replaces is not null || Refill is not null))
         {
             return BadRequest();
         }
 
-        if (await phi.OrderFormAsync(id, catalogCode, Replaces, HttpContext.RequestAborted, Refill) is not { } form)
+        if (await phi.OrderFormAsync(id, catalogCode, Replaces, HttpContext.RequestAborted, Refill, Proposal) is not { } form)
         {
             return NotFound();
         }
 
         Form = form;
+        if (Proposal is not null)
+        {
+            if (form.Proposal is null || Notes.ProposedFromDictation.From(form.Proposal) is not { } proposed)
+            {
+                // Not an order proposed from this clinician's dictation of this patient: nothing to open.
+                return HttpMethods.IsPost(Request.Method) ? NotFound() : RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));
+            }
+
+            Proposed = proposed;
+            if (!proposed.Waiting)
+            {
+                // Decided already: a post says so; a link goes back to the review, which shows the decision.
+                return HttpMethods.IsPost(Request.Method) ? ProposalNotDecided() : Redirect(ReviewLink!);
+            }
+        }
+
         if (Refill is { } refill)
         {
             Type = OrderType.Medication;

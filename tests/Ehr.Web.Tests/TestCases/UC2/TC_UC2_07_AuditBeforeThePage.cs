@@ -91,7 +91,7 @@ public class TC_UC2_07_AuditBeforeThePage(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([["read patients", "read clinical_notes"]], watched.Writes);
         watched.Writes.Clear();
         var page = await client.GetStringAsync(NotePath(patient, note), Cancel);
-        Assert.Contains(History, page);
+        Assert.Contains(Subjective, page);
         Assert.Equal([["read patients", "read clinical_notes"]], watched.Writes);
         Assert.Equal(before + 4, real.ReadPending(int.MaxValue).Events.Count);
 

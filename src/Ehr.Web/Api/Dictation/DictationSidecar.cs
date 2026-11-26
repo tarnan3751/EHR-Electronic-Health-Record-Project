@@ -11,6 +11,10 @@ public sealed class DictationSidecar(string? url, string? apiKey, HttpMessageInv
 {
     public const string OwnerHeader = "X-Dictation-Owner";
 
+    // On every call for a session listening to a visit (step 16): the service ties each session to its kind when it
+    // starts, and answers a call of the other kind as it would for no session at all.
+    public const string ModeHeader = "X-Dictation-Mode";
+
     // The cloud app's forwarder waits 30 seconds for an answer, and then marks the on-prem app unreachable for
     // everyone, so no dictation call may take longer than this.
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(20);
@@ -42,8 +46,9 @@ public sealed class DictationSidecar(string? url, string? apiKey, HttpMessageInv
             configuration["Ehr:Dictation:Url"], configuration["Ehr:Dictation:ApiKey"], new HttpMessageInvoker(handler), DefaultTimeout);
     }
 
-    // A call for the owner's session; path is relative to the service's address, such as "v1/sessions".
-    public HttpRequestMessage Request(HttpMethod method, string path, Guid owner, HttpContent? content)
+    // A call for the owner's session; path is relative to the service's address, such as "v1/sessions". With ambient,
+    // for a session listening to a visit.
+    public HttpRequestMessage Request(HttpMethod method, string path, Guid owner, HttpContent? content, bool ambient = false)
     {
         if (!IsConfigured)
         {
@@ -53,6 +58,11 @@ public sealed class DictationSidecar(string? url, string? apiKey, HttpMessageInv
         var request = new HttpRequestMessage(method, $"{Url}/{path}") { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
         request.Headers.Add(OwnerHeader, owner.ToString());
+        if (ambient)
+        {
+            request.Headers.Add(ModeHeader, "ambient");
+        }
+
         return request;
     }
 }

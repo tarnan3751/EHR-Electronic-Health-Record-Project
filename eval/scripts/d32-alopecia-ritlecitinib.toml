@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): alopecia areata starting ritlecitinib, with an allergy change to leave out. Format: eval/README.md.
 id = "d32-alopecia-ritlecitinib"
 voice = "ef_dora"
-tags = ["numbers", "drug-new", "negation", "allergy-change", "spoken-punctuation", "experiencer"]
+tags = ["numbers", "drug-new", "negation", "allergy-change", "spoken-punctuation", "experiencer", "proposal", "proposal-trap"]
 dates = []
 drugs = ["doxycycline", "ritlecitinib"]
 forbidden = ["put doxycycline on her allergy list"]
@@ -21,8 +21,8 @@ small risk of infections and blood clots {period} Blood count and liver tests at
 Photos taken today for comparison {period} Return in [[12 weeks|twelve weeks]] {period}
 """
 
-[gold.history]
-value = "17-year-old girl with patchy hair loss for 2 years, spreading over the last 6 months, now about half of the scalp affected and some loss of the eyebrows. Steroid injections into the patches did not help. No nail changes, no itching, no scalp pain. Mother has hypothyroidism. Doxycycline taken for acne made her very sick to her stomach. Vaccines up to date. SALT score 52. Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges. Thyroid function and blood count from last month normal; tuberculosis screening negative."
+[gold.subjective]
+value = "17-year-old girl with patchy hair loss for 2 years, spreading over the last 6 months, now about half of the scalp affected and some loss of the eyebrows. Steroid injections into the patches did not help. No nail changes, no itching, no scalp pain. Mother has hypothyroidism. Doxycycline taken for acne made her very sick to her stomach. Vaccines up to date."
 sources = [
     "17-year-old girl with patchy hair loss for 2 years that has spread over the last 6 months, now with about half of the scalp affected and some loss of the eyebrows.",
     "Steroid injections into the patches did not help.",
@@ -30,6 +30,11 @@ sources = [
     "Her mother has hypothyroidism.",
     "The patient says the doxycycline she took for acne made her very sick to her stomach",
     "Her vaccines are up to date.",
+]
+
+[gold.objective]
+value = "SALT score 52. Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges. Thyroid function and blood count from last month normal; tuberculosis screening negative."
+sources = [
     "SALT score 52.",
     "Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges.",
     "Thyroid function and blood count from last month are normal, and tuberculosis screening is negative.",
@@ -49,8 +54,8 @@ sources = [
     "Return in 12 weeks.",
 ]
 
-[gold_rules.history]
-value = "17-year-old girl with patchy hair loss for 2 years that has spread over the last 6 months, now with about half of the scalp affected and some loss of the eyebrows. Steroid injections into the patches did not help. No nail changes, no itching and no scalp pain. Her mother has hypothyroidism. The patient says the doxycycline she took for acne made her very sick to her stomach. Her vaccines are up to date. SALT score 52. Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges. Thyroid function and blood count from last month are normal, and tuberculosis screening is negative."
+[gold_rules.subjective]
+value = "17-year-old girl with patchy hair loss for 2 years that has spread over the last 6 months, now with about half of the scalp affected and some loss of the eyebrows. Steroid injections into the patches did not help. No nail changes, no itching and no scalp pain. Her mother has hypothyroidism. The patient says the doxycycline she took for acne made her very sick to her stomach. Her vaccines are up to date."
 sources = [
     "17-year-old girl with patchy hair loss for 2 years that has spread over the last 6 months, now with about half of the scalp affected and some loss of the eyebrows.",
     "Steroid injections into the patches did not help.",
@@ -58,7 +63,16 @@ sources = [
     "Her mother has hypothyroidism.",
     "The patient says the doxycycline she took for acne made her very sick to her stomach",
     "Her vaccines are up to date.",
+]
+
+[gold_rules.objective]
+value = "SALT score 52. Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges. Thyroid function and blood count from last month are normal, and tuberculosis screening is negative."
+sources = [
     "SALT score 52.",
     "Large smooth patches over the crown and both sides, with exclamation mark hairs at the edges.",
     "Thyroid function and blood count from last month are normal, and tuberculosis screening is negative.",
 ]
+
+[[not_proposed]]
+words = "put doxycycline on her allergy list"
+why = "not_plain"

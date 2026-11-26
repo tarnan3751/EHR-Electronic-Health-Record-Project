@@ -52,7 +52,16 @@ pub struct Chart {
 pub struct SignedNote {
     pub signed_at: String,
     pub signer: String,
+    /// The note's History as signed or, for a note signed in four sections
+    /// (the expansion plan's step 14), its Subjective and Objective, each
+    /// under its heading: what a build that knows only History shows.
     pub history: String,
+    /// A note signed in four sections: shown in place of History. Absent
+    /// from notes signed before then, and from copies made before step 14.
+    #[serde(default)]
+    pub subjective: Option<String>,
+    #[serde(default)]
+    pub objective: Option<String>,
     pub assessment: String,
     pub plan: String,
     #[serde(default)]
@@ -202,5 +211,44 @@ mod tests {
         assert_eq!(again.notes.len(), 1);
         assert_eq!(again.notes[0].addenda[0].author, "Dr. Colleague");
         assert_eq!(again.notes[0].sensitive_addenda_not_kept, 2);
+        assert_eq!(again.notes[0].subjective, None);
+    }
+
+    /// The expansion plan's step 14: a note signed in four sections carries
+    /// Subjective and Objective, which survive storing; and a build from
+    /// before them, which knows only History, still reads the copy, with the
+    /// two sections under History.
+    #[test]
+    fn a_four_section_note_reads_here_and_in_a_build_that_knows_only_history() {
+        let new = r#"{"id":"018f0000-0000-7000-8000-000000000001","name":"Synthetic Patient","mrn":"SYN1","birthDate":"1980-01-01",
+            "gender":"unknown","allergies":[],"medications":[],"conditions":[],"visits":[],
+            "notes":[{"signedAt":"2026-11-22T06:00:17Z","signer":"Dr. Test","history":"Subjective\nS\n\nObjective\nO",
+                "assessment":"A","plan":"P","addenda":[],"sensitiveAddendaNotKept":0,"subjective":"S","objective":"O"}]}"#;
+        let chart: Chart = serde_json::from_str(new).unwrap();
+        let again: Chart = serde_json::from_str(&serde_json::to_string(&chart).unwrap()).unwrap();
+        assert_eq!(again.notes[0].subjective.as_deref(), Some("S"));
+        assert_eq!(again.notes[0].objective.as_deref(), Some("O"));
+
+        // SignedNote as it stood before step 14.
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct EarlierNote {
+            history: String,
+            assessment: String,
+            plan: String,
+        }
+        #[derive(Deserialize)]
+        struct EarlierChart {
+            notes: Vec<EarlierNote>,
+        }
+        let earlier: EarlierChart = serde_json::from_str(new).unwrap();
+        assert_eq!(earlier.notes[0].history, "Subjective\nS\n\nObjective\nO");
+        assert_eq!(
+            (
+                earlier.notes[0].assessment.as_str(),
+                earlier.notes[0].plan.as_str()
+            ),
+            ("A", "P")
+        );
     }
 }

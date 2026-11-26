@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   the request's Host header set to another site; the clinic's clock is UTC in the tests.
 // Test data: What we talked about "We talked about your cough and how you have been sleeping.", What we found "Your
 //   chest sounded clear." and "Your temperature was normal." on two lines, What happens next "Rest, drink plenty of
-//   fluids, and call us if the cough lasts more than two weeks."; the note's history "Synthetic history: dry cough,
+//   fluids, and call us if the cough lasts more than two weeks."; the note's Subjective "Synthetic subjective: dry cough,
 //   quartzwing pattern, nocturnal.".
 // Steps:
 //   1. Open the first signed note, then "Write a summary for the patient".
@@ -31,7 +31,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   3. Release a summary of the second note.
 //   4. A day passes. Release a summary of the third note.
 // Expected result: Step 1: the note's page says "Not written yet." and offers the link; the form's three fields are
-//   empty and the note's history is under it; opening it is one recorded read of the note. Step 2: the note's page
+//   empty and the note's Subjective is under it; opening it is one recorded read of the note. Step 2: the note's page
 //   says "Released: the patient can read the summary in the portal." and shows the three parts, line breaks kept,
 //   "Released to the patient by Dr. Test" and the time labeled UTC, and no link to write another; the chart tags the
 //   note "Summary released"; the database has it as released by the clinician, standing, not sensitive, with a write
@@ -48,9 +48,9 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
     {
         var (clinician, patient, session) = await OnPanelAsync(apps);
         var (email, _) = await apps.CreatePatientAccountAsync(patient);
-        var note = await SignedNoteAsync(session.Client, patient, history: NoteHistory);
-        var second = await SignedNoteAsync(session.Client, patient, history: NoteHistory);
-        var third = await SignedNoteAsync(session.Client, patient, history: NoteHistory);
+        var note = await SignedNoteAsync(session.Client, patient, subjective: NoteSubjective);
+        var second = await SignedNoteAsync(session.Client, patient, subjective: NoteSubjective);
+        var third = await SignedNoteAsync(session.Client, patient, subjective: NoteSubjective);
 
         var notePage = await session.Client.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.Contains("Not written yet. The patient sees nothing of this note.", Words(notePage));
@@ -63,7 +63,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
             Assert.Matches($"<textarea id=\"{field}\"[^>]*></textarea>", form);
         }
 
-        Assert.Contains(NoteHistory, form);
+        Assert.Contains(NoteSubjective, form);
         Assert.Contains("Not copied into the summary.", form);
         // The banner's read of the patient and the note's.
         Assert.Equal(readsBefore + 2, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));

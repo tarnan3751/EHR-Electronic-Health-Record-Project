@@ -46,6 +46,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "patient_assignments")] = ["SELECT"],
         [("ehr_app", "break_glass_accesses")] = ["SELECT", "INSERT"],
         [("ehr_read", "break_glass_accesses")] = ["SELECT"],
+        [("ehr_app", "emergency_access_reviews")] = ["SELECT", "INSERT"],
+        [("ehr_read", "emergency_access_reviews")] = ["SELECT"],
         // Chart lists: clinicians add and change entries, and nothing deletes one. Their history is the database's to write.
         [("ehr_app", "allergy_intolerances")] = ["SELECT", "INSERT", "UPDATE"],
         // Messages: sent by insert, never edited; marking one read is a column grant.
@@ -85,6 +87,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "order_result_codes")] = ["SELECT"],
         [("ehr_app", "questionnaires")] = ["SELECT"],
         [("ehr_read", "questionnaires")] = ["SELECT"],
+        [("ehr_app", "note_templates")] = ["SELECT"],
+        [("ehr_read", "note_templates")] = ["SELECT"],
         [("ehr_app", "drug_ingredients")] = ["SELECT"],
         [("ehr_read", "drug_ingredients")] = ["SELECT"],
         [("ehr_app", "drug_classes")] = ["SELECT"],
@@ -103,6 +107,16 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_read", "ai_note_reviews")] = ["SELECT"],
         [("ehr_app", "ai_field_proposals")] = ["SELECT", "INSERT", "UPDATE"],
         [("ehr_read", "ai_field_proposals")] = ["SELECT"],
+        // Step 15: a dictation's proposed orders and allergies, staged with their review; deciding one is a column grant
+        // (ExpectedColumnPrivileges).
+        [("ehr_app", "ai_chart_proposals")] = ["SELECT", "INSERT"],
+        [("ehr_read", "ai_chart_proposals")] = ["SELECT"],
+        // Step 16: a consent is a record; a transcript is written as its review is staged and deleted as it is finished. The
+        // cloud app's role sees only that a transcript exists (ExpectedColumnPrivileges).
+        [("ehr_app", "ambient_consents")] = ["SELECT", "INSERT"],
+        [("ehr_read", "ambient_consents")] = ["SELECT"],
+        [("ehr_app", "ambient_transcripts")] = ["SELECT", "INSERT", "DELETE"],
+        [("ehr_read", "ambient_transcripts")] = [],
         [("ehr_app", "clinical_notes")] = ["SELECT", "INSERT"],
         [("ehr_read", "clinical_notes")] = ["SELECT"],
         [("ehr_app", "note_addenda")] = ["SELECT", "INSERT"],
@@ -312,6 +326,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         [("ehr_app", "visit_summaries", "UPDATE")] = ["sensitive", "sensitive_reason", "withdrawn_reason"],
         // Step 13d: answering a refill request, by the order that approves it or the message that declines it.
         [("ehr_app", "refill_requests", "UPDATE")] = ["decline_message", "order_id"],
+        // Step 15: deciding a dictation's proposed order or allergy, once.
+        [("ehr_app", "ai_chart_proposals", "UPDATE")] = ["allergy_id", "order_id", "state"],
         // Step 9b: marking a vital sign entered in error.
         [("ehr_app", "observations", "UPDATE")] = ["entered_in_error_reason", "status"],
         // Marking an inbox item done.
@@ -319,6 +335,8 @@ public class RuntimeRoleTests(MigratedDatabase database) : IClassFixture<Migrate
         // Audit events without details: admins get those from ehr.shown_audit_details, never a sensitive item's.
         [("ehr_app", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
         [("ehr_read", "audit_events", "SELECT")] = ["action", "actor_id", "id", "occurred_at", "part", "patient_id", "reason", "row_id", "sensitive", "source", "table_name"],
+        // Step 16: that a conversation's transcript exists, never the transcript.
+        [("ehr_read", "ambient_transcripts", "SELECT")] = ["created_at", "id", "patient_id", "sensitive"],
     };
 
     async Task AssertExactPrivilegesAsync()

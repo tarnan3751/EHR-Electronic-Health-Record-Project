@@ -36,7 +36,7 @@
     "sorting": "done",
     "reason": null,
     "fields": {
-      "history": {
+      "subjective": {
         "status": "pending",
         "value": "Speech speech.",
         "sources": [
@@ -53,6 +53,12 @@
           }
         ]
       },
+      "objective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
       "assessment": {
         "status": "empty",
         "reasons": [
@@ -67,6 +73,7 @@
       }
     },
     "notCarriedOver": [],
+    "proposals": [],
     "provenance": {
       "speech": {
         "repository": "google/medasr",

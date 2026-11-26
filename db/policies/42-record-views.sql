@@ -16,11 +16,15 @@ AS $$
         WHEN action = 'sent_to_lab' THEN 'lab-order'
         WHEN action = 'download' THEN 'download'
         WHEN action = 'download_sensitive' THEN 'download-sensitive'
-        WHEN table_name = 'audit_events' THEN 'views'
+        -- The log, and the administrators' reviews of emergency access that go with it (step 18).
+        WHEN table_name IN ('audit_events', 'emergency_access_reviews') THEN 'views'
         WHEN table_name = 'patients' THEN CASE WHEN action = 'read_sensitive' THEN 'record-sensitive' ELSE 'record' END
         WHEN table_name = 'visit_summaries' THEN 'summary'
         WHEN table_name IN ('message_threads', 'messages') THEN 'messages'
-        WHEN table_name IN ('clinical_notes', 'note_addenda', 'clinical_drafts', 'ai_note_reviews', 'ai_field_proposals') THEN 'note'
+        -- A dictation's proposed orders and allergies (step 15) are its review's words: a note being written. So is a
+        -- clinician's consent to record a visit and the visit's transcript (step 16).
+        WHEN table_name IN ('clinical_notes', 'note_addenda', 'clinical_drafts', 'ai_note_reviews', 'ai_field_proposals',
+                            'ai_chart_proposals', 'ambient_consents', 'ambient_transcripts') THEN 'note'
         -- Pre-visit forms (step 13e), sensitive items always: a part of their own, the one their pages' reads are recorded
         -- with too (step 13c2), which a proxy without sensitive items is never shown a view of, by either.
         WHEN table_name IN ('questionnaire_requests', 'questionnaire_responses') THEN 'forms'

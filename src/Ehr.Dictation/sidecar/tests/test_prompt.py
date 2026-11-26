@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import shutil
 
-from ehr_dictation import prompt
+from ehr_dictation import prompt, translation
+from ehr_dictation.transcript import Placed, Segment, Transcript
 
 
 def test_the_transcript_goes_between_the_markers_as_the_user_message():
@@ -85,3 +86,84 @@ def test_editing_only_the_comment_for_people_keeps_the_hash(tmp_path):
     edited.write_text(edited.read_text(encoding="utf-8").replace("<!--", "<!-- Reworded.", 1), encoding="utf-8")
 
     assert prompt.load(tmp_path).structuring_sha256 == prompt.load().structuring_sha256
+
+
+# ---- Spanish dictation (the expansion plan's step 17) ---------------------------------------------------------------
+
+
+def test_a_spanish_dictation_is_sent_its_own_prompt_and_schema_with_the_same_generation():
+    english, spanish = prompt.load(), prompt.load(language="es")
+
+    assert spanish.system.startswith("You sort a clinician's dictated transcript, spoken in Spanish")
+    assert "human review" not in spanish.system and "$comment" not in spanish.schema
+    assert spanish.parameters == english.parameters and spanish.language == "es" and english.language == "en"
+    request = spanish.request("Tos de tres días.")
+    assert request["messages"][1]["content"] == "<transcript>\nTos de tres días.\n</transcript>"
+    assert request["response_format"]["json_schema"]["schema"] == spanish.schema
+    assert spanish.structuring_sha256 != english.structuring_sha256
+
+
+def test_the_english_prompt_and_schema_are_what_they_were_before_spanish(tmp_path):
+    # The English files, copied alone into another folder, give the same hashes: adding the Spanish files (and the
+    # language parameter) changed nothing an English dictation is sent.
+    for name in (prompt.PROMPT_FILE, prompt.SCHEMA_FILE):
+        shutil.copy(prompt.SCHEMA_DIRECTORY / name, tmp_path / name)
+    alone, here = prompt.load(tmp_path), prompt.load()
+    assert (alone.prompt_sha256, alone.schema_sha256, alone.structuring_sha256) == (
+        here.prompt_sha256, here.schema_sha256, here.structuring_sha256)
+
+
+def test_the_spanish_prompts_example_of_a_correction_is_an_answer_the_checks_offer():
+    # Rule 6's example: what stands once the correction is made, quoted in two passages, translated whole.
+    said = "Revisar la presión en 1 mes, no, perdón, en 3 meses"
+    system = prompt.load(language="es").system
+    assert f'for "{said}", the "spanish" is "Revisar la presión" and "en 3 meses"' in system
+    text = said + "."
+    statement = {"spanish": ["Revisar la presión", "en 3 meses"], "english": "Recheck blood pressure in 3 months"}
+    checked = translation.check({"plan": [statement]}, [], one_passage(text)).fields["plan"]
+    assert checked.pending and checked.value == "Recheck blood pressure in 3 months."
+
+
+def one_passage(text: str) -> Transcript:
+    return Transcript(text, (Placed(Segment(0, 0, text, 1.0, None, True), 0, len(text)),), True)
+
+
+# ---- A recorded visit's conversation (the expansion plan's step 16) -------------------------------------------------
+
+CONVERSATION = prompt.load_conversation()
+# What the two prompts say alike, in the dictation prompt's words.
+SHARED = (
+    "The transcript is in the user message, between <transcript> and </transcript>.",
+    "You may leave words out, but never the words just before a number, and add only \"a\", \"an\" or \"the\".",
+    "copy every number, unit, date, drug name, dose and abbreviation exactly as transcribed, don't spell out abbreviations",
+    "The clinician does those in the chart; they are not part of the note.",
+    "Every fact in the value must be in one of its sources. Never quote [unclear].",
+    "Answer with one JSON object and nothing else:\n",
+)
+
+
+def test_the_conversation_prompt_shares_the_dictation_prompts_words_and_schema():
+    dictation = prompt.load()
+
+    for sentence in SHARED:
+        assert sentence in dictation.system and sentence in CONVERSATION.system, sentence
+    assert dictation.system.splitlines()[-1] == CONVERSATION.system.splitlines()[-1], "the same answer"
+    for name, field in CONVERSATION.schema["properties"].items():
+        assert f"- {name}: {field['description']}\n" in CONVERSATION.system, name
+    assert CONVERSATION.schema == dictation.schema
+    # The same parameters but the answer's length: a window's answer ends well within its 90 seconds.
+    assert CONVERSATION.parameters == dictation.parameters | {"max_tokens": 1100}
+    assert dictation.parameters["max_tokens"] == 2048, "dictation's own is unchanged"
+
+
+def test_the_conversation_prompt_names_the_roles_its_lines_are_led_by_and_isnt_sent_its_comment():
+    from ehr_dictation import conversation
+
+    assert all(f'"{label}:"' in CONVERSATION.system for label in conversation.LABELS.values())
+    assert CONVERSATION.system.startswith("You sort part of the transcript of a conversation between a clinician and a patient")
+    assert "<!--" not in CONVERSATION.system and "human review" not in CONVERSATION.system
+
+
+def test_the_conversation_has_a_structuring_hash_of_its_own():
+    assert CONVERSATION.structuring_sha256 != prompt.load().structuring_sha256
+    assert CONVERSATION.schema_sha256 == prompt.load().schema_sha256

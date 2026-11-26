@@ -1,0 +1,242 @@
+id = "c04-knee-pain-after-gardening"
+speakers = 2
+voices = { clinician = "am_fenrir", patient = "af_bella" }
+tags = ["small-talk", "hedging", "backchannel", "question-no", "order-spoken", "negation", "numbers"]
+hedged = ["meniscus tear", "gout"]
+noise = []
+dates = []
+drugs = ["ibuprofen"]
+forbidden = ["I'll put in an order for a knee X-ray"]
+denied = ["locking", "given way", "fever", "redness"]
+
+[[turns]]
+role = "clinician"
+text = "Hi there, come on in. Is it still pouring out there?"
+
+[[turns]]
+role = "patient"
+text = "It's easing off a bit. I nearly stayed home, but this knee isn't going to fix itself."
+
+[[turns]]
+role = "clinician"
+text = "Well, I'm glad you came. How's the new puppy? Last time you'd just brought him home."
+
+[[turns]]
+role = "patient"
+text = "Oh, he's a menace. He's chewed my slippers and half the garden hose. We love him, though."
+
+[[turns]]
+role = "clinician"
+text = "Puppies. So, tell me about this knee."
+
+[[turns]]
+role = "patient"
+text = "It's my right knee. It started hurting about [[6 weeks|six weeks]] ago, after I'd been gardening, kneeling and twisting a lot. It aches on the inside of the knee, just here. My daughter thinks I've got gout in it."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. Did you feel a pop, or did it swell up straight away?"
+
+[[turns]]
+role = "patient"
+text = "I don't remember a pop, but it was a bit puffy the next day. Then it settled down."
+
+[[turns]]
+role = "clinician"
+text = "Okay. How bad is the pain, on a scale of [[0 to 10|zero to ten]]?"
+
+[[turns]]
+role = "patient"
+text = "Most days it's about a [[4|four]]. After a long walk it's more like a [[7|seven]]."
+
+[[turns]]
+role = "clinician"
+text = "Mm-hm. What makes it worse?"
+
+[[turns]]
+role = "patient"
+text = "Stairs, especially going down, and getting up from a low chair. Turning quickly on it is the worst."
+gap = 0.6
+
+[[turns]]
+role = "clinician"
+text = "Does it ever feel like it's locking, like it gets stuck and won't straighten?"
+
+[[turns]]
+role = "patient"
+text = "No, it doesn't get stuck. I do notice a click sometimes when I bend it."
+
+[[turns]]
+role = "clinician"
+text = "Okay. Has it ever given way on you, so you nearly fall?"
+
+[[turns]]
+role = "patient"
+text = "No, never."
+gap = 0.2
+
+[[turns]]
+role = "clinician"
+text = "Any fever, or redness in the knee?"
+
+[[turns]]
+role = "patient"
+text = "No, none of that."
+overlap = 0.3
+
+[[turns]]
+role = "clinician"
+text = "And the other knee, and your hips?"
+
+[[turns]]
+role = "patient"
+text = "My left knee is fine, and so are my hips."
+
+[[turns]]
+role = "clinician"
+text = "Have you hurt this knee before?"
+
+[[turns]]
+role = "patient"
+text = "I twisted it skiing years ago, but it was fine after a few weeks."
+
+[[turns]]
+role = "clinician"
+text = "And what do you do for work?"
+
+[[turns]]
+role = "patient"
+text = "I work in a school kitchen, so I'm on my feet most of the day."
+
+[[turns]]
+role = "clinician"
+text = "Okay. What have you tried for it so far?"
+
+[[turns]]
+role = "patient"
+text = "Ibuprofen, [[400 mg|four hundred milligrams]] when it's bad. It helps, but I don't like taking it every day because of my stomach."
+
+[[turns]]
+role = "clinician"
+text = "That's sensible. Do you get much exercise otherwise?"
+
+[[turns]]
+role = "patient"
+text = "I walk most days, and I go to a swimming class on Thursdays. Swimming doesn't hurt at all."
+
+[[turns]]
+role = "clinician"
+text = "Good, swimming is great for knees. Let me have a look. Can you lie back on the couch for me?"
+
+[[turns]]
+role = "patient"
+text = "Okay."
+gap = 1.0
+
+[[turns]]
+role = "clinician"
+text = "Your right knee has a small amount of fluid, and it's tender along the inside joint line. You can bend it fully, but it hurts at the end of the bend. The ligaments feel stable. There's a click and some pain on the inside when I twist it like this."
+gap = 2.5
+
+[[turns]]
+role = "patient"
+text = "Ow. Yes, that's the spot."
+overlap = 0.4
+
+[[turns]]
+role = "clinician"
+text = "That's it, all done. You can sit up now."
+
+[[turns]]
+role = "clinician"
+text = "So, here's where I've got to. I think it's mostly arthritis, but you might have a small meniscus tear as well. That's the cushion inside the knee. The twisting while you were gardening fits with a tear, and the click does too."
+gap = 1.2
+
+[[turns]]
+role = "patient"
+text = "Okay. Will I need an operation?"
+
+[[turns]]
+role = "clinician"
+text = "I doubt it. Most of these settle with exercises and time."
+
+[[turns]]
+role = "patient"
+text = "Mm-hm."
+
+[[turns]]
+role = "clinician"
+text = "Here's the plan. Keep taking the ibuprofen when you need it, with food. Start the exercises on this sheet, twice a day. Keep swimming, but avoid kneeling and twisting in the garden for now. Come back in [[6 weeks|six weeks]] if it isn't better."
+
+[[turns]]
+role = "patient"
+text = "Okay."
+
+[[turns]]
+role = "clinician"
+text = "And I'll put in an order for a knee X-ray, so we can see how much arthritis there is."
+
+[[turns]]
+role = "patient"
+text = "Where do I go for that?"
+
+[[turns]]
+role = "clinician"
+text = "Down the corridor, past the waiting room. You can go today if you like."
+
+[[turns]]
+role = "patient"
+text = "Great, thanks. I'd better get home before the puppy eats the sofa."
+
+[[turns]]
+role = "clinician"
+text = "Good luck with that. Take care of the knee."
+
+[gold.subjective]
+value = "It's my right knee. It started hurting about 6 weeks ago, after I'd been gardening, kneeling and twisting a lot. It aches on the inside of the knee. I don't remember a pop, but it was a bit puffy the next day. Then it settled down. Most days it's about a 4. After a long walk it's more like a 7. Stairs, especially going down, and getting up from a low chair. Turning quickly on it is the worst. It doesn't get stuck. I do notice a click sometimes when I bend it. My left knee is fine, and so are my hips. I twisted it skiing years ago, but it was fine after a few weeks. I work in a school kitchen, so I'm on my feet most of the day. Ibuprofen, 400 mg when it's bad. It helps, but I don't like taking it every day because of my stomach. I walk most days, and I go to a swimming class on Thursdays. Swimming doesn't hurt at all. My daughter thinks I've got gout in it."
+sources = [
+    "It's my right knee",
+    "It started hurting about 6 weeks ago, after I'd been gardening, kneeling and twisting a lot",
+    "It aches on the inside of the knee",
+    "I don't remember a pop, but it was a bit puffy the next day",
+    "Then it settled down",
+    "Most days it's about a 4",
+    "After a long walk it's more like a 7",
+    "Stairs, especially going down, and getting up from a low chair",
+    "Turning quickly on it is the worst",
+    "it doesn't get stuck",
+    "I do notice a click sometimes when I bend it",
+    "My left knee is fine, and so are my hips",
+    "I twisted it skiing years ago, but it was fine after a few weeks",
+    "I work in a school kitchen, so I'm on my feet most of the day",
+    "Ibuprofen, 400 mg when it's bad",
+    "It helps, but I don't like taking it every day because of my stomach",
+    "I walk most days, and I go to a swimming class on Thursdays",
+    "Swimming doesn't hurt at all",
+    "My daughter thinks I've got gout in it",
+]
+
+[gold.objective]
+value = "Your right knee has a small amount of fluid, and it's tender along the inside joint line. You can bend it fully, but it hurts at the end of the bend. The ligaments feel stable. There's a click and some pain on the inside when I twist it like this."
+sources = [
+    "Your right knee has a small amount of fluid, and it's tender along the inside joint line",
+    "You can bend it fully, but it hurts at the end of the bend",
+    "The ligaments feel stable",
+    "There's a click and some pain on the inside when I twist it like this",
+]
+
+[gold.assessment]
+value = "I think it's mostly arthritis, but you might have a small meniscus tear as well. The twisting while you were gardening fits with a tear, and the click does too."
+sources = [
+    "I think it's mostly arthritis, but you might have a small meniscus tear as well",
+    "The twisting while you were gardening fits with a tear, and the click does too",
+]
+
+[gold.plan]
+value = "Keep taking the ibuprofen when you need it, with food. Start the exercises on this sheet, twice a day. Keep swimming, but avoid kneeling and twisting in the garden for now. Come back in 6 weeks if it isn't better."
+sources = [
+    "Keep taking the ibuprofen when you need it, with food",
+    "Start the exercises on this sheet, twice a day",
+    "Keep swimming, but avoid kneeling and twisting in the garden for now",
+    "Come back in 6 weeks if it isn't better",
+]

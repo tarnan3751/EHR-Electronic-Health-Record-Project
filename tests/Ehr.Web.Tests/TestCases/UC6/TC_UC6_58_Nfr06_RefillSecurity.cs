@@ -78,7 +78,7 @@ public class TC_UC6_58_Nfr06_RefillSecurity(WebApps apps) : IClassFixture<WebApp
         }
 
         Assert.All(Regex.Matches(markup, "data-[a-z-]+=\"([^\"]*)\"").Select(m => m.Groups[1].Value),
-            value => Assert.Contains(value, new[] { "ask", "rejected", "requested", "completed", "hidden", "shown", "" }));
+            value => Assert.Contains(value, new[] { "ask", "rejected", "requested", "completed", "hidden", "shown", "" }.Concat(SessionBrowser.PortalSettings)));
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, patient.Account, patient.Patient);
         using (var head = await patient.Client.SendAsync(new HttpRequestMessage(HttpMethod.Head, PortalPath), Cancel))

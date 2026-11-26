@@ -2284,3 +2284,180 @@ VALUES ('20261127080400_AuditEventParts', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.clinical_notes ALTER COLUMN history DROP NOT NULL;
+
+ALTER TABLE ehr.clinical_notes ADD objective text;
+
+ALTER TABLE ehr.clinical_notes ADD subjective text;
+
+ALTER TABLE ehr.clinical_drafts ADD note_template_code character varying(40);
+
+ALTER TABLE ehr.clinical_drafts ADD objective text;
+
+ALTER TABLE ehr.clinical_drafts ADD subjective text;
+
+CREATE TABLE ehr.note_templates (
+    code character varying(40) NOT NULL,
+    title character varying(80) NOT NULL,
+    position integer NOT NULL,
+    subjective_prompt character varying(500) NOT NULL,
+    objective_prompt character varying(500) NOT NULL,
+    assessment_prompt character varying(500) NOT NULL,
+    plan_prompt character varying(500) NOT NULL,
+    CONSTRAINT pk_note_templates PRIMARY KEY (code),
+    CONSTRAINT ck_note_templates_assessment_prompt CHECK (assessment_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_code CHECK (code ~ '^[a-z][a-z0-9-]{1,39}$'),
+    CONSTRAINT ck_note_templates_objective_prompt CHECK (objective_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_plan_prompt CHECK (plan_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_position CHECK (position > 0),
+    CONSTRAINT ck_note_templates_subjective_prompt CHECK (subjective_prompt ~ '[^[:space:]]'),
+    CONSTRAINT ck_note_templates_title CHECK (title ~ '[^[:space:]]')
+);
+
+ALTER TABLE ehr.clinical_notes ADD CONSTRAINT ck_clinical_notes_sections CHECK ((history IS NULL AND subjective IS NOT NULL AND objective IS NOT NULL) OR (history IS NOT NULL AND subjective IS NULL AND objective IS NULL));
+
+CREATE INDEX ix_clinical_drafts_note_template_code ON ehr.clinical_drafts (note_template_code);
+
+ALTER TABLE ehr.clinical_drafts ADD CONSTRAINT ck_clinical_drafts_sections CHECK (history IS NULL OR (subjective IS NULL AND objective IS NULL));
+
+CREATE UNIQUE INDEX ix_note_templates_position ON ehr.note_templates (position);
+
+CREATE UNIQUE INDEX ix_note_templates_title ON ehr.note_templates (title);
+
+ALTER TABLE ehr.clinical_drafts ADD CONSTRAINT fk_clinical_drafts_note_templates_note_template_code FOREIGN KEY (note_template_code) REFERENCES ehr.note_templates (code) ON DELETE RESTRICT;
+
+DO $$
+DECLARE
+    kept bigint := (SELECT count(*) FROM ehr.clinical_notes);
+BEGIN
+    RAISE NOTICE 'Migration 14: % signed notes keep their History, Assessment and Plan as signed; no row was changed', kept;
+    RAISE NOTICE 'Migration 14: unsigned drafts were not read; each opens in the editor with its History in Subjective, and changes only when its author saves it';
+END
+$$;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127090100_SoapNotes', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE ehr.ai_chart_proposals (
+    id uuid NOT NULL,
+    review_id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    ordinal smallint NOT NULL,
+    kind character varying(16) NOT NULL,
+    state character varying(16) NOT NULL,
+    order_id uuid,
+    allergy_id uuid,
+    decided_by uuid,
+    decided_at timestamp with time zone,
+    CONSTRAINT pk_ai_chart_proposals PRIMARY KEY (id),
+    CONSTRAINT ck_ai_chart_proposals_decision CHECK ((state = 'pending') = (decided_at IS NULL) AND (decided_at IS NULL) = (decided_by IS NULL) AND (state = 'ordered') = (order_id IS NOT NULL) AND (state = 'recorded') = (allergy_id IS NOT NULL) AND (order_id IS NULL OR kind = 'order') AND (allergy_id IS NULL OR kind = 'allergy_addition')),
+    CONSTRAINT ck_ai_chart_proposals_kind CHECK (kind IN ('order', 'allergy_addition')),
+    CONSTRAINT ck_ai_chart_proposals_ordinal CHECK (ordinal BETWEEN 0 AND 19),
+    CONSTRAINT ck_ai_chart_proposals_state CHECK (state IN ('pending', 'ordered', 'recorded', 'dismissed')),
+    CONSTRAINT fk_ai_chart_proposals_ai_note_reviews_review_id_patient_id FOREIGN KEY (review_id, patient_id) REFERENCES ehr.ai_note_reviews (id, patient_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ai_chart_proposals_allergy_intolerances_allergy_id FOREIGN KEY (allergy_id) REFERENCES ehr.allergy_intolerances (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ai_chart_proposals_orders_order_id FOREIGN KEY (order_id) REFERENCES ehr.orders (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ai_chart_proposals_staff_users_decided_by FOREIGN KEY (decided_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_ai_chart_proposals_allergy_id ON ehr.ai_chart_proposals (allergy_id);
+
+CREATE INDEX ix_ai_chart_proposals_decided_by ON ehr.ai_chart_proposals (decided_by);
+
+CREATE UNIQUE INDEX ix_ai_chart_proposals_order_id ON ehr.ai_chart_proposals (order_id);
+
+CREATE UNIQUE INDEX ix_ai_chart_proposals_review_id_ordinal ON ehr.ai_chart_proposals (review_id, ordinal);
+
+CREATE INDEX ix_ai_chart_proposals_review_id_patient_id ON ehr.ai_chart_proposals (review_id, patient_id);
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127090200_AiChartProposals', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+ALTER TABLE ehr.ai_note_reviews ADD consent_id uuid;
+
+ALTER TABLE ehr.ai_note_reviews ADD mode character varying(16) NOT NULL DEFAULT 'dictation';
+
+ALTER TABLE ehr.ai_note_reviews ADD sensitive boolean NOT NULL DEFAULT FALSE;
+
+ALTER TABLE ehr.ai_field_proposals ADD sensitive boolean NOT NULL DEFAULT FALSE;
+
+CREATE TABLE ehr.ambient_consents (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    clinician_id uuid NOT NULL DEFAULT (NULLIF(current_setting('app.user_id', true), '')::uuid),
+    speakers smallint NOT NULL,
+    given_by character varying(16) NOT NULL,
+    confirmed_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_ambient_consents PRIMARY KEY (id),
+    CONSTRAINT ak_ambient_consents_id_patient_id UNIQUE (id, patient_id),
+    CONSTRAINT ck_ambient_consents_given_by CHECK (given_by IN ('patient', 'representative')),
+    CONSTRAINT ck_ambient_consents_speakers CHECK (speakers IN (2, 3)),
+    CONSTRAINT fk_ambient_consents_patients_patient_id FOREIGN KEY (patient_id) REFERENCES ehr.patients (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_ambient_consents_staff_users_clinician_id FOREIGN KEY (clinician_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE ehr.ambient_transcripts (
+    id uuid NOT NULL,
+    patient_id uuid NOT NULL,
+    transcript jsonb NOT NULL,
+    sensitive boolean NOT NULL,
+    created_at timestamp with time zone NOT NULL DEFAULT (now()),
+    CONSTRAINT pk_ambient_transcripts PRIMARY KEY (id),
+    CONSTRAINT ck_ambient_transcripts_sensitive CHECK (sensitive),
+    CONSTRAINT ck_ambient_transcripts_transcript CHECK (jsonb_typeof(transcript) = 'object' AND octet_length(transcript::text) <= 1048576),
+    CONSTRAINT fk_ambient_transcripts_ai_note_reviews_id_patient_id FOREIGN KEY (id, patient_id) REFERENCES ehr.ai_note_reviews (id, patient_id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX ix_ai_note_reviews_consent_id ON ehr.ai_note_reviews (consent_id);
+
+CREATE INDEX ix_ai_note_reviews_consent_id_patient_id ON ehr.ai_note_reviews (consent_id, patient_id);
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT ck_ai_note_reviews_consent CHECK ((mode = 'ambient') = (consent_id IS NOT NULL));
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT ck_ai_note_reviews_mode CHECK (mode IN ('dictation', 'ambient'));
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT ck_ai_note_reviews_sensitive CHECK (sensitive = (mode = 'ambient'));
+
+CREATE INDEX ix_ambient_consents_clinician_id ON ehr.ambient_consents (clinician_id);
+
+CREATE INDEX ix_ambient_consents_patient_id ON ehr.ambient_consents (patient_id);
+
+CREATE INDEX ix_ambient_transcripts_id_patient_id ON ehr.ambient_transcripts (id, patient_id);
+
+ALTER TABLE ehr.ai_note_reviews ADD CONSTRAINT fk_ai_note_reviews_ambient_consents_consent_id_patient_id FOREIGN KEY (consent_id, patient_id) REFERENCES ehr.ambient_consents (id, patient_id) ON DELETE RESTRICT;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127090300_AmbientListening', '10.0.13');
+
+COMMIT;
+
+START TRANSACTION;
+CREATE TABLE ehr.emergency_access_reviews (
+    id uuid NOT NULL,
+    reviewer_id uuid NOT NULL,
+    reviewed_at timestamp with time zone NOT NULL,
+    outcome character varying(20) NOT NULL,
+    note character varying(500) NOT NULL,
+    CONSTRAINT pk_emergency_access_reviews PRIMARY KEY (id),
+    CONSTRAINT ck_emergency_access_reviews_note CHECK (char_length(note) BETWEEN 10 AND 500),
+    CONSTRAINT ck_emergency_access_reviews_outcome CHECK (outcome IN ('appropriate', 'not-appropriate')),
+    CONSTRAINT fk_emergency_access_reviews_break_glass_accesses_id FOREIGN KEY (id) REFERENCES ehr.break_glass_accesses (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_emergency_access_reviews_staff_users_reviewer_id FOREIGN KEY (reviewer_id) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT
+);
+
+CREATE INDEX ix_emergency_access_reviews_reviewer_id ON ehr.emergency_access_reviews (reviewer_id);
+
+CREATE INDEX ix_audit_events_break_glass ON ehr.audit_events (occurred_at DESC, id DESC) WHERE action = 'break_glass';
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261127090400_EmergencyAccessReviews', '10.0.13');
+
+COMMIT;
+

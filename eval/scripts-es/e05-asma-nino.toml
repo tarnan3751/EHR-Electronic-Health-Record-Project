@@ -1,0 +1,86 @@
+id = "e05-asma-nino"
+language = "es"
+voice = "af_heart"
+tags = ["numbers", "units", "frequency", "routes", "sides", "severity", "negation", "actions", "drug-name-differs", "missing-field", "short"]
+dates = []
+drugs = ["salbutamol", "budesonida"]
+drugs_en = ["albuterol", "budesonide"]
+negated = ["fever"]
+affirmed = ["night cough"]
+text = """
+Niño de [[7|siete]] años con asma. La madre refiere tos nocturna desde hace una semana. No ha tenido fiebre. Duerme mal por la tos y falta a la escuela
+algunos días. Usa
+salbutamol inhalado [[2|dos]] disparos cada [[4|cuatro]] horas si es necesario. En la exploración, sibilancias
+espiratorias leves bilaterales, [[SatO2|saturación]] [[96 %|noventa y seis por ciento]]. Plan: continuar salbutamol inhalado
+[[2|dos]] disparos cada [[4|cuatro]] horas si es necesario. Iniciar budesonida inhalada [[200 mcg|doscientos
+microgramos]] dos veces al día. Control en una semana.
+"""
+
+[[facts]]
+said = "Niño de 7 años con asma."
+items = [{ of = "age", number = "7" }, { of = "asthma" }]
+
+[[facts]]
+said = "La madre refiere tos nocturna desde hace una semana."
+items = [{ of = "night cough", aka = ["nocturnal cough", "cough at night"], negated = false, duration = "1 week" }]
+
+[[facts]]
+said = "No ha tenido fiebre."
+items = [{ of = "fever", negated = true }]
+
+[[facts]]
+said = "Usa salbutamol inhalado 2 disparos cada 4 horas si es necesario."
+items = [{ of = "albuterol", aka = ["salbutamol"], action = "take", route = "inhaled", number = "2 puffs", frequency = ["every 4 hours", "as needed"] }]
+
+[[facts]]
+said = "sibilancias espiratorias leves bilaterales, SatO2 96 %."
+items = [{ of = "wheezes", aka = ["wheezing", "expiratory wheezes"], negated = false, severity = "mild", side = "both" },
+         { of = "SpO2", number = "96%" }]
+
+[[facts]]
+said = "continuar salbutamol inhalado 2 disparos cada 4 horas si es necesario."
+items = [{ of = "albuterol", aka = ["salbutamol"], action = "continue", route = "inhaled", number = "2 puffs", frequency = ["every 4 hours", "as needed"] }]
+
+[[facts]]
+said = "Iniciar budesonida inhalada 200 mcg dos veces al día."
+items = [{ of = "budesonide", action = "start", route = "inhaled", number = "200 mcg", frequency = "twice daily" }]
+
+[[facts]]
+said = "Control en una semana."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "1 week" }]
+
+[[gold.subjective]]
+spanish = ["Niño de 7 años con asma."]
+english = "7-year-old boy with asthma."
+
+[[gold.subjective]]
+spanish = ["La madre refiere tos nocturna desde hace una semana."]
+english = "Mother reports night cough for one week."
+
+[[gold.subjective]]
+spanish = ["No ha tenido fiebre."]
+english = "Has not had fever."
+
+[[gold.subjective]]
+spanish = ["Duerme mal por la tos y falta a la escuela algunos días."]
+english = "Sleeps poorly because of the cough and misses school some days."
+
+[[gold.subjective]]
+spanish = ["Usa salbutamol inhalado 2 disparos cada 4 horas si es necesario."]
+english = "Uses albuterol inhaled 2 puffs every 4 hours as needed."
+
+[[gold.objective]]
+spanish = ["sibilancias espiratorias leves bilaterales, SatO2 96 %."]
+english = "Mild bilateral expiratory wheezes, SpO2 96%."
+
+[[gold.plan]]
+spanish = ["continuar salbutamol inhalado 2 disparos cada 4 horas si es necesario."]
+english = "Continue albuterol inhaled 2 puffs every 4 hours as needed."
+
+[[gold.plan]]
+spanish = ["Iniciar budesonida inhalada 200 mcg dos veces al día."]
+english = "Start budesonide inhaled 200 mcg twice a day."
+
+[[gold.plan]]
+spanish = ["Control en una semana."]
+english = "Follow-up in one week."

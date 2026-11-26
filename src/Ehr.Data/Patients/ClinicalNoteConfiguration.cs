@@ -8,6 +8,9 @@ public sealed class ClinicalNoteConfiguration : IEntityTypeConfiguration<Clinica
 {
     public void Configure(EntityTypeBuilder<ClinicalNote> note)
     {
+        // Four sections, or, for a note signed before the expansion plan's step 14, History in place of the first two.
+        note.ToTable(table => table.HasCheckConstraint("ck_clinical_notes_sections",
+            "(history IS NULL AND subjective IS NOT NULL AND objective IS NOT NULL) OR (history IS NOT NULL AND subjective IS NULL AND objective IS NULL)"));
         note.HasOne<ClinicalDraft>().WithMany().HasForeignKey(n => n.DraftId).OnDelete(DeleteBehavior.Restrict);
         note.HasIndex(n => n.DraftId).IsUnique();
         note.HasOne<Patient>().WithMany().HasForeignKey(n => n.PatientId).OnDelete(DeleteBehavior.Restrict);

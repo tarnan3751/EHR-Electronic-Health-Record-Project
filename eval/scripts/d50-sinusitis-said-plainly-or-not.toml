@@ -1,0 +1,73 @@
+# Dictation test script (synthetic): sinusitis, whose plan says two orders plainly among others said with a condition, after "No,", for someone else, with someone else's say-so, and taken back. Format: eval/README.md.
+id = "d50-sinusitis-said-plainly-or-not"
+voice = "bm_george"
+tags = ["vitals", "numbers", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
+dates = []
+drugs = ["lisinopril"]
+forbidden = [
+    "order a CBC today", "Order an MRI of the sinuses", "order a chest X-ray today", "Order a flu test for his wife",
+    "Refill his lisinopril", "Order a sinus CT", "order a sed rate",
+]
+text = """
+Follow-up for a [[52-year-old|fifty-two-year-old]] man with sinus congestion for [[10 days|ten days]] and a mild
+cough {period} No fever {comma} no facial swelling {period} He takes lisinopril [[10 mg|ten milligrams]] daily for
+blood pressure {period} {new paragraph}
+On examination temperature [[37.1|thirty-seven point one]] {comma} blood pressure
+[[128/78|one twenty-eight over seventy-eight]] {comma} nasal turbinates swollen {comma} chest clear {period}
+{new paragraph}
+Assessment {colon} acute sinusitis {comma} probably viral {period} {new paragraph}
+Plan {colon} saline rinses twice a day {period} Go ahead and order a CBC today {period} Order an MRI of the sinuses
+if he gets worse {period} No {comma} order a chest X-ray today {period} Order a flu test for his wife as well
+{period} Refill his lisinopril for [[90 days|ninety days]] {period} Order a sinus CT {comma} he insisted {period}
+I'll order a sed rate {period} Skip that {period} Recheck in one week {period}
+"""
+
+[gold.subjective]
+value = "Follow-up for a 52-year-old man with sinus congestion for 10 days and a mild cough. No fever, no facial swelling. He takes lisinopril 10 mg daily for blood pressure."
+sources = [
+    "Follow-up for a 52-year-old man with sinus congestion for 10 days and a mild cough.",
+    "No fever, no facial swelling.",
+    "He takes lisinopril 10 mg daily for blood pressure.",
+]
+
+[gold.objective]
+value = "Temperature 37.1, blood pressure 128/78, nasal turbinates swollen, chest clear."
+sources = ["temperature 37.1, blood pressure 128/78, nasal turbinates swollen, chest clear."]
+
+[gold.assessment]
+value = "Acute sinusitis, probably viral."
+sources = ["acute sinusitis, probably viral."]
+
+[gold.plan]
+value = "Saline rinses twice a day. Recheck in one week."
+sources = ["saline rinses twice a day.", "Recheck in one week."]
+
+[[proposals]]
+kind = "order"
+words = "order a CBC today"
+item = "CBC"
+
+[[proposals]]
+kind = "order"
+words = "Refill his lisinopril"
+item = "lisinopril"
+
+[[not_proposed]]
+words = "Order an MRI of the sinuses"
+why = "hedged"
+
+[[not_proposed]]
+words = "order a chest X-ray today"
+why = "not_plain"
+
+[[not_proposed]]
+words = "Order a flu test for his wife"
+why = "names_no_item"
+
+[[not_proposed]]
+words = "Order a sinus CT"
+why = "names_no_item"
+
+[[not_proposed]]
+words = "order a sed rate"
+why = "taken_back"

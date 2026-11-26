@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): short addendum with a plan and an allergy change to leave out, and no assessment. Format: eval/README.md.
 id = "d33-addendum-potassium"
 voice = "bm_george"
-tags = ["short", "numbers", "allergy-change", "mixed-plan", "missing-field", "spoken-punctuation"]
+tags = ["short", "numbers", "allergy-change", "mixed-plan", "missing-field", "spoken-punctuation", "proposal", "proposal-trap"]
 dates = []
 drugs = ["spironolactone", "ramipril", "co-trimoxazole"]
 forbidden = ["make sure sulfa is on his allergy list"]
@@ -14,9 +14,15 @@ medicines unchanged {comma} including the ramipril {period} He mentioned on the 
 co-trimoxazole last year {comma} so make sure sulfa is on his allergy list {period} End of addendum {period}
 """
 
-[gold.history]
+[gold.subjective]
 value = "Rash with co-trimoxazole last year, mentioned on the phone."
-sources = ["He mentioned on the phone that he had a rash with co-trimoxazole last year"]
+sources = [
+    "He mentioned on the phone that he had a rash with co-trimoxazole last year",
+]
+
+[gold.objective]
+value = ""
+sources = []
 
 [gold.assessment]
 value = ""
@@ -39,3 +45,7 @@ sources = [
     "Low potassium diet sheet posted out today.",
     "Continue the rest of his medicines unchanged, including the ramipril.",
 ]
+
+[[not_proposed]]
+words = "make sure sulfa is on his allergy list"
+why = "names_no_item"

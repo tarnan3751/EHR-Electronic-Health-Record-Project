@@ -60,12 +60,17 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         ["vital_reference_ranges"] = Protection.Internal,
         ["order_result_codes"] = Protection.Internal,
         ["questionnaires"] = Protection.Internal,
+        ["note_templates"] = Protection.Internal,
         ["drug_ingredients"] = Protection.Internal,
         ["drug_classes"] = Protection.Internal,
         ["drug_class_cross_reactions"] = Protection.Internal,
         ["drug_interactions"] = Protection.Internal,
         ["ai_note_reviews"] = Protection.Phi,
         ["ai_field_proposals"] = Protection.Phi,
+        ["ai_chart_proposals"] = Protection.Phi,
+        // Step 16: a clinician's consent to record a visit, and the conversation's transcript while its review is open.
+        ["ambient_consents"] = Protection.Phi,
+        ["ambient_transcripts"] = Protection.Phi,
         ["clinical_notes"] = Protection.Phi,
         ["note_addenda"] = Protection.Phi,
         ["visit_summaries"] = Protection.Phi,
@@ -82,6 +87,9 @@ public class ProtectionTests(MigratedDatabase database) : IClassFixture<Migrated
         // The lab's key, as its hash, read only by the functions of the lab's door.
         ["lab_keys"] = Protection.Internal,
         ["audit_events"] = Protection.Restricted,
+        // An administrator's review of an emergency access (step 18): kept with the audit log, and like it restricted;
+        // the row is its own record, never changed.
+        ["emergency_access_reviews"] = Protection.Restricted,
     };
 
     [Fact]

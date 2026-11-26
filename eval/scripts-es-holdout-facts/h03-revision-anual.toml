@@ -1,0 +1,34 @@
+# What the held-out script of the same name says, passage by passage (ehr_eval/facts_es.py says the format), for the
+# scoring to compare each statement shown with. Kept apart from the script, whose file stays as it was sealed.
+
+[[facts]]
+said = "Mujer de 52 años que viene a su revisión anual."
+items = [{ of = "age", number = "52" }]
+
+[[facts]]
+said = "Antecedentes familiares de cáncer de colon en su padre a los 60 años."
+items = [{ of = "colon cancer", who = "father", history = true }, { of = "age", number = "60" }]
+
+[[facts]]
+said = "Su hermana tiene diabetes tipo 2."
+items = [{ of = "diabetes", number = "2", who = "sister" }]
+
+[[facts]]
+said = "Refiere que la semana pasada tuvo urticaria después de tomar naproxeno."
+items = [{ of = "hives", aka = ["urticaria"], negated = false, date = "last week" }, { of = "naproxen", action = "take" }]
+
+[[facts]]
+said = "No toma medicamentos de forma habitual."
+items = [{ of = "medications", aka = ["regular medications", "medication"], action = "take", negated = true }]
+
+[[facts]]
+said = "peso 68 kg, TA 118/76."
+items = [{ of = "weight", number = "68 kg" }, { of = "BP", number = "118/76" }]
+
+[[facts]]
+said = "mujer sana con antecedente familiar de cáncer de colon."
+items = [{ of = "colon cancer", history = true }]
+
+[[facts]]
+said = "Control en 1 año."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "1 year" }]

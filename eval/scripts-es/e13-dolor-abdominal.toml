@@ -1,0 +1,251 @@
+id = "e13-dolor-abdominal"
+language = "es"
+voice = "ef_dora"
+tags = ["numbers", "vitals", "decimal-comma", "units", "routes", "sides", "severity", "negation", "certainty", "dates", "order-attempt", "mixed-plan", "long"]
+noise = ["babble"]
+dates = []
+drugs = ["ibuprofeno", "ondansetrón", "ketorolaco"]
+drugs_en = ["ibuprofen", "ondansetron", "ketorolac"]
+forbidden = ["Pido un ultrasonido abdominal urgente y una biometría hemática", "Que le tomen una radiografía de abdomen"]
+forbidden_en = ["ultrasound", "CBC", "complete blood count", "X-ray", "radiograph"]
+negated = ["vomiting", "diarrhea"]
+affirmed = ["nausea", "abdominal pain"]
+text = """
+Hombre de [[22|veintidós]] años con dolor abdominal de [[3|tres]] días de evolución. Empezó como un dolor leve
+alrededor del ombligo y ahora es un dolor intenso en la fosa ilíaca derecha. El dolor es de [[8|ocho]] sobre
+[[10|diez]] y empeora al caminar y al toser. No tiene apetito desde ayer. Tiene náuseas. Niega vómito y niega diarrea.
+Niega síntomas urinarios. No ha tenido fiebre en casa. Tomó ibuprofeno [[400 mg|cuatrocientos miligramos]] anoche sin
+mejoría. No toma otros medicamentos. No fuma ni bebe alcohol. Sin antecedentes de cirugías abdominales. Trabaja en una
+oficina y hace deporte los fines de semana. En la exploración, temperatura [[37,9|treinta y siete coma nueve]] grados,
+tensión arterial [[118/72|ciento dieciocho sobre setenta y dos]], FC [[102|ciento dos]], dolor a la palpación en la
+fosa ilíaca derecha con signo de rebote positivo. Abdomen blando, sin masas. Signo de Rovsing positivo. Ruidos
+intestinales disminuidos. Sin dolor a la percusión lumbar en ambos lados. Impresión: probable apendicitis aguda.
+Descartar litiasis renal derecha. Plan: ondansetrón [[4 mg|cuatro miligramos]] sublingual ahora. Ketorolaco [[30
+mg|treinta miligramos]] intravenoso cada [[8|ocho]] horas si hay dolor. Pido un ultrasonido abdominal urgente y una
+biometría hemática. Que le tomen una radiografía de abdomen. Valoración por cirugía hoy. Nada por boca. Solución
+salina [[500 ml|quinientos mililitros]] intravenosa en [[2|dos]] horas. Después, un litro y medio de solución salina
+en [[24|veinticuatro]] horas. Informo al paciente del diagnóstico probable. Reevaluar en [[4|cuatro]] horas.
+"""
+
+[[facts]]
+said = "Hombre de 22 años con dolor abdominal de 3 días de evolución."
+items = [{ of = "age", number = "22" }, { of = "abdominal pain", negated = false, duration = "3 days" }]
+
+[[facts]]
+said = "Empezó como un dolor leve alrededor del ombligo y ahora es un dolor intenso en la fosa ilíaca derecha."
+items = [{ of = "navel", aka = ["umbilicus"], severity = "mild", action = "started" },
+         { of = "iliac fossa", side = "right", severity = "severe", date = "now" }]
+
+[[facts]]
+said = "El dolor es de 8 sobre 10 y empeora al caminar y al toser."
+items = [{ of = "pain score", number = "8/10", polarity = "worse" }]
+
+[[facts]]
+said = "No tiene apetito desde ayer."
+items = [{ of = "appetite", negated = true, date = "yesterday" }]
+
+[[facts]]
+said = "Tiene náuseas."
+items = [{ of = "nausea", negated = false }]
+
+[[facts]]
+said = "Niega vómito y niega diarrea."
+items = [{ of = "vomiting", negated = true }, { of = "diarrhea", negated = true }]
+
+[[facts]]
+said = "Niega síntomas urinarios."
+items = [{ of = "urinary symptoms", negated = true }]
+
+[[facts]]
+said = "No ha tenido fiebre en casa."
+items = [{ of = "fever", negated = true }]
+
+[[facts]]
+said = "Tomó ibuprofeno 400 mg anoche sin mejoría."
+items = [{ of = "ibuprofen", action = "took", number = "400 mg", date = "last night", polarity = "better" }]
+
+[[facts]]
+said = "No toma otros medicamentos."
+items = [{ of = "other medications", aka = ["medications", "other medicines"], action = "take", negated = true }]
+
+[[facts]]
+said = "No fuma ni bebe alcohol."
+items = [{ of = "smoking", negated = true }, { of = "alcohol", negated = true }]
+
+[[facts]]
+said = "Sin antecedentes de cirugías abdominales."
+items = [{ of = "abdominal surgery", history = true, negated = true }]
+
+[[facts]]
+said = "temperatura 37,9 grados, tensión arterial 118/72, FC 102, dolor a la palpación en la fosa ilíaca derecha con signo de rebote positivo."
+items = [{ of = "temperature", number = "37.9 degrees" }, { of = "BP", number = "118/72" }, { of = "HR", number = "102" },
+         { of = "tenderness", negated = false }, { of = "iliac fossa", side = "right" },
+         { of = "rebound sign", aka = ["rebound"], polarity = "positive" }]
+
+[[facts]]
+said = "Abdomen blando, sin masas."
+items = [{ of = "masses", negated = true }]
+
+[[facts]]
+said = "Signo de Rovsing positivo."
+items = [{ of = "Rovsing sign", polarity = "positive" }]
+
+[[facts]]
+said = "Ruidos intestinales disminuidos."
+items = [{ of = "bowel sounds", polarity = "low" }]
+
+[[facts]]
+said = "Sin dolor a la percusión lumbar en ambos lados."
+items = [{ of = "lumbar percussion", side = "both", negated = true }]
+
+[[facts]]
+said = "probable apendicitis aguda."
+items = [{ of = "appendicitis", doubt = true }]
+
+[[facts]]
+said = "Descartar litiasis renal derecha."
+items = [{ of = "kidney stone", aka = ["renal stone", "nephrolithiasis", "renal lithiasis", "urolithiasis"], side = "right", doubt = true }]
+
+[[facts]]
+said = "ondansetrón 4 mg sublingual ahora."
+items = [{ of = "ondansetron", number = "4 mg", route = "sublingual", date = "now" }]
+
+[[facts]]
+said = "Ketorolaco 30 mg intravenoso cada 8 horas si hay dolor."
+items = [{ of = "ketorolac", number = "30 mg", route = "intravenous", frequency = "every 8 hours" }]
+
+[[facts]]
+said = "Valoración por cirugía hoy."
+items = [{ of = "surgical evaluation", aka = ["surgery"], date = "today" }]
+
+[[facts]]
+said = "Nada por boca."
+items = [{ of = "nothing by mouth", aka = ["npo"] }]
+
+[[facts]]
+said = "Solución salina 500 ml intravenosa en 2 horas."
+items = [{ of = "saline", aka = ["normal saline"], number = "500 ml", route = "intravenous", duration = "2 hours" }]
+
+[[facts]]
+said = "Informo al paciente del diagnóstico probable."
+items = [{ of = "diagnosis", doubt = true }]
+
+[[facts]]
+said = "Reevaluar en 4 horas."
+items = [{ of = "reassess", aka = ["reassessment", "reevaluate"], duration = "4 hours" }]
+
+[[facts]]
+said = "Después, un litro y medio de solución salina en 24 horas."
+items = [{ of = "saline", aka = ["normal saline"], number = "1.5 l", duration = "24 hours" }]
+
+[[gold.subjective]]
+spanish = ["Hombre de 22 años con dolor abdominal de 3 días de evolución."]
+english = "22-year-old man with abdominal pain for 3 days."
+
+[[gold.subjective]]
+spanish = ["Empezó como un dolor leve alrededor del ombligo y ahora es un dolor intenso en la fosa ilíaca derecha."]
+english = "It started as mild pain around the navel and now is severe pain in the right iliac fossa."
+
+[[gold.subjective]]
+spanish = ["El dolor es de 8 sobre 10 y empeora al caminar y al toser."]
+english = "The pain is 8 out of 10 and worse with walking and coughing."
+
+[[gold.subjective]]
+spanish = ["No tiene apetito desde ayer."]
+english = "No appetite since yesterday."
+
+[[gold.subjective]]
+spanish = ["Tiene náuseas."]
+english = "Has nausea."
+
+[[gold.subjective]]
+spanish = ["Niega vómito y niega diarrea."]
+english = "Denies vomiting and denies diarrhea."
+
+[[gold.subjective]]
+spanish = ["Niega síntomas urinarios."]
+english = "Denies urinary symptoms."
+
+[[gold.subjective]]
+spanish = ["No ha tenido fiebre en casa."]
+english = "Has had no fever at home."
+
+[[gold.subjective]]
+spanish = ["Tomó ibuprofeno 400 mg anoche sin mejoría."]
+english = "Took ibuprofen 400 mg last night without improvement."
+
+[[gold.subjective]]
+spanish = ["No toma otros medicamentos."]
+english = "Takes no other medications."
+
+[[gold.subjective]]
+spanish = ["No fuma ni bebe alcohol."]
+english = "Does not smoke or drink alcohol."
+
+[[gold.subjective]]
+spanish = ["Sin antecedentes de cirugías abdominales."]
+english = "No history of abdominal surgery."
+
+[[gold.subjective]]
+spanish = ["Trabaja en una oficina y hace deporte los fines de semana."]
+english = "Works in an office and plays sports on weekends."
+
+[[gold.objective]]
+spanish = ["temperatura 37,9 grados, tensión arterial 118/72, FC 102, dolor a la palpación en la fosa ilíaca derecha con signo de rebote positivo."]
+english = "Temperature 37.9 degrees, blood pressure 118/72, HR 102, tenderness in the right iliac fossa with positive rebound sign."
+
+[[gold.objective]]
+spanish = ["Abdomen blando, sin masas."]
+english = "Soft abdomen, no masses."
+
+[[gold.objective]]
+spanish = ["Signo de Rovsing positivo."]
+english = "Positive Rovsing sign."
+
+[[gold.objective]]
+spanish = ["Ruidos intestinales disminuidos."]
+english = "Decreased bowel sounds."
+
+[[gold.objective]]
+spanish = ["Sin dolor a la percusión lumbar en ambos lados."]
+english = "No pain on lumbar percussion on both sides."
+
+[[gold.assessment]]
+spanish = ["probable apendicitis aguda."]
+english = "Probable acute appendicitis."
+
+[[gold.assessment]]
+spanish = ["Descartar litiasis renal derecha."]
+english = "Rule out right kidney stone."
+
+[[gold.plan]]
+spanish = ["ondansetrón 4 mg sublingual ahora."]
+english = "Ondansetron 4 mg sublingual now."
+
+[[gold.plan]]
+spanish = ["Ketorolaco 30 mg intravenoso cada 8 horas si hay dolor."]
+english = "Ketorolac 30 mg intravenous every 8 hours if in pain."
+
+[[gold.plan]]
+spanish = ["Valoración por cirugía hoy."]
+english = "Surgical evaluation today."
+
+[[gold.plan]]
+spanish = ["Nada por boca."]
+english = "Nothing by mouth."
+
+[[gold.plan]]
+spanish = ["Solución salina 500 ml intravenosa en 2 horas."]
+english = "Normal saline 500 ml intravenous over 2 hours."
+
+[[gold.plan]]
+spanish = ["Después, un litro y medio de solución salina en 24 horas."]
+english = "Then 1.5 liters of normal saline over 24 hours."
+
+[[gold.plan]]
+spanish = ["Informo al paciente del diagnóstico probable."]
+english = "I inform the patient of the probable diagnosis."
+
+[[gold.plan]]
+spanish = ["Reevaluar en 4 horas."]
+english = "Reassess in 4 hours."

@@ -22,8 +22,8 @@ Plan {colon} start fezolinetant [[45 mg|forty-five milligrams]] once daily {peri
 [[3 months|three months]] {period}
 """
 
-[gold.history]
-value = "52-year-old woman with hot flashes for about a year, now 8 to 10 a day and waking her 3 times a night. Last menstrual period over a year ago. DVT after surgery in her thirties, so would rather avoid hormone therapy. No vaginal bleeding. No breast lumps. Not on any regular medication. Blood pressure 124/76, BMI 27. Baseline liver tests normal, ALT 22."
+[gold.subjective]
+value = "52-year-old woman with hot flashes for about a year, now 8 to 10 a day and waking her 3 times a night. Last menstrual period over a year ago. DVT after surgery in her thirties, so would rather avoid hormone therapy. No vaginal bleeding. No breast lumps. Not on any regular medication."
 sources = [
     "52-year-old woman with hot flashes for about a year, now 8 to 10 a day and waking her 3 times a night.",
     "Last menstrual period over a year ago.",
@@ -31,6 +31,11 @@ sources = [
     "No vaginal bleeding.",
     "No breast lumps.",
     "Not on any regular medication.",
+]
+
+[gold.objective]
+value = "Blood pressure 124/76, BMI 27. Baseline liver tests normal, ALT 22."
+sources = [
     "Blood pressure 124/76, BMI 27.",
     "Baseline liver tests are normal, ALT 22.",
 ]

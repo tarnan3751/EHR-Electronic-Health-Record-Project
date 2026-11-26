@@ -1,0 +1,148 @@
+id = "h01-lumbalgia"
+language = "es"
+voice = "em_alex"
+tags = ["numbers", "vitals", "decimal-comma", "units", "frequency", "sides", "severity", "negation", "certainty", "history", "actions", "drug-name-differs", "long"]
+dates = []
+drugs = ["paracetamol", "ibuprofeno"]
+drugs_en = ["acetaminophen", "ibuprofen"]
+negated = ["fever"]
+affirmed = ["low back pain"]
+text = """
+Consulta por dolor lumbar. Hombre de [[46|cuarenta y seis]] años que trabaja en un almacén y carga cajas pesadas todos
+los días. No fuma y no toma medicación de forma habitual. Refiere dolor lumbar desde hace [[10|diez]] días, que empezó
+al levantar una caja del suelo. El dolor baja por la parte de atrás de la pierna derecha hasta la rodilla, sin llegar
+al pie. Lo describe como intenso por las mañanas y moderado por las tardes. Empeora al estar sentado mucho tiempo y al
+toser, y mejora al caminar. Niega pérdida de fuerza en las piernas, niega problemas para orinar y niega fiebre.
+Tampoco ha notado hormigueo en los pies. Antecedente de un episodio parecido hace [[3|tres]] años, que mejoró con
+reposo relativo en unas semanas. Ha tomado paracetamol [[1 g|un gramo]] cada [[8|ocho]] horas, con poca mejoría.
+Duerme mal por el dolor y ha faltado al trabajo [[2|dos]] días esta semana. Le preocupa no poder volver pronto al
+trabajo. En la exploración, TA [[128/82|ciento veintiocho sobre ochenta y dos]], FC [[76|setenta y seis]], temperatura
+[[36,6|treinta y seis coma seis]] grados. Camina sin cojera. Contractura de la musculatura lumbar derecha, con dolor a
+la palpación. Lasègue positivo en la pierna derecha a los [[40|cuarenta]] grados. Fuerza y sensibilidad conservadas en
+ambas piernas. Reflejos simétricos. Abdomen blando, sin masas palpables. Impresión: lumbociática derecha aguda,
+probablemente por una hernia discal. No hay signos de alarma. Plan: suspender el paracetamol. Iniciar ibuprofeno [[600
+mg|seiscientos miligramos]] cada [[8|ocho]] horas con comida durante [[7|siete]] días. Calor local por las noches.
+Evitar cargar peso durante [[2|dos]] semanas. Caminar a diario según tolerancia. Derivar a fisioterapia. Se le dan
+recomendaciones de higiene postural. Se explica al paciente que acuda a urgencias si nota pérdida de fuerza o
+problemas para orinar. Control en [[3|tres]] semanas, antes si empeora.
+"""
+
+[[gold.subjective]]
+spanish = ["Hombre de 46 años que trabaja en un almacén y carga cajas pesadas todos los días."]
+english = "46-year-old man who works in a warehouse and carries heavy boxes every day."
+
+[[gold.subjective]]
+spanish = ["No fuma y no toma medicación de forma habitual."]
+english = "Does not smoke and takes no regular medication."
+
+[[gold.subjective]]
+spanish = ["Refiere dolor lumbar desde hace 10 días, que empezó al levantar una caja del suelo."]
+english = "Reports low back pain for 10 days, which started when lifting a box from the floor."
+
+[[gold.subjective]]
+spanish = ["El dolor baja por la parte de atrás de la pierna derecha hasta la rodilla, sin llegar al pie."]
+english = "The pain goes down the back of the right leg to the knee, not reaching the foot."
+
+[[gold.subjective]]
+spanish = ["Lo describe como intenso por las mañanas y moderado por las tardes."]
+english = "He describes it as intense in the mornings and moderate in the afternoons."
+
+[[gold.subjective]]
+spanish = ["Empeora al estar sentado mucho tiempo y al toser, y mejora al caminar."]
+english = "It worsens with prolonged sitting and with coughing, and improves with walking."
+
+[[gold.subjective]]
+spanish = ["Niega pérdida de fuerza en las piernas, niega problemas para orinar y niega fiebre."]
+english = "Denies leg weakness, denies trouble urinating and denies fever."
+
+[[gold.subjective]]
+spanish = ["Tampoco ha notado hormigueo en los pies."]
+english = "He has not noticed tingling in his feet either."
+
+[[gold.subjective]]
+spanish = ["Antecedente de un episodio parecido hace 3 años, que mejoró con reposo relativo en unas semanas."]
+english = "History of a similar episode 3 years ago, which improved with relative rest in a few weeks."
+
+[[gold.subjective]]
+spanish = ["Ha tomado paracetamol 1 g cada 8 horas, con poca mejoría."]
+english = "Has taken acetaminophen 1 g every 8 hours, with little improvement."
+
+[[gold.subjective]]
+spanish = ["Duerme mal por el dolor y ha faltado al trabajo 2 días esta semana."]
+english = "Sleeps poorly because of the pain and has missed 2 days of work this week."
+
+[[gold.subjective]]
+spanish = ["Le preocupa no poder volver pronto al trabajo."]
+english = "He is worried about not being able to return to work soon."
+
+[[gold.objective]]
+spanish = ["TA 128/82, FC 76, temperatura 36,6 grados."]
+english = "BP 128/82, HR 76, temperature 36.6 degrees."
+
+[[gold.objective]]
+spanish = ["Camina sin cojera."]
+english = "Walks without a limp."
+
+[[gold.objective]]
+spanish = ["Contractura de la musculatura lumbar derecha, con dolor a la palpación."]
+english = "Right lumbar muscle spasm, tender on palpation."
+
+[[gold.objective]]
+spanish = ["Lasègue positivo en la pierna derecha a los 40 grados."]
+english = "Positive Lasègue sign in the right leg at 40 degrees."
+
+[[gold.objective]]
+spanish = ["Fuerza y sensibilidad conservadas en ambas piernas."]
+english = "Strength and sensation preserved in both legs."
+
+[[gold.objective]]
+spanish = ["Reflejos simétricos."]
+english = "Symmetric reflexes."
+
+[[gold.objective]]
+spanish = ["Abdomen blando, sin masas palpables."]
+english = "Soft abdomen, no palpable masses."
+
+[[gold.assessment]]
+spanish = ["lumbociática derecha aguda, probablemente por una hernia discal."]
+english = "Acute right sciatica, probably due to a herniated disc."
+
+[[gold.assessment]]
+spanish = ["No hay signos de alarma."]
+english = "No red flags."
+
+[[gold.plan]]
+spanish = ["suspender el paracetamol."]
+english = "Stop acetaminophen."
+
+[[gold.plan]]
+spanish = ["Iniciar ibuprofeno 600 mg cada 8 horas con comida durante 7 días."]
+english = "Start ibuprofen 600 mg every 8 hours with food for 7 days."
+
+[[gold.plan]]
+spanish = ["Calor local por las noches."]
+english = "Local heat at night."
+
+[[gold.plan]]
+spanish = ["Evitar cargar peso durante 2 semanas."]
+english = "Avoid lifting loads for 2 weeks."
+
+[[gold.plan]]
+spanish = ["Caminar a diario según tolerancia."]
+english = "Walk daily as tolerated."
+
+[[gold.plan]]
+spanish = ["Derivar a fisioterapia."]
+english = "Refer to physical therapy."
+
+[[gold.plan]]
+spanish = ["Se le dan recomendaciones de higiene postural."]
+english = "He is given advice on posture."
+
+[[gold.plan]]
+spanish = ["Se explica al paciente que acuda a urgencias si nota pérdida de fuerza o problemas para orinar."]
+english = "The patient is told to go to the emergency department if he notices weakness or trouble urinating."
+
+[[gold.plan]]
+spanish = ["Control en 3 semanas, antes si empeora."]
+english = "Follow-up in 3 weeks, sooner if worse."

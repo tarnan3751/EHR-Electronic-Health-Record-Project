@@ -408,14 +408,18 @@ function clinicStamp(text, zone, withTime = true) {
 }
 
 // Signed notes, read-only, each followed by its addenda in the order they were signed. Sensitive notes and addenda
-// are never kept on this device; the line above the visits says how many items were left out.
+// are never kept on this device; the line above the visits says how many items were left out. A note signed in four
+// sections (the expansion plan's step 14) is shown in them; one signed before, in History, Assessment and Plan.
 function signedNotes(notes, zone) {
   const stamp = (text) => clinicStamp(text, zone);
   const part = (title, text) => [el('h5', { textContent: title }), el('p', { className: 'sc-note__text', textContent: text })];
   return el('section', {}, el('h4', { textContent: 'Signed notes' }),
     ...(notes.length ? notes.map((note) => el('details', { className: 'sc-result' },
       el('summary', { textContent: `Signed note · ${stamp(note.signedAt)} · ${note.signer}${note.addenda.length ? ` · ${note.addenda.length} ${note.addenda.length === 1 ? 'addendum' : 'addenda'}` : ''}` }),
-      ...part('History', note.history), ...part('Assessment', note.assessment), ...part('Plan', note.plan),
+      ...(note.subjective != null
+        ? [...part('Subjective', note.subjective), ...part('Objective', note.objective ?? '')]
+        : part('History', note.history)),
+      ...part('Assessment', note.assessment), ...part('Plan', note.plan),
       ...note.addenda.flatMap((addendum) => part(`${addendum.notNoteAuthor ? `Addendum by ${addendum.author}, not the note's author` : `Addendum · ${addendum.author}`} · ${stamp(addendum.signedAt)}`, addendum.text)),
       ...(note.sensitiveAddendaNotKept
         ? [el('p', { className: 'sc-muted', textContent: `Sensitive addenda not kept offline: ${note.sensitiveAddendaNotKept}. Open the note on the clinic's site to see them.` })]

@@ -24,8 +24,8 @@ Plan {colon} continue aprocitentan at the same dose {period} Recheck hemoglobin 
 {period}
 """
 
-[gold.history]
-value = "63-year-old woman with resistant hypertension, started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg. Mild swelling in both ankles by the end of the day. Denies chest pain, shortness of breath, headaches or dizziness. Home readings in the 130s over 80s. Family history of stroke in her father at 68. Blood pressure 142/88, heart rate 72; blood pressure better than at the last visit, heart rate about the same. Trace pitting edema at both ankles. Hemoglobin 12.9, down from 13.6."
+[gold.subjective]
+value = "63-year-old woman with resistant hypertension, started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg. Mild swelling in both ankles by the end of the day. Denies chest pain, shortness of breath, headaches or dizziness. Home readings in the 130s over 80s. Family history of stroke in her father at 68."
 sources = [
     "This is a follow-up visit for resistant hypertension.",
     "She is a 63-year-old woman who was started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg.",
@@ -33,6 +33,11 @@ sources = [
     "She denies chest pain, shortness of breath, headaches or dizziness.",
     "Home readings have been running in the 130s over 80s.",
     "Family history of stroke in her father at 68.",
+]
+
+[gold.objective]
+value = "Blood pressure 142/88, heart rate 72; blood pressure better than at the last visit, heart rate about the same. Trace pitting edema at both ankles. Hemoglobin 12.9, down from 13.6."
+sources = [
     "Blood pressure today is 142/88, heart rate 72.",
     "Her blood pressure is better than at the last visit but her heart rate is about the same.",
     "There is trace pitting edema at both ankles.",
@@ -52,8 +57,8 @@ sources = [
     "Follow up in 2 months.",
 ]
 
-[gold_rules.history]
-value = "This is a follow-up visit for resistant hypertension. She is a 63-year-old woman who was started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg. She reports mild swelling in both ankles by the end of the day. She denies chest pain, shortness of breath, headaches or dizziness. Home readings have been running in the 130s over 80s. Family history of stroke in her father at 68. Blood pressure today is 142/88, heart rate 72. Her blood pressure is better than at the last visit but her heart rate is about the same. There is trace pitting edema at both ankles. Hemoglobin is 12.9, down from 13.6."
+[gold_rules.subjective]
+value = "This is a follow-up visit for resistant hypertension. She is a 63-year-old woman who was started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg. She reports mild swelling in both ankles by the end of the day. She denies chest pain, shortness of breath, headaches or dizziness. Home readings have been running in the 130s over 80s. Family history of stroke in her father at 68."
 sources = [
     "This is a follow-up visit for resistant hypertension.",
     "She is a 63-year-old woman who was started on aprocitentan 12.5 mg daily 6 weeks ago in addition to amlodipine 10 mg, chlorthalidone 25 mg and losartan 100 mg.",
@@ -61,6 +66,11 @@ sources = [
     "She denies chest pain, shortness of breath, headaches or dizziness.",
     "Home readings have been running in the 130s over 80s.",
     "Family history of stroke in her father at 68.",
+]
+
+[gold_rules.objective]
+value = "Blood pressure today is 142/88, heart rate 72. Her blood pressure is better than at the last visit but her heart rate is about the same. There is trace pitting edema at both ankles. Hemoglobin is 12.9, down from 13.6."
+sources = [
     "Blood pressure today is 142/88, heart rate 72.",
     "Her blood pressure is better than at the last visit but her heart rate is about the same.",
     "There is trace pitting edema at both ankles.",

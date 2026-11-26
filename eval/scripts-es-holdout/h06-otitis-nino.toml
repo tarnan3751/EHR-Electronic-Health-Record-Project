@@ -1,0 +1,88 @@
+id = "h06-otitis-nino"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "vitals", "decimal-comma", "units", "frequency", "sides", "negation", "self-correction", "allergy-change"]
+dates = []
+drugs = ["penicilina", "azitromicina", "ibuprofeno"]
+drugs_en = ["penicillin", "azithromycin", "ibuprofen"]
+retracted = ["5 días"]
+forbidden = ["Añade la penicilina a su lista de alergias"]
+forbidden_en = ["allergy list", "allergies"]
+negated = ["ear discharge", "exudate"]
+affirmed = ["ear pain"]
+text = """
+Niño de [[3|tres]] años que acude a urgencias por dolor en el oído derecho desde hace [[2|dos]] días. La madre refiere
+fiebre de hasta [[39,2|treinta y nueve coma dos]] grados desde anoche. Está irritable y come menos, pero toma bien los
+líquidos. No ha vomitado y no le supura el oído. Lleva una semana con mocos. Es alérgico a la penicilina: a los
+[[2|dos]] años le salió un sarpullido por todo el cuerpo. Añade la penicilina a su lista de alergias. Vacunas al día.
+En la exploración, peso [[15 kg|quince kilos]], temperatura [[38,6|treinta y ocho coma seis]] grados. Tímpano derecho
+abombado y enrojecido. Tímpano izquierdo normal. Faringe sin exudado. Auscultación pulmonar normal. Impresión: otitis
+media aguda derecha. Plan: azitromicina [[150 mg|ciento cincuenta miligramos]] una vez al día durante [[5|cinco]]
+días, digo, durante [[3|tres]] días. Ibuprofeno en suspensión, [[7,5 ml|siete coma cinco mililitros]] cada [[8|ocho]]
+horas si hay fiebre o dolor. Se explica a la madre que vuelva si sigue con fiebre a las [[48|cuarenta y ocho]] horas o
+si aparece hinchazón detrás de la oreja.
+"""
+
+[[gold.subjective]]
+spanish = ["Niño de 3 años que acude a urgencias por dolor en el oído derecho desde hace 2 días."]
+english = "3-year-old boy in the emergency department with right ear pain for 2 days."
+
+[[gold.subjective]]
+spanish = ["La madre refiere fiebre de hasta 39,2 grados desde anoche."]
+english = "Mother reports fever up to 39.2 degrees since last night."
+
+[[gold.subjective]]
+spanish = ["Está irritable y come menos, pero toma bien los líquidos."]
+english = "He is irritable and eating less, but drinking fluids well."
+
+[[gold.subjective]]
+spanish = ["No ha vomitado y no le supura el oído."]
+english = "Has not vomited and has no ear discharge."
+
+[[gold.subjective]]
+spanish = ["Lleva una semana con mocos."]
+english = "Runny nose for one week."
+
+[[gold.subjective]]
+spanish = ["Es alérgico a la penicilina: a los 2 años le salió un sarpullido por todo el cuerpo."]
+english = "Allergic to penicillin: at age 2 he had a rash all over his body."
+
+[[gold.subjective]]
+spanish = ["Vacunas al día."]
+english = "Vaccines up to date."
+
+[[gold.objective]]
+spanish = ["peso 15 kg, temperatura 38,6 grados."]
+english = "Weight 15 kg, temperature 38.6 degrees."
+
+[[gold.objective]]
+spanish = ["Tímpano derecho abombado y enrojecido."]
+english = "Right eardrum bulging and red."
+
+[[gold.objective]]
+spanish = ["Tímpano izquierdo normal."]
+english = "Left eardrum normal."
+
+[[gold.objective]]
+spanish = ["Faringe sin exudado."]
+english = "Pharynx without exudate."
+
+[[gold.objective]]
+spanish = ["Auscultación pulmonar normal."]
+english = "Normal lung auscultation."
+
+[[gold.assessment]]
+spanish = ["otitis media aguda derecha."]
+english = "Right acute otitis media."
+
+[[gold.plan]]
+spanish = ["azitromicina 150 mg una vez al día durante 5 días, digo, durante 3 días."]
+english = "Azithromycin 150 mg once a day for 3 days."
+
+[[gold.plan]]
+spanish = ["Ibuprofeno en suspensión, 7,5 ml cada 8 horas si hay fiebre o dolor."]
+english = "Ibuprofen suspension, 7.5 ml every 8 hours if there is fever or pain."
+
+[[gold.plan]]
+spanish = ["Se explica a la madre que vuelva si sigue con fiebre a las 48 horas o si aparece hinchazón detrás de la oreja."]
+english = "The mother is told to return if he still has fever at 48 hours or if swelling appears behind the ear."

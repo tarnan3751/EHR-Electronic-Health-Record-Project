@@ -14,13 +14,18 @@ times a day with food for up to a week ankle brace and range of motion exercises
 [[2 weeks|two weeks]]
 """
 
-[gold.history]
-value = "22-year-old man rolled his right ankle playing basketball last night. Swelling and pain over the outside of the ankle. Could walk four steps right away and still can. No numbness, no other injury. Swelling and bruising below the lateral malleolus. No bony tenderness at the malleoli or the base of the fifth metatarsal."
+[gold.subjective]
+value = "22-year-old man rolled his right ankle playing basketball last night. Swelling and pain over the outside of the ankle. Could walk four steps right away and still can. No numbness, no other injury."
 sources = [
     "22-year-old man rolled his right ankle playing basketball last night",
     "swelling and pain over the outside of the ankle",
     "he could walk four steps right away and still can",
     "no numbness no other injury",
+]
+
+[gold.objective]
+value = "Swelling and bruising below the lateral malleolus. No bony tenderness at the malleoli or the base of the fifth metatarsal."
+sources = [
     "swelling and bruising below the lateral malleolus",
     "no bony tenderness at the malleoli or the base of the fifth metatarsal",
 ]

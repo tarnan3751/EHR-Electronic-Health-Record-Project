@@ -1,0 +1,9 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "speakers-ambient",
+  "status": 422,
+  "body": {
+    "error": "speakers_incomplete",
+    "detail": "Name every voice: one clinician, one patient, and one other at most."
+  }
+}

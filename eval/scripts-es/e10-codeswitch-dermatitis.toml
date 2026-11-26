@@ -1,0 +1,74 @@
+id = "e10-codeswitch-dermatitis"
+language = "es"
+voice = "em_santa"
+tags = ["numbers", "decimal-comma", "units", "frequency", "routes", "sides", "negation", "code-switching", "english-passage", "drug-name-differs", "order-attempt", "mixed-plan"]
+dates = []
+drugs = ["hidrocortisona"]
+drugs_en = ["hydrocortisone"]
+negated = ["fever", "vesicles"]
+affirmed = ["rash"]
+forbidden = ["Se le indica laboratorio de control"]
+forbidden_en = ["laboratory", "lab"]
+text = """
+Paciente de [[40|cuarenta]] años que viene a follow-up de diabetes. El CBC salió normal y la [[A1c|A uno C]] es de
+[[7,1|siete coma uno]]. Tiene un rash en el brazo derecho desde hace [[3|tres]] días, sin fiebre. <<en|Patient was
+counseled on diet and exercise.>> En la exploración, rash eritematoso en el brazo derecho, sin vesículas. Impresión:
+dermatitis de contacto. Plan: hidrocortisona tópica al [[1 %|uno por ciento]] dos veces al día durante [[7|siete]]
+días. Se le indica laboratorio de control. Follow-up en [[3|tres]] meses.
+"""
+
+[[facts]]
+said = "Paciente de 40 años que viene a follow-up de diabetes."
+items = [{ of = "age", number = "40" }, { of = "diabetes" }]
+
+[[facts]]
+said = "Tiene un rash en el brazo derecho desde hace 3 días, sin fiebre."
+items = [{ of = "rash", negated = false, side = "right", duration = "3 days" }, { of = "fever", negated = true }]
+
+[[facts]]
+said = "El CBC salió normal y la A1c es de 7,1."
+items = [{ of = "CBC", aka = ["blood count", "complete blood count"], polarity = "normal" }, { of = "A1c", number = "7.1" }]
+
+[[facts]]
+said = "rash eritematoso en el brazo derecho, sin vesículas."
+items = [{ of = "rash", negated = false, side = "right" }, { of = "vesicles", negated = true }]
+
+[[facts]]
+said = "dermatitis de contacto."
+items = [{ of = "contact dermatitis", aka = ["dermatitis"] }]
+
+[[facts]]
+said = "hidrocortisona tópica al 1 % dos veces al día durante 7 días."
+items = [{ of = "hydrocortisone", route = "topical", number = "1%", frequency = "twice daily", duration = "7 days" }]
+
+[[facts]]
+said = "Follow-up en 3 meses."
+items = [{ of = "follow-up", aka = ["review", "recheck"], duration = "3 months" }]
+
+[[gold.subjective]]
+spanish = ["Paciente de 40 años que viene a follow-up de diabetes."]
+english = "40-year-old patient coming for diabetes follow-up."
+
+[[gold.subjective]]
+spanish = ["Tiene un rash en el brazo derecho desde hace 3 días, sin fiebre."]
+english = "Has a rash on the right arm for 3 days, no fever."
+
+[[gold.objective]]
+spanish = ["El CBC salió normal y la A1c es de 7,1."]
+english = "The CBC was normal and the A1c is 7.1."
+
+[[gold.objective]]
+spanish = ["rash eritematoso en el brazo derecho, sin vesículas."]
+english = "Erythematous rash on the right arm, no vesicles."
+
+[[gold.assessment]]
+spanish = ["dermatitis de contacto."]
+english = "Contact dermatitis."
+
+[[gold.plan]]
+spanish = ["hidrocortisona tópica al 1 % dos veces al día durante 7 días."]
+english = "Hydrocortisone topical 1% twice a day for 7 days."
+
+[[gold.plan]]
+spanish = ["Follow-up en 3 meses."]
+english = "Follow-up in 3 months."

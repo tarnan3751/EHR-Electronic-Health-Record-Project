@@ -2,8 +2,10 @@
 @using Ehr.Domain.Notes
 @using Ehr.Data.Patients
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ReviewModel
+@inject Ehr.Web.Forwarding.OnPremStatus OnPrem
+@inject AmbientTranscriptKeep Keep
 @{
-    ViewData["Title"] = "Review AI-proposed fields";
+    ViewData["Title"] = Model.Ambient ? "Review the note drafted from the visit" : "Review AI-proposed fields";
 }
 @* The patient, in the banner under the app bar. The note pages read no allergies, so the banner shows none. *@
 @section Banner {
@@ -20,6 +22,10 @@
         _ => "No usable suggestion",
     };
 
+    // A proposed field's heading. A dictation sorted into History (before the expansion plan's step 14) is added to
+    // Subjective, where the editor asks for what belongs in Objective to be moved there (NoteReviews).
+    static string FieldLabel(string field) => field == "history" ? "History (goes into Subjective)" : char.ToUpperInvariant(field[0]) + field[1..];
+
     static string StateTone(string? state) => state switch
     {
         AiProposalStates.Pending => "sc-tag sc-tag--warning",
@@ -28,12 +34,27 @@
     };
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to the chart</a></p>
 </div>
-<h1>Review AI-proposed fields</h1>
-<p class="sc-prose">Compare every suggestion with your original words. Accepted and edited values enter the note only when you complete review. Orders and allergy changes are never executed by this workflow.</p>
-<section data-note-review data-dictation data-stage-url="@($"/api/dictation/sessions/review/{Model.Review.Id}/stage")">
+<h1>@(Model.Ambient ? "Review the note drafted from the visit" : "Review AI-proposed fields")</h1>
+<p class="sc-prose">Compare every suggestion with @(Model.Ambient ? "what was said" : "your original words"). Accepted and edited values enter the note only when you complete review. Orders and allergy changes are never executed by this workflow.</p>
+@* The expansion plan's step 16: a recorded visit's review. *@
+@if (Model.Ambient)
+{
+    <p class="sc-notice sc-notice--info" data-ambient-own-words><span class="sc-notice__state">Check:</span> each Subjective value is in the patient's own words. Reword it as your note before you accept it.</p>
+    @if (Model.DecideAtTheClinic)
+    {
+        <p class="sc-notice sc-notice--warning" data-ambient-at-the-clinic><span class="sc-notice__state">Read-only here:</span> @ReviewModel.FinishAtTheClinic</p>
+    }
+}
+@* Off-site, a visit's words are read only at the clinic: the script says so where it would quote them. *@
+<section data-note-review data-dictation data-stage-url="@($"/api/dictation/sessions/review/{Model.Review.Id}/stage")" data-dictation-words-at-the-clinic="@(Model.DecideAtTheClinic ? "true" : "false")">
     <script type="application/json" data-review-snapshot>@Json.Serialize(Model.Snapshot)</script>
+    @* Step 16: a recorded visit's transcript, read at the clinic, as stored (ReviewModel.ConversationJson). *@
+    @if (Model.ConversationJson is { } conversation)
+    {
+        <script type="application/json" data-review-transcript>@Html.Raw(conversation)</script>
+    }
     <p id="note-save-status" class="sc-status" role="status" aria-live="polite">Saved review</p>
     <div id="note-errors" class="sc-notice sc-notice--danger" role="alert" tabindex="-1" hidden="@(Model.Errors.Count == 0)">
         @foreach (var error in Model.Errors) { <p>@error</p> }
@@ -42,39 +63,81 @@
     @Html.AntiForgeryToken()
     @if (Model.Review.State == AiReviewStates.Recording && !Model.Signed)
     {
-        <p class="sc-notice sc-notice--warning">This dictation has not been staged for review. Retrieve its finished result, or discard the temporary dictation and continue manually. No AI text has entered the note.</p>
+        @* Step 16: a visit left here when its page couldn't fetch it, or was closed, says what it is. One whose voices were
+           named may still be drafting at the service, so Retrieve comes first and the sentence says to wait for it;
+           otherwise it is discarded. *@
+        @if (Model.Ambient)
+        {
+            <p class="sc-notice sc-notice--warning" data-ambient-not-drafted>A visit recorded at @Clinic.Format(Model.Review.CreatedAt) hasn't been drafted yet. If its voices were named a moment ago, wait a minute and choose Retrieve. Otherwise discard it to dictate or listen again.</p>
+        }
+        else
+        {
+            <p class="sc-notice sc-notice--warning">This dictation has not been staged for review. Retrieve its finished result, or discard the temporary dictation and continue manually. No AI text has entered the note.</p>
+        }
         <div class="sc-actions">
-            <button type="button" class="sc-btn" data-review-retrieve>Retrieve finished dictation</button>
+            <button type="button" class="sc-btn" data-review-retrieve>@(Model.Ambient ? "Retrieve the visit's draft" : "Retrieve finished dictation")</button>
             <form method="post" asp-page-handler="Discard" data-review-submit>
-                <button class="sc-btn sc-btn--danger">Discard unfinished dictation and continue manually</button>
+                <button class="sc-btn sc-btn--danger">@(Model.Ambient ? "Discard the visit" : "Discard unfinished dictation and continue manually")</button>
             </form>
         </div>
     }
-    @if (Model.Signed) { <p class="sc-notice sc-notice--info">The note is signed. This review evidence is read-only.</p> }
+    @* Signing ends the fields' review, not the proposals' (step 15): those still waiting are opened or dismissed below. *@
+    @if (Model.Signed)
+    {
+        <p class="sc-notice sc-notice--info">The note is signed. The review of its fields is read-only.@(Model.ChartProposals.Any(p => p.Waiting) ? " The proposed orders and allergies below can still be opened in their forms or dismissed." : "")</p>
+    }
+    @if (Model.Translated)
+    {
+        @* The expansion plan's step 17: the checks compare the kinds of word that carry the most risk, not the meaning of every word. *@
+        <p class="sc-notice sc-notice--info">Translated from Spanish: these proposals are English translations of what you said. Check each sentence against the Spanish beside it before you accept it. The checks compare numbers, doses, units, dates, medicine names, sides, routes, how often, what changes and negations; they don't check the meaning of every word.</p>
+    }
     <div class="sc-review">
         <section>
             <section class="sc-transcript" aria-labelledby="review-transcript">
-                <div class="sc-transcript__head"><h2 class="sc-transcript__title" id="review-transcript">Original transcript</h2></div>
-                <div class="sc-transcript__body" data-dictation-transcript><p>@Model.Result?.Transcript.Text</p></div>
+                <div class="sc-transcript__head"><h2 class="sc-transcript__title" id="review-transcript">@(Model.Translated ? "Original transcript, in Spanish" : "Original transcript")</h2></div>
+                @if (Model.Ambient && !Model.TranscriptKept)
+                {
+                    <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder" data-ambient-transcript-gone>@(Model.Review.State == AiReviewStates.Pending ? NoteReviews.TranscriptGone(Keep) : "This visit's transcript was deleted when its review was finished. Each proposal shows who said the words it came from.")</p></div>
+                }
+                else if (Model.Ambient && Model.DecideAtTheClinic)
+                {
+                    <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder">The conversation can be read only at the clinic.</p></div>
+                }
+                else
+                {
+                    <div class="sc-transcript__body" data-dictation-transcript lang="@(Model.Translated ? "es" : null)"><p>@(Model.Ambient ? Model.ConversationText : Model.Result?.Transcript.Text)</p></div>
+                }
                 <p class="sc-transcript__note" data-dictation-unclear hidden>Marked passages were unclear. Check them before approving.</p>
             </section>
             <p class="sc-status" data-dictation-sort-message></p>
             <section class="sc-notice sc-notice--warning" data-dictation-not-carried hidden>
                 <h3>Not carried over</h3>
-                <p>Place any indicated orders or allergy updates through their normal clinical workflow.</p>
+                <p>@(Model.Ambient ? "This draft" : "Dictation") doesn't propose these. Place any that still apply through their normal clinical workflow.</p>
                 <ul data-dictation-not-carried-list></ul>
             </section>
         </section>
         <section>
             <h2>Proposed fields</h2>
             <dl class="sc-proposals">
-                @foreach (var field in new[] { "history", "assessment", "plan" })
+                @foreach (var field in Model.FieldNames)
                 {
                     var proposal = Model.Proposals.SingleOrDefault(p => p.Field == field);
                     <div class="sc-proposal" data-dictation-field="@field" data-proposal-id="@proposal?.Id" data-review-state="@proposal?.State">
-                        <dt class="sc-proposal__head"><span class="sc-proposal__field">@(char.ToUpperInvariant(field[0]) + field[1..])</span> <span class="@StateTone(proposal?.State)" data-field-status>@StateWords(proposal?.State)</span></dt>
-                        <dd data-field-value>@proposal?.OriginalValue</dd>
-                        @if (proposal is { State: AiProposalStates.Pending } && !Model.Signed)
+                        <dt class="sc-proposal__head"><span class="sc-proposal__field">@FieldLabel(field)</span> <span class="@StateTone(proposal?.State)" data-field-status>@StateWords(proposal?.State)</span></dt>
+                        <dd data-field-value>@if (Model.Statements(field).ToList() is { Count: > 0 } statements)
+                        {
+                            // From a dictation in Spanish (step 17), each English sentence beside the Spanish it was translated
+                            // from (docs/brand: Translated sentences), each saying it is a translation to check, warning or not,
+                            // so none reads as checked for having no warning; otherwise the value as proposed.
+                            <ol class="sc-translation">
+                                @foreach (var (english, spanish) in statements)
+                                {
+                                    <li class="sc-translation__pair"><p class="sc-translation__check">@ReviewModel.TranslatedSentence</p><p class="sc-translation__english">@english</p><p class="sc-translation__spanish">You said: <span lang="es">“@spanish”</span></p></li>
+                                }
+                            </ol>
+                        }
+                        else { @proposal?.OriginalValue }</dd>
+                        @if (proposal is { State: AiProposalStates.Pending } && !Model.Signed && !Model.DecideAtTheClinic)
                         {
                             <dd class="sc-proposal__controls" data-review-controls>
                                 <form method="post" asp-page-handler="Decide" data-review-submit>
@@ -82,7 +145,10 @@
                                     <input type="hidden" name="ProposalId" value="@proposal.Id" />
                                     <input type="hidden" name="DecisionKey" value="@(Model.ProposalId == proposal.Id && Model.DecisionKey != Guid.Empty ? Model.DecisionKey : Guid.NewGuid())" />
                                     <div class="sc-actions">
-                                        <button class="sc-btn" name="Decision" value="accepted">Accept @field</button>
+                                        @if (!Model.TranscriptGone)
+                                        {
+                                            <button class="sc-btn" name="Decision" value="accepted">@(Model.Translated ? "Accept translated" : "Accept") @field</button>
+                                        }
                                         <button class="sc-btn" name="Decision" value="rejected">Reject @field</button>
                                     </div>
                                     <details>
@@ -90,7 +156,13 @@
                                         <div class="sc-stack">
                                             <div class="sc-field sc-field--wide">
                                                 <label for="edited-@field">Corrected @field</label>
-                                                <textarea id="edited-@field" class="sc-field__input" name="EditedValue" rows="5">@(Model.ProposalId == proposal.Id ? Model.EditedValue : proposal.OriginalValue)</textarea>
+                                                @* Step 16: with a visit's transcript gone, the words offered can't go in as they are, so they aren't
+                                                   offered here ready to approve. *@
+                                                @if (Model.TranscriptGone)
+                                                {
+                                                    <p class="sc-field__hint" id="edited-@field-hint" data-ambient-own-note>Write it as your own note: with the visit's transcript deleted, the words offered can't go in as they are.</p>
+                                                }
+                                                <textarea id="edited-@field" class="sc-field__input" name="EditedValue" rows="5" aria-describedby="@(Model.TranscriptGone ? $"edited-{field}-hint" : null)">@(Model.ProposalId == proposal.Id ? Model.EditedValue : Model.TranscriptGone ? "" : proposal.OriginalValue)</textarea>
                                             </div>
                                             <div class="sc-actions"><button class="sc-btn" name="Decision" value="edited">Approve edited @field</button></div>
                                         </div>
@@ -102,13 +174,97 @@
                     </div>
                 }
             </dl>
+            @* The expansion plan's step 15: what the dictation proposes beyond the note, each in the clinician's words as heard,
+               with what was heard after it (step 15.1, so a retraction the service's rules don't read is in view beside the
+               button, as said and never judged), opened in its form, where it is signed or saved through every check of that
+               form, or dismissed here. None holds up this review or signing. *@
+            @if (Model.ChartProposals.Count > 0)
+            {
+                <section data-chart-proposals aria-labelledby="chart-proposals">
+                    <h2 id="chart-proposals" tabindex="-1" autofocus="@(Model.Decided is not null && Model.NextProposal is null)">Proposed orders and allergies</h2>
+                    <p class="sc-prose">Dictation proposes these from what you said and places or saves none of them. Each shows what you said after it. Open each in its form to check every field and sign or save it there, or dismiss it. They don't hold up this review or signing the note.</p>
+                    @if (!OnPrem.IsReachable)
+                    {
+                        <p class="sc-muted" data-chart-proposals-offline>Opening or dismissing a proposal needs the clinic's server. The review remains readable.</p>
+                    }
+                    <ol class="sc-proposals">
+                        @foreach (var proposed in Model.ChartProposals)
+                        {
+                            var row = proposed.Row;
+                            <li class="sc-proposal" data-chart-proposal="@row.Id" data-review-state="@row.State" data-chart-proposal-start="@proposed.Start" data-chart-proposal-end="@proposed.End">
+                                <p class="sc-proposal__head"><span class="sc-proposal__field">@proposed.KindWords</span> <span class="@(proposed.Waiting ? "sc-tag sc-tag--warning" : row.State == AiChartProposalStates.Dismissed ? "sc-tag" : "sc-tag sc-tag--success")" data-chart-proposal-state>@proposed.StateWords</span></p>
+                                <p class="sc-proposal__value" data-chart-proposal-words><span class="sc-proposal__field">As heard:</span> @proposed.Before<mark class="sc-transcript__source">@proposed.Words</mark>@proposed.After</p>
+                                @if (proposed.HeardAfter.Length > 0)
+                                {
+                                    <p class="sc-proposal__value" data-chart-proposal-heard-after><span class="sc-proposal__field">Heard after it:</span> @proposed.HeardAfter</p>
+                                }
+                                @* Its warnings only while it waits: once decided, there is nothing left to check them for. *@
+                                @if (proposed.Waiting)
+                                {
+                                    foreach (var warning in proposed.Warnings)
+                                    {
+                                        <p class="sc-proposal__warning">Check: @ProposedFromDictation.WarningWords(warning.Code) “@warning.Said”</p>
+                                    }
+                                }
+                                @if (row.DecidedAt is { } decidedAt)
+                                {
+                                    @* What it was decided into, on the chart: the order signed for it, or the allergy added. Only the
+                                       proposal's own clinician reads its review (row-level security). *@
+                                    var made = row.OrderId is { } order ? $"order-{order}" : row.AllergyId is { } allergy ? $"allergy-{allergy}" : null;
+                                    <p class="sc-proposal__message">
+                                        @proposed.StateWords @Clinic.Format(decidedAt).
+                                        @if (made is not null)
+                                        {
+                                            <a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id" asp-fragment="@made" data-chart-proposal-made>@(row.OrderId is not null ? "See the order on the chart" : "See the allergy on the chart")</a>
+                                        }
+                                    </p>
+                                }
+                                else if (OnPrem.IsReachable)
+                                {
+                                    var first = Model.NextProposal == row.Id;
+                                    <div class="sc-actions">
+                                        @if (proposed.IsOrder)
+                                        {
+                                            <a class="sc-btn" asp-page="/Patients/Orders/New" asp-route-id="@Model.Patient.Id" asp-route-proposal="@row.Id" autofocus="@first" data-open-proposal>Open in the order form</a>
+                                        }
+                                        else
+                                        {
+                                            <a class="sc-btn" asp-page="/Patients/Lists/Entry" asp-route-id="@Model.Patient.Id" asp-route-list="allergies" asp-route-proposal="@row.Id" autofocus="@first" data-open-proposal>Open in the allergy form</a>
+                                        }
+                                        <form method="post" asp-page-handler="DismissProposal">
+                                            <input type="hidden" name="ChartProposalId" value="@row.Id" />
+                                            <button class="sc-btn sc-btn--quiet">Dismiss proposal</button>
+                                        </form>
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ol>
+                </section>
+            }
+            else if (Model.Translated)
+            {
+                @* The expansion plan's step 17: nothing is proposed beyond the note from a dictation in Spanish. *@
+                <section data-chart-proposals-none aria-labelledby="chart-proposals">
+                    <h2 id="chart-proposals">Proposed orders and allergies</h2>
+                    <p class="sc-prose">Nothing is proposed for orders or the allergy list from a dictation in Spanish. Any order or allergy change you dictated is listed under “Not carried over”, for you to place through its normal clinical workflow.</p>
+                </section>
+            }
         </section>
     </div>
     <details>
         <summary>Current saved note — compare before adding approved values</summary>
-        <partial name="_NoteContent" model="NoteContent.From(Model.Draft)" />
+        <partial name="_NoteContent" model="NoteSections.AsSaved(Model.Draft)" />
     </details>
-    @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed)
+    @if (Model.Ambient && Model.Review.State == AiReviewStates.Pending && !Model.Signed && !Model.DecideAtTheClinic && Model.Proposals.Any(p => p.State == AiProposalStates.Pending))
+    {
+        @* For a patient who withdraws their consent after the visit: nothing goes into the note, and the transcript goes. *@
+        <form method="post" asp-page-handler="RejectAll" class="sc-form sc-form--wide" data-ambient-reject-all>
+            <input type="hidden" name="Version" value="@Model.Draft.Version" />
+            <button class="sc-btn sc-btn--danger sc-btn--wraps">Reject every proposal and delete the conversation</button>
+        </form>
+    }
+    @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed && !Model.DecideAtTheClinic)
     {
         <form method="post" asp-page-handler="Complete" class="sc-form sc-form--wide" data-review-submit data-review-complete>
             <input type="hidden" name="Version" value="@Model.Draft.Version" />

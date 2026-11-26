@@ -20,11 +20,17 @@ import dictation_scripts as ds  # noqa: E402
 SCRIPTS = ds.load_scripts()
 FIELDS = ds.FIELDS
 VOICES = tomllib.loads((EVAL_DIR / "voices.toml").read_text(encoding="utf-8"))
+# The clinical gold for proposals, by script id (clinical-proposals.toml); each script's [[proposals]] is the
+# rule-following gold.
+CLINICAL_PROPOSALS = {
+    script: [ds.Proposal(**row) for row in rows]
+    for script, rows in tomllib.loads((EVAL_DIR / "clinical-proposals.toml").read_text(encoding="utf-8")).items()
+}
 
 CONTENT_TAGS = {
     "dates", "numbers", "vitals", "drug-new", "drug-uncommon", "negation", "self-correction", "order-attempt",
     "allergy-change", "mixed-plan", "recombination", "injection", "missing-field", "spoken-punctuation", "long",
-    "short", "max-length", "experiencer",
+    "short", "max-length", "experiencer", "proposal", "proposal-trap",
 }  # fmt: skip
 ACCENTS = {"us", "gb", "hi-voice", "es-voice", "fr-voice"}
 
@@ -51,8 +57,10 @@ UNCOMMON_DRUGS = {
 MINIMUMS = {
     "dates": 6, "vitals": 6, "negation": 6, "self-correction": 6, "drug-new": 6, "drug-uncommon": 6,
     "order-attempt": 5, "allergy-change": 5, "mixed-plan": 5, "recombination": 5, "injection": 3, "missing-field": 4,
-    "long": 6, "max-length": 2, "experiencer": 5,
+    "long": 6, "max-length": 2, "experiencer": 5, "proposal": 12, "proposal-trap": 10,
 }  # fmt: skip
+# Scripts with rule-following gold proposals (their own [[proposals]]): the "proposal" tag counts the clinical gold.
+RULE_FOLLOWING_PROPOSAL_SCRIPTS = 6
 
 # How a dictation corrects itself; a retracted value comes just before one of these.
 CORRECTION = re.compile(r"\b(sorry|wait no|no wait|correction|I mean|scratch that|make that)\b")
@@ -256,6 +264,8 @@ def test_tags_match_the_content(script):
     assert ("experiencer" in tags) == bool(SOMEONE_ELSE.search(display))
     assert ("drug-new" in tags) == bool(drugs & NEW_DRUGS)
     assert ("drug-uncommon" in tags) == bool(drugs & UNCOMMON_DRUGS)
+    assert ("proposal" in tags) == bool(CLINICAL_PROPOSALS.get(script.id))
+    assert ("proposal-trap" in tags) == bool(script.not_proposed)
     if "self-correction" in tags:
         assert CORRECTION.search(display)
     if "negation" in tags:
@@ -269,6 +279,7 @@ def test_coverage_minimums():
     counts = Counter(tag for script in SCRIPTS for tag in script.tags)
     short = {tag: counts[tag] for tag, minimum in MINIMUMS.items() if counts[tag] < minimum}
     assert not short, f"below the minimum: {short}"
+    assert sum(1 for script in SCRIPTS if script.proposals) >= RULE_FOLLOWING_PROPOSAL_SCRIPTS
     voices = Counter(script.voice for script in SCRIPTS)
     assert set(voices) == set(VOICES["voices"]), "every voice is used"
     assert min(voices.values()) >= 3, voices
@@ -291,7 +302,39 @@ def test_voices_and_noise_are_described():
     assert re.fullmatch(r"[0-9a-f]{40}", model["revision"]) and re.fullmatch(r"[0-9a-f]{64}", model["sha256"])
 
 
-def test_variants_add_up_to_about_eighty_items():
+@pytest.mark.parametrize("script", SCRIPTS, ids=ids(SCRIPTS))
+def test_what_should_and_shouldnt_be_proposed_is_in_the_display_text_and_never_in_gold(script):
+    """Each gold proposal is one of the forbidden passages, with the item it names in it; what mustn't be proposed is in
+    the display text; and no gold value has a proposal's words (the step 15 gold: the gate's listed proposals)."""
+    display = script.display.lower()
+    for proposal in script.proposals:
+        assert proposal.words.lower() in display and proposal.item.lower() in proposal.words.lower()
+        assert display.count(proposal.words.lower()) == 1, f"{proposal.words!r} is said more than once: where it was said is how it's scored"
+        for field, gold in golds(script):
+            assert proposal.words.lower() not in gold.value.lower(), f"{field} value has a proposal's words"
+    for row in script.not_proposed:
+        assert row.words.lower() in display, f"{row.words!r} isn't in the display text"
+
+
+def test_the_clinical_proposals_gold_holds_every_rule_following_one_and_its_others_are_held_back():
+    """Each clinical gold proposal is its script's, as a rule-following one would be: one of its forbidden passages,
+    said once, with the item it names in it. Every rule-following proposal is in it, and every other is one of the
+    script's [[not_proposed]], held back by a rule."""
+    scripts = {script.id: script for script in SCRIPTS}
+    assert set(CLINICAL_PROPOSALS) <= set(scripts)
+    for script_id, proposals in CLINICAL_PROPOSALS.items():
+        script = scripts[script_id]
+        display, forbidden = script.display.lower(), {item.lower() for item in script.forbidden}
+        for proposal in proposals:
+            assert proposal.kind in ds.PROPOSAL_KINDS and proposal.words.lower() in forbidden, (script_id, proposal)
+            assert proposal.item.lower() in proposal.words.lower() and display.count(proposal.words.lower()) == 1
+        held_back = {row.words.lower() for row in script.not_proposed if row.why != "not_an_instruction"}
+        assert set(script.proposals) <= set(proposals), script_id
+        assert all(p.words.lower() in held_back for p in proposals if p not in script.proposals), script_id
+    assert all(script.id in CLINICAL_PROPOSALS for script in SCRIPTS if script.proposals)
+
+
+def test_variants_add_up_to_about_a_hundred_items():
     variants = VOICES["variants"]
     by_id = {script.id: script for script in SCRIPTS}
     assert len(variants["unusable"]) == 4
@@ -299,7 +342,7 @@ def test_variants_add_up_to_about_eighty_items():
         assert by_id[script_id].noise, f"{script_id} is in unusable but lists no noise"
     noisy = sum(len(script.noise) * len(variants["snr_db"]) for script in SCRIPTS)
     total = len(SCRIPTS) + noisy + len(variants["unusable"])
-    assert 75 <= total <= 90, total
+    assert 90 <= total <= 105, total
 
 
 # ---- Rendering -----------------------------------------------------------------------------------------------------

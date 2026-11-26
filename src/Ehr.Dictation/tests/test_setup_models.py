@@ -59,6 +59,35 @@ MEDASR = {
 }
 
 
+WHISPER = {
+    "sha": setup_models.WHISPER_REVISION,
+    "license": "mit",
+    "files": {
+        ".gitattributes": (b"*.safetensors filter=lfs", False),
+        "config.json": (b'{"model_type": "whisper"}', False),
+        "model.safetensors": (b"whisper weights" * 300, True),
+        "tokenizer.json": (b'{"vocab": {}}', False),
+        "README.md": (b"license: mit", False),
+    },
+}
+
+
+SPEAKER_WEIGHTS = b"ecapa" * 400
+SPEAKER = {
+    "sha": setup_models.SPEAKER_COMMIT,
+    "license": "apache-2.0",
+    "files": {
+        ".gitattributes": (b"*.ckpt filter=lfs", False),
+        "README.md": (b"ECAPA model card", False),
+        "hyperparams.yaml": (b"n_mels: 80", False),
+        "embedding_model.ckpt": (SPEAKER_WEIGHTS, True),
+        "classifier.ckpt": (b"classifier" * 50, True),
+        "label_encoder.txt": (b"id10001", False),
+        "example1.wav": (b"RIFF", False),
+    },
+}
+
+
 class FakeHub:
     def __init__(self, repos, token="hf_test", gated=()):
         self.repos = repos
@@ -80,7 +109,8 @@ class FakeHub:
             )
             for filename, (data, lfs) in repo["files"].items()
         ]
-        return SimpleNamespace(sha=repo["sha"], siblings=siblings)
+        return SimpleNamespace(sha=repo["sha"], siblings=siblings, gated=repo.get("gated", name in self.gated),
+                               card_data=SimpleNamespace(license=repo.get("license")))
 
     def download(self, repo_id, filename, revision=None, local_dir=None):
         assert revision == self.repos[repo_id]["sha"], "downloads use the resolved commit"
@@ -99,7 +129,11 @@ class FakeHub:
 
 @pytest.fixture
 def hub(monkeypatch):
-    fake = FakeHub({"IFM/K2-Horizon-7B-GGUF": gguf_repo(), "google/medasr": MEDASR})
+    fake = FakeHub({"IFM/K2-Horizon-7B-GGUF": gguf_repo(), "google/medasr": MEDASR,
+                    "openai/whisper-large-v3-turbo": WHISPER, setup_models.SPEAKER_REPO: dict(SPEAKER)})
+    # The fake's speaker weights stand in for the pinned file: the pin is what the fake Hub publishes.
+    monkeypatch.setattr(setup_models, "SPEAKER_WEIGHTS_SIZE", len(SPEAKER_WEIGHTS))
+    monkeypatch.setattr(setup_models, "SPEAKER_WEIGHTS_SHA256", hashlib.sha256(SPEAKER_WEIGHTS).hexdigest())
     monkeypatch.setattr(setup_models, "HfApi", lambda: fake)
     monkeypatch.setattr(setup_models, "hf_hub_download", fake.download)
     monkeypatch.setattr(setup_models, "get_token", lambda: fake.token)
@@ -186,6 +220,19 @@ def test_an_identical_copy_is_reused_instead_of_downloaded(hub, models, tmp_path
     assert not [f for _, f in hub.downloads if f.endswith(".gguf")]
 
 
+# --from-file is for the K2 Horizon file: with a model that isn't one, it is refused before anything is read or
+# downloaded, Whisper (step 17) as MedASR and the speaker model are.
+@pytest.mark.parametrize("only", ["medasr", "speaker", "whisper"])
+def test_from_file_with_a_model_it_isnt_for_is_refused(hub, models, tmp_path, capsys, only):
+    existing = tmp_path / f"IFM_K2-Horizon-7B-GGUF_{Q4}"
+    existing.write_bytes(Q4_BYTES)
+
+    assert run(models, "--only", only, "--from-file", str(existing)) == 1
+
+    assert f"it can't be used with --only {only}" in capsys.readouterr().err
+    assert not hub.downloads and not (models / "models-manifest.json").exists()
+
+
 def test_a_different_copy_is_refused(hub, models, tmp_path, capsys):
     other = tmp_path / "community-Q4_K_M.gguf"
     other.write_bytes(b"Z" * len(Q4_BYTES))
@@ -261,3 +308,131 @@ def test_a_folder_git_would_track_is_refused(hub, tmp_path, monkeypatch, capsys)
     assert run(repo / "infra" / "compose" / "models", "--only", "llm") == 0
     assert run(repo / "weights", "--only", "llm") == 1
     assert "isn't gitignored" in capsys.readouterr().err
+
+
+# Step 17: Whisper, for dictation in Spanish, only when asked; at the pinned commit, with no sign-in, recorded as
+# MedASR is, beside the others, and re-checked by --verify.
+# Hugging Face says gated is False (the fake hub's default for a repository it isn't told is gated): accepted.
+def test_whisper_is_set_up_only_when_asked_at_the_pinned_commit_without_a_sign_in(hub, models):
+    assert run(models) == 0
+    assert "whisper" not in manifest(models)
+    hub.token = None
+    assert run(models, "--only", "whisper") == 0
+    recorded = manifest(models)
+    assert {"llm", "medasr", "whisper"} <= set(recorded)
+    assert recorded["whisper"]["commit"] == setup_models.WHISPER_REVISION
+    assert recorded["whisper"]["directory"] == "whisper"
+    assert {f["path"] for f in recorded["whisper"]["files"]} == {"config.json", "model.safetensors", "tokenizer.json", "README.md"}
+    weights = next(f for f in recorded["whisper"]["files"] if f["path"] == "model.safetensors")
+    assert weights["sha256"] == hashlib.sha256(WHISPER["files"]["model.safetensors"][0]).hexdigest()
+    assert (models / "whisper" / "model.safetensors").is_file()
+    assert run(models, "--verify") == 0
+
+
+@pytest.mark.parametrize("gated", [None, "auto", "manual"])
+def test_whisper_is_refused_unless_hugging_face_says_it_isnt_gated(hub, models, capsys, gated):
+    hub.repos["openai/whisper-large-v3-turbo"] = WHISPER | {"gated": gated}
+    assert run(models, "--only", "whisper") == 1
+    assert "is gated" in capsys.readouterr().err
+    assert not (models / "whisper").exists() and not (models / "models-manifest.json").exists()
+
+
+def test_whisper_at_another_commit_than_the_one_asked_is_refused(hub, models, capsys):
+    hub.repos["openai/whisper-large-v3-turbo"] = WHISPER | {"sha": "d" * 40}
+    assert run(models, "--only", "whisper") == 1
+    assert "another commit" in capsys.readouterr().err
+    assert not (models / "whisper").exists()
+
+
+# The pin is enforced: a branch or tag can move, and an abbreviated commit names no commit for certain, so only a full
+# commit is asked for. Nothing is read from the Hub, downloaded or recorded.
+PINNED = setup_models.WHISPER_REVISION
+
+
+@pytest.mark.parametrize("revision", ["main", "v1.0", PINNED[:12], PINNED.upper()])
+def test_whisper_at_anything_but_a_full_commit_is_refused(hub, models, capsys, revision):
+    hub.model_info = lambda *args, **kwargs: pytest.fail("the Hub was asked")
+
+    assert run(models, "--only", "whisper", "--whisper-revision", revision) == 1
+
+    assert "isn't a full commit" in capsys.readouterr().err
+    assert not hub.downloads and not (models / "whisper").exists() and not (models / "models-manifest.json").exists()
+
+
+# The licence is the card's, as the Hub reads its front matter: MIT, in any case, is accepted (the test above with the
+# fake hub's "mit"; here "MIT"); anything else, or a card that doesn't say, stops it before a byte is downloaded.
+@pytest.mark.parametrize(("license", "accepted"), [("MIT", True), ("apache-2.0", False), ("cc-by-nc-4.0", False),
+                                                   (None, False)])
+def test_whisper_is_set_up_only_while_its_card_says_mit(hub, models, capsys, license, accepted):
+    hub.repos["openai/whisper-large-v3-turbo"] = WHISPER | {"license": license}
+
+    assert run(models, "--only", "whisper") == (0 if accepted else 1)
+
+    if accepted:
+        assert manifest(models)["whisper"]["commit"] == setup_models.WHISPER_REVISION
+    else:
+        assert f"says its licence is {license!r}, not mit" in capsys.readouterr().err
+        assert not hub.downloads and not (models / "whisper").exists()
+
+
+# ---- The speaker model (the expansion plan's step 16) -----------------------------------------------------------------
+
+
+def test_sets_up_the_speaker_model_at_its_pinned_commit_and_records_it(hub, models, capsys):
+    assert run(models, "--only", "speaker") == 0
+
+    assert (models / "speaker" / "embedding_model.ckpt").read_bytes() == SPEAKER_WEIGHTS
+    assert (models / "notices" / "speechbrain__spkrec-ecapa-voxceleb" / "README.md").is_file()
+    assert sorted(f for r, f in hub.downloads if r == setup_models.SPEAKER_REPO) == [
+        "README.md", "embedding_model.ckpt", "hyperparams.yaml"], "the weights and hyperparameters, and the card"
+    recorded = manifest(models)["speaker"]
+    assert (recorded["repository"], recorded["commit"], recorded["license"], recorded["file"]) == (
+        "speechbrain/spkrec-ecapa-voxceleb", "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286", "apache-2.0",
+        "embedding_model.ckpt")
+    assert {f["path"]: f["sha256"] for f in recorded["files"]}["embedding_model.ckpt"] == (
+        hashlib.sha256(SPEAKER_WEIGHTS).hexdigest())
+    assert "listen to a visit" in capsys.readouterr().out
+
+
+def test_the_pin_is_the_file_chosen_for_the_plan():
+    assert setup_models.SPEAKER_COMMIT == "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286"
+    assert setup_models.SPEAKER_WEIGHTS_SIZE == 83_316_686
+    assert setup_models.SPEAKER_WEIGHTS_SHA256 == "0575cb64845e6b9a10db9bcb74d5ac32b326b8dc90352671d345e2ee3d0126a2"
+
+
+def test_the_speaker_model_needs_no_sign_in(hub, models):
+    hub.token = None
+    assert run(models, "--only", "speaker") == 0
+
+
+@pytest.mark.parametrize(("change", "message"), [
+    ({"gated": "auto"}, "asks for terms or an account"),
+    ({"gated": None}, "didn't say whether"),
+    ({"license": "cc-by-4.0"}, "not apache-2.0"),
+    ({"license": None}, "not apache-2.0"),
+    ({"files": SPEAKER["files"] | {"embedding_model.ckpt": (b"retrained" * 400, True)}}, "isn't the file pinned here"),
+    ({"sha": "f" * 40}, "with another commit, ffffffffffff"),  # read_repository()'s check, for every pinned model
+])
+def test_a_speaker_model_that_changed_since_it_was_chosen_is_refused_before_any_download(hub, models, capsys, change,
+                                                                                         message):
+    hub.repos[setup_models.SPEAKER_REPO] = SPEAKER | change
+
+    assert run(models, "--only", "speaker") == 1
+    assert message in capsys.readouterr().err
+    assert hub.downloads == [] and not (models / "models-manifest.json").exists()
+
+
+def test_a_speaker_model_gated_at_download_says_to_ask_the_owner(hub, models, capsys):
+    hub.gated.add(setup_models.SPEAKER_REPO)
+
+    assert run(models, "--only", "speaker") == 1
+    err = capsys.readouterr().err
+    assert "ask the project owner" in err and "Accept its terms" not in err
+
+
+def test_verify_checks_the_speaker_model_too(hub, models, capsys):
+    assert run(models) == 0
+    (models / "speaker" / "embedding_model.ckpt").write_bytes(b"X" + SPEAKER_WEIGHTS[1:])
+
+    assert run(models, "--verify") == 1
+    assert "embedding_model.ckpt: CHANGED" in capsys.readouterr().out

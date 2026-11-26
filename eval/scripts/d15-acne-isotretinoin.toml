@@ -1,7 +1,7 @@
 # Dictation test script (synthetic): nodular acne on isotretinoin, with a prescription renewal to leave out. Format: eval/README.md.
 id = "d15-acne-isotretinoin"
 voice = "bf_emma"
-tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation"]
+tags = ["dates", "numbers", "drug-uncommon", "negation", "order-attempt", "mixed-plan", "spoken-punctuation", "proposal", "proposal-trap"]
 dates = ["--08-18", "--12-15"]
 drugs = ["isotretinoin"]
 forbidden = ["renew her isotretinoin prescription"]
@@ -24,15 +24,21 @@ nose {period} Monthly pregnancy tests to continue {period} Review on [[December 
 {period}
 """
 
-[gold.history]
-value = "19-year-old woman with nodular acne on her face and back, in month 3 of isotretinoin. Started on August 18 at 20 mg daily, went up to 40 mg daily in September. Skin clearly better, only a few new spots. Dry lips and some nosebleeds in the mornings. No headaches, no visual change, no joint pain, no low mood. Two forms of contraception, the implant and condoms; pregnancy test today negative. A few small papules on the chin, healing scars on the back, cheilitis. Fasting triglycerides last month 1.9; liver tests normal."
+[gold.subjective]
+value = "19-year-old woman with nodular acne on her face and back, in month 3 of isotretinoin. Started on August 18 at 20 mg daily, went up to 40 mg daily in September. Skin clearly better, only a few new spots. Dry lips and some nosebleeds in the mornings. No headaches, no visual change, no joint pain, no low mood. Two forms of contraception, the implant and condoms."
 sources = [
     "19-year-old woman with nodular acne on her face and back, now in month 3 of isotretinoin.",
     "She started on August 18 at 20 mg daily and went up to 40 mg daily in September.",
     "Her skin is clearly better with only a few new spots.",
     "She has dry lips and some nosebleeds in the mornings.",
     "No headaches, no visual change, no joint pain and no low mood.",
-    "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative.",
+    "She uses two forms of contraception, the implant and condoms",
+]
+
+[gold.objective]
+value = "Pregnancy test today negative. A few small papules on the chin, healing scars on the back, cheilitis. Fasting triglycerides last month 1.9; liver tests normal."
+sources = [
+    "her pregnancy test today is negative.",
     "On examination there are a few small papules on the chin and healing scars on the back, with cheilitis.",
     "Her fasting triglycerides last month were 1.9 and liver tests were normal.",
 ]
@@ -50,15 +56,25 @@ sources = [
     "Review on December 15.",
 ]
 
-[gold_rules.history]
-value = "19-year-old woman with nodular acne on her face and back, now in month 3 of isotretinoin. She started on August 18 at 20 mg daily and went up to 40 mg daily in September. Her skin is clearly better with only a few new spots. She has dry lips and some nosebleeds in the mornings. No headaches, no visual change, no joint pain and no low mood. She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative. On examination there are a few small papules on the chin and healing scars on the back, with cheilitis. Her fasting triglycerides last month were 1.9 and liver tests were normal."
+[gold_rules.subjective]
+value = "19-year-old woman with nodular acne on her face and back, now in month 3 of isotretinoin. She started on August 18 at 20 mg daily and went up to 40 mg daily in September. Her skin is clearly better with only a few new spots. She has dry lips and some nosebleeds in the mornings. No headaches, no visual change, no joint pain and no low mood. She uses two forms of contraception, the implant and condoms."
 sources = [
     "19-year-old woman with nodular acne on her face and back, now in month 3 of isotretinoin.",
     "She started on August 18 at 20 mg daily and went up to 40 mg daily in September.",
     "Her skin is clearly better with only a few new spots.",
     "She has dry lips and some nosebleeds in the mornings.",
     "No headaches, no visual change, no joint pain and no low mood.",
-    "She uses two forms of contraception, the implant and condoms, and her pregnancy test today is negative.",
+    "She uses two forms of contraception, the implant and condoms",
+]
+
+[gold_rules.objective]
+value = "Her pregnancy test today is negative. On examination there are a few small papules on the chin and healing scars on the back, with cheilitis. Her fasting triglycerides last month were 1.9 and liver tests were normal."
+sources = [
+    "her pregnancy test today is negative.",
     "On examination there are a few small papules on the chin and healing scars on the back, with cheilitis.",
     "Her fasting triglycerides last month were 1.9 and liver tests were normal.",
 ]
+
+[[not_proposed]]
+words = "renew her isotretinoin prescription"
+why = "not_plain"

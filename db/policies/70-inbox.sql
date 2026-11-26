@@ -28,6 +28,13 @@ BEGIN
         RAISE EXCEPTION 'A refill request is done by answering it, not marked done' USING ERRCODE = '23514';
     END IF;
 
+    -- An emergency access is done by reviewing it (step 18, 72-emergency-access-review.sql), which marks every
+    -- administrator's item done as the tables' owner: ticked off without a review, it would never be reviewed. An item
+    -- of the kind with no access behind it is marked done here as any other.
+    IF OLD.kind = 'emergency-access-review' AND OLD.source_table = 'break_glass_accesses' AND current_user IN ('ehr_app', 'ehr_read') THEN
+        RAISE EXCEPTION 'An emergency access is done by reviewing it, not marked done' USING ERRCODE = '23514';
+    END IF;
+
     IF (to_jsonb(NEW) - 'done_at') IS DISTINCT FROM (to_jsonb(OLD) - 'done_at') THEN
         RAISE EXCEPTION 'An inbox item is never edited' USING ERRCODE = '42501';
     END IF;

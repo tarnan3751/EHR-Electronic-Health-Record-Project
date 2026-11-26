@@ -14,6 +14,7 @@ using Ehr.Domain.Proxies;
 using Ehr.Domain.Refills;
 using Ehr.Domain.Results;
 using Ehr.Domain.Scheduling;
+using Ehr.Domain.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ehr.Domain.Phi;
@@ -27,6 +28,9 @@ namespace Ehr.Domain.Phi;
 public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, UserContext user)
 {
     public const string PatientsTable = "patients";
+
+    // The reads one page makes through several of these calls, recorded together in one statement (AuditRecorder).
+    public Task<T> TogetherAsync<T>(Func<Task<T>> reads, CancellationToken cancellationToken) => audit.TogetherAsync(reads, cancellationToken);
 
     public async Task<Patient?> PatientAsync(Guid id, string part, CancellationToken cancellationToken)
     {
@@ -250,7 +254,9 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     // The form for one entry of a chart list: the patient, their allergies for the banner and, when changing an entry,
     // that entry, which must be this patient's. One recorded read of the patient: of sensitive items, when the entry
     // is sensitive, since the form shows it.
-    public async Task<ChartEntryForm?> ChartEntryAsync(Guid id, string? table, Guid? entry, CancellationToken cancellationToken)
+    // Step 15: `proposal` is an allergy to add that the clinician's dictation proposed: it comes back with the form when it
+    // is this patient's and theirs, its read recorded too.
+    public async Task<ChartEntryForm?> ChartEntryAsync(Guid id, string? table, Guid? entry, CancellationToken cancellationToken, Guid? proposal = null)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (patient is null)
@@ -268,6 +274,11 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
                 "conditions" => form with { Condition = await db.Conditions.AsNoTracking().SingleOrDefaultAsync(c => c.Id == entry && c.PatientId == id, cancellationToken) },
                 _ => form,
             };
+        }
+
+        if (proposal is { } proposed)
+        {
+            form = form with { Proposal = await ReadProposalAsync(id, proposed, AiChartProposalKinds.AllergyAddition, cancellationToken) };
         }
 
         var showsSensitive = form.Medication?.Sensitive == true || form.Condition?.Sensitive == true;
@@ -324,7 +335,10 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
     // order being replaced: it comes back when it is an active order of this patient, and isn't counted as a duplicate.
     // Step 13d: `refill` is a refill request the order approves; it comes back when it is this patient's, with whether the
     // chosen item renews its medication, and showing it is a view of sensitive items when the request is sensitive.
-    public async Task<OrderForm?> OrderFormAsync(Guid id, string? catalogCode, Guid? replaces, CancellationToken cancellationToken, Guid? refill = null)
+    // Step 15: `proposal` is an order the clinician's dictation proposed: it comes back when it is this patient's and
+    // theirs, its read recorded too.
+    public async Task<OrderForm?> OrderFormAsync(Guid id, string? catalogCode, Guid? replaces, CancellationToken cancellationToken, Guid? refill = null,
+        Guid? proposal = null)
     {
         var patient = await db.Patients.AsNoTracking().SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
         if (patient is null)
@@ -342,12 +356,13 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         var request = refill is { } asked ? await ReadRefillAsync(patient, allergies, asked, cancellationToken) : null;
         // The product that was asked for, which the chart's entry must still have (77-refill-requests.sql).
         var renews = request is not null && catalogCode is not null && catalogCode == request.AskedCode && catalogCode == request.Medication.Code;
+        var proposed = proposal is { } dictated ? await ReadProposalAsync(id, dictated, AiChartProposalKinds.Order, cancellationToken) : null;
 
         // The order form for a refill request (step 13d) is part of answering it: the refill requests'.
         audit.Record(request?.Sensitive == true ? AuditActions.ReadSensitive : AuditActions.Read, patient.Id, PatientsTable, patient.Id,
             part: refill is null ? AuditParts.Orders : AuditParts.Refills);
         await db.SaveChangesAsync(cancellationToken);
-        return new OrderForm(patient, allergies, duplicates, replaced) { Warnings = warnings, Refill = request, RenewsRefill = renews };
+        return new OrderForm(patient, allergies, duplicates, replaced) { Warnings = warnings, Refill = request, RenewsRefill = renews, Proposal = proposed };
     }
 
     // UC 1: a patient's discontinued orders, newest first, each with who discontinued it, when and why, and the order
@@ -720,6 +735,42 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         await db.SaveChangesAsync(cancellationToken);
         return new PatientVitals(patient, allergies, signs);
     }
+
+    // The vital signs a note's Objective may be given (the expansion plan's step 14): every value that stands (none entered
+    // in error, step 9b) taken on the clinic's day of the patient's newest standing one, however many there are, so each
+    // sign taken that day is among them and a blood pressure's two values come together (Notes.ObjectiveVitals takes the
+    // newest of each). Two statements, each a range of the index on the patient and the time taken: the newest moment,
+    // then that day's bounds on the clinic's clock (a day the clocks change on is 23 or 25 hours). A value marked in error
+    // between the two can leave that day with none standing: then both are asked once more, so the offer is the latest
+    // day that still has one, not none. Read only when the clinician asks, for their own draft of the patient, and
+    // recorded once as the vital signs page's read is, with its part.
+    public async Task<IReadOnlyList<Observation>> ObjectiveVitalsAsync(Guid patientId, ClinicTime clinic, CancellationToken cancellationToken)
+    {
+        var standing = db.Observations.AsNoTracking()
+            .Where(o => o.PatientId == patientId && o.Category == ObservationCategory.VitalSigns && o.Value != null && ObservationStatus.Released.Contains(o.Status));
+        IReadOnlyList<Observation> signs = [];
+        for (var asked = 0; asked < 2 && signs.Count == 0; asked++)
+        {
+            var newest = await standing.OrderByDescending(o => o.EffectiveAt).Select(o => (DateTimeOffset?)o.EffectiveAt).FirstOrDefaultAsync(cancellationToken);
+            if (newest is not { } moment)
+            {
+                break;
+            }
+
+            var (from, to) = clinic.DayBounds(DateOnly.FromDateTime(clinic.At(moment).DateTime));
+            signs = await standing.Where(o => o.EffectiveAt >= from && o.EffectiveAt < to).ToListAsync(cancellationToken);
+        }
+
+        audit.Record(AuditActions.Read, patientId, PatientsTable, patientId, part: AuditParts.Vitals);
+        await db.SaveChangesAsync(cancellationToken);
+        return signs;
+    }
+
+    // Whether a draft is the reader's own, unsigned, and for this patient (row-level security adds: with the patient on
+    // their panel). A yes or no, with nothing of the draft, so nothing is recorded here: what follows records its own read.
+    public Task<bool> OwnsUnsignedDraftAsync(Guid draft, Guid patient, CancellationToken cancel) =>
+        db.ClinicalDrafts.AnyAsync(d => d.Id == draft && d.PatientId == patient && d.ClinicianId == user.UserId
+            && !db.ClinicalNotes.Any(n => n.DraftId == d.Id), cancel);
 
     // Proxy access (FR-19).
 
@@ -1218,6 +1269,62 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         return review;
     }
 
+    // Ambient listening (step 16). Whether the signed-in clinician is listening to a visit under this session, with its
+    // consent recorded and the review neither staged nor ended: the check every chunk of audio passes before it goes to
+    // the dictation service. How many people its consent said would speak, or null when it isn't. Like IsAssignedAsync,
+    // it shows nothing of the record, so it records no read: the count only holds the voices named to it.
+    public Task<short?> AmbientCaptureAsync(string sessionId, CancellationToken cancel) =>
+        (from r in db.AiNoteReviews
+         join c in db.AmbientConsents on r.ConsentId equals (Guid?)c.Id
+         where r.SessionId == sessionId && r.ClinicianId == user.UserId && r.Mode == AiReviewModes.Ambient
+             && r.State == AiReviewStates.Recording
+         select (short?)c.Speakers).FirstOrDefaultAsync(cancel);
+
+    // Whether a review's conversation is still kept (only while the review is open, and for at most 7 days): what decides
+    // where its proposals may be decided and how. Shows nothing of the transcript, which the cloud app can't read, so it
+    // records no read.
+    public Task<bool> AmbientTranscriptKeptAsync(Guid review, CancellationToken cancel) =>
+        db.AmbientTranscripts.Where(t => t.Id == review).Select(t => t.Id).AnyAsync(cancel);
+
+    // A review and, when it is a visit's whose transcript is still kept, that transcript, in one query: the review page at
+    // the clinic (step 16), one round trip fewer than reading them apart. Each a recorded read of the note being written,
+    // as AiReviewAsync and AmbientTranscriptAsync record them.
+    public async Task<(AiNoteReview? Review, AmbientTranscript? Transcript)> AiReviewWithTranscriptAsync(Guid id, CancellationToken cancel)
+    {
+        var row = await (
+            from review in db.AiNoteReviews.AsNoTracking()
+            where review.Id == id && review.ClinicianId == user.UserId
+            join kept in db.AmbientTranscripts.AsNoTracking() on review.Id equals kept.Id into transcripts
+            from transcript in transcripts.DefaultIfEmpty()
+            select new { review, transcript }).SingleOrDefaultAsync(cancel);
+        if (row is null)
+        {
+            return (null, null);
+        }
+
+        audit.Record(AuditActions.Read, row.review.PatientId, "ai_note_reviews", row.review.Id, part: AuditParts.NoteDraft);
+        if (row.transcript is { } read)
+        {
+            audit.Record(AuditActions.Read, read.PatientId, "ambient_transcripts", read.Id, part: AuditParts.NoteDraft);
+        }
+
+        await db.SaveChangesAsync(cancel);
+        return (row.review, row.transcript);
+    }
+
+    // The conversation's transcript, for the review screen: a recorded read of the note being written.
+    public async Task<AmbientTranscript?> AmbientTranscriptAsync(Guid review, CancellationToken cancel)
+    {
+        var transcript = await db.AmbientTranscripts.AsNoTracking().SingleOrDefaultAsync(t => t.Id == review, cancel);
+        if (transcript is not null)
+        {
+            audit.Record(AuditActions.Read, transcript.PatientId, "ambient_transcripts", transcript.Id, part: AuditParts.NoteDraft);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return transcript;
+    }
+
     public async Task<IReadOnlyList<AiNoteReview>> AiReviewsAsync(Guid draft, string part, CancellationToken cancel)
     {
         var reviews = await db.AiNoteReviews.AsNoTracking().Where(r => r.DraftId == draft && r.ClinicianId == user.UserId)
@@ -1242,6 +1349,61 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         }
 
         return proposals;
+    }
+
+    // The orders and allergies to add a dictation proposes (the expansion plan's step 15), in its result's order: the
+    // review's own clinician's alone, as row-level security has it. Each a recorded read, with the part of the page.
+    public async Task<IReadOnlyList<AiChartProposal>> ChartProposalsAsync(Guid review, string part, CancellationToken cancel, bool tracking = false)
+    {
+        var query = tracking ? db.AiChartProposals.AsQueryable() : db.AiChartProposals.AsNoTracking();
+        var proposals = await query.Where(p => p.ReviewId == review).OrderBy(p => p.Ordinal).ToListAsync(cancel);
+        if (proposals.Count > 0)
+        {
+            await audit.RecordReadsAsync("ai_chart_proposals", part, proposals.Select(p => (p.PatientId, p.Id)), cancel);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return proposals;
+    }
+
+    // Of those reviews' proposals, the ones still waiting for their clinician's decision, for the note to say so: recorded
+    // as read, with the part of the page. No statement when there are no reviews, as for a note written by hand.
+    public async Task<IReadOnlyList<AiChartProposal>> WaitingChartProposalsAsync(IReadOnlyCollection<Guid> reviews, string part, CancellationToken cancel)
+    {
+        if (reviews.Count == 0)
+        {
+            return [];
+        }
+
+        var waiting = await db.AiChartProposals.AsNoTracking()
+            .Where(p => reviews.Contains(p.ReviewId) && p.State == AiChartProposalStates.Pending)
+            .OrderBy(p => p.ReviewId).ThenBy(p => p.Ordinal).ToListAsync(cancel);
+        if (waiting.Count > 0)
+        {
+            await audit.RecordReadsAsync("ai_chart_proposals", part, waiting.Select(p => (p.PatientId, p.Id)), cancel);
+            await db.SaveChangesAsync(cancel);
+        }
+
+        return waiting;
+    }
+
+    // One proposal of the patient's of the given kind, for the form opened from it (the expansion plan's step 15), with
+    // its review, whose stored result holds its words: both recorded as read, a note being written. Null when it isn't
+    // this patient's, of that kind, or the reader's own.
+    async Task<DictatedProposal?> ReadProposalAsync(Guid patient, Guid proposalId, string kind, CancellationToken cancel)
+    {
+        var row = await (
+            from proposal in db.AiChartProposals.AsNoTracking()
+            join review in db.AiNoteReviews.AsNoTracking() on proposal.ReviewId equals review.Id
+            where proposal.Id == proposalId && proposal.PatientId == patient && proposal.Kind == kind && review.ClinicianId == user.UserId
+            select new DictatedProposal(proposal, review)).SingleOrDefaultAsync(cancel);
+        if (row is not null)
+        {
+            audit.Record(AuditActions.Read, patient, "ai_chart_proposals", row.Proposal.Id, part: AuditParts.NoteDraft);
+            audit.Record(AuditActions.Read, patient, "ai_note_reviews", row.Review.Id, part: AuditParts.NoteDraft);
+        }
+
+        return row;
     }
 
     // The FHIR API (the expansion plan's step 11). Each read of entries below is one view of one patient, so one recorded

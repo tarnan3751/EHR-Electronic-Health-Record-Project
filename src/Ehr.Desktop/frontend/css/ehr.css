@@ -578,6 +578,16 @@
         padding: 0 var(--space-3);
     }
 
+    /* A button whose words can be longer than a phone is wide wraps them, instead of running past the window's edge: a
+       recorded visit's "Reject every proposal and delete the conversation" (step 16). */
+    .sc-btn--wraps {
+        height: auto;
+        min-height: var(--control-height);
+        padding-block: var(--space-1);
+        white-space: normal;
+        text-align: center;
+    }
+
     .sc-btn--portal,
     .sc-app--portal .sc-btn {
         height: var(--control-height-portal);
@@ -1287,6 +1297,54 @@
         border-radius: var(--radius-lg);
     }
 
+    /* Dialog: a native <dialog> opened modally, such as the warning before a session ends (step 18). It floats, so it
+       has the dialog's radius and shadow (docs/brand: Shape), on the raised surface, at most a form's width, with its
+       buttons in a row that wraps. No motion. */
+    .sc-dialog {
+        width: min(var(--width-form), calc(100vw - 2 * var(--space-4)));
+        padding: var(--space-6);
+        color: var(--ink);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-dialog);
+    }
+
+    .sc-dialog::backdrop {
+        background: color-mix(in srgb, var(--brand-navy) 55%, transparent);
+    }
+
+    .sc-dialog__title {
+        margin: 0 0 var(--space-3);
+        font-size: 20px;
+        line-height: 28px;
+    }
+
+    .sc-dialog p {
+        margin: 0 0 var(--space-3);
+    }
+
+    .sc-dialog__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        align-items: center;
+        margin-top: var(--space-4);
+    }
+
+    .sc-dialog__actions form {
+        margin: 0;
+    }
+
+    /* What takes a page's place when its session has ended (step 18): the notice, and the sign-in in a frame below it,
+       borderless, as tall as the sign-in's steps need. */
+    .sc-signed-out__frame {
+        display: block;
+        width: 100%;
+        height: 40rem;
+        border: 0;
+    }
+
     /* A plain list of record lines, one per row. A word too long for the line, such as an email address on a phone,
        wraps inside it. */
     .sc-list {
@@ -1530,6 +1588,12 @@
         font-weight: 600;
     }
 
+    /* A warning the status line carries, such as listening about to stop: said once, as every message is. */
+    .sc-status--warning {
+        color: var(--warning);
+        font-weight: 600;
+    }
+
     .sc-status[data-state="recording"] {
         color: var(--ink);
     }
@@ -1541,6 +1605,22 @@
         height: 8px;
         border-radius: var(--radius-full);
         background: var(--danger);
+    }
+
+    /* Time left: how much of a dictation's limit is left, after its controls while recording. The minutes and seconds
+       in mono-id, so the digits hold still as they count down, then "left" in body-sm. Not a live region. */
+    .sc-timeleft {
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
+        white-space: nowrap;
+    }
+
+    .sc-timeleft__value {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--ink);
     }
 
     /* Transcript: the panel a dictation's words appear in. */
@@ -1606,6 +1686,17 @@
         margin: 0;
     }
 
+    /* A recorded visit's transcript (step 16): a paragraph a turn, led by who said it, in words. */
+    .sc-transcript__body > .sc-transcript__turn + .sc-transcript__turn {
+        margin-top: var(--space-2);
+    }
+
+    .sc-transcript__speaker {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink-muted);
+    }
+
     .sc-transcript__tentative {
         color: var(--ink-muted);
         font-style: italic;
@@ -1654,6 +1745,16 @@
         max-width: var(--width-reading);
     }
 
+    /* The orders and allergies a dictation proposes, as a list of the same rows: no numbers, and no gap between them. */
+    ol.sc-proposals {
+        list-style: none;
+        padding: 0;
+    }
+
+    ol.sc-proposals > li + li {
+        margin-top: 0;
+    }
+
     .sc-proposal dd {
         margin: 0;
     }
@@ -1699,6 +1800,22 @@
         font-weight: 600;
     }
 
+    /* In the notice on a form opened from a proposal, its words and warnings keep the notice's paragraph gap. */
+    .sc-notice > .sc-proposal__value,
+    .sc-notice > .sc-proposal__warning {
+        margin: 0 0 var(--space-4);
+    }
+
+    /* An order or allergy proposed: its quiet button sits on its text, so when it wraps under the other it lines up with
+       that one's edge. */
+    .sc-proposal > .sc-actions {
+        column-gap: var(--space-4);
+    }
+
+    .sc-proposal > .sc-actions .sc-btn--quiet {
+        padding-inline: 0;
+    }
+
     /* The decision's buttons, and under them the way to correct the text first. */
     .sc-proposal .sc-proposal__controls {
         margin-top: var(--space-3);
@@ -1728,6 +1845,64 @@
 
     .sc-proposal[data-review-state="rejected"] {
         box-shadow: inset 2px 0 0 var(--line-strong);
+    }
+
+    /* Translated sentences: a field proposed from a dictation in Spanish, each English sentence beside the Spanish it was
+       translated from, side by side where both fit and the Spanish under the English where they don't. Hovering or
+       focusing a sentence highlights its Spanish in the transcript and tints the pair. */
+    .sc-translation {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .sc-translation__pair {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+        gap: var(--space-1) var(--space-4);
+        padding: var(--space-2) 0;
+        border-radius: var(--radius-xs);
+    }
+
+    .sc-translation__pair + .sc-translation__pair {
+        border-top: 1px solid var(--line);
+    }
+
+    .sc-translation__pair:hover,
+    .sc-translation__pair:focus {
+        background: var(--highlight-source);
+    }
+
+    /* On the tint the Spanish and the line over the pair are ink, which keeps their contrast there (tokens.json:
+       highlight-source). */
+    .sc-translation__pair:hover .sc-translation__spanish,
+    .sc-translation__pair:focus .sc-translation__spanish,
+    .sc-translation__pair:hover .sc-translation__check,
+    .sc-translation__pair:focus .sc-translation__check {
+        color: var(--ink);
+    }
+
+    .sc-translation__english,
+    .sc-translation__spanish,
+    .sc-translation__check {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Over every pair, across both columns, warning or not: "Translated from Spanish: check it against the Spanish
+       beside it", so no sentence reads as checked for having no warning. */
+    .sc-translation__check {
+        grid-column: 1 / -1;
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--info);
+    }
+
+    .sc-translation__spanish {
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
     }
 
     /* Two versions side by side, such as "Theirs (saved)" and "Mine (not saved)". Never merged silently. */

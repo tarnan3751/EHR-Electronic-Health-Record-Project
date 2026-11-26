@@ -61,9 +61,11 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain($"/patients/{patient}", await session.Client.GetStringAsync("/patients", Cancel));
 
         // The panel listing was a read of the patient, like the chart views; the emergency access, the assignment and
-        // its end are writes.
+        // its end are writes. (So, since step 18, is each administrator's inbox item to review the access, which
+        // TC-UC12-04 counts.)
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient) >= 6);
-        Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.Insert, actorId: clinician.Id, patientId: patient));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Insert, actorId: clinician.Id, patientId: patient, table: "break_glass_accesses"));
+        Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Insert, actorId: clinician.Id, patientId: patient, table: "patient_assignments"));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Update, actorId: clinician.Id, patientId: patient));
     }
 

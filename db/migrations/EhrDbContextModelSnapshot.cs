@@ -495,12 +495,57 @@ namespace Ehr.Migrations
                     b.HasIndex("ActorId", "OccurredAt")
                         .HasDatabaseName("ix_audit_events_actor_id_occurred_at");
 
+                    b.HasIndex("OccurredAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_audit_events_break_glass")
+                        .HasFilter("action = 'break_glass'");
+
                     b.HasIndex("PatientId", "OccurredAt")
                         .HasDatabaseName("ix_audit_events_patient_id_occurred_at");
 
                     b.ToTable("audit_events", "ehr", t =>
                         {
                             t.HasCheckConstraint("ck_audit_events_part", "part IS NULL OR action IN ('read', 'read_sensitive', 'download', 'download_sensitive') AND part IN ('chart', 'lists', 'orders', 'results', 'vitals', 'search', 'panel', 'schedule', 'inbox', 'appointments', 'home', 'conversations', 'access', 'visit-note', 'note-draft', 'offline', 'fhir', 'summaries', 'printable', 'download', 'views', 'refills', 'forms')");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Audit.EmergencyAccessReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid>("ReviewerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_emergency_access_reviews");
+
+                    b.HasIndex("ReviewerId")
+                        .HasDatabaseName("ix_emergency_access_reviews_reviewer_id");
+
+                    b.ToTable("emergency_access_reviews", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_emergency_access_reviews_note", "char_length(note) BETWEEN 10 AND 500");
+
+                            t.HasCheckConstraint("ck_emergency_access_reviews_outcome", "outcome IN ('appropriate', 'not-appropriate')");
                         });
                 });
 
@@ -1395,6 +1440,89 @@ namespace Ehr.Migrations
                     b.ToTable("result_acknowledgments", "ehr");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.AiChartProposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AllergyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("allergy_id");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<short>("Ordinal")
+                        .HasColumnType("smallint")
+                        .HasColumnName("ordinal");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("review_id");
+
+                    b.Property<string>("State")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ai_chart_proposals");
+
+                    b.HasIndex("AllergyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_chart_proposals_allergy_id");
+
+                    b.HasIndex("DecidedBy")
+                        .HasDatabaseName("ix_ai_chart_proposals_decided_by");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_chart_proposals_order_id");
+
+                    b.HasIndex("ReviewId", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_chart_proposals_review_id_ordinal");
+
+                    b.HasIndex("ReviewId", "PatientId")
+                        .HasDatabaseName("ix_ai_chart_proposals_review_id_patient_id");
+
+                    b.ToTable("ai_chart_proposals", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_chart_proposals_decision", "(state = 'pending') = (decided_at IS NULL) AND (decided_at IS NULL) = (decided_by IS NULL) AND (state = 'ordered') = (order_id IS NOT NULL) AND (state = 'recorded') = (allergy_id IS NOT NULL) AND (order_id IS NULL OR kind = 'order') AND (allergy_id IS NULL OR kind = 'allergy_addition')");
+
+                            t.HasCheckConstraint("ck_ai_chart_proposals_kind", "kind IN ('order', 'allergy_addition')");
+
+                            t.HasCheckConstraint("ck_ai_chart_proposals_ordinal", "ordinal BETWEEN 0 AND 19");
+
+                            t.HasCheckConstraint("ck_ai_chart_proposals_state", "state IN ('pending', 'ordered', 'recorded', 'dismissed')");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1439,6 +1567,10 @@ namespace Ehr.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("reviewer_id");
 
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
                     b.Property<string>("State")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -1482,6 +1614,10 @@ namespace Ehr.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
 
+                    b.Property<Guid?>("ConsentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consent_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1504,6 +1640,14 @@ namespace Ehr.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("max_seconds");
 
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("dictation")
+                        .HasColumnName("mode");
+
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
@@ -1511,6 +1655,10 @@ namespace Ehr.Migrations
                     b.Property<string>("ResultJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("result_json");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
 
                     b.Property<string>("SessionId")
                         .IsRequired()
@@ -1538,6 +1686,10 @@ namespace Ehr.Migrations
                     b.HasIndex("ClinicianId")
                         .HasDatabaseName("ix_ai_note_reviews_clinician_id");
 
+                    b.HasIndex("ConsentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ai_note_reviews_consent_id");
+
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_ai_note_reviews_patient_id");
 
@@ -1545,10 +1697,20 @@ namespace Ehr.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_ai_note_reviews_session_id");
 
+                    b.HasIndex("ConsentId", "PatientId")
+                        .HasDatabaseName("ix_ai_note_reviews_consent_id_patient_id");
+
                     b.HasIndex("DraftId", "State")
                         .HasDatabaseName("ix_ai_note_reviews_draft_id_state");
 
-                    b.ToTable("ai_note_reviews", "ehr");
+                    b.ToTable("ai_note_reviews", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_note_reviews_consent", "(mode = 'ambient') = (consent_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_ai_note_reviews_mode", "mode IN ('dictation', 'ambient')");
+
+                            t.HasCheckConstraint("ck_ai_note_reviews_sensitive", "sensitive = (mode = 'ambient')");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AllergyIntolerance", b =>
@@ -1628,6 +1790,98 @@ namespace Ehr.Migrations
                             t.HasCheckConstraint("ck_allergy_intolerances_criticality", "criticality IN ('low', 'high', 'unable-to-assess')");
 
                             t.HasCheckConstraint("ck_allergy_intolerances_severity", "severity IN ('mild', 'moderate', 'severe')");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientConsent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClinicianId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("clinician_id")
+                        .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
+
+                    b.Property<DateTimeOffset>("ConfirmedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("GivenBy")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("given_by");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<short>("Speakers")
+                        .HasColumnType("smallint")
+                        .HasColumnName("speakers");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ambient_consents");
+
+                    b.HasAlternateKey("Id", "PatientId")
+                        .HasName("ak_ambient_consents_id_patient_id");
+
+                    b.HasIndex("ClinicianId")
+                        .HasDatabaseName("ix_ambient_consents_clinician_id");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("ix_ambient_consents_patient_id");
+
+                    b.ToTable("ambient_consents", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ambient_consents_given_by", "given_by IN ('patient', 'representative')");
+
+                            t.HasCheckConstraint("ck_ambient_consents_speakers", "speakers IN (2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientTranscript", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("patient_id");
+
+                    b.Property<bool>("Sensitive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sensitive");
+
+                    b.Property<string>("Transcript")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("transcript");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ambient_transcripts");
+
+                    b.HasIndex("Id", "PatientId")
+                        .HasDatabaseName("ix_ambient_transcripts_id_patient_id");
+
+                    b.ToTable("ambient_transcripts", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_ambient_transcripts_sensitive", "sensitive");
+
+                            t.HasCheckConstraint("ck_ambient_transcripts_transcript", "jsonb_typeof(transcript) = 'object' AND octet_length(transcript::text) <= 1048576");
                         });
                 });
 
@@ -1819,6 +2073,15 @@ namespace Ehr.Migrations
                         .HasColumnType("text")
                         .HasColumnName("history");
 
+                    b.Property<string>("NoteTemplateCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("note_template_code");
+
+                    b.Property<string>("Objective")
+                        .HasColumnType("text")
+                        .HasColumnName("objective");
+
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
                         .HasColumnName("patient_id");
@@ -1831,6 +2094,10 @@ namespace Ehr.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("structured_version");
 
+                    b.Property<string>("Subjective")
+                        .HasColumnType("text")
+                        .HasColumnName("subjective");
+
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint")
@@ -1842,10 +2109,16 @@ namespace Ehr.Migrations
                     b.HasIndex("ClinicianId")
                         .HasDatabaseName("ix_clinical_drafts_clinician_id");
 
+                    b.HasIndex("NoteTemplateCode")
+                        .HasDatabaseName("ix_clinical_drafts_note_template_code");
+
                     b.HasIndex("PatientId")
                         .HasDatabaseName("ix_clinical_drafts_patient_id");
 
-                    b.ToTable("clinical_drafts", "ehr");
+                    b.ToTable("clinical_drafts", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_clinical_drafts_sections", "history IS NULL OR (subjective IS NULL AND objective IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.ClinicalNote", b =>
@@ -1869,9 +2142,12 @@ namespace Ehr.Migrations
                         .HasColumnName("draft_version");
 
                     b.Property<string>("History")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("history");
+
+                    b.Property<string>("Objective")
+                        .HasColumnType("text")
+                        .HasColumnName("objective");
 
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uuid")
@@ -1911,6 +2187,10 @@ namespace Ehr.Migrations
                         .HasColumnName("signer_id")
                         .HasDefaultValueSql("NULLIF(current_setting('app.user_id', true), '')::uuid");
 
+                    b.Property<string>("Subjective")
+                        .HasColumnType("text")
+                        .HasColumnName("subjective");
+
                     b.HasKey("Id")
                         .HasName("pk_clinical_notes");
 
@@ -1930,7 +2210,10 @@ namespace Ehr.Migrations
                     b.HasIndex("PatientId", "SignedAt")
                         .HasDatabaseName("ix_clinical_notes_patient_id_signed_at");
 
-                    b.ToTable("clinical_notes", "ehr");
+                    b.ToTable("clinical_notes", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_clinical_notes_sections", "(history IS NULL AND subjective IS NOT NULL AND objective IS NOT NULL) OR (history IS NOT NULL AND subjective IS NULL AND objective IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.Condition", b =>
@@ -2991,6 +3274,76 @@ namespace Ehr.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Ehr.Data.Reference.NoteTemplate", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("AssessmentPrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("assessment_prompt");
+
+                    b.Property<string>("ObjectivePrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("objective_prompt");
+
+                    b.Property<string>("PlanPrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("plan_prompt");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("SubjectivePrompt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("subjective_prompt");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Code")
+                        .HasName("pk_note_templates");
+
+                    b.HasIndex("Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_note_templates_position");
+
+                    b.HasIndex("Title")
+                        .IsUnique()
+                        .HasDatabaseName("ix_note_templates_title");
+
+                    b.ToTable("note_templates", "ehr", t =>
+                        {
+                            t.HasCheckConstraint("ck_note_templates_assessment_prompt", "assessment_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_code", "code ~ '^[a-z][a-z0-9-]{1,39}$'");
+
+                            t.HasCheckConstraint("ck_note_templates_objective_prompt", "objective_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_plan_prompt", "plan_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_position", "position > 0");
+
+                            t.HasCheckConstraint("ck_note_templates_subjective_prompt", "subjective_prompt ~ '[^[:space:]]'");
+
+                            t.HasCheckConstraint("ck_note_templates_title", "title ~ '[^[:space:]]'");
+                        });
+                });
+
             modelBuilder.Entity("Ehr.Data.Reference.ObservationCode", b =>
                 {
                     b.Property<string>("Code")
@@ -3370,6 +3723,23 @@ namespace Ehr.Migrations
                         .HasConstraintName("fk_staff_user_tokens_staff_users_user_id");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Audit.EmergencyAccessReview", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.BreakGlassAccess", null)
+                        .WithOne()
+                        .HasForeignKey("Ehr.Data.Audit.EmergencyAccessReview", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emergency_access_reviews_break_glass_accesses_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_emergency_access_reviews_staff_users_reviewer_id");
+                });
+
             modelBuilder.Entity("Ehr.Data.Forms.QuestionnaireRequest", b =>
                 {
                     b.HasOne("Ehr.Data.Scheduling.Appointment", null)
@@ -3556,6 +3926,35 @@ namespace Ehr.Migrations
                         .HasConstraintName("fk_result_acknowledgments_orders_order_id_patient_id");
                 });
 
+            modelBuilder.Entity("Ehr.Data.Patients.AiChartProposal", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.AllergyIntolerance", null)
+                        .WithMany()
+                        .HasForeignKey("AllergyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_chart_proposals_allergy_intolerances_allergy_id");
+
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_chart_proposals_staff_users_decided_by");
+
+                    b.HasOne("Ehr.Data.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_chart_proposals_orders_order_id");
+
+                    b.HasOne("Ehr.Data.Patients.AiNoteReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_chart_proposals_ai_note_reviews_review_id_patient_id");
+                });
+
             modelBuilder.Entity("Ehr.Data.Patients.AiFieldProposal", b =>
                 {
                     b.HasOne("Ehr.Data.Accounts.StaffUser", null)
@@ -3595,6 +3994,13 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_ai_note_reviews_patients_patient_id");
+
+                    b.HasOne("Ehr.Data.Patients.AmbientConsent", null)
+                        .WithMany()
+                        .HasForeignKey("ConsentId", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ai_note_reviews_ambient_consents_consent_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.AllergyIntolerance", b =>
@@ -3605,6 +4011,34 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_allergy_intolerances_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientConsent", b =>
+                {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClinicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambient_consents_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambient_consents_patients_patient_id");
+                });
+
+            modelBuilder.Entity("Ehr.Data.Patients.AmbientTranscript", b =>
+                {
+                    b.HasOne("Ehr.Data.Patients.AiNoteReview", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "PatientId")
+                        .HasPrincipalKey("Id", "PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ambient_transcripts_ai_note_reviews_id_patient_id");
                 });
 
             modelBuilder.Entity("Ehr.Data.Patients.BreakGlassAccess", b =>
@@ -3648,6 +4082,12 @@ namespace Ehr.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_clinical_drafts_staff_users_clinician_id");
+
+                    b.HasOne("Ehr.Data.Reference.NoteTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("NoteTemplateCode")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_clinical_drafts_note_templates_note_template_code");
 
                     b.HasOne("Ehr.Data.Patients.Patient", null)
                         .WithMany()

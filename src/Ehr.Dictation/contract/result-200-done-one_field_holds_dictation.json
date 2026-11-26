@@ -1,0 +1,80 @@
+{
+  "$comment": "Written by src/Ehr.Dictation/sidecar/tests/test_contract.py from the sidecar's real answers, and read by tests/Ehr.Web.Tests/DictationApiTests.cs. Rewrite with UPDATE_CONTRACT=1; never edit by hand.",
+  "route": "result",
+  "status": 200,
+  "body": {
+    "transcript": {
+      "text": "Cough for three days with a sore throat.",
+      "final": true,
+      "segments": [
+        {
+          "start": 0,
+          "end": 40,
+          "startMs": 0,
+          "endMs": 4000,
+          "final": true,
+          "unclear": null
+        }
+      ]
+    },
+    "sorting": "done",
+    "reason": null,
+    "fields": {
+      "subjective": {
+        "status": "pending",
+        "value": "Cough for three days with a sore throat.",
+        "sources": [
+          {
+            "start": 0,
+            "end": 39
+          }
+        ],
+        "warnings": [
+          {
+            "code": "one_field_holds_dictation",
+            "start": 0,
+            "end": 39
+          }
+        ]
+      },
+      "objective": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "assessment": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      },
+      "plan": {
+        "status": "empty",
+        "reasons": [
+          "not_dictated"
+        ]
+      }
+    },
+    "notCarriedOver": [],
+    "proposals": [],
+    "provenance": {
+      "speech": {
+        "repository": "google/medasr",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "language": {
+        "repository": "IFM/K2-Horizon-7B-GGUF",
+        "commit": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "K2-Horizon-7B-Q4_K_M.gguf",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "llamaServer": "b11669-620d2225",
+      "prompt": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "schema": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "structuring": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "code": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
+}

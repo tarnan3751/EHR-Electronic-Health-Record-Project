@@ -1,0 +1,47 @@
+# Dictation test script (synthetic): a telephone follow-up after cystitis, with an allergy to add, and a drug history and an allergy already listed that are neither. Format: eval/README.md.
+id = "d44-cystitis-nitrofurantoin-rash"
+voice = "bm_george"
+tags = ["numbers", "negation", "allergy-change", "missing-field", "spoken-punctuation", "proposal", "proposal-trap"]
+noise = ["hvac"]
+dates = []
+drugs = ["nitrofurantoin", "penicillin", "metformin"]
+forbidden = ["add nitrofurantoin to her allergy list"]
+text = """
+Telephone follow-up for a [[34-year-old|thirty-four-year-old]] woman treated for a urinary tract infection last
+week {period} She took nitrofurantoin for [[2 days|two days]] and developed an itchy rash on her arms and chest
+{comma} so she stopped it and the rash settled with an antihistamine {period} Her urinary symptoms have now resolved
+{period} No fever {comma} no flank pain {period} She had hives with penicillin as a child {comma} which is already
+recorded {period} She stopped metformin last year after losing weight {comma} and her sugars have stayed normal
+{period} {new paragraph}
+Assessment {colon} uncomplicated cystitis {comma} resolved {comma} and a probable drug rash from nitrofurantoin
+{period} {new paragraph}
+Plan {colon} she will call back if the symptoms return {period} Please add nitrofurantoin to her allergy list with
+the reaction rash {period}
+"""
+
+[gold.subjective]
+value = "Treated for a urinary tract infection last week. She took nitrofurantoin for 2 days and developed an itchy rash on her arms and chest, so she stopped it and the rash settled with an antihistamine. Her urinary symptoms have now resolved. No fever, no flank pain. She had hives with penicillin as a child, which is already recorded. She stopped metformin last year after losing weight, and her sugars have stayed normal."
+sources = [
+    "treated for a urinary tract infection last week.",
+    "She took nitrofurantoin for 2 days and developed an itchy rash on her arms and chest, so she stopped it and the rash settled with an antihistamine.",
+    "Her urinary symptoms have now resolved.",
+    "No fever, no flank pain.",
+    "She had hives with penicillin as a child, which is already recorded.",
+    "She stopped metformin last year after losing weight, and her sugars have stayed normal.",
+]
+
+[gold.objective]
+value = ""
+sources = []
+
+[gold.assessment]
+value = "Uncomplicated cystitis, resolved, and a probable drug rash from nitrofurantoin."
+sources = ["uncomplicated cystitis, resolved, and a probable drug rash from nitrofurantoin."]
+
+[gold.plan]
+value = "She will call back if the symptoms return."
+sources = ["she will call back if the symptoms return."]
+
+[[not_proposed]]
+words = "add nitrofurantoin to her allergy list"
+why = "not_plain"

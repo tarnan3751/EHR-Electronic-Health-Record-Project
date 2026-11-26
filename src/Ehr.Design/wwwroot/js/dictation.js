@@ -1,17 +1,24 @@
 // Dictating a note (UC 9 Transcribe dictated audio, UC 10 Structure and validate note fields; Samir Mukshe). The script
 // for Areas/Clinical/Pages/Patients/Dictate: it records the microphone, sends the recording to the clinician dictation
 // API (Ehr.Web, Api/Dictation/DictationApi.cs, whose header is the contract) in numbered chunks, and shows the
-// transcript as the clinician speaks. After Stop it asks for the result and shows the History, Assessment and Plan the
-// model proposed and validation let through, each awaiting review, or says why the fields couldn't be sorted.
+// transcript as the clinician speaks. After Stop it asks for the result and shows the Subjective, Objective, Assessment
+// and Plan the model proposed and validation let through, each awaiting review, or says why the fields couldn't be
+// sorted.
 //
 // What it handles, from UC 9 and UC 10's alternative courses:
 // - no microphone, or one the browser blocks: says how to fix it, and the page stays usable;
 // - a dropped connection: recording carries on, the chunks wait here in order, and they are sent again with backoff,
 //   from the one the API expects next (409 out_of_order), so the transcript resumes where it paused;
-// - a passage too quiet, too noisy or too uncertain to trust: marked in the transcript, to say again;
+// - a passage too quiet, too noisy or too uncertain to trust, or in Spanish not heard as Spanish: marked in the
+//   transcript, to say again;
 // - the model unavailable or too slow: the transcript stays as plain text, with the API's message;
 // - an order or allergy change dictated: listed as not carried over, never filled into a field (FR-14);
+// - the dictation's limit, 3 minutes or 2 in Spanish as the service gives it: the time left shown beside Stop, the
+//   status line saying a minute ahead that it stops then, at its limit, and when 30 and 10 seconds are left, and at the limit the recording stopped, the page's
+//   own words for it shown, said once with the transcript's finishing, and what was recorded taken on to the review;
 // - Cancel: the session is deleted, so its audio and transcript are discarded, and the screen is cleared.
+// The language is chosen for each dictation, English first (the expansion plan's step 17): sent with the start as
+// spokenLanguage, never remembered, and fixed while a dictation is under way; a Spanish transcript is marked lang="es".
 // Finished results are staged through the server-owned review binding; no AI text is approved here (FR-13). The audio goes up in whatever format the browser records (AGENTS.md: never
 // hard-code one), and every piece of text is set with textContent, never parsed as HTML. Wired here rather than in
 // attributes, so a strict CSP can be added later.
@@ -27,16 +34,22 @@
     const api = root.dataset.dictationApi;
     const token = root.querySelector("input[name=__RequestVerificationToken]")?.value ?? "";
     const startButton = part("start");
+    const languageChoice = part("language");
+    const languageHint = part("language-hint");
     const stopButton = part("stop");
     const cancelButton = part("cancel");
+    const timeLeft = part("time-left");
+    const timeLeftValue = part("time-left-value");
     const statusArea = part("status");
+    const limitNotice = part("limit");
     const recordingMark = part("recording");
     const transcriptArea = part("transcript");
     const unclearNotice = part("unclear");
     const sortMessage = part("sort-message");
     const notCarried = part("not-carried");
     const notCarriedList = part("not-carried-list");
-    const fieldNames = ["history", "assessment", "plan"];
+    // The fields the page shows (the expansion plan's step 14: subjective, objective, assessment and plan).
+    const fieldNames = [...root.querySelectorAll("[data-dictation-field]")].map((field) => field.dataset.dictationField);
 
     const view = new window.SwiftChartDictationView(root);
     const renderTranscript = (...args) => view.renderTranscript(...args);
@@ -47,8 +60,14 @@
     // How long to wait before sending again after a failure: doubling, up to the most.
     const firstRetryMs = 1000;
     const mostRetryMs = 10000;
-    // Warn this many seconds before the dictation's limit.
-    const warnSeconds = 30;
+    // What the status line says as the time left reaches each point, in seconds, given the limit in minutes: a minute
+    // ahead, in the Listen page's words for a visit ("Listening stops in a minute, at its 20-minute limit."), then twice
+    // near the end, whatever the limit. The time left itself is shown beside Stop.
+    const leftToSay = [
+        [60, (limit) => `Dictation stops in a minute, at its ${limit}-minute limit.`],
+        [30, () => "30 seconds of dictation left. Stop soon, then dictate the rest separately."],
+        [10, () => "10 seconds of dictation left. Stop soon, then dictate the rest separately."],
+    ];
 
     let state = fresh();
 
@@ -64,6 +83,12 @@
             retryMs: firstRetryMs,
             retryTimer: 0,
             stopRequested: false,
+            // The service refused audio past the dictation's limit, so nothing more is sent.
+            atLimit: false,
+            // At the limit (the service's too_long), the page's words for it, said again as the transcript is finished.
+            limitWords: null,
+            // The last of leftToSay the time left has reached.
+            leftSaid: Infinity,
             stopping: false,
             ended: false,
             cancelled: false,
@@ -86,11 +111,36 @@
         statusArea.classList.toggle("sc-status--error", isError);
     }
 
+    // The language can be changed only while a dictation can be started, never in the middle of one.
+    function startable(enabled) {
+        startButton.disabled = !enabled;
+        languageChoice.disabled = !enabled;
+    }
+
+    // The hint, read with the choice, says what a dictation in Spanish is.
+    function showLanguage() {
+        const spanish = languageChoice.value === "es";
+        languageHint.hidden = !spanish;
+        if (spanish) {
+            languageChoice.setAttribute("aria-describedby", languageHint.id);
+        } else {
+            languageChoice.removeAttribute("aria-describedby");
+        }
+    }
+
     // While recording, the status line carries a dot and the transcript's head says "Recording": a word beside each.
     function buttons(recording) {
         statusArea.dataset.state = recording ? "recording" : "idle";
+        // For session.js (the expansion plan's step 18): no session warning or end while a dictation is recorded, sent or
+        // transcribed, from Dictate until its result, a failure or Cancel.
+        if (recording) {
+            document.body.dataset.sessionRecording = "recording";
+        } else {
+            delete document.body.dataset.sessionRecording;
+        }
+
         recordingMark.hidden = !recording;
-        startButton.disabled = recording;
+        startable(!recording);
         stopButton.disabled = !recording;
         cancelButton.disabled = !recording && state.session === null;
     }
@@ -139,8 +189,13 @@
         const requestId = state.requestId || crypto.randomUUID();
         state = fresh();
         state.requestId = requestId;
-        startButton.disabled = true;
+        const spokenLanguage = languageChoice.value === "es" ? "es" : "en";
+        startable(false);
         resetScreen();
+        if (spokenLanguage === "es") {
+            transcriptArea.lang = "es";
+        }
+
         cancelAs("Cancel");
         try {
             state.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -154,7 +209,7 @@
         try {
             response = await call("POST", "/for-note", JSON.stringify({
                 reviewId: state.requestId, patientId: root.dataset.patientId,
-                draftId: root.dataset.draftId || null, version: Number(root.dataset.draftVersion) || null,
+                draftId: root.dataset.draftId || null, version: Number(root.dataset.draftVersion) || null, spokenLanguage,
             }), "application/json");
         } catch {
             endRecording();
@@ -187,19 +242,23 @@
         const recorder = new MediaRecorder(state.stream);
         state.recorder = recorder;
         recorder.addEventListener("dataavailable", (event) => {
-            if (event.data && event.data.size > 0 && !state.cancelled) {
+            if (event.data && event.data.size > 0 && !state.cancelled && !state.atLimit) {
                 state.queue.push({ seq: state.nextSeq++, blob: event.data, type: event.data.type || recorder.mimeType || "audio/*" });
                 pump();
             }
         });
         recorder.addEventListener("stop", () => {
             stopTracks();
+            timeLeft.hidden = true;
             if (!state.cancelled) {
                 state.stopRequested = true;
                 pump();
             }
         });
         recorder.start(1000);
+        // The whole limit, until the service says how much audio it holds.
+        timeLeftValue.textContent = clock(state.session.maxSeconds);
+        timeLeft.hidden = false;
         buttons(true);
         say("Recording. Speak your note, then select Stop.");
     }
@@ -247,7 +306,7 @@
                     state.queue.shift();
                     resumed();
                     renderTranscript(received.transcript);
-                    warnNearLimit(received.audioSeconds);
+                    showTimeLeft(received.audioSeconds);
                     continue;
                 }
 
@@ -269,9 +328,24 @@
                 }
 
                 if (response.status === 413) {
-                    // Over the dictation's limit: what was sent is kept, and the dictation stops here.
+                    // Over the dictation's limit: what was sent is kept, and the dictation stops here. Nothing more is
+                    // sent, not even the last of the audio the recorder hands over as it stops, which would only be
+                    // refused as out of order, again and again.
                     state.queue = [];
-                    say(body.message || "The dictation is over its time limit, so it has been stopped.", true);
+                    state.atLimit = true;
+                    stopButton.disabled = true;
+                    if (body.error === "too_long") {
+                        // The page's own words, naming the limit, shown until the dictation goes on to its review. The
+                        // notice isn't a live region: the status line says the limit once, as it says the transcript
+                        // is being finished, which follows at once (finish()), rather than a moment before it.
+                        state.limitWords = `The dictation stopped at its ${state.session.maxSeconds / 60}-minute limit.`;
+                        limitNotice.textContent = `${state.limitWords} What you recorded is kept and goes on to the review. `
+                            + "Start another dictation for the rest once you've reviewed it.";
+                        limitNotice.hidden = false;
+                    } else {
+                        say(body.message || "The dictation is over its time limit, so it has been stopped.", true);
+                    }
+
                     if (state.recorder?.state === "recording") {
                         state.recorder.stop();
                     }
@@ -310,11 +384,25 @@
         }
     }
 
-    function warnNearLimit(audioSeconds) {
-        const left = Math.floor((state.session?.maxSeconds ?? 0) - (audioSeconds ?? 0));
-        if (state.recorder?.state === "recording" && !state.paused && left <= warnSeconds) {
-            say(left > 0 ? `About ${left} seconds of dictation left. Stop soon, then dictate the rest separately.` : "The dictation has reached its time limit.");
+    // The time left beside Stop: the dictation's limit (the session's maxSeconds, 3 minutes or 2 in Spanish) less the
+    // audio the service holds. It changes with every chunk, so it isn't a live region: the status line says each of
+    // leftToSay as the time left reaches it, once, and only while recording. Points passed together, as the chunks
+    // held back by a dropped connection go up, are said as the last of them.
+    function showTimeLeft(audioSeconds) {
+        const left = Math.floor(state.session.maxSeconds - audioSeconds);
+        timeLeftValue.textContent = clock(left);
+        const reached = leftToSay.filter(([at]) => left <= at && at < state.leftSaid).at(-1);
+        if (reached) {
+            state.leftSaid = reached[0];
+            if (state.recorder?.state === "recording") {
+                say(reached[1](state.session.maxSeconds / 60));
+            }
         }
+    }
+
+    // Minutes and seconds, as the time left is shown: 2:00, 0:09.
+    function clock(seconds) {
+        return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
     }
 
     function stop() {
@@ -332,7 +420,8 @@
         }
 
         state.stopping = true;
-        say("Finishing the transcript and proposing the fields. This can take up to a minute.");
+        const finishing = "Finishing the transcript and proposing the fields. This can take up to a minute.";
+        say(state.limitWords ? `${state.limitWords} ${finishing}` : finishing);
         let result = await ask("stop");
         while (result && result.sorting === "pending" && !state.cancelled) {
             result = await ask("result");
@@ -343,7 +432,7 @@
             buttons(false);
             cancelButton.disabled = false;
             cancelAs("Discard");
-            startButton.disabled = true;
+            startable(false);
             say(result.sorting === "done"
                 ? "Done. Review each proposed field; nothing is in the note until you approve it."
                 : "Done, but the fields couldn't be sorted. The transcript is kept as plain text.");
@@ -411,7 +500,7 @@
         endRecording();
         state.ended = true;
         buttons(false);
-        startButton.disabled = state.session !== null;
+        startable(state.session === null);
         cancelButton.disabled = state.session === null;
         say(message, true);
     }
@@ -434,7 +523,7 @@
                 state.cancelled = false;
                 state.ended = true;
                 buttons(false);
-                startButton.disabled = true;
+                startable(false);
                 cancelButton.disabled = false;
                 say(`${error.message} Your transcript is still displayed; saved proposals must be reviewed individually.`, true);
                 return;
@@ -472,6 +561,8 @@
     function resetScreen() {
         state.transcript = null;
         reviewButton.hidden = true;
+        limitNotice.hidden = true;
+        transcriptArea.removeAttribute("lang");
         transcriptArea.replaceChildren(element("p", "Your words appear here as you speak.", "sc-transcript__placeholder"));
         unclearNotice.hidden = true;
         sortMessage.textContent = "The fields are proposed once you stop.";
@@ -495,6 +586,16 @@
         return node;
     }
 
+    languageChoice.value = "en";
+    showLanguage();
+    languageChoice.addEventListener("change", showLanguage);
+    // A page the browser kept and shows again (Back) starts in English too, if no dictation is under way.
+    window.addEventListener("pageshow", (event) => {
+        if (event.persisted && !languageChoice.disabled) {
+            languageChoice.value = "en";
+            showLanguage();
+        }
+    });
     reviewButton.addEventListener("click", stageReview);
     startButton.addEventListener("click", start);
     stopButton.addEventListener("click", stop);

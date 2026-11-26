@@ -77,7 +77,7 @@ public class TC_UC14_17_SensitiveNotesAddendaInherit(WebApps apps) : IClassFixtu
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(page, "data-addendum-sensitive=\"own\">Sensitive</span>"));
         Assert.True(await ViewsAsync() > views);
         copy = await OfflineAsync();
-        Assert.All(new[] { one, two, three, History }, text => Assert.DoesNotContain(text, copy));
+        Assert.All(new[] { one, two, three, Subjective }, text => Assert.DoesNotContain(text, copy));
         Assert.Contains("\"sensitiveNotKept\":1", copy);
 
         // 3. Unmarked: the inherited marks go with the note's; the addendum marked on its own stays.

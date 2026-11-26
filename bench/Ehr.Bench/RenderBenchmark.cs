@@ -6,12 +6,14 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Ehr.Data;
 using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Data.Orders;
+using Ehr.Data.Patients;
 using Ehr.Domain.Audit;
 using Ehr.Domain.Patients;
 using Ehr.Seed;
@@ -53,7 +55,7 @@ namespace Ehr.Bench;
 // app's own settings instead, as `dotnet run --project src/Ehr.Web` does, against a primary already seeded with as many
 // patients. Either way it creates a clinician of its own, with a random password nobody keeps, puts 100 of the seeded
 // patients on their panel, signs six orders for each of them and discontinues two (UC 1), so the chart it measures lists active orders,
-// signs in with password and authenticator code like a browser, and locks the account at the end. It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
+// signs in with password and authenticator code like a browser, and locks the account at the end; and an administrator of its own, the same way, to review emergency access (step 18). It knows whom to search for from the synthetic clinic itself, so it reads nobody outside the pages it measures.
 //
 // UC 2, off-site (Tahseen Arnan): then the same requests, in the same order, to the cloud app (OffSiteApp), reading as
 // ehr_read with its link to the on-prem app down, as in an on-site outage, with the same session. Each row's name starts
@@ -174,6 +176,30 @@ internal static partial class RenderBenchmark
                     var (patient, note) = noted[noteRandom.Next(noted.Count)];
                     return $"/patients/{patient}/notes/{note}/addendum";
                 }));
+                // The note editor (step 14), with its visit types and their prompts: a draft for each of those patients, in
+                // four sections for a follow-up visit. A generator of its own, so the rows after it pick as they did.
+                var drafted = await WriteDraftsAsync(app, clinicianId, noted);
+                var draftRandom = new Random(20261126);
+                results.Add(await MeasureAsync(client, times, "Note editor, a draft of a patient on the panel", typing: false, () =>
+                {
+                    var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                    return $"/patients/{patient}/notes/drafts/{draft}";
+                }));
+                // The vital signs the editor offers for Objective when asked (step 14): the latest day's of the seeded patient.
+                results.Add(await MeasureAsync(client, times, "Vital signs for a note's Objective, a patient on the panel", typing: false, () =>
+                {
+                    var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                    return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
+                }));
+                // What a dictation proposes beyond the note (step 15): for each of those patients, a new draft dictated with an
+                // order and an allergy to add, staged through the app's own service. Its review; the order form and the
+                // allergy form opened from them; and its editor, which says they wait. A generator of its own.
+                var proposed = await DictateProposalsAsync(app, clinicianId, noted);
+                results.AddRange(await MeasureProposalsAsync(client, times, "", proposed));
+                // A recorded visit (step 16): for each of those patients, a 20-minute conversation's review, with its transcript
+                // kept apart, staged through the app's own service.
+                var visits = await ListenToVisitsAsync(app, clinicianId, noted);
+                results.AddRange(await MeasureVisitReviewsAsync(client, times, "", visits));
                 // The patient portal's results page (UC6, FR-16; Simar Rekhi), as a patient with released results, the
                 // last patient in the clinic who has some: the local stack's example account uses the first. On-site, so before the
                 // off-site rows.
@@ -214,6 +240,10 @@ internal static partial class RenderBenchmark
                 // Download my record (step 13b) is measured for the seeded patient with the most entries too.
                 var (largestUserId, largestEmail, largestPassword, _) = await CreatePatientAccountAsync(app, LargestRecord(patients, portalPatient));
                 var largestSession = new CookieContainer();
+                // Reviewing emergency access (step 18): an administrator of the benchmark's own, signed in with their second
+                // factor, locked out at the end as the clinician is.
+                var (adminId, adminEmail, adminPassword, adminKey) = await CreateClinicianAsync(app, StaffRoles.Admin);
+                var adminSession = new CookieContainer();
                 try
                 {
                     using var portal = await PortalSignInAsync(app, portalSession, patientEmail, patientPassword);
@@ -254,17 +284,41 @@ internal static partial class RenderBenchmark
                         results.AddRange(await MeasureRecordAsync(largest, times, "", "the largest seeded record", page: false));
                     }
                     results.Add(await MeasureAsync(portal, times, "Portal who viewed, as a proxy", typing: false, () => "/portal/views"));
+                    // Sessions (step 18): what a page asks while someone works on it, to keep their session and learn how
+                    // long it has, staff and portal.
+                    results.Add(await MeasureAsync(client, times, "Session keep-alive, staff", typing: false, () => "/session"));
+                    results.Add(await MeasureAsync(portal, times, "Session keep-alive, portal", typing: false, () => "/portal/session"));
+                    // Reviewing emergency access (step 18): the clinician's year of emergency accesses (FillPanelHistoryAsync),
+                    // half of them reviewed. The review page of any of them, and the audit page's list of those waiting. A
+                    // generator of its own.
+                    var accesses = await ReviewHalfAsync(database, adminId, clinicianId);
+                    using var admin = await SignInAsync(app, adminSession, adminEmail, adminPassword, adminKey, home: "/admin/staff");
+                    var accessRandom = new Random(20261127);
+                    if (accesses.Count > 0)
+                    {
+                        results.Add(await MeasureAsync(admin, times, "Emergency access review, an ended access", typing: false,
+                            () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
+                        results.Add(await MeasureAsync(admin, times, "Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
+                    }
 
+                    // The review of a dictation (UC 13), in English and, since the expansion plan's step 17, in Spanish, each
+                    // English sentence beside the Spanish it was translated from: staged on new drafts of the patients with
+                    // signed notes only after every row that reads those patients' drafts, on-site and off-site, so that no
+                    // row's data changes; then measured on-site here, and off-site as the last of the off-site rows.
                     if (database is null)
                     {
                         Console.WriteLine("Off-site: not measured with --stack, which has no ehr_read login for the replica.");
                         Console.WriteLine("The lab's door: not measured with --stack, whose lab key is in the stack's .env alone.");
+                        Console.WriteLine("Emergency access review: not measured with --stack, whose emergency accesses are the stack's own.");
+                        results.AddRange(await MeasureReviewsAsync(client, times, "", await StageReviewsAsync(app, clinicianId, noted)));
                     }
                     else
                     {
                         await SettleAsync(database);
-                        results.AddRange(await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
-                            refills, forms));
+                        var (offSite, reviewed) = await MeasureOffSiteAsync(app, database, session, panel, labOrders, patients, scheduleDay, appointments, noted, summarized, portalSession, largestSession,
+                            refills, forms, drafted, proposed, visits, adminSession, accesses, () => StageReviewsAsync(app, clinicianId, noted));
+                        results.AddRange(offSite);
+                        results.AddRange(await MeasureReviewsAsync(client, times, "", reviewed));
                         // The lab's door (step 12), last, so every row before it makes the requests it always did.
                         results.AddRange(await MeasureLabAsync(app, database, times, clinicianId, panel));
                     }
@@ -273,6 +327,7 @@ internal static partial class RenderBenchmark
                 {
                     await LockOutPatientAsync(app, patientUserId);
                     await LockOutPatientAsync(app, largestUserId);
+                    await LockOutAsync(app, adminId);
                 }
 
                 await PrintAsync(app, patients, durability, results);
@@ -389,6 +444,8 @@ internal static partial class RenderBenchmark
             await MeasureAsync(client, times, prefix + $"Inbox, {InboxSize} items", typing: false, () => "/inbox"),
             // Vital signs (step 9): the flowsheet and its trend charts, drawn by the server.
             await MeasureAsync(client, times, prefix + "Vital signs, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}/vitals"),
+            // Step 16: listening to a visit, its consent first; off-site, the page that says it works only at the clinic.
+            await MeasureAsync(client, times, prefix + "Listen to the visit, a patient on the panel", typing: false, () => $"/patients/{panel[random.Next(panel.Count)]}/listen"),
             // Step 9b: the page that marks a set's readings entered in error, for a seeded visit's set.
             await MeasureAsync(client, times, prefix + "Mark vital signs in error form, a patient on the panel", typing: false, () =>
             {
@@ -447,6 +504,21 @@ internal static partial class RenderBenchmark
         ];
     }
 
+    // A session ends 15 minutes after its last request (step 18): each session given, which the run keeps for rows to come,
+    // asks for its session page once, unmeasured, so it isn't ended as idle while other rows run.
+    static async Task KeepAliveAsync(WebApplicationFactory<Program> app, params (CookieContainer Session, string Path)[] sessions)
+    {
+        foreach (var (session, path) in sessions)
+        {
+            using var client = app.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
+            using var response = await client.GetAsync(path);
+            if (!response.IsSuccessStatusCode || response.RequestMessage?.RequestUri?.AbsolutePath != path)
+            {
+                throw new InvalidOperationException($"Keeping a session at {path} answered {(int)response.StatusCode} at {response.RequestMessage?.RequestUri?.AbsolutePath}.");
+            }
+        }
+    }
+
     // What a clinician might have typed so far when looking for a diagnosis.
     static readonly string[] CodeSearches = ["typ", "ess", "anx", "ast", "hyp", "dia", "dep", "alc", "low", "mig"];
 
@@ -454,10 +526,12 @@ internal static partial class RenderBenchmark
 
     // UC 2 (Tahseen Arnan): the same requests to the cloud app, with the on-site session's cookies, during an outage. Its
     // audit queue goes in a folder of its own, deleted at the end.
-    static async Task<List<Result>> MeasureOffSiteAsync(
+    static async Task<(List<Result> Results, List<Reviewed> Reviewed)> MeasureOffSiteAsync(
         BenchApp onPrem, MigratedDatabase database, CookieContainer session, List<Guid> panel, IReadOnlyDictionary<Guid, Guid> labOrders, int patients,
         string scheduleDay, List<Guid> appointments, List<(Guid Patient, Guid Note)> noted, List<(Guid Patient, Guid Note, Guid Summary)> summarized,
-        CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms)
+        CookieContainer portalSession, CookieContainer largestSession, List<(Guid Patient, Guid Request, bool Waiting)> refills, FormRows forms,
+        List<(Guid Patient, Guid Draft)> drafted, List<Proposed> proposed, List<Listened> visits, CookieContainer adminSession, List<Guid> accesses,
+        Func<Task<List<Reviewed>>> stageReviews)
     {
         var queue = Path.Combine(Path.GetTempPath(), $"ehr-bench-cloud-audit-{Guid.NewGuid():N}");
         try
@@ -471,6 +545,8 @@ internal static partial class RenderBenchmark
             }
 
             using var client = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
+            // The sessions the rows below use last, kept from ending as idle while the rows before them run (step 18).
+            await KeepAliveAsync(cloud, (portalSession, "/portal/session"), (largestSession, "/portal/session"), (adminSession, "/session"));
             var results = await MeasureEachAsync(client, times, "Off-site, ", panel, labOrders, patients);
             results.AddRange(await MeasureScheduleAsync(client, times, "Off-site, ", panel, scheduleDay, appointments));
             // Pages that record more than one audit event (step 10c): a chart that has a signed note records the
@@ -498,9 +574,27 @@ internal static partial class RenderBenchmark
                 var (patient, note, summary) = summarized[summaryRandom.Next(summarized.Count)];
                 return $"/patients/{patient}/notes/{note}/summaries/{summary}/withdraw";
             }));
+            // The note editor (step 14), with the same generator's draws as on-site: during an outage, the draft as last
+            // saved, read-only; and the vital signs it offers for Objective, read from the replica.
+            var draftRandom = new Random(20261126);
+            results.Add(await MeasureAsync(client, times, "Off-site, Note editor, a draft of a patient on the panel", typing: false, () =>
+            {
+                var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                return $"/patients/{patient}/notes/drafts/{draft}";
+            }));
+            results.Add(await MeasureAsync(client, times, "Off-site, Vital signs for a note's Objective, a patient on the panel", typing: false, () =>
+            {
+                var (patient, draft) = drafted[draftRandom.Next(drafted.Count)];
+                return $"/patients/{patient}/notes/drafts/{draft}?handler=Vitals";
+            }));
             results.AddRange(await MeasureRefillsAsync(client, times, "Off-site, ", refills));
+            // A dictation's proposals (step 15), read from the cloud copy: opening or dismissing one says why it can't.
+            results.AddRange(await MeasureProposalsAsync(client, times, "Off-site, ", proposed));
+            // A recorded visit's review (step 16), read from the cloud copy: without its transcript, which is read at the clinic.
+            results.AddRange(await MeasureVisitReviewsAsync(client, times, "Off-site, ", visits));
             // Pre-visit forms (step 13e): the clinician's pages, read from the cloud copy; asking says why it can't.
             results.AddRange(await MeasureFormsAsync(client, times, "Off-site, ", forms));
+            await KeepAliveAsync(cloud, (largestSession, "/portal/session"), (adminSession, "/session"));
             using var portal = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(portalSession));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal visit summaries, as a proxy", typing: false, () => "/portal/summaries"));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal refills, as a proxy", typing: false, () => "/portal/refills"));
@@ -522,7 +616,19 @@ internal static partial class RenderBenchmark
             using var largest = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(largestSession));
             results.AddRange(await MeasureRecordAsync(largest, times, "Off-site, ", "the largest seeded record", page: false));
             results.Add(await MeasureAsync(portal, times, "Off-site, Portal who viewed, the patient's own", typing: false, () => "/portal/views"));
-            return results;
+            // Sessions and reviewing emergency access (step 18), with the same generator's draws as on-site: the review page
+            // read from the cloud copy, its form replaced by why it can't be marked reviewed.
+            results.Add(await MeasureAsync(client, times, "Off-site, Session keep-alive, staff", typing: false, () => "/session"));
+            results.Add(await MeasureAsync(portal, times, "Off-site, Session keep-alive, portal", typing: false, () => "/portal/session"));
+            using var admin = cloud.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(adminSession));
+            var accessRandom = new Random(20261127);
+            results.Add(await MeasureAsync(admin, times, "Off-site, Emergency access review, an ended access", typing: false,
+                () => $"/admin/emergency-access/{accesses[accessRandom.Next(accesses.Count)]}"));
+            results.Add(await MeasureAsync(admin, times, "Off-site, Audit, emergency accesses waiting for review", typing: false, () => "/admin/audit?Review=waiting"));
+            // Last: the dictation reviews, staged now, after every row that reads those patients' drafts.
+            var reviewed = await stageReviews();
+            results.AddRange(await MeasureReviewsAsync(client, times, "Off-site, ", reviewed));
+            return (results, reviewed);
         }
         finally
         {
@@ -998,13 +1104,13 @@ internal static partial class RenderBenchmark
         return true;
     }
 
-    static async Task<(Guid Id, string Email, string Password, string Key)> CreateClinicianAsync(BenchApp app)
+    static async Task<(Guid Id, string Email, string Password, string Key)> CreateClinicianAsync(BenchApp app, string role = StaffRoles.Clinician)
     {
         await using var scope = app.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<StaffUser>>();
         var email = $"bench-{Guid.NewGuid():N}@example.test";
         var password = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
-        var user = new StaffUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = "Benchmark", Roles = [StaffRoles.Clinician] };
+        var user = new StaffUser { UserName = email, Email = email, EmailConfirmed = true, DisplayName = "Benchmark", Roles = [role] };
         Check(await users.CreateAsync(user, password));
         Check(await users.ResetAuthenticatorKeyAsync(user));
         var key = (await users.GetAuthenticatorKeyAsync(user))!;
@@ -1224,7 +1330,8 @@ internal static partial class RenderBenchmark
                 ClinicianId = clinicianId,
                 Body = "Synthetic note",
                 Version = 1,
-                History = "Synthetic history: cough for two days.",
+                Subjective = "Synthetic subjective: cough for two days.",
+                Objective = "Synthetic objective: chest clear.",
                 Assessment = "Synthetic assessment: viral illness.",
                 Plan = "Synthetic plan: rest and follow-up.",
                 StructuredVersion = 1,
@@ -1237,7 +1344,8 @@ internal static partial class RenderBenchmark
                 DraftId = draft.Id,
                 PatientId = patient,
                 DraftVersion = 1,
-                History = draft.History,
+                Subjective = draft.Subjective,
+                Objective = draft.Objective,
                 Assessment = draft.Assessment,
                 Plan = draft.Plan,
             };
@@ -1256,6 +1364,280 @@ internal static partial class RenderBenchmark
 
         await transaction.CommitAsync();
         return noted;
+    }
+
+    // Step 14: a draft for each patient with a signed note, written in four sections for a follow-up visit, through the
+    // app's own service and the database's rules.
+    static async Task<List<(Guid Patient, Guid Draft)>> WriteDraftsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        var drafted = new List<(Guid, Guid)>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var notes = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.ClinicalNotes>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, _) in noted)
+        {
+            var draft = await notes.CreateAsync(patient, CancellationToken.None) ?? throw new InvalidOperationException("The benchmark's draft was refused.");
+            var content = new Ehr.Domain.Notes.NoteContent("Synthetic subjective: no new symptoms.", "Synthetic objective: blood pressure 128/78.",
+                "Synthetic assessment: hypertension controlled.", "Synthetic plan: same dose, review in three months.");
+            if ((await notes.SaveAsync(patient, draft.Id, draft.Version, content, CancellationToken.None, "follow-up")).Status != 200)
+            {
+                throw new InvalidOperationException("The benchmark's draft was not saved.");
+            }
+
+            drafted.Add((patient, draft.Id));
+        }
+
+        await transaction.CommitAsync();
+        return drafted;
+    }
+
+    // A dictation of a new draft for a patient, and its two proposals (step 15).
+    sealed record Proposed(Guid Patient, Guid Draft, Guid Review, Guid Order, Guid Allergy);
+
+    // Step 15: for each patient, a new draft dictated with an order and an allergy to add, begun and staged through the app's
+    // own service and the database's rules, as the dictation page does after Stop. The result is the one the service would
+    // give: its transcript, no field, the two instructions it lists, and the two it proposes.
+    static async Task<List<Proposed>> DictateProposalsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        const string text = "Synthetic: blood pressure is fine today. Go ahead and order a lipid panel. Add penicillin to her allergy list.";
+        const string order = "Go ahead and order a lipid panel", allergy = "Add penicillin to her allergy list";
+        var (orderAt, allergyAt) = (text.IndexOf(order, StringComparison.Ordinal), text.IndexOf(allergy, StringComparison.Ordinal));
+        var empty = new Ehr.Web.Api.Dictation.EmptyField(["not_dictated"]);
+        var result = new Ehr.Web.Api.Dictation.DictationResult(
+            new Ehr.Web.Api.Dictation.Transcript(text, true, [new Ehr.Web.Api.Dictation.TranscriptSegment(0, text.Length, 0, 9000, true)]),
+            Ehr.Web.Api.Dictation.Sorting.Done, new Ehr.Web.Api.Dictation.NoteFields(empty, empty, empty, empty),
+            [new(Ehr.Web.Api.Dictation.Instruction.Order, orderAt, orderAt + order.Length),
+                new(Ehr.Web.Api.Dictation.Instruction.AllergyChange, allergyAt, allergyAt + allergy.Length)],
+            new Ehr.Web.Api.Dictation.Provenance(new("synthetic", "0", "0"), null, null, "synthetic", "synthetic", "synthetic", "synthetic"),
+            Proposals:
+            [
+                new(Ehr.Web.Api.Dictation.ProposalKind.Order, orderAt, orderAt + order.Length, []),
+                new(Ehr.Web.Api.Dictation.ProposalKind.AllergyAddition, allergyAt, allergyAt + allergy.Length, []),
+            ]);
+        var trusted = new Ehr.Domain.Notes.TrustedReviewResult(JsonSerializer.Serialize(result, JsonSerializerOptions.Web), new Dictionary<string, string>(),
+            [AiChartProposalKinds.Order, AiChartProposalKinds.AllergyAddition]);
+
+        var proposed = new List<Proposed>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var reviews = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.NoteReviews>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, _) in noted)
+        {
+            var begun = await reviews.BeginAsync(Guid.NewGuid(), patient, null, null, Guid.NewGuid().ToString("N"), 180, 1024 * 1024, CancellationToken.None);
+            if (begun.Status != 201 || begun.Review is not { } review)
+            {
+                throw new InvalidOperationException("The benchmark's dictation was refused.");
+            }
+
+            if ((await reviews.StageAsync(review.Id, begun.Version!.Value, trusted, CancellationToken.None)).Status != 200)
+            {
+                throw new InvalidOperationException("The benchmark's dictation was not staged.");
+            }
+
+            var rows = await db.AiChartProposals.AsNoTracking().Where(p => p.ReviewId == review.Id).OrderBy(p => p.Ordinal).Select(p => p.Id).ToListAsync();
+            proposed.Add(new(patient, review.DraftId, review.Id, rows[0], rows[1]));
+        }
+
+        await transaction.CommitAsync();
+        return proposed;
+    }
+
+    // A recorded visit's review (step 16).
+    sealed record Listened(Guid Patient, Guid Draft, Guid Review);
+
+    // Step 16: for each patient, a new draft from a 20-minute recorded visit, begun with its consent and staged through the
+    // app's own service and the database's rules, as the Listen page does: 3,000 words or so (150 a minute), kept apart,
+    // and a value proposed for each of the four fields from who said it. The dictation service cuts its transcript into a
+    // segment at the first pause of at least 0.4 seconds after at least a second (segmenter.py), and a conversation pauses
+    // that long every couple of seconds, between phrases and at each turn: 20 minutes is about 600 segments of 2 seconds,
+    // here in 200 turns of three, five words each.
+    static async Task<List<Listened>> ListenToVisitsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        var text = new StringBuilder();
+        var segments = new List<Ehr.Web.Api.Dictation.TranscriptSegment>();
+        for (var passage = 0; passage < 600; passage++)
+        {
+            var turn = passage / 3;
+            var (speaker, words) = turn % 2 == 0
+                ? (Ehr.Web.Api.Dictation.Speaker.Clinician, $"Synthetic question {turn}, part {passage % 3}.")
+                : (Ehr.Web.Api.Dictation.Speaker.Patient, $"Synthetic answer {turn}, part {passage % 3}.");
+            text.Append(passage == 0 ? "" : passage % 3 == 0 ? "\n" : " ");
+            segments.Add(new(text.Length, text.Length + words.Length, passage * 2000L, passage * 2000L + 1800, true, null, 1 + turn % 2, speaker));
+            text.Append(words);
+        }
+
+        // From the patient's first passage, and the clinician's.
+        Ehr.Web.Api.Dictation.PendingField Field(int passage) => new(
+            text.ToString(segments[passage].Start, segments[passage].End - segments[passage].Start),
+            [new(segments[passage].Start, segments[passage].End, segments[passage].Speaker)], []);
+        var fields = new Ehr.Web.Api.Dictation.NoteFields(Field(3), Field(0), Field(6), Field(12));
+        var transcript = new Ehr.Web.Api.Dictation.Transcript(text.ToString(), true, segments);
+        var result = new Ehr.Web.Api.Dictation.DictationResult(transcript with { Text = "", Segments = [] }, Ehr.Web.Api.Dictation.Sorting.Done, fields, [],
+            new Ehr.Web.Api.Dictation.Provenance(new("synthetic", "0", "0"), null, null, "synthetic", "synthetic", "synthetic", "synthetic"));
+        var trusted = new Ehr.Domain.Notes.TrustedReviewResult(JsonSerializer.Serialize(result, JsonSerializerOptions.Web),
+            new Dictionary<string, string>
+            {
+                ["subjective"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Subjective).Value,
+                ["objective"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Objective).Value,
+                ["assessment"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Assessment).Value,
+                ["plan"] = ((Ehr.Web.Api.Dictation.PendingField)fields.Plan).Value,
+            },
+            [], JsonSerializer.Serialize(transcript, JsonSerializerOptions.Web));
+
+        var listened = new List<Listened>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var reviews = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.NoteReviews>();
+        await using var dbTransaction = await db.Database.BeginTransactionAsync();
+        foreach (var (patient, _) in noted)
+        {
+            var begun = await reviews.BeginAsync(Guid.NewGuid(), patient, null, null, Guid.NewGuid().ToString("N"), 1200, 1024 * 1024,
+                CancellationToken.None, new Ehr.Domain.Notes.AmbientStart(2, AmbientConsentGivers.Patient));
+            if (begun.Status != 201 || begun.Review is not { } review
+                || (await reviews.StageAsync(review.Id, begun.Version!.Value, trusted, CancellationToken.None)).Status != 200)
+            {
+                throw new InvalidOperationException("The benchmark's recorded visit was refused.");
+            }
+
+            listened.Add(new(patient, review.DraftId, review.Id));
+        }
+
+        await dbTransaction.CommitAsync();
+        return listened;
+    }
+
+    static async Task<List<Result>> MeasureVisitReviewsAsync(HttpClient client, DatabaseTimes times, string site, List<Listened> visits)
+    {
+        var random = new Random(20261128);
+        return
+        [
+            await MeasureAsync(client, times, $"{site}Note review of a 20-minute recorded visit, a patient on the panel", typing: false, () =>
+            {
+                var one = visits[random.Next(visits.Count)];
+                return $"/patients/{one.Patient}/notes/drafts/{one.Draft}/review/{one.Review}";
+            }),
+        ];
+    }
+
+    static async Task<List<Result>> MeasureProposalsAsync(HttpClient client, DatabaseTimes times, string site, List<Proposed> proposed)
+    {
+        var random = new Random(20261127);
+        return
+        [
+            await MeasureAsync(client, times, $"{site}Note review with dictation proposals, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/notes/drafts/{one.Draft}/review/{one.Review}";
+            }),
+            await MeasureAsync(client, times, $"{site}Order form from a dictation proposal, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/orders/new?type=lab&proposal={one.Order}";
+            }),
+            await MeasureAsync(client, times, $"{site}Allergy form from a dictation proposal, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/allergies?proposal={one.Allergy}";
+            }),
+            await MeasureAsync(client, times, $"{site}Note editor with dictation proposals waiting, a patient on the panel", typing: false, () =>
+            {
+                var one = proposed[random.Next(proposed.Count)];
+                return $"/patients/{one.Patient}/notes/drafts/{one.Draft}";
+            }),
+        ];
+    }
+
+    // A dictation's review (UC 13) on a new draft of each noted patient, in English and in Spanish (the expansion plan's step
+    // 17), staged through the app's own services as the dictation API stages a result the service sent: all four fields
+    // proposed, those from Spanish as English sentences each beside the Spanish it was translated from.
+    sealed record Reviewed(Guid Patient, Guid Draft, Guid Review, bool Spanish);
+
+    static async Task<List<Reviewed>> StageReviewsAsync(BenchApp app, Guid clinicianId, List<(Guid Patient, Guid Note)> noted)
+    {
+        var reviewed = new List<Reviewed>();
+        await using var scope = app.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<UserContext>().UserId = clinicianId;
+        var db = scope.ServiceProvider.GetRequiredService<EhrDbContext>();
+        var reviews = scope.ServiceProvider.GetRequiredService<Ehr.Domain.Notes.NoteReviews>();
+        foreach (var (patient, _) in noted)
+        {
+            foreach (var spanish in new[] { false, true })
+            {
+                await using var transaction = await db.Database.BeginTransactionAsync();
+                var id = Guid.NewGuid();
+                var begun = await reviews.BeginAsync(id, patient, null, null, Convert.ToBase64String(RandomNumberGenerator.GetBytes(24)).Replace('+', '-').Replace('/', '_'),
+                    180, 1024 * 1024, CancellationToken.None);
+                var (result, suggestions) = DictationReviewResult(spanish);
+                var staged = begun.Review is not null
+                    ? await reviews.StageAsync(id, begun.Version!.Value, new Ehr.Domain.Notes.TrustedReviewResult(JsonSerializer.Serialize(result, JsonSerializerOptions.Web), suggestions, []), CancellationToken.None)
+                    : begun;
+                if (staged.Status != 200)
+                {
+                    throw new InvalidOperationException("The benchmark's dictation review was refused.");
+                }
+
+                await transaction.CommitAsync();
+                reviewed.Add(new(patient, begun.Review!.DraftId, id, spanish));
+            }
+        }
+
+        return reviewed;
+    }
+
+    // A dictation's result as the service sends it: four sentences, one a field, in English or, in Spanish, each field's
+    // English beside the Spanish it was translated from.
+    static (Ehr.Web.Api.Dictation.DictationResult Result, Dictionary<string, string> Suggestions) DictationReviewResult(bool spanish)
+    {
+        string[] said = spanish
+            ? ["Tos desde hace tres días y niega fiebre.", "Pulmones limpios.", "Probable cuadro viral.", "Líquidos abundantes y reposo durante cinco días."]
+            : ["Cough for three days, no fever.", "Chest is clear.", "Likely viral.", "Fluids and rest for five days."];
+        string[] english = ["Cough for three days. Denies fever.", "Lungs clear.", "Likely viral illness.", "Plenty of fluids and rest for five days."];
+        var text = string.Join(' ', said);
+        var segments = new List<Ehr.Web.Api.Dictation.TranscriptSegment>();
+        var fields = new List<Ehr.Web.Api.Dictation.NoteField>();
+        var suggestions = new Dictionary<string, string>();
+        string[] names = ["subjective", "objective", "assessment", "plan"];
+        for (var i = 0; i < said.Length; i++)
+        {
+            var start = text.IndexOf(said[i], StringComparison.Ordinal);
+            var source = new Ehr.Web.Api.Dictation.SourceSpan(start, start + said[i].Length);
+            segments.Add(new(source.Start, source.End, i * 4000, i * 4000 + 3800, true));
+            var value = spanish ? english[i] : said[i];
+            fields.Add(new Ehr.Web.Api.Dictation.PendingField(value, [source], [],
+                spanish ? [new Ehr.Web.Api.Dictation.TranslatedStatement(0, value.Length, [source])] : null));
+            suggestions[names[i]] = value;
+        }
+
+        var provenance = new Ehr.Web.Api.Dictation.Provenance(
+            new(spanish ? "openai/whisper-large-v3-turbo" : "google/medasr", "bench", new string('a', 64)),
+            new("IFM/K2-Horizon-7B-GGUF", "bench", "K2-Horizon-7B-Q4_K_M.gguf", new string('b', 64)),
+            "bench", "sha256:bench", "sha256:bench", "sha256:bench", "sha256:bench");
+        var result = new Ehr.Web.Api.Dictation.DictationResult(new(text, true, segments), Ehr.Web.Api.Dictation.Sorting.Done,
+            new(fields[0], fields[1], fields[2], fields[3]), [], provenance,
+            SpokenLanguage: spanish ? Ehr.Web.Api.Dictation.SpokenLanguage.Spanish : Ehr.Web.Api.Dictation.SpokenLanguage.English);
+        return (result, suggestions);
+    }
+
+    static async Task<List<Result>> MeasureReviewsAsync(HttpClient client, DatabaseTimes times, string prefix, List<Reviewed> reviewed)
+    {
+        var results = new List<Result>();
+        var random = new Random(20261127);
+        foreach (var (spanish, name) in new[] { (false, "AI review of a dictation, a patient on the panel"), (true, "AI review of a dictation in Spanish, a patient on the panel") })
+        {
+            var mine = reviewed.Where(r => r.Spanish == spanish).ToList();
+            results.Add(await MeasureAsync(client, times, prefix + name, typing: false, () =>
+            {
+                var review = mine[random.Next(mine.Count)];
+                return $"/patients/{review.Patient}/notes/drafts/{review.Draft}/review/{review.Review}";
+            }));
+        }
+
+        return results;
     }
 
     // Step 13a: for each patient, six signed notes and a visit summary of each, through the app's own service and the
@@ -1280,7 +1662,8 @@ internal static partial class RenderBenchmark
                     ClinicianId = clinicianId,
                     Body = "Synthetic note",
                     Version = 1,
-                    History = "Synthetic history: a check-up.",
+                    Subjective = "Synthetic subjective: a check-up.",
+                    Objective = "Synthetic objective: nothing abnormal found.",
                     Assessment = "Synthetic assessment: well.",
                     Plan = "Synthetic plan: see you in a year.",
                     StructuredVersion = 1,
@@ -1293,7 +1676,8 @@ internal static partial class RenderBenchmark
                     DraftId = draft.Id,
                     PatientId = patient,
                     DraftVersion = 1,
-                    History = draft.History,
+                    Subjective = draft.Subjective,
+                    Objective = draft.Objective,
                     Assessment = draft.Assessment,
                     Plan = draft.Plan,
                 };
@@ -1703,6 +2087,49 @@ internal static partial class RenderBenchmark
         await command.ExecuteNonQueryAsync();
     }
 
+    // Step 18: half the benchmark clinician's emergency accesses reviewed by the benchmark's administrator, every other one
+    // in the order they were granted, one in four of those "not appropriate", through the database's own rules: as the
+    // superuser, acting as the administrator, so the review's guard and its trigger run. The accesses, every one ended, in
+    // that order. In the benchmark's own database only: with --stack, none.
+    static async Task<List<Guid>> ReviewHalfAsync(MigratedDatabase? database, Guid adminId, Guid clinicianId)
+    {
+        if (database is null)
+        {
+            return [];
+        }
+
+        await using var connection = new NpgsqlConnection(database.SuperuserConnectionString);
+        await connection.OpenAsync();
+        await using (var transaction = await connection.BeginTransactionAsync())
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                SELECT set_config('app.user_id', @admin::text, true);
+                INSERT INTO ehr.emergency_access_reviews (id, reviewer_id, reviewed_at, outcome, note)
+                SELECT b.id, @admin, now(), CASE WHEN b.n % 4 = 1 THEN 'not-appropriate' ELSE 'appropriate' END, 'Synthetic review note for the benchmark.'
+                FROM (SELECT id, row_number() OVER (ORDER BY granted_at, id) AS n FROM ehr.break_glass_accesses WHERE clinician_id = @clinician) b
+                WHERE b.n % 2 = 1;
+                ANALYZE ehr.emergency_access_reviews;
+                """, connection, transaction);
+            command.Parameters.AddWithValue("admin", adminId);
+            command.Parameters.AddWithValue("clinician", clinicianId);
+            await command.ExecuteNonQueryAsync();
+            await transaction.CommitAsync();
+        }
+
+        await using var accesses = new NpgsqlCommand(
+            "SELECT id FROM ehr.break_glass_accesses WHERE clinician_id = @clinician ORDER BY granted_at, id", connection);
+        accesses.Parameters.AddWithValue("clinician", clinicianId);
+        var ids = new List<Guid>();
+        await using var reader = await accesses.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            ids.Add(reader.GetGuid(0));
+        }
+
+        return ids;
+    }
+
     // Step 13c: a year of views of each record in the audit log, 26 minutes apart, beyond those the run's own pages make.
     // One in twenty is the clinician's read of the record; the rest are views of sensitive items, of a note, of a
     // summary marked sensitive, or by another portal account, and events that are no view at all (a sign-in, writes).
@@ -1748,14 +2175,14 @@ internal static partial class RenderBenchmark
 
     // Signs in as a browser does, password then authenticator code, and returns a client with the session's cookies, which
     // it keeps in the jar given, for the off-site app too.
-    static async Task<HttpClient> SignInAsync(BenchApp app, CookieContainer session, string email, string password, string key)
+    static async Task<HttpClient> SignInAsync(BenchApp app, CookieContainer session, string email, string password, string key, string home = "/patients")
     {
         var client = app.CreateDefaultClient(Base, new RedirectHandler(), new CookieContainerHandler(session));
         using var codePage = await PostFormAsync(client, "/sign-in", await client.GetStringAsync("/sign-in"), ("Input.Email", email), ("Input.Password", password));
-        using var home = await PostFormAsync(client, "/sign-in/code", await codePage.Content.ReadAsStringAsync(), ("Code", Totp.Code(key)));
-        if (home.RequestMessage?.RequestUri?.AbsolutePath != "/patients")
+        using var landed = await PostFormAsync(client, "/sign-in/code", await codePage.Content.ReadAsStringAsync(), ("Code", Totp.Code(key)));
+        if (landed.RequestMessage?.RequestUri?.AbsolutePath != home)
         {
-            throw new InvalidOperationException($"Signing in ended at {home.RequestMessage?.RequestUri?.AbsolutePath}, not at /patients.");
+            throw new InvalidOperationException($"Signing in ended at {landed.RequestMessage?.RequestUri?.AbsolutePath}, not at {home}.");
         }
 
         return client;
@@ -1814,6 +2241,8 @@ internal static partial class RenderBenchmark
             builder
                 .UseContentRoot(RepositoryRoot.Combine("src/Ehr.Web"))
                 .UseSetting("Ehr:Site", "OnPrem")
+                // Listening to a visit is off unless switched on; on here, as the visit's review is measured.
+                .UseSetting("Ehr:Ambient:Enabled", "true")
                 .UseSetting("Logging:LogLevel:Default", "Warning")
                 .UseSetting("Logging:LogLevel:Microsoft.AspNetCore.DataProtection", "Critical")
                 .ConfigureTestServices(services =>
@@ -1853,6 +2282,7 @@ internal static partial class RenderBenchmark
                 .UseContentRoot(RepositoryRoot.Combine("src/Ehr.Web"))
                 .UseEnvironment(Environments.Production)
                 .UseSetting("Ehr:Site", "Cloud")
+                .UseSetting("Ehr:Ambient:Enabled", "true")
                 .UseSetting("ConnectionStrings:Ehr", connectionString)
                 .UseSetting("Ehr:OnPrem:Url", OnPremUrl)
                 .UseSetting("Ehr:CloudAudit:Key", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))

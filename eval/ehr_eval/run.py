@@ -8,15 +8,19 @@ recording goes through the sidecar's own code (answers.py): ffmpeg decoding, Med
 Horizon, timed stage by stage, and then the checks. The two-minute recordings are also fed in one-second chunks, as a
 live dictation is, to time the transcript's update after each chunk. Nothing reaches the network but llama-server.
 
+--set es runs the Spanish test set instead (the expansion plan's step 17; run_es.py), into eval/results/latest-es.json.
+
 It runs K2 Horizon as the sidecar ships it, reasoning off. --reasoning low256 runs the comparison the owner asked for
 instead, reasoning on at "low" capped at 256 tokens (and enable_thinking set, since a llama-server started with
 --reasoning off would otherwise keep it off): its results go to eval/results/compare-low256.json, which the gate
 doesn't check.
 
 The results go to eval/results/latest.json (--out), stamped with the models' hashes, the prompt, schema and parameters
-hash, the pipeline and scoring hashes (scripts.py), the test set's hash and the machine. Record the
-accepted baseline on the server machine only (README.md, "Dictation server hardware"): a run on another machine is for
-information.
+hash, the pipeline and scoring hashes (scripts.py), the test set's hash and the machine. The file is written as the run
+goes: each recording's answers as K2 Horizon gave them, before any check, then checked, and the measures only once
+every recording is in. A fault in the checks or the scoring leaves every answer so far in the file, which rescore.py
+finishes without the models once it is fixed. Record the accepted baseline on the server machine only (README.md,
+"Dictation server hardware"): a run on another machine is for information.
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ import os
 import platform
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -47,11 +52,25 @@ SCHEMA_VERSION = 1
 OUT = {"off": "latest.json", "low256": "compare-low256.json"}
 
 
-async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: Structurer, scripts) -> scoring.Item:  # noqa: ANN001
+async def run_variant(variant: dict, audio_dir: Path, recognizer, structurer: Structurer, scripts,  # noqa: ANN001
+                      raw: Callable[[scoring.Item], None] | None = None) -> scoring.Item:
+    """The recording's item, checked as the sidecar checks it; `raw` is given it first, with its answer as K2 Horizon
+    gave it and no check run yet."""
     item, transcript, proposal = await answer(variant, audio_dir, recognizer, structurer, scripts)
+    if proposal is not None:
+        item.unknown = list(proposal.unknown)
+        item.fields = {name: scoring.FieldOutcome(proposed=field["value"], sources=field["sources"])
+                       for name, field in proposal.fields.items()}
+    if raw is not None:
+        raw(item)
+    scoring.weigh_proposals(item, transcript)
     if proposal is None:
         return item
-    checks = validation.check(proposal.fields, proposal.unknown, transcript)
+    try:
+        checks = validation.check(proposal.fields, proposal.unknown, transcript)
+    except validation.NotEnglish as refused:  # as the sidecar reports it: unsorted, its reason, no field
+        item.sorting, item.reason, item.fields = "unavailable", refused.reason, {}
+        return item
     item.unknown = list(checks.unknown)
     item.fields = {
         name: scoring.FieldOutcome(
@@ -110,6 +129,12 @@ async def main_async(args: argparse.Namespace) -> int:
     if not api_key:
         print("Set LLAMA_API_KEY to llama-server's key.", file=sys.stderr)
         return 2
+    if args.set == "es":
+        from . import run_es
+
+        args.audio, args.out = args.audio or run_es.AUDIO, args.out or run_es.OUT
+        return await run_es.main_async(args, api_key)
+    args.audio = args.audio or EVAL_DIR / "audio"
     manifest_path = args.audio / "manifest.json"
     if not manifest_path.is_file():
         print(f"No {manifest_path}: generate the audio first (eval/README.md).", file=sys.stderr)
@@ -121,26 +146,14 @@ async def main_async(args: argparse.Namespace) -> int:
     models, recognizer, llama, structuring, structurer = open_pipeline(args, api_key)
     out = args.out or EVAL_DIR / "results" / OUT[args.reasoning]
     started_at = datetime.now(UTC).isoformat(timespec="seconds")
-
-    items: list[scoring.Item] = []
-    for number, variant in enumerate(variants, 1):
-        item = await run_variant(variant, args.audio, recognizer, structurer, scripts)
-        if item.seconds >= scoring.TWO_MINUTES and variant.get("noise") is None and not args.no_live:
-            data = (args.audio / variant["file"]).read_bytes()
-            item.chunk_seconds = await live_chunks(data, item.seconds, recognizer, structurer, models)
-        items.append(item)
-        print(f"[{number}/{len(variants)}] {variant['id']}: {item.sorting}"
-              f" ({', '.join(f'{k} {v:.1f}s' for k, v in item.timings.items())})", flush=True)
-    await llama.aclose()
-
-    results = {
+    header = {
         "schema_version": SCHEMA_VERSION,
         "baseline": False,
         "run": {
             "started_at": started_at,
-            "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "finished_at": None,
             "machine": machine(args.machine, args.device),
-            "llama_server": structurer.build,
+            "llama_server": None,
             "reasoning": args.reasoning,
             "parameters": structuring.parameters,
         },
@@ -161,28 +174,67 @@ async def main_async(args: argparse.Namespace) -> int:
             "complete": not args.only,
             "audio": manifest.get("generator", {}),
         },
-        "metrics": scoring.score(items, scripts),
-        "items": [dataclasses.asdict(item) for item in items],
     }
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def save(items: list[scoring.Item], metrics: dict | None = None) -> None:
+        header["run"] |= {"finished_at": datetime.now(UTC).isoformat(timespec="seconds"), "llama_server": structurer.build}
+        write(out, header, items, metrics)
+
+    items: list[scoring.Item] = []
+    for number, variant in enumerate(variants, 1):
+        item = await run_variant(variant, args.audio, recognizer, structurer, scripts,
+                                 raw=lambda answered: save([*items, answered]))
+        if item.seconds >= scoring.TWO_MINUTES and variant.get("noise") is None and not args.no_live:
+            data = (args.audio / variant["file"]).read_bytes()
+            item.chunk_seconds = await live_chunks(data, item.seconds, recognizer, structurer, models)
+        items.append(item)
+        save(items)
+        print(f"[{number}/{len(variants)}] {variant['id']}: {item.sorting}"
+              f" ({', '.join(f'{k} {v:.1f}s' for k, v in item.timings.items())})", flush=True)
+    await llama.aclose()
+
+    save(items, scoring.score(items, scripts))
     print(f"Wrote {out}")
     return 0
 
 
+def write(out: Path, header: dict, items: list, metrics: dict | None = None) -> None:
+    """The results file as it stands: the run's stamps, every recording answered so far, and the measures once there
+    are some."""
+    results = header | ({"metrics": metrics} if metrics is not None else {}) | {
+        "items": [dataclasses.asdict(item) for item in items]}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--llama-url", required=True, help="llama-server's address, such as http://127.0.0.1:8080")
+    parser.add_argument("--set", choices=["en", "es"], default="en", help="the English test set (default) or the Spanish")
+    parser.add_argument("--rescore", type=Path, help="with --set es: a results file whose stored answers to score again")
+    parser.add_argument("--llama-url", help="llama-server's address, such as http://127.0.0.1:8080 (required to run)")
     parser.add_argument("--models-dir", type=Path, default=REPO_ROOT / "infra" / "compose" / "models")
-    parser.add_argument("--audio", type=Path, default=EVAL_DIR / "audio", help="the recordings and their manifest.json")
-    parser.add_argument("--device", default="cpu", help="where MedASR runs: cpu, mps (Apple Silicon) or cuda")
+    parser.add_argument("--audio", type=Path, help="the recordings and their manifest.json (default: eval/audio, or "
+                        "eval/audio-es with --set es)")
+    parser.add_argument("--device", default="cpu", help="where MedASR and Whisper run: cpu, mps (Apple Silicon) or cuda")
     parser.add_argument("--machine", help="a name for this machine in the results (default: its CPU, memory and OS)")
     parser.add_argument("--reasoning", choices=sorted(REASONING), default="off",
                         help="off, as shipped (default), or low256, the comparison")
-    parser.add_argument("--out", type=Path, help="default: eval/results/latest.json, or compare-low256.json")
+    parser.add_argument("--out", type=Path, help="default: eval/results/latest.json, compare-low256.json, or with --set "
+                        "es latest-es.json")
     parser.add_argument("--only", nargs="*", help="script IDs to run, for a quick look; the gate wants all of them")
     parser.add_argument("--no-live", action="store_true", help="skip the one-second-chunk timing")
-    return asyncio.run(main_async(parser.parse_args(argv)))
+    args = parser.parse_args(argv)
+    if args.set == "es" and args.reasoning != "off":
+        parser.error("the Spanish set runs K2 Horizon as it ships, reasoning off")
+    if args.rescore:
+        if args.set != "es":
+            parser.error("--rescore is for --set es; for the English set, use ehr_eval.rescore")
+        from . import run_es
+
+        return run_es.main_rescore(args.rescore, args.out or args.rescore)
+    if not args.llama_url:
+        parser.error("--llama-url is required")
+    return asyncio.run(main_async(args))
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ natively). Secrets come from the environment only, never from a file in the repo
     LLAMA_API_KEY         required: llama-server's key
     DICTATION_LLAMA_URL   llama-server's address (default http://llama:8080, the ai profile's llama service)
     DICTATION_MODELS_DIR  where setup_models.py put the models (default /models, the ai profile's mount)
-    DICTATION_DEVICE      where MedASR runs: cpu (default), mps on a Mac, cuda on an NVIDIA GPU
+    DICTATION_DEVICE      where MedASR and Whisper run: cpu (default), mps on a Mac, cuda on an NVIDIA GPU
 
 The limits are fixed here rather than read from the environment, so every server behaves the same:
 
@@ -14,6 +14,10 @@ The limits are fixed here rather than read from the environment, so every server
     max_session_seconds                    3 minutes of audio a dictation. K2 Horizon repeats each value's sources in its
                                            answer, so a genuine 5-minute dictation took 98-114 s to sort on an M5's GPU,
                                            over its 90 seconds, and outran its 2,048-token answer; 3 minutes leaves room
+    max_spanish_seconds                    2 minutes of audio a dictation in Spanish (the expansion plan's step 17,
+                                           decision 20). Its answer carries English beside every Spanish passage: about
+                                           4 tokens a spoken word, so 3 minutes (about 450 words, 1,900 tokens, 95 s on
+                                           an M5's GPU) would outrun the 90 seconds; 2 minutes is about 64 s
     idle_seconds                           a session no audio has reached for 10 minutes is discarded
     result_seconds                         a result is discarded 10 minutes after it is ready
     structuring_seconds                    K2 Horizon has 90 seconds, its wait for a turn included
@@ -21,6 +25,19 @@ The limits are fixed here rather than read from the environment, so every server
     call_seconds                           a chunk is answered within 15 seconds, transcript updated or not
     stop_wait_seconds                      stop answers within 8 seconds, with whatever is ready
     max_result_wait_seconds                result waits at most 10 seconds for the fields
+
+Listening to a visit (the expansion plan's step 16; listening.py) has limits of its own, besides counting against the
+sessions at once above:
+
+    ambient_max_sessions                   2 visits at once across the server, counted until each one's draft is ready,
+                                           since each holds up to 32 MB of recording and decodes it to 77 MB
+    ambient_max_session_bytes              32 MB a visit
+    ambient_max_session_seconds            20 minutes of audio a visit: about 8 to 12 windows of about 450 tokens
+                                           (conversation.py) to draft, a few minutes; each window has
+                                           structuring_seconds once its turn comes, and waits for its turn while any
+                                           dictation is being sorted
+    ambient_wait_seconds                   10 minutes of waiting for its turns, in all, a visit's windows have; after
+                                           that the visit is left undrafted (model_busy), with its transcript
 
 The on-prem app gives every call 20 seconds (Ehr.Web, Api/Dictation), so no answer here may take longer.
 """
@@ -50,6 +67,7 @@ class Settings:
     max_chunk_bytes: int = 2 * 1024 * 1024
     max_session_bytes: int = 10 * 1024 * 1024
     max_session_seconds: int = 180
+    max_spanish_seconds: int = 120
     idle_seconds: float = 600.0  # a session no audio has reached for this long is discarded
     result_seconds: float = 600.0  # a finished result is discarded this long after it was ready
     structuring_seconds: float = 90.0  # K2 Horizon's time to answer, after which the fields are left unsorted
@@ -57,6 +75,11 @@ class Settings:
     call_seconds: float = 15.0
     stop_wait_seconds: float = 8.0  # how long stop waits for the transcript and fields before answering without them
     max_result_wait_seconds: float = 10.0
+
+    ambient_max_sessions: int = 2
+    ambient_max_session_bytes: int = 32 * 1024 * 1024
+    ambient_max_session_seconds: int = 1200
+    ambient_wait_seconds: float = 600.0
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] = os.environ) -> Settings:

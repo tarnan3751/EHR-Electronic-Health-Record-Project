@@ -48,7 +48,7 @@ public class TC_UC14_09_AddendumInvalidAndRefused(WebApps apps) : IClassFixture<
         using var opened = await PostFormAsync(covering.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));
         var token = Token(await ReadAsync(opened));
         var read = await covering.Client.GetStringAsync(NotePath(patient, note), Cancel);
-        Assert.Contains(History, read);
+        Assert.Contains(Subjective, read);
         Assert.Contains("Add this patient to your panel to sign an addendum.", read);
         Assert.DoesNotContain("data-add-addendum", read);
         var noRedirects = Client(apps.OnPrem, covering.Jar, followRedirects: false);
@@ -73,7 +73,7 @@ public class TC_UC14_09_AddendumInvalidAndRefused(WebApps apps) : IClassFixture<
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, target);
             request.Headers.Add("HX-Request", "true");
-            request.Content = Form([("__RequestVerificationToken", token), ("Version", version), ("History", History),
+            request.Content = Form([("__RequestVerificationToken", token), ("Version", version), ("Subjective", Subjective), ("Objective", Objective),
                 ("Assessment", "Synthetic assessment."), ("Plan", "Synthetic plan."), .. extra]);
             return await session.Client.SendAsync(request, Cancel);
         }
