@@ -48,6 +48,10 @@ namespace Ehr.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at");
 
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by");
+
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -66,6 +70,9 @@ namespace Ehr.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_desktop_sessions");
+
+                    b.HasIndex("RevokedBy")
+                        .HasDatabaseName("ix_desktop_sessions_revoked_by");
 
                     b.HasIndex("StaffUserId")
                         .HasDatabaseName("ix_desktop_sessions_staff_user_id");
@@ -3666,6 +3673,12 @@ namespace Ehr.Migrations
 
             modelBuilder.Entity("Ehr.Data.Accounts.DesktopSession", b =>
                 {
+                    b.HasOne("Ehr.Data.Accounts.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_desktop_sessions_staff_users_revoked_by");
+
                     b.HasOne("Ehr.Data.Accounts.StaffUser", null)
                         .WithMany()
                         .HasForeignKey("StaffUserId")

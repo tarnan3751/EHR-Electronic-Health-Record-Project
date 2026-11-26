@@ -11,7 +11,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Admin;
 // Staff accounts, for admins: who there is, creating one, and looking after one. A new account gets a one-time setup
 // link, shown once, which the admin passes on; the person chooses their password with it and enrolls an authenticator
 // at their first sign-in. The same link serves a forgotten password; a lost phone or device gets the authenticator
-// reset, which removes the account's passkeys too (step 19); and a person who leaves has the account disabled. An admin does none of these to their own account. Nothing here is PHI.
+// reset, which removes the account's passkeys too (step 19); and a person who leaves has the account disabled. An admin does none of these to their own account. A clinician's desktop sign-ins, their own included, are revoked from their own page (DesktopSignIns). Nothing here is PHI.
 public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) : PageModel
 {
     public IReadOnlyList<StaffUser> Staff { get; private set; } = [];

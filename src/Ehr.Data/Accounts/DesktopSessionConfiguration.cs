@@ -16,5 +16,6 @@ public sealed class DesktopSessionConfiguration : IEntityTypeConfiguration<Deskt
         session.Property(s => s.Device).HasMaxLength(100);
         session.HasIndex(s => s.StaffUserId);
         session.HasOne<StaffUser>().WithMany().HasForeignKey(s => s.StaffUserId).OnDelete(DeleteBehavior.Restrict);
+        session.HasOne<StaffUser>().WithMany().HasForeignKey(s => s.RevokedBy).OnDelete(DeleteBehavior.Restrict);
     }
 }

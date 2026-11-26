@@ -29,7 +29,17 @@ busy the app is, as a web sign-in does (Tahseen's ruling 11b of 25 November 2026
   after the 12 hours, it says when they were last updated (`docs/UC7.md`).
 - **Unchanged:** the 30 days, which are now how long the app may open its offline copy without a sign-in (the sign-in's
   `offlineAccess`); signing out; and an administrator ending a session by disabling the account. Remote wipe and what
-  happens when the 30 days run out offline are step 20's.
+  happens when the 30 days run out offline are step 20's (below).
+
+## A revoked sign-in's token says so (the plan's step 20)
+
+An administrator can revoke a clinician's desktop sign-ins (`docs/UC11.md`). From then on every desktop and sync
+request with one of their tokens, on either site, is refused with a 401 carrying `Ehr-Sign-In: revoked`: the remote
+wipe's marker, on which the app deletes what it keeps on that computer (`docs/UC7.md`). The marker comes first,
+whatever else is true of the session: its 12 hours or its 30 days past, its password changed, its account disabled or
+locked out. So a computer that comes back after any time away is still wiped. Only a session an administrator revoked
+gets it (`revoked_by`); a sign-out's token, or any other session that is over, gets the plain 401 it always did, and the
+app keeps what it holds.
 
 ## Test cases
 
@@ -37,6 +47,10 @@ busy the app is, as a web sign-in does (Tahseen's ruling 11b of 25 November 2026
   hours 59 minutes on both sites; at 12 hours a sync on either site and a forwarded chart download are each refused
   with `Ehr-Sign-In: ended`; a new full sign-in syncs; a signed-out session's refusal, and a changed password's, don't
   carry the header.
+- **TC-UC8-09** (`tests/Ehr.Web.Tests/TestCases/UC8/TC_UC8_09_RevokedDesktopToken.cs`): two revoked tokens are refused
+  with `Ehr-Sign-In: revoked` on a sync and an unlock on the on-site app and a sync and a forwarded chart download on
+  the cloud app, and still are after the password changes and 31 days pass; a signed-out token of the same account
+  never carries the header.
 - **TC-UC8-08** (`src/Ehr.Desktop/src-tauri/src/sync.rs`, `an_ended_sign_in_keeps_the_session_and_says_so`): a round
   answered with `Ehr-Sign-In: ended` keeps the session and the offline charts open, says a sign-in is needed, tells the
   lock once, and sends nothing; a chart download answered so says the same.

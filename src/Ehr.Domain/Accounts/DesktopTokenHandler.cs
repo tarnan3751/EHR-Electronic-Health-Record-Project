@@ -13,7 +13,9 @@ namespace Ehr.Domain.Accounts;
 // session it came from, so sign-out knows which one to end. Anything else fails, and a failed or missing token gets
 // the base handler's answer: 401, with no redirect, since the app is not a browser. A token refused only because its
 // sign-in is 12 hours old (the expansion plan's step 19a) says so in SignInHeader, so the app asks for a full sign-in and
-// keeps its offline copy; every other refusal means the session is over, and the app forgets it.
+// keeps its offline copy. A token an administrator revoked says so there too (step 20), and the app deletes everything
+// it keeps on that computer: the remote wipe. Every other refusal means the session is over, and the app forgets it,
+// keeping what it holds.
 public sealed class DesktopTokenHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder,
     DesktopSessions sessions, IUserClaimsPrincipalFactory<StaffUser> principals)
@@ -21,15 +23,18 @@ public sealed class DesktopTokenHandler(
 {
     public const string SessionClaim = "ehr:desktop_session";
 
-    // On the 401 for a session whose sign-in has ended (SignInEnded); nothing else sends it.
+    // On the 401 for a session whose sign-in has ended (SignInEnded), or that an administrator revoked (Revoked);
+    // nothing else sends it.
     public const string SignInHeader = "Ehr-Sign-In";
 
     public const string SignInEnded = "ended";
 
+    public const string Revoked = "revoked";
+
     const string Bearer = "Bearer ";
 
-    // Set while authenticating a session whose sign-in has ended, for the challenge to say so.
-    const string EndedItem = "ehr:desktop-sign-in-ended";
+    // What the challenge says of a refused token: SignInEnded or Revoked, set while authenticating it.
+    const string RefusalItem = "ehr:desktop-refusal";
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -45,9 +50,15 @@ public sealed class DesktopTokenHandler(
             return AuthenticateResult.Fail("The session is over.");
         }
 
+        if (signedIn.Revoked)
+        {
+            Context.Items[RefusalItem] = Revoked;
+            return AuthenticateResult.Fail("An administrator revoked the session.");
+        }
+
         if (signedIn.SignInEnded)
         {
-            Context.Items[EndedItem] = true;
+            Context.Items[RefusalItem] = SignInEnded;
             return AuthenticateResult.Fail("The sign-in is 12 hours old.");
         }
 
@@ -58,9 +69,9 @@ public sealed class DesktopTokenHandler(
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
-        if (Context.Items.ContainsKey(EndedItem))
+        if (Context.Items[RefusalItem] is string refusal)
         {
-            Response.Headers[SignInHeader] = SignInEnded;
+            Response.Headers[SignInHeader] = refusal;
         }
 
         return base.HandleChallengeAsync(properties);

@@ -2487,3 +2487,15 @@ VALUES ('20261125183406_StaffPasskeys', '10.0.13');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE ehr.desktop_sessions ADD revoked_by uuid;
+
+CREATE INDEX ix_desktop_sessions_revoked_by ON ehr.desktop_sessions (revoked_by);
+
+ALTER TABLE ehr.desktop_sessions ADD CONSTRAINT fk_desktop_sessions_staff_users_revoked_by FOREIGN KEY (revoked_by) REFERENCES ehr.staff_users (id) ON DELETE RESTRICT;
+
+INSERT INTO ehr.__ef_migrations_history (migration_id, product_version)
+VALUES ('20261126012834_DesktopSessionRevokedBy', '10.0.13');
+
+COMMIT;
+
