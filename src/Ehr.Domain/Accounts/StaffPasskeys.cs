@@ -21,12 +21,13 @@ namespace Ehr.Domain.Accounts;
 // verified by the device every time (AddEhrAccounts). Between the options the page is given and the credential it sends
 // back, the handler's state travels in the page, protected by Data Protection, for a few minutes, bound to its purpose,
 // to the account and to this sign-in, or for a sign-in to this password step (StaffSignIn.PendingAsync): a state from
-// another account's page, or from another sign-in or password step of the same account, is refused. Every add, refusal
-// and removal is an audit event that names the passkey by a short hash, never its name. Each change holds the account's
-// row first (StaffUserLock), so a locked-out account is refused before a code is checked, every wrong code is counted
-// however requests race, and two adds finishing at once can't both pass the limit; and an add or a removal Identity
-// fails to save throws, so the request's transaction is rolled back with nothing half-saved, and a passkey's row and its
-// audit event always commit together.
+// another account's page, or from another sign-in or password step of the same account, is refused. An add's state also
+// carries the account's security stamp, and an administrator's authenticator reset in between refuses it (step 19.1).
+// Every add, refusal and removal is an audit event that names the passkey by a short hash, never its name. Each change
+// holds the account's row first (StaffUserLock), so a locked-out account is refused before a code is checked, every
+// wrong code is counted however requests race, and two adds finishing at once can't both pass the limit; and an add or a
+// removal Identity fails to save throws, so the request's transaction is rolled back with nothing half-saved, and a
+// passkey's row and its audit event always commit together.
 public sealed class StaffPasskeys(
     UserManager<StaffUser> users, IPasskeyHandler<StaffUser> handler, IOptions<IdentityPasskeyOptions> options,
     IDataProtectionProvider dataProtection, AuditRecorder audit, EhrDbContext db, ILogger<StaffPasskeys> logger)
@@ -86,10 +87,14 @@ public sealed class StaffPasskeys(
 
         var made = await handler.MakeCreationOptionsAsync(
             new PasskeyUserEntity { Id = user.Id.ToString(), Name = user.Email!, DisplayName = user.DisplayName }, context);
-        return PasskeyCeremony.Ready(made.CreationOptionsJson, Protect(new(Adding, user.Id, binding, made.AttestationState!, name)));
+        return PasskeyCeremony.Ready(made.CreationOptionsJson,
+            Protect(new(Adding, user.Id, binding, made.AttestationState!, name, await users.GetSecurityStampAsync(user))));
     }
 
-    // The passkey the browser made, added to the account; or why not.
+    // The passkey the browser made, added to the account; or why not. Refused if the account's security stamp has
+    // changed since its code was checked (step 19.1): an administrator's authenticator reset changes it, and so does an
+    // authenticator enrolled after one, so an add begun before a reset never outlives it. Nothing about the passkey is
+    // checked then, and the refusal doesn't count towards the lockout.
     public async Task<string?> FinishAddAsync(HttpContext context, StaffUser user, string? credentialJson, string? state, CancellationToken cancellationToken)
     {
         if (Unprotect(state, Adding, user.Id, await SignedInAsync(context)) is not { } ceremony || string.IsNullOrEmpty(credentialJson))
@@ -100,6 +105,13 @@ public sealed class StaffPasskeys(
         if (await LockedOutAsync(user, cancellationToken))
         {
             return Locked;
+        }
+
+        if (ceremony.Stamp != await users.GetSecurityStampAsync(user))
+        {
+            audit.Record(AuditActions.PasskeyRefused, tableName: StaffTable, rowId: user.Id, reason: "account changed");
+            await db.SaveChangesAsync(cancellationToken);
+            return "Not saved: your account's sign-in settings changed while this passkey was being added. Sign in again, then add it.";
         }
 
         var made = await handler.PerformAttestationAsync(
@@ -152,7 +164,7 @@ public sealed class StaffPasskeys(
         }
 
         var made = await handler.MakeRequestOptionsAsync(user, context);
-        return PasskeyCeremony.Ready(made.RequestOptionsJson, Protect(new(SigningIn, user.Id, pending, made.AssertionState!, null)));
+        return PasskeyCeremony.Ready(made.RequestOptionsJson, Protect(new(SigningIn, user.Id, pending, made.AssertionState!, null, null)));
     }
 
     // The passkey the browser used, checked for this account and password step: its signature, the person verified,
@@ -248,8 +260,9 @@ public sealed class StaffPasskeys(
     }
 
     // What the page carries between the options and the credential: what it is for, whose, which sign-in, Identity's
-    // own state (the challenge), and the name being given.
-    sealed record Ceremony(string Purpose, Guid Account, string Binding, string State, string? Name);
+    // own state (the challenge), and, for an add, the name being given and the account's security stamp when its code
+    // was checked (none for a sign-in, whose state its purpose keeps from an add).
+    sealed record Ceremony(string Purpose, Guid Account, string Binding, string State, string? Name, string? Stamp);
 }
 
 // The options for the browser and the state to send back with its credential, or the field that is wrong and why, as

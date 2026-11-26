@@ -65,9 +65,12 @@ public sealed class StaffAccounts(UserManager<StaffUser> users, EhrDbContext db,
 
     // The account enrolls an authenticator app again at its next sign-in; the old app, the recovery codes and every
     // passkey stop working: a passkey is never left on an account without its authenticator, and a lost device may hold
-    // either. How many passkeys were removed, each recorded with the admin who removed it.
+    // either. How many passkeys were removed, each recorded with the admin who removed it. The account is held first
+    // (StaffUserLock, step 19.1), so a passkey whose add finishes at the same moment is either saved before the reset
+    // reads the account's passkeys, and removed and counted with them, or refused at its finish (StaffPasskeys).
     public async Task<int> ResetAuthenticatorAsync(StaffUser user, CancellationToken cancellationToken)
     {
+        await StaffUserLock.AcquireAsync(db, user, cancellationToken);
         var removed = 0;
         foreach (var passkey in await passkeys.ListAsync(user))
         {
