@@ -205,6 +205,8 @@ struct View {
     lock: LockView,
     /// Why the kept sign-in was forgotten at start, shown with the sign-in form.
     signed_out_because: Option<&'static str>,
+    /// The servers a sign-in goes to, in order, which the sign-in form names.
+    servers: Vec<String>,
 }
 
 #[tauri::command]
@@ -214,6 +216,10 @@ fn view(app: State<'_, App>) -> Result<View, String> {
     Ok(View {
         lock,
         signed_out_because: *app.notice.lock().unwrap_or_else(PoisonError::into_inner),
+        servers: app
+            .sync()
+            .map(|sync| sync.servers().to_vec())
+            .unwrap_or_default(),
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
@@ -625,7 +631,8 @@ fn times() -> lock::Times {
 /// Locked from the start whenever a sign-in is kept, so quitting never skips the lock. A sign-in kept by an earlier
 /// build, which has no record of the lock's (ehr_desktop::unlock), is forgotten here: the server ends it at its 12
 /// hours anyway, and the clinician signs in again. A record with no sign-in goes too. So does a sign-in made with other
-/// servers than the app has now (EHR_SYNC_SERVERS), before anything is sent to them: any server can answer yes to a
+/// servers than the app has now (a build made for others, or EHR_SYNC_SERVERS in a development build), before anything
+/// is sent to them: any server can answer yes to a
 /// password, and only those the sign-in was made with may answer for the lock (step 19a's final review). The second
 /// value says why, when that's the reason.
 fn starting_lock(

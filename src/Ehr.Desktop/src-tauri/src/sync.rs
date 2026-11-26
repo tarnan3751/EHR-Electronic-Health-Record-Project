@@ -27,10 +27,16 @@ use crate::api::{PullResponse, PushRequest, PushResponse, Refusal, Session, Sign
 use crate::key;
 use crate::store::{self, Store};
 
-/// The on-prem app on the clinic network, then the cloud app over the internet. EHR_SYNC_SERVERS, separated by
-/// commas, replaces them: HTTPS only in a release build. A sign-in is tied to the servers it was made with (main.rs):
-/// started with others, the app forgets it before anything is sent.
-const DEFAULT_SERVERS: &str = "https://ehr.example.com:8443,https://ehr-remote.example.com:9443";
+/// The servers this build was made for, in the order they're tried, separated by commas: EHR_BUILD_SERVERS as it was
+/// when the app was compiled, or without it the local server stack's, the on-prem app on the clinic network, then the
+/// cloud app over the internet. A release build uses these and nothing else, so it can't be started pointing at someone
+/// else's server (the expansion plan's step 20); a development build takes EHR_SYNC_SERVERS in their place. HTTPS only
+/// in a release build. A sign-in is tied to the servers it was made with (main.rs): started with others, the app
+/// forgets it before anything is sent.
+const BUILT_IN_SERVERS: &str = match option_env!("EHR_BUILD_SERVERS") {
+    Some(servers) => servers,
+    None => "https://ehr.example.com:8443,https://ehr-remote.example.com:9443",
+};
 const PATH: &str = "/api/sync/quick-texts";
 const SIGN_IN: &str = "/api/desktop/sign-in";
 const SIGN_OUT: &str = "/api/desktop/sign-out";
@@ -123,9 +129,9 @@ impl From<store::Error> for Failure {
 
 impl Sync {
     pub fn from_environment(saved: Entry) -> Result<Sync, String> {
-        let servers =
-            std::env::var("EHR_SYNC_SERVERS").unwrap_or_else(|_| DEFAULT_SERVERS.to_owned());
-        Sync::new(parse_servers(&servers, !cfg!(debug_assertions))?, saved)
+        let release = !cfg!(debug_assertions);
+        let servers = servers_for(std::env::var("EHR_SYNC_SERVERS").ok(), release);
+        Sync::new(parse_servers(&servers, release)?, saved)
     }
 
     /// The servers, in the order they're tried.
@@ -785,6 +791,14 @@ impl Sync {
     }
 }
 
+/// The built-in servers, or in a development build those `variable` names (EHR_SYNC_SERVERS), when it's set.
+fn servers_for(variable: Option<String>, release: bool) -> String {
+    match variable {
+        Some(servers) if !release => servers,
+        _ => BUILT_IN_SERVERS.to_owned(),
+    }
+}
+
 /// The servers a comma-separated list names. `https_only`, in a release build: a plain-HTTP server, which anything on
 /// this computer could stand in for, is refused, and the app can't sync until the list is put right.
 fn parse_servers(list: &str, https_only: bool) -> Result<Vec<String>, String> {
@@ -799,7 +813,7 @@ fn parse_servers(list: &str, https_only: bool) -> Result<Vec<String>, String> {
         .find(|server| https_only && !server.starts_with("https://"))
     {
         Some(server) => Err(format!(
-            "EHR_SYNC_SERVERS names {server}: this app connects to HTTPS servers only."
+            "The servers' list names {server}: this app connects to HTTPS servers only."
         )),
         None => Ok(servers),
     }
@@ -1441,6 +1455,21 @@ mod tests {
             2,
             "development builds"
         );
+    }
+
+    /// The expansion plan's step 20: a release build uses the servers it was built for whatever EHR_SYNC_SERVERS says, so
+    /// nobody can start it pointing at a server of theirs; a development build takes the variable when it's set.
+    #[test]
+    fn a_release_build_uses_only_its_built_in_servers() {
+        let elsewhere = || Some("https://someone-else.example.net".to_owned());
+        assert_eq!(servers_for(elsewhere(), true), BUILT_IN_SERVERS);
+        assert_eq!(servers_for(None, true), BUILT_IN_SERVERS);
+        assert_eq!(
+            servers_for(elsewhere(), false),
+            "https://someone-else.example.net"
+        );
+        assert_eq!(servers_for(None, false), BUILT_IN_SERVERS);
+        assert!(parse_servers(BUILT_IN_SERVERS, true).is_ok());
     }
 
     /// The server answers 403 when the account isn't a clinician's.

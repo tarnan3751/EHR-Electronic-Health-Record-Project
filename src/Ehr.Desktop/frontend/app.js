@@ -51,6 +51,7 @@ async function refresh() {
     renderStatus(view.status, view.waiting);
     renderAccount(view.status.account);
     show(byId('sign-in-notice'), view.signedOutBecause);
+    byId('sign-in-servers').textContent = `Signs in to: ${view.servers.map(host).join(', ')}`;
     renderOfflineAccess(view.offlineAvailable, signedIn);
     chartsUpdated = view.chartsUpdated;
     renderChartsUpdated();

@@ -56,11 +56,14 @@ A server's no stands: once one has said "wrong password" or "locked out", nothin
 
 **Only the servers the sign-in was made with** answer for the lock (step 19a's final review). Any server can answer yes
 to a password, so the app keeps, with the lock's record, the servers each sign-in was made with (the built-in ones, or
-`EHR_SYNC_SERVERS`), and asks only those. Started with any others, it forgets the kept sign-in and its record before
+`EHR_SYNC_SERVERS` in a development build), and asks only those. Started with any others, it forgets the kept sign-in and its record before
 anything is sent, the token included, and the sign-in form says: "Signed out: this app was started with servers other
 than the ones you signed in with, and only those can open its lock. Sign in again; nothing on this computer was
 deleted." So the hash on this computer isn't used then either: the lock is gone, and only a sign-in opens the offline
-charts. A release build takes HTTPS servers only, so nothing on the computer can stand in for one unauthenticated.
+charts. A release build takes HTTPS servers only, so nothing on the computer can stand in for one unauthenticated, and
+since step 20 only the ones it was built for (`EHR_BUILD_SERVERS` when it was compiled), so it can't be started pointing
+at another server at all; the sign-in form names them ("Signs in to: …"), so a person can see where their password
+goes.
 
 **Past the 12 hours with no server** (decided under the plan's first principle: an outage is when the offline chart is
 needed, and the password still has to be known). The password alone opens the offline charts, to read and to save
