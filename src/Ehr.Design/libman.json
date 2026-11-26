@@ -6,11 +6,6 @@
       "library": "htmx.org@2.0.11",
       "destination": "wwwroot/lib/htmx/",
       "files": [ "dist/htmx.min.js" ]
-    },
-    {
-      "library": "@alpinejs/csp@3.17.4",
-      "destination": "wwwroot/lib/alpinejs/",
-      "files": [ "dist/cdn.min.js" ]
     }
   ]
 }
