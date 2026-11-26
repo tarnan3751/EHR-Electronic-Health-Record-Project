@@ -8,6 +8,14 @@ on:
     branches: ["**"]
   pull_request:
     branches: [main]
+  # A run started by hand can keep the desktop installers it builds (the desktop job). Every other run builds them and
+  # keeps nothing: the repository is public, and the owner decides whether a downloadable artifact counts as publishing.
+  workflow_dispatch:
+    inputs:
+      upload_installers:
+        description: Keep the desktop installers as this run's artifacts, for 3 days
+        type: boolean
+        default: false
 
 # Every job gets a read-only token unless it asks for more.
 permissions:
@@ -369,6 +377,26 @@ jobs:
       # other UC 7 and UC 8 test cases (TC-UC7-01 to 04, TC-UC8-01, 02, 04 and 06); --show-output prints its times.
       - name: Test
         run: cargo test --locked --release -- --show-output
+
+      # The installers, unsigned (the expansion plan's step 20, docs/desktop-install.md): the .dmg on macOS, sealed ad
+      # hoc, and the NSIS setup on Windows. Built on every run, so both platforms are known to bundle; nothing signs an
+      # update here, and no key is ever given to CI. The CLI is cached with the toolchain after its first install.
+      - name: Install the Tauri CLI
+        run: cargo install tauri-cli --version 2.12.0 --locked
+
+      - name: Build the installer
+        run: cargo tauri build --ci -- --locked
+
+      - name: Keep the installer
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SwiftChart-${{ runner.os }}
+          path: |
+            ${{ github.workspace }}/target/release/bundle/dmg/*.dmg
+            ${{ github.workspace }}/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 3
 
   dictation:
     name: Dictation
