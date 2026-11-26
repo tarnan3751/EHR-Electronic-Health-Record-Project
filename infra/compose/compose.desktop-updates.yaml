@@ -1,0 +1,17 @@
+# The desktop app's local update server (the expansion plan's step 20): both apps serve the releases in
+# ./desktop-updates (gitignored), read-only, at /api/desktop/updates on their own addresses, and may refuse to sync
+# with a desktop build older than EHR_DESKTOP_MINIMUM_VERSION (empty: none). See "Desktop updates" in README.md here.
+#   docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait
+services:
+  onprem-app:
+    volumes:
+      - ./desktop-updates:/desktop-updates:ro
+    environment:
+      Ehr__Desktop__UpdatesFolder: /desktop-updates
+      Ehr__Desktop__MinimumVersion: ${EHR_DESKTOP_MINIMUM_VERSION:-}
+  cloud-app:
+    volumes:
+      - ./desktop-updates:/desktop-updates:ro
+    environment:
+      Ehr__Desktop__UpdatesFolder: /desktop-updates
+      Ehr__Desktop__MinimumVersion: ${EHR_DESKTOP_MINIMUM_VERSION:-}

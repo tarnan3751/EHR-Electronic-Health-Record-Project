@@ -196,6 +196,40 @@ Not watched: how far the replica is behind while it streams, how many audit even
 
 Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. The root README's "Dictation server hardware" section covers the faster native options. MedASR runs on the CPU in every case; it's small. Whisper does too in Docker, in fp32, which is slower: it transcribes finished passages only, between pauses.
 
+## Desktop updates
+
+The desktop app checks the servers it was built for for a newer release, and installs one only if it's signed with
+the key built into it (the expansion plan's step 20; `src/Ehr.Web/Api/Desktop/DesktopUpdates.cs`). Locally, both apps
+serve what's in `infra/compose/desktop-updates/` (gitignored) when started with `compose.desktop-updates.yaml`:
+
+```
+docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait
+```
+
+The folder holds the release's files and `latest.json`, in Tauri's form, each platform's `url` a file name in the
+folder:
+
+```
+{
+  "version": "0.2.1",
+  "notes": "What changed, in a sentence.",
+  "pub_date": "2026-11-25T12:00:00Z",
+  "platforms": {
+    "darwin-aarch64": { "signature": "<the contents of SwiftChart.app.tar.gz.sig>", "url": "SwiftChart.app.tar.gz" },
+    "windows-x86_64": { "signature": "<the contents of the setup's .sig>", "url": "SwiftChart_0.2.1_x64-setup.exe" }
+  }
+}
+```
+
+Each site answers with its own address for the file, so off-site copies fetch it from the cloud app. The signatures
+are made on the owner's Mac with the updater's private key, never here or in CI (`docs/desktop-install.md`).
+`EHR_DESKTOP_MINIMUM_VERSION`, set when starting the stack, makes both apps refuse to sync with an older desktop build,
+which then offers the update; its lock and offline charts still work. A build named EHR, from before step 20, says no
+version and is refused too. On macOS:
+`EHR_DESKTOP_MINIMUM_VERSION=0.2.1 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait`; in
+PowerShell: `$env:EHR_DESKTOP_MINIMUM_VERSION = "0.2.1"; docker compose -f compose.yaml -f compose.desktop-updates.yaml
+up -d --wait; Remove-Item Env:EHR_DESKTOP_MINIMUM_VERSION`.
+
 ## Encryption
 
 **In transit.** These connections are TLS with the certificate from the one-time setup, verified against its root: browsers and the desktop app to the three sites; both apps and the migration job to their databases (`SSL Mode=VerifyFull`); the replica's and Barman's streams from the primary across the WAN link; and the cloud app's forwarding to the on-prem app. The databases refuse anything else: `hostssl` is the only kind of network line in `postgres/*/pg_hba.conf`, and `postgres/tls.sh` hands PostgreSQL the certificate in the form it accepts. The `ai` profile is the exception: the on-prem app's calls to `dictation`, and `dictation`'s to `llama`, are plain HTTP with an API key, on the `inference` network inside the on-prem server, which has no route out and nothing else on it. To see the database connections:

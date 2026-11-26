@@ -1,4 +1,4 @@
-//! The EHR desktop app: a window over an encrypted local database (store.rs) that syncs with the servers in the
+//! The SwiftChart desktop app: a window over an encrypted local database (store.rs) that syncs with the servers in the
 //! background (sync.rs) while a clinician is signed in. The page (frontend/) calls the commands below and redraws on
 //! the "changed" event.
 //!
@@ -8,6 +8,10 @@
 //! carries on. It opens with the password, checked by the server when one answers and otherwise against the hash in
 //! the store (ehr_desktop::unlock); after the 12 hours, with a full sign-in, or the password alone while no server can
 //! complete one; after the server ended the session, with a full sign-in only.
+//!
+//! When a server the sign-in was made with says an administrator revoked it, the app deletes everything it keeps on
+//! this computer (the expansion plan's step 20, wipe.rs), says so, and refuses everything else until it's quit. It
+//! offers updates from the same servers, never over the lock or a recording (updates.rs).
 
 // Release builds on Windows open no console window alongside the app.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -17,6 +21,8 @@ mod key;
 mod rules;
 mod store;
 mod sync;
+mod updates;
+mod wipe;
 
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -34,6 +40,10 @@ use store::{Conflict, Phrase, Store};
 
 /// How often the app syncs when nothing prompts it sooner.
 const SYNC_EVERY: Duration = Duration::from_secs(10);
+/// How often a session the server ended presents its token (sync.rs), only so that a revocation made afterwards still
+/// reaches this computer: one refused request every 5 minutes, which records no audit event and counts towards no
+/// lockout on the server (step 20's final review).
+const ENDED_EVERY: Duration = Duration::from_secs(5 * 60);
 
 struct App {
     /// Or why the local database couldn't be opened.
@@ -47,6 +57,14 @@ struct App {
     lock: Mutex<Lock>,
     /// Why the kept sign-in was forgotten at start, for the sign-in form; none once someone signs in.
     notice: Mutex<Option<&'static str>>,
+    /// The local database's file; none on Linux, which keeps it in memory.
+    database: Option<PathBuf>,
+    /// Once an administrator revoked the sign-in: whether everything here was deleted, or what couldn't be. From then
+    /// on the app refuses everything, and says so.
+    deleted: Mutex<Option<Result<(), String>>>,
+    /// This build's version (Cargo.toml, or a release build's --config), which the page shows and every request says.
+    version: String,
+    updates: updates::Updates,
 }
 
 /// Said when the app starts with servers other than the ones the kept sign-in was made with (step 19a's final review).
@@ -58,6 +76,9 @@ const LOCKED: &str = "Locked: unlock the window to see the offline charts.";
 
 impl App {
     fn store(&self) -> Result<MutexGuard<'_, Store>, String> {
+        if self.deleted().is_some() {
+            return Err(DELETED.to_owned());
+        }
         self.store
             .as_ref()
             .map(store::lock)
@@ -66,6 +87,13 @@ impl App {
 
     fn sync(&self) -> Result<&sync::Sync, String> {
         self.sync.as_ref().map_err(Clone::clone)
+    }
+
+    fn deleted(&self) -> Option<Result<(), String>> {
+        self.deleted
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     fn status(&self) -> MutexGuard<'_, Status> {
@@ -128,30 +156,73 @@ impl App {
     }
 
     /// The server ended the sign-in's 12 hours, or the session: kept in the lock's record, so a restart knows, and told
-    /// to the lock. A record that can't be written changes nothing the session doesn't: with it over, nothing opens.
-    fn ending(&self, ending: sync::Ending) {
+    /// to the lock. A record that can't be written changes nothing the session doesn't: with it over, nothing opens. Or
+    /// an administrator revoked the sign-in: everything here is deleted.
+    fn ending(&self, ending: sync::Ending, handle: &AppHandle) {
+        let record = match ending {
+            sync::Ending::SignIn => unlock::sign_in_ended,
+            sync::Ending::Session => unlock::session_over,
+            sync::Ending::Revoked => return self.revoked(handle),
+        };
         if let Ok(store) = self.store() {
-            let _ = store.unlock(match ending {
-                sync::Ending::SignIn => unlock::sign_in_ended,
-                sync::Ending::Session => unlock::session_over,
-            });
+            let _ = store.unlock(record);
         }
         let mut lock = self.lock();
         match ending {
             sync::Ending::SignIn => lock.server_ended_sign_in(),
-            sync::Ending::Session => lock.server_ended_session(),
+            _ => lock.server_ended_session(),
         }
     }
 
-    fn take_ending(&self) {
+    fn take_ending(&self, handle: &AppHandle) {
         if let Some(ending) = self.sync().ok().and_then(sync::Sync::take_ending) {
-            self.ending(ending);
+            self.ending(ending, handle);
         }
+    }
+
+    /// The remote wipe (wipe.rs), only for a sign-in made with the servers that said so. The app was started with them,
+    /// so they always are (starting_lock forgets a sign-in made with others before anything is sent): this checks it
+    /// again where it matters, and otherwise treats the answer as the session's end, deleting nothing.
+    fn revoked(&self, handle: &AppHandle) {
+        // Begun already, by another answer: that wipe says what became of it.
+        if self.deleted().is_some() {
+            return;
+        }
+        let record = self
+            .store()
+            .ok()
+            .and_then(|store| store.unlock(unlock::account).ok().flatten());
+        let servers = self.sync().map(sync::Sync::servers).unwrap_or_default();
+        if !wipe_allowed(record.as_ref(), servers) {
+            if let Ok(sync) = self.sync() {
+                let _ = sync.forget_kept();
+            }
+            self.lock().server_ended_session();
+            return;
+        }
+        // From here on the app refuses everything (store()), whatever becomes of the rest.
+        *self.deleted.lock().unwrap_or_else(PoisonError::into_inner) = Some(Ok(()));
+        let deleted = key::key_entry().and_then(|key| {
+            let mut store = self.store.as_ref().ok().map(store::lock);
+            wipe::delete(store.as_deref_mut(), self.database.as_deref(), &key)
+        });
+        if deleted.is_ok() {
+            if let Some(window) = handle.get_webview_window("main") {
+                let _ = window.clear_all_browsing_data();
+                let _ = window.reload();
+            }
+            if let Ok(sync) = self.sync() {
+                let _ = sync.forget_kept();
+            }
+        }
+        self.lock().signed_out(Moment::now());
+        *self.deleted.lock().unwrap_or_else(PoisonError::into_inner) = Some(deleted);
+        let _ = handle.emit("changed", ());
     }
 }
 
 /// The lock, for the page (frontend/app.js).
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct LockView {
     /// "signedOut" (nothing to lock), "unlocked", "warning" or "locked".
@@ -190,7 +261,7 @@ struct Status {
     checked_at: Option<u64>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct View {
     phrases: Vec<Phrase>,
@@ -205,15 +276,42 @@ struct View {
     lock: LockView,
     /// Why the kept sign-in was forgotten at start, shown with the sign-in form.
     signed_out_because: Option<&'static str>,
+    /// The servers a sign-in goes to, in order, which the sign-in form names.
+    servers: Vec<String>,
+    /// An administrator revoked the sign-in, and everything here was deleted: the page shows only that.
+    deleted: bool,
+    /// What couldn't be deleted, when something couldn't: quitting and starting again finishes it.
+    deleted_problem: Option<String>,
+    /// This build's version.
+    version: String,
+    /// An update, while the window is unlocked and nothing is recording.
+    update: Option<updates::Offer>,
 }
 
 #[tauri::command]
 fn view(app: State<'_, App>) -> Result<View, String> {
+    if let Some(deleted) = app.deleted() {
+        return Ok(View {
+            deleted: true,
+            deleted_problem: deleted.err(),
+            ..View::default()
+        });
+    }
     let lock = app.lock_view();
+    let recording = app.lock().recording_now(Moment::now());
+    let update = app.updates.view(lock.state == "locked", recording);
     let store = app.store()?;
     Ok(View {
         lock,
         signed_out_because: *app.notice.lock().unwrap_or_else(PoisonError::into_inner),
+        servers: app
+            .sync()
+            .map(|sync| sync.servers().to_vec())
+            .unwrap_or_default(),
+        deleted: false,
+        deleted_problem: None,
+        version: app.version.clone(),
+        update,
         phrases: store.phrases()?,
         conflicts: store.conflicts()?,
         waiting: store.waiting()?,
@@ -241,11 +339,14 @@ struct OfflineChart {
 }
 
 #[tauri::command]
-async fn download_panel(app: State<'_, App>) -> Result<(), String> {
+async fn download_panel(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
     app.unlocked()?;
     let sync = app.sync()?;
     let downloaded = sync.download_panel().await;
-    app.take_ending();
+    app.take_ending(&handle);
+    if sync.take_update_required() {
+        app.updates.check_now();
+    }
     let (token, panel) = downloaded?;
     let mut store = app.store()?;
     sync.with_clinician(Some(&token), |owner| {
@@ -399,10 +500,18 @@ async fn sign_in(
 ) -> Result<(), String> {
     app.sync()?.sign_in(&email, &password, &code).await?;
     let remembered = remember_sign_in(&app, &email, password).await;
-    app.lock().signed_in(SystemTime::now(), Moment::now());
+    signed_in(&app);
     *app.notice.lock().unwrap_or_else(PoisonError::into_inner) = None;
     app.wake.notify_one();
     remembered
+}
+
+/// A sign-in with both factors: the lock's 12 hours start now, and the offline copy's 30 days are the new session's.
+fn signed_in(app: &App) {
+    let offline_until = app.sync().ok().and_then(sync::Sync::offline_until);
+    let mut lock = app.lock();
+    lock.signed_in(SystemTime::now(), Moment::now());
+    lock.offline_until(offline_until);
 }
 
 /// After a sign-in with both factors, what the lock needs to open without a server (ehr_desktop::unlock): the password's
@@ -424,8 +533,13 @@ async fn remember_sign_in(app: &App, email: &str, password: String) -> Result<()
 /// Signs out, and starts a round so the status says so. The local copy stays, to read; the lock's record goes, and
 /// there's nothing left to lock. The lock offers it too, to someone else at the computer.
 #[tauri::command]
-async fn sign_out(app: State<'_, App>) -> Result<(), String> {
+async fn sign_out(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
     let signed_out = app.sync()?.sign_out().await;
+    // A server that says the sign-in was revoked: everything here is deleted instead (step 20's final review).
+    app.take_ending(&handle);
+    if app.deleted().is_some() {
+        return Ok(());
+    }
     let forgotten = app
         .store()
         .and_then(|store| store.unlock(unlock::forget).map_err(Into::into));
@@ -461,7 +575,12 @@ fn lock_now(app: State<'_, App>) -> LockView {
 /// can does this computer, against its hash; a server's no stands. For a full sign-in, the same: the password alone
 /// opens it past the 12 hours only when no server can complete a sign-in; after the server ended the session, never.
 #[tauri::command]
-async fn unlock(app: State<'_, App>, password: String, code: String) -> Result<LockView, String> {
+async fn unlock(
+    app: State<'_, App>,
+    handle: AppHandle,
+    password: String,
+    code: String,
+) -> Result<LockView, String> {
     let Some(need) = app.lock().need() else {
         return Ok(app.lock_view());
     };
@@ -482,7 +601,7 @@ async fn unlock(app: State<'_, App>, password: String, code: String) -> Result<L
         let answer = sync.sign_in_answer(&email, &password, &code).await;
         if answer.is_ok() {
             remember_sign_in(&app, &email, password).await?;
-            app.lock().signed_in(SystemTime::now(), Moment::now());
+            signed_in(&app);
             *app.notice.lock().unwrap_or_else(PoisonError::into_inner) = None;
             app.wake.notify_one();
             return Ok(app.lock_view());
@@ -494,7 +613,7 @@ async fn unlock(app: State<'_, App>, password: String, code: String) -> Result<L
         Next::CheckHere => open_here(&app, password).await?,
         Next::Refused(problem) => return Err(problem),
         Next::Ended(ending, problem) => {
-            app.ending(ending);
+            app.ending(ending, &handle);
             return Err(problem);
         }
     }
@@ -525,6 +644,7 @@ fn after_unlock(answer: sync::Unlock) -> Next {
                 .to_owned(),
         ),
         sync::Unlock::SessionOver => Next::Ended(sync::Ending::Session, SESSION_OVER.to_owned()),
+        sync::Unlock::Revoked => Next::Ended(sync::Ending::Revoked, DELETED.to_owned()),
         sync::Unlock::Unreachable => Next::CheckHere,
     }
 }
@@ -591,6 +711,89 @@ async fn open_here(app: &App, password: String) -> Result<(), String> {
     })
 }
 
+/// What every command answers once an administrator revoked the sign-in and the app deleted what it kept here.
+const DELETED: &str = "Deleted: an administrator revoked this computer's sign-in. Quit SwiftChart.";
+
+/// Whether the remote wipe's marker may delete what's kept here: only for a sign-in whose lock's record says it was made
+/// with the servers the app has, which are the ones that answered (adjustment c of the step's plan review).
+fn wipe_allowed(record: Option<&unlock::Account>, servers: &[String]) -> bool {
+    record.is_some_and(|record| record.servers == servers)
+}
+
+/// Get the offered update ready: downloaded, its signature checked, and on macOS installed for the next start.
+#[tauri::command]
+async fn accept_update(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
+    let _ = handle.emit("changed", ());
+    let accepted = app.updates.accept().await;
+    let _ = handle.emit("changed", ());
+    accepted
+}
+
+/// "Not now": the offer is put away until the next start.
+#[tauri::command]
+fn dismiss_update(app: State<'_, App>) {
+    app.updates.dismiss();
+}
+
+/// Restart now, with an update ready: never while the window is locked or a recording is being made.
+#[tauri::command]
+fn restart_for_update(app: State<'_, App>, handle: AppHandle) -> Result<(), String> {
+    {
+        let lock = app.lock();
+        if lock.is_locked() {
+            return Err(LOCKED.to_owned());
+        }
+        if lock.recording_now(Moment::now()) {
+            return Err("Finish the recording first: restarting would stop it.".to_owned());
+        }
+    }
+    app.updates.restart(&handle)
+}
+
+/// The app's commands, each refused once everything here was deleted, but for those open_after_deletion names.
+fn refused_after_deletion(
+    commands: impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static,
+) -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    move |invoke| {
+        let deleted = invoke
+            .message
+            .webview()
+            .try_state::<App>()
+            .is_some_and(|app| app.deleted().is_some());
+        if deleted && !open_after_deletion(invoke.message.command()) {
+            invoke.resolver.reject(DELETED);
+            return true;
+        }
+        commands(invoke)
+    }
+}
+
+/// Checks for updates from the servers this build was made for (updates.rs).
+async fn updates_in_background(handle: AppHandle) {
+    let app = handle.state::<App>();
+    let servers = app
+        .sync()
+        .map(|sync| sync.servers().to_vec())
+        .unwrap_or_default();
+    if !servers.is_empty() {
+        app.updates
+            .check_in_background(handle.clone(), servers)
+            .await;
+    }
+}
+
+/// The commands the page may still call once everything here was deleted: what it shows, and Quit. Every other is
+/// refused, a command added later included (main's invoke handler).
+fn open_after_deletion(command: &str) -> bool {
+    matches!(command, "view" | "quit")
+}
+
+/// Ends the app, from the page that says everything here was deleted.
+#[tauri::command]
+fn quit(handle: AppHandle) {
+    handle.exit(0);
+}
+
 const TOO_MANY: &str = "Too many wrong passwords: only a sign-in with your password and the code from your \
                         authenticator app opens this window now, once the clinic's server can be reached. Nothing on \
                         this computer was deleted.";
@@ -625,7 +828,8 @@ fn times() -> lock::Times {
 /// Locked from the start whenever a sign-in is kept, so quitting never skips the lock. A sign-in kept by an earlier
 /// build, which has no record of the lock's (ehr_desktop::unlock), is forgotten here: the server ends it at its 12
 /// hours anyway, and the clinician signs in again. A record with no sign-in goes too. So does a sign-in made with other
-/// servers than the app has now (EHR_SYNC_SERVERS), before anything is sent to them: any server can answer yes to a
+/// servers than the app has now (a build made for others, or EHR_SYNC_SERVERS in a development build), before anything
+/// is sent to them: any server can answer yes to a
 /// password, and only those the sign-in was made with may answer for the lock (step 19a's final review). The second
 /// value says why, when that's the reason.
 fn starting_lock(
@@ -649,8 +853,14 @@ fn starting_lock(
         let signed_in_at =
             UNIX_EPOCH + Duration::from_secs(u64::try_from(record.signed_in_at).unwrap_or(0));
         let mut lock = Lock::new(times(), Some(signed_in_at), record.sign_in_ended, now);
+        // Past the sign-in's 30 days, it opens on the lock for a full sign-in only (lock.rs), the session kept.
+        lock.offline_until(sync.as_ref().ok().and_then(sync::Sync::offline_until));
         if record.wrong >= unlock::WRONG_BEFORE_SIGN_IN {
             lock.require_sign_in();
+        }
+        // A session the server ended, kept for a revocation to reach: only a full sign-in opens the lock.
+        if sync.as_ref().is_ok_and(sync::Sync::session_ended) {
+            lock.server_ended_session();
         }
         return (lock, None);
     }
@@ -741,7 +951,14 @@ async fn sync_in_background(handle: AppHandle) {
     loop {
         let report = client.round(store).await;
         // Before the page hears of the round: a session the server ended locks the window, rather than clear it.
-        app.take_ending();
+        app.take_ending(&handle);
+        if client.take_update_required() {
+            app.updates.check_now();
+        }
+        if app.deleted().is_some() {
+            // Wiped: nothing more is sent, or kept.
+            return;
+        }
         let _ = handle.emit("lock", app.lock_view());
         {
             let mut status = app.status();
@@ -755,22 +972,27 @@ async fn sync_in_background(handle: AppHandle) {
         // Only a closed window misses it, and the page asks for everything when it opens.
         let _ = handle.emit("changed", ());
 
+        let every = if client.session_ended() {
+            ENDED_EVERY
+        } else {
+            SYNC_EVERY
+        };
         tokio::select! {
-            () = tokio::time::sleep(SYNC_EVERY) => {}
+            () = tokio::time::sleep(every) => {}
             () = app.wake.notified() => {}
         }
     }
 }
 
-/// Opens the encrypted database without replacing it if the key is missing or invalid.
-fn open_store(app: &tauri::App) -> Result<Store, String> {
-    let path = database_path(app)?;
+/// Opens the encrypted database at `path` without replacing it if the key is missing or invalid.
+fn open_store(path: &Result<PathBuf, String>) -> Result<Store, String> {
+    let path = path.as_ref().map_err(Clone::clone)?;
     let exists = path != std::path::Path::new(":memory:")
         && path
             .try_exists()
             .map_err(|error| format!("{}: {error}", path.display()))?;
     let key = key::load(exists)?;
-    Store::open(&path, &key).map_err(Into::into)
+    Store::open(path, &key).map_err(Into::into)
 }
 
 /// In the app's data folder on macOS and Windows. Linux is for development only, and keeps its key in memory
@@ -791,10 +1013,14 @@ fn database_path(app: &tauri::App) -> Result<PathBuf, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let store = open_store(app).map(Mutex::new);
+            let database = database_path(app);
+            let store = open_store(&database).map(Mutex::new);
             // After open_store, which chose the credential store that keeps the session.
-            let sync = key::session_entry().and_then(sync::Sync::from_environment);
+            let version = app.package_info().version.to_string();
+            let sync = key::session_entry()
+                .and_then(|entry| sync::Sync::from_environment(entry, &version));
             let (lock, notice) = starting_lock(&store, &sync);
             app.manage(App {
                 store,
@@ -803,12 +1029,19 @@ fn main() {
                 wake: Notify::new(),
                 lock: Mutex::new(lock),
                 notice: Mutex::new(notice),
+                database: database
+                    .ok()
+                    .filter(|path| path != std::path::Path::new(":memory:")),
+                deleted: Mutex::new(None),
+                version,
+                updates: updates::Updates::default(),
             });
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
             tauri::async_runtime::spawn(lock_in_background(app.handle().clone()));
+            tauri::async_runtime::spawn(updates_in_background(app.handle().clone()));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(refused_after_deletion(tauri::generate_handler![
             view,
             add,
             edit,
@@ -828,9 +1061,13 @@ fn main() {
             recording,
             lock_now,
             unlock,
-        ])
+            quit,
+            accept_update,
+            dismiss_update,
+            restart_for_update,
+        ]))
         .run(tauri::generate_context!())
-        .expect("failed to run the EHR desktop app");
+        .expect("failed to run the SwiftChart desktop app");
 }
 
 #[cfg(test)]
@@ -872,6 +1109,23 @@ mod tests {
     fn kept_sign_in(
         servers: Vec<String>,
     ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
+        kept_sign_in_until(servers, 4_102_444_800)
+    }
+
+    /// kept_sign_in, with the offline copy's 30 days ending at `offline_until`, in seconds since 1970.
+    fn kept_sign_in_until(
+        servers: Vec<String>,
+        offline_until: u64,
+    ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
+        kept_session(servers, offline_until, false)
+    }
+
+    /// kept_sign_in_until, with the session `ended` by the server (sync.rs) or not.
+    fn kept_session(
+        servers: Vec<String>,
+        offline_until: u64,
+        ended: bool,
+    ) -> (Result<Mutex<Store>, String>, Result<sync::Sync, String>) {
         let store = Store::open(Path::new(":memory:"), &[7; 32]).unwrap();
         store
             .unlock(|db| {
@@ -887,17 +1141,20 @@ mod tests {
             .unwrap();
         let credentials = mock::Store::new().unwrap();
         let entry = credentials
-            .build("com.example.ehr", "server-session", None)
+            .build(crate::key::SERVICE, "server-session", None)
             .unwrap();
         entry
             .set_password(
                 &serde_json::json!({ "token": "the-token", "displayName": "Dr. Example",
-                    "expiresAt": "2099-01-01T00:00:00Z",
-                    "offlineAccess": { "clinicianId": CLINICIAN, "expiresUnixSeconds": 4_102_444_800u64 } })
+                    "expiresAt": "2099-01-01T00:00:00Z", "ended": ended,
+                    "offlineAccess": { "clinicianId": CLINICIAN, "expiresUnixSeconds": offline_until } })
                 .to_string(),
             )
             .unwrap();
-        (Ok(Mutex::new(store)), sync::Sync::new(servers, entry))
+        (
+            Ok(Mutex::new(store)),
+            sync::Sync::new(servers, entry, "0.2.0"),
+        )
     }
 
     /// Step 19a's final review, the reviewer's case: with the window locked, someone at the computer starts the app again
@@ -941,6 +1198,105 @@ mod tests {
         );
         assert_eq!(notice, None);
         assert_eq!(sync.unwrap().account().as_deref(), Some("Dr. Example"));
+    }
+
+    /// TC-UC7-13 (proposed FR-69, Tahseen's 14b): a kept sign-in whose 30 days are over starts on the lock for a full
+    /// sign-in only, with the session kept for the next server to answer, and nothing deleted.
+    #[test]
+    fn a_kept_sign_in_past_its_30_days_starts_locked_for_a_full_sign_in() {
+        let yesterday = u64::try_from(unix_now()).unwrap() - 24 * 60 * 60;
+        let (store, sync) = kept_sign_in_until(vec![SIGNED_IN_WITH.to_owned()], yesterday);
+
+        let (mut lock, notice) = starting_lock(&store, &sync);
+
+        assert_eq!(
+            lock.tick(Moment::now()),
+            lock::State::Locked {
+                need: Need::SignedOut,
+                why: Why::OfflineEnded
+            }
+        );
+        assert_eq!(notice, None);
+        assert_eq!(sync.unwrap().account().as_deref(), Some("Dr. Example"));
+        assert!(
+            store::lock(&store.unwrap())
+                .unlock(unlock::account)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    /// Step 20's final review: a session the server ended, its token kept for a revocation to reach, starts on the lock
+    /// for a full sign-in only, and opens nothing until then.
+    #[test]
+    fn a_kept_session_the_server_ended_starts_locked_for_a_full_sign_in() {
+        let (store, sync) = kept_session(vec![SIGNED_IN_WITH.to_owned()], 4_102_444_800, true);
+
+        let (mut lock, notice) = starting_lock(&store, &sync);
+
+        assert_eq!(
+            lock.tick(Moment::now()),
+            lock::State::Locked {
+                need: Need::SignedOut,
+                why: Why::Ended
+            }
+        );
+        assert_eq!(notice, None);
+        let sync = sync.unwrap();
+        assert!(sync.session_ended());
+        assert!(!sync.offline_available());
+    }
+
+    /// Step 20's final review: once everything here was deleted, every command is refused but the page's view and Quit,
+    /// a command added later included.
+    #[test]
+    fn after_deletion_only_the_view_and_quit_are_open() {
+        let commands = [
+            "add",
+            "edit",
+            "resolve",
+            "sync_now",
+            "sign_in",
+            "sign_out",
+            "download_panel",
+            "offline_panel",
+            "offline_chart",
+            "save_clinical_draft",
+            "edit_clinical",
+            "resolve_clinical",
+            "save_recording",
+            "lock_state",
+            "activity",
+            "recording",
+            "lock_now",
+            "unlock",
+            "accept_update",
+            "dismiss_update",
+            "restart_for_update",
+            "a_command_added_later",
+        ];
+        assert!(commands.iter().all(|command| !open_after_deletion(command)));
+        assert!(open_after_deletion("view") && open_after_deletion("quit"));
+    }
+
+    /// TC-UC7-12 (proposed FR-69): the remote wipe's marker deletes what's kept here only for a sign-in made with the
+    /// servers the app has, which answered; a sign-in with no lock's record, or made with others, is never wiped.
+    #[test]
+    fn only_the_servers_the_sign_in_was_made_with_can_wipe_it() {
+        let (store, _) = kept_sign_in(vec![SIGNED_IN_WITH.to_owned()]);
+        let record = store::lock(&store.unwrap())
+            .unlock(unlock::account)
+            .unwrap();
+        let theirs = [SIGNED_IN_WITH.to_owned()];
+        let others = ["https://someone-else.example.net".to_owned()];
+
+        assert!(wipe_allowed(record.as_ref(), &theirs));
+        assert!(!wipe_allowed(record.as_ref(), &others));
+        assert!(!wipe_allowed(None, &theirs));
+        assert_eq!(
+            after_unlock(sync::Unlock::Revoked),
+            Next::Ended(sync::Ending::Revoked, DELETED.to_owned())
+        );
     }
 
     /// TC-UC7-10 (proposed FR-68), the lock's choice: the password is checked on this computer only when no server

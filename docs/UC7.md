@@ -56,11 +56,14 @@ A server's no stands: once one has said "wrong password" or "locked out", nothin
 
 **Only the servers the sign-in was made with** answer for the lock (step 19a's final review). Any server can answer yes
 to a password, so the app keeps, with the lock's record, the servers each sign-in was made with (the built-in ones, or
-`EHR_SYNC_SERVERS`), and asks only those. Started with any others, it forgets the kept sign-in and its record before
+`EHR_SYNC_SERVERS` in a development build), and asks only those. Started with any others, it forgets the kept sign-in and its record before
 anything is sent, the token included, and the sign-in form says: "Signed out: this app was started with servers other
 than the ones you signed in with, and only those can open its lock. Sign in again; nothing on this computer was
 deleted." So the hash on this computer isn't used then either: the lock is gone, and only a sign-in opens the offline
-charts. A release build takes HTTPS servers only, so nothing on the computer can stand in for one unauthenticated.
+charts. A release build takes HTTPS servers only, so nothing on the computer can stand in for one unauthenticated, and
+since step 20 only the ones it was built for (`EHR_BUILD_SERVERS` when it was compiled), so it can't be started pointing
+at another server at all; the sign-in form names them ("Signs in to: …"), so a person can see where their password
+goes.
 
 **Past the 12 hours with no server** (decided under the plan's first principle: an outage is when the offline chart is
 needed, and the password still has to be known). The password alone opens the offline charts, to read and to save
@@ -121,6 +124,85 @@ copy older than it would have, so the offline charts now say how old they are: "
 recorded with each download, by this computer's clock, in the encrypted store (`charts.rs`); charts downloaded by an
 earlier build say that when isn't recorded, until they are downloaded again.
 
+## When the 30 days pass offline (the plan's step 20)
+
+A sign-in's session lets the app open its offline copy for 30 days (the sign-in's `offlineAccess`). A computer that
+stops reaching any server, a revoked one that is never connected again included, could otherwise keep its charts open
+with the password alone. So, Tahseen's ruling 14b: when the 30 days pass, by this computer's clock, the window locks,
+as soon as no recording holds it off, and also opens on that lock at start: "Locked: the offline charts open for 30
+days after a sign-in, and yours have passed. Nothing on this computer was deleted." Only a full sign-in, the password
+and the code, opens it, and only once a server can complete one: the password alone is never enough, whether or not a
+server can be reached (`lock.rs`, `Why::OfflineEnded`). Nothing is deleted, and the session is kept, so the next server
+to answer says what became of it: a revoked one is wiped (below); one merely over is ended, keeping what the
+computer holds and its token (below). The commands that read the offline charts already refused them after the 30 days; this
+closes a chart that was open when they passed. Setting the computer's clock back delays it, as it delays the 12-hour
+lock (the decision log, step 19a); changing the clock needs the computer's administrator.
+
+## The remote wipe (the plan's step 20)
+
+When an administrator revokes a clinician's desktop sign-ins (`docs/UC11.md`), every server refuses their tokens
+saying so (`Ehr-Sign-In: revoked`, `docs/UC8.md`), and the next time the app on each of their computers reaches a
+server, by its sync every 10 seconds, a chart download or the lock's check of the password, it deletes everything it
+keeps there (`src-tauri/src/wipe.rs`, proposed FR-69), and so does signing out on it while the server says so. Nothing
+else leads to it: a plain 401, the 12-hour answer and any other refusal keep what the computer holds, as before.
+
+**In either order** (step 20's final review). A plain 401, the account disabled or its password or authenticator
+reset, or the 30 days over, ends the session here but no longer forgets its token: the window locks for a full sign-in,
+nothing opens without one (the offline charts, drafts and recordings refuse an ended session), and the token is kept and
+presented every 5 minutes and at each start, with nothing sent and nothing brought back applied, so that a revocation
+made afterwards still reaches this computer and wipes it. It goes when the person signs out here, or when a new full
+sign-in replaces it. A redirect is never followed, so only the servers named can say `revoked`. And only for a sign-in whose lock's record says it was made with
+the servers that answered, which the app was started with: a release build has those built in (step 20), and a sign-in
+made with others is forgotten at start before anything is sent (step 19a).
+
+In this order, so that a crash at any point leaves nothing readable and the next start, told again, finishes it:
+
+1. The encrypted database, closed first, since Windows can't delete an open file, and SQLite's files beside it: the
+   offline charts, drafts and recordings, phrases and changes not sent, and the lock's record with its hash of the
+   password.
+2. Its key, in the Keychain or Credential Manager. Until then the database was unreadable without it; after, there is
+   nothing left to read.
+3. The web view's own data (the page keeps nothing there, but it's cleared all the same), and the page itself, loaded
+   again, so nothing it showed or had typed in it stays in memory.
+4. The kept sign-in, last: until then a start after a crash presents it again and is told again.
+
+The window then shows only: "Deleted: an administrator revoked this computer's sign-in, so SwiftChart deleted
+everything it kept here: the offline charts, drafts and recordings not yet sent, and its key. Quit SwiftChart; when it
+starts again it is empty, and you can sign in.", with **Quit SwiftChart**; every command is refused. If something
+couldn't be deleted, it says "Not finished:" and what, and starting again finishes it. Drafts and recordings not yet
+sent are lost, by design: the administrator is told before revoking. One way past it: a clinician who signs in again
+with the password and the code before the app's first round reaches a server replaces the revoked sign-in, so nothing
+is deleted; only the account's owner can, and for someone leaving the administrator disables the account too, before or
+after revoking. Once deleted, every command but the page's view and Quit is refused, any added later included; a second
+answer of `revoked` while a wipe is under way leaves that wipe to say what became of it.
+
+## Updates (the plan's step 20)
+
+The app updates itself with Tauri's updater (`src-tauri/src/updates.rs`, Tahseen's 15a, proposed FR-70), from Rust
+only: the page has no permission for the updater.
+
+- **Where from:** the servers the build was made for, in order (`docs/UC8.md` has the server's side), after each start
+  and every 24 hours, and at once when a server refuses this version as too old.
+- **What it takes:** only a release newer than this one, never an older, and only if its signature matches the key built
+  into the app (`tauri.conf.json`, `plugins.updater.pubkey`) for the very version announced (`requireSignedVersion`), so
+  nobody who can change what a server says can pair a new version number with an older release. The updater checks it
+  after downloading and again before installing; a signature that doesn't match installs nothing: "Not installed:
+  SwiftChart … couldn't be downloaded or installed, or its signature didn't match, so nothing was changed." An
+  interrupted download fails the same check. The signing key never reaches CI (`docs/desktop-install.md`).
+- **When:** it asks, and only while the window is unlocked and nothing is recording: "Update available: SwiftChart ….
+  Get it ready, and it installs when you restart SwiftChart; nothing you've saved is affected.", with **Get it ready**
+  and **Not now**, which puts it away; a notice that it failed can be put away too. The daily check goes on all the
+  same, and offers a release again unless it's the one put away; a check gives up after 30 seconds. Got ready, on macOS
+  the checked app replaces this one on disk at once, swapped whole, and runs from the next start; on Windows its
+  installer runs at **Restart now**, showing its progress, for this user, and starts the new version (quitting instead
+  offers it again at the next start). **Restart now** is refused while recording. A start after an update opens on the lock, as every start with a sign-in kept does, and what
+  the app keeps is untouched: the identifier is the same.
+- **Below the minimum** a server names (`docs/UC8.md`), the status says the server's words, "Update needed: the
+  clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the offline charts can
+  still be read.", and the app checks for the update at once. The lock and the offline charts work as before.
+- **No going back** from inside the app: a bad release is followed by a newer one, or the previous installer run again,
+  which keeps what the app holds.
+
 ## Test cases
 
 - **TC-UC7-07** (`tests/Ehr.Web.Tests/TestCases/UC7/TC_UC7_07_DesktopUnlock.cs`): the right password unlocks, on the
@@ -149,5 +231,19 @@ earlier build say that when isn't recorded, until they are downloaded again.
   with, it starts locked for the password with the sign-in kept; a release build refuses a plain-HTTP server.
 - **TC-UC7-11** (`src-tauri/src/unlock.rs`): the hash takes under a second, and CI's macOS and Windows runners print how
   long.
+- **TC-UC7-12** (`src-tauri/src/sync.rs`, `wipe.rs`, `main.rs`): only the remote wipe's marker leads to the wipe: a
+  round answered with it keeps the session to be deleted last, says so and sends nothing more, as a chart download and
+  the lock's check do; beside it a plain 401 ends the session, keeping its token, the 12-hour marker keeps it, and a
+  426 is a problem like any other; the wipe deletes the database's files after closing it, then its key, and a second run finds nothing
+  and is fine; and it runs only for a sign-in whose lock's record names the servers the app has, never with no record
+  or other servers.
+- **TC-UC7-13** (`src-tauri/src/lock.rs`, `main.rs`): when the 30 days pass the window locks for a full sign-in only,
+  once a recording ends, and a lock for the password asks for one; a kept sign-in started past them opens on that lock
+  with its session and the lock's record kept; signed out, there's nothing to lock. The full sign-in with no server to
+  complete it opens nothing then (TC-UC7-10's test of the lock's choice).
+- **TC-UC7-14** (`src-tauri/src/updates.rs`): an update is shown only while the window is unlocked and nothing is
+  recording, and "Not now" puts an offer away until the next start, while one being got ready, ready or failed still
+  shows; each built-in server is asked at its own address. The updater's own checks of the signature and the version
+  aren't run by a test here: the hands-on check's step for a bad signature is.
 - **The download's time** (`charts.rs`, `a_download_records_when_it_was_made`): a download records when it was made and
   the clinic's time zone, for that clinician only, and the next one moves it on.

@@ -20,6 +20,7 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("/admin/staff", "/sign-in")]
     [InlineData("/session", "/sign-in")]
     [InlineData("/admin/emergency-access/00000000-0000-0000-0000-000000000001", "/sign-in")]
+    [InlineData("/admin/staff/00000000-0000-0000-0000-000000000001/desktop", "/sign-in")]
     [InlineData("/passkeys", "/sign-in")]
     [InlineData("/portal", "/portal/sign-in")]
     [InlineData("/portal/session", "/portal/sign-in")]
@@ -66,8 +67,12 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
     {
         var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
 
-        // The staff page, and an emergency access's review (step 18).
-        foreach (var path in new[] { "/admin/staff", "/admin/emergency-access/00000000-0000-0000-0000-000000000001" })
+        // The staff page, an emergency access's review (step 18), and a staff account's desktop sign-ins (step 20).
+        foreach (var path in new[]
+        {
+            "/admin/staff", "/admin/emergency-access/00000000-0000-0000-0000-000000000001",
+            "/admin/staff/00000000-0000-0000-0000-000000000001/desktop",
+        })
         {
             using var response = await Client(apps.OnPrem, session.Jar, followRedirects: false).GetAsync(path, Cancel);
 

@@ -8,6 +8,10 @@
 //!   has passed. Once only: a lock opened then with the password alone, because no server could complete a sign-in,
 //!   isn't locked again by each server that says so; every lock after it asks for a full sign-in.
 //! - When the server ends the session (a changed password, the account locked or disabled, the session's 30 days).
+//! - When the sign-in's 30 days pass by this computer's clock, how long the offline copy may be opened without one,
+//!   for a full sign-in with the password alone never enough, whether or not a server can be reached (the expansion
+//!   plan's step 20, Tahseen's 14b: a revoked computer that never connects again locks its data, and deletes nothing
+//!   until it connects). The session is kept, so the next server to answer can say what became of it.
 //! - At launch, whenever a sign-in is kept, so quitting never skips the lock.
 //!
 //! A recording being made counts as activity and holds every lock and warning off, for 5 minutes at most: the desktop
@@ -106,6 +110,8 @@ pub enum Why {
     WrongPasswords,
     /// The server ended the session.
     Ended,
+    /// The sign-in's 30 days are over, by this computer's clock: the offline copy is closed until a full sign-in.
+    OfflineEnded,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -139,6 +145,9 @@ pub struct Lock {
     ended: bool,
     /// The server ended the session: the window locks as soon as no recording holds it off.
     session_over: bool,
+    /// Until when the offline copy may be opened without a sign-in (the session's offlineAccess): after it, the window
+    /// locks as soon as no recording holds it off, for a full sign-in only.
+    offline_until: Option<SystemTime>,
     /// The 12-hour warning was dismissed, and isn't shown again for this sign-in.
     last_warning_dismissed: bool,
     /// How many times the window has locked, opened or changed what opens it: the page drops a view of the lock older
@@ -163,6 +172,7 @@ impl Lock {
             server_ended,
             ended: false,
             session_over: false,
+            offline_until: None,
             last_warning_dismissed: false,
             generation: 0,
         };
@@ -184,9 +194,11 @@ impl Lock {
         }
         if let Some((need, _)) = self.locked {
             // A lock asks for more when there is more to ask: a full sign-in once the 12 hours are over, and nothing
-            // but one once the session is over.
+            // but one once the session or its 30 days are over.
             if need != Need::SignedOut && self.session_over {
                 self.set_locked(Some((Need::SignedOut, Why::Ended)));
+            } else if need != Need::SignedOut && self.offline_over(now) {
+                self.set_locked(Some((Need::SignedOut, Why::OfflineEnded)));
             } else if need == Need::Password && self.past_longest(now) {
                 self.ended = true;
                 self.set_locked(Some((Need::SignIn, Why::Longest)));
@@ -199,6 +211,9 @@ impl Lock {
         }
         if self.session_over {
             return self.lock(Need::SignedOut, Why::Ended);
+        }
+        if self.offline_over(now) {
+            return self.lock(Need::SignedOut, Why::OfflineEnded);
         }
         if !self.ended && self.past_longest(now) {
             self.ended = true;
@@ -293,6 +308,12 @@ impl Lock {
         };
     }
 
+    /// Until when the kept session lets the offline copy be opened without a sign-in: given at start and after each
+    /// sign-in with both factors (main.rs); none for a session from a server too old to say.
+    pub fn offline_until(&mut self, until: Option<SystemTime>) {
+        self.offline_until = until;
+    }
+
     /// The server refused the token because the sign-in's 12 hours are over.
     pub fn server_ended_sign_in(&mut self) {
         self.server_ended = true;
@@ -353,7 +374,13 @@ impl Lock {
         Some(end.duration_since(now.wall).unwrap_or_default())
     }
 
-    fn recording_now(&self, now: Moment) -> bool {
+    /// The sign-in's 30 days are over, by this computer's clock.
+    fn offline_over(&self, now: Moment) -> bool {
+        self.signed_in_at.is_some() && self.offline_until.is_some_and(|until| now.wall >= until)
+    }
+
+    /// A recording is being made, and holds the lock off (and an update's restart, updates.rs).
+    pub fn recording_now(&self, now: Moment) -> bool {
         self.recording
             .is_some_and(|since| now.since(&since) < RECORDING_HOLD)
     }
@@ -409,6 +436,45 @@ mod tests {
                 why: Why::Longest
             }
         );
+    }
+
+    /// TC-UC7-13 (proposed FR-69, Tahseen's 14b): when the sign-in's 30 days pass by this computer's clock, the window
+    /// locks for a full sign-in only, as soon as no recording holds it off; a lock for the password asks for one too;
+    /// and a kept sign-in started past them opens on that lock.
+    #[test]
+    fn the_offline_copy_locks_for_a_full_sign_in_when_its_30_days_pass() {
+        let start = Moment::now();
+        let offline_ended = State::Locked {
+            need: Need::SignedOut,
+            why: Why::OfflineEnded,
+        };
+        let mut lock = open(start);
+        lock.offline_until(Some(start.wall + 10 * MINUTE));
+
+        lock.recording(true, at(start, 9 * MINUTE));
+        assert_eq!(lock.tick(at(start, 10 * MINUTE)), State::Unlocked);
+        lock.recording(false, at(start, 11 * MINUTE));
+        assert_eq!(lock.tick(at(start, 11 * MINUTE)), offline_ended);
+        lock.unlocked(at(start, 12 * MINUTE));
+        assert_eq!(lock.tick(at(start, 12 * MINUTE)), offline_ended);
+
+        let mut idle = open(start);
+        idle.offline_until(Some(start.wall + 20 * MINUTE));
+        assert!(matches!(
+            idle.tick(at(start, 15 * MINUTE)),
+            State::Locked {
+                need: Need::Password,
+                ..
+            }
+        ));
+        assert_eq!(idle.tick(at(start, 20 * MINUTE)), offline_ended);
+
+        let mut kept = Lock::new(Times::STANDARD, Some(start.wall), false, start);
+        kept.offline_until(Some(start.wall - MINUTE));
+        assert_eq!(kept.tick(start), offline_ended);
+        let mut signed_out = Lock::new(Times::STANDARD, None, false, start);
+        signed_out.offline_until(Some(start.wall - MINUTE));
+        assert_eq!(signed_out.tick(start), State::SignedOut);
     }
 
     /// TC-UC7-09: warned at 13 idle minutes, with 2 left; any activity starts the 15 minutes again; locked at 15.

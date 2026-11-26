@@ -43,6 +43,11 @@ public static class AuditActions
     // wrong one is recorded as SignInFailed, with the desktop session in its details.
     public const string Unlock = "unlock";
 
+    // An administrator revoked every desktop sign-in of a staff account, so each computer holding one deletes what the
+    // desktop app keeps there the next time it reaches a server (the expansion plan's step 20). The account is the
+    // event's row; the details say how many sign-ins were revoked.
+    public const string DesktopRevoked = "desktop_revoked";
+
     // Emergency access to a patient outside the actor's normal access, with its stated reason.
     public const string BreakGlass = "break_glass";
 
@@ -113,7 +118,7 @@ public static class AuditActions
     // Every action, for the audit page's filter.
     public static readonly string[] All =
     [
-        Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, Unlock, BreakGlass, BootstrapAdmin, PasswordChanged,
+        Read, ReadSensitive, Download, DownloadSensitive, Insert, Update, Delete, SignNote, AiReviewStaged, AiFieldReviewed, AiReviewCompleted, SignIn, SignInFailed, SignOut, Unlock, DesktopRevoked, BreakGlass, BootstrapAdmin, PasswordChanged,
         PasswordResetRequested, PasswordReset, AuthenticatorReset, AccountDisabled, AccountEnabled, MfaEnrolled,
         RecoveryCodeUsed, PasskeyAdded, PasskeyRemoved, PasskeyRefused, StaffInvited, EnrollmentIssued, PatientRegistered, EmailConfirmed, ConfirmationResent,
         RegistrationReplaced, ProxyAccountCreated, SentToLab, ReviewItemsFailed,
