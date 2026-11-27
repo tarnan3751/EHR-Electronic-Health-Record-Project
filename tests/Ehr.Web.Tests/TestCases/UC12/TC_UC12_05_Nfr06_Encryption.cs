@@ -53,7 +53,7 @@ public partial class TC_UC12_05_Nfr06_Encryption(WebApps apps) : IClassFixture<W
         using var opened = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason",
             ("Reason", "Off-site consult for the on-call physician."));
 
-        Assert.Contains("Emergency access: this patient is not on your panel.", Words(await ReadAsync(opened)));
+        Assert.Contains("Emergency access. This isn't one of your patients.", Words(await ReadAsync(opened)));
         Assert.True(opened.Headers.CacheControl?.NoStore);
         Assert.Contains($"POST /patients/{patient}/reason", apps.Forwarded.Skip(forwarded));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.BreakGlass, clinician.Id, patient, AuditSources.OnPrem));

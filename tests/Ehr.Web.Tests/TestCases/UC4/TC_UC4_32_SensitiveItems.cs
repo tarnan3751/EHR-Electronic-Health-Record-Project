@@ -30,9 +30,9 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   6. Download the desktop app's offline copy.
 // Expected result: After step 1 the anxiety diagnosis is stored sensitive and the hypertension not. Step 2: the chart
 //   lists the hypertension but neither anxiety nor sertraline, anywhere on the page, banner included, and says
-//   "Sensitive items hidden: 2 diagnoses or medications are not shown." with a "Show sensitive items" link; nothing
+//   "Sensitive items hidden. 2 diagnoses or medications are not shown." with a "Show sensitive items" link; nothing
 //   is recorded as read_sensitive. Step 3: both are listed, each with a "Sensitive" tag, the chart says "Sensitive
-//   items shown: your view of them is recorded.", the banner still names neither, and one read_sensitive is recorded
+//   items shown. Your view is logged.", the banner still names neither, and one read_sensitive is recorded
 //   and no plain read. Step 4: the history leaves their changes out ("Sensitive items hidden. 2 changes are not
 //   shown.") until asked, then shows them, recorded the same way. Step 5: the form shows the diagnosis with its
 //   "Sensitive" box fixed ("Sensitive because of its code."), and is recorded as read_sensitive. Step 6: the offline copy
@@ -59,14 +59,14 @@ public class TC_UC4_32_SensitiveItems(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<strong>Essential (primary) hypertension</strong>", chart);
         Assert.DoesNotContain("anxiety", chart, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sertraline", chart, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 2 diagnoses or medications are not shown. Show sensitive items", Words(chart));
+        Assert.Contains("Sensitive items hidden. 2 diagnoses or medications are not shown. Show sensitive items", Words(chart));
         Assert.Equal(views, await SensitiveViewsAsync());
 
         var reads = await ReadsAsync();
         var shown = await session.Client.GetStringAsync($"/patients/{patient}?sensitive=true", Cancel);
         Assert.Matches("<strong>Generalized anxiety disorder</strong>[^<]*\\(F41\\.1\\)[\\s\\S]*?<span class=\"sc-tag sc-tag--warning\">Sensitive</span>", shown);
         Assert.Matches("<strong>sertraline 50 MG Oral Tablet</strong>\\s*<span class=\"sc-tag sc-tag--warning\">Sensitive</span>", shown);
-        Assert.Contains("Sensitive items shown: your view of them is recorded.", Words(shown));
+        Assert.Contains("Sensitive items shown. Your view is logged.", Words(shown));
         var banner = System.Text.RegularExpressions.Regex.Match(shown, "<section class=\"sc-banner\"[\\s\\S]*?</section>").Value;
         Assert.NotEmpty(banner);
         Assert.DoesNotContain("anxiety", banner, StringComparison.OrdinalIgnoreCase);

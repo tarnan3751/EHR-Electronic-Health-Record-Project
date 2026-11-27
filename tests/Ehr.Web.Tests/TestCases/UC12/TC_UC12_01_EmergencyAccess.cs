@@ -78,7 +78,7 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
             var html = await ReadAsync(opened);
             Assert.Equal($"/patients/{patient}", PathOf(opened));
             Assert.Contains("Offpanel, Ezra", html);
-            Assert.Contains("Emergency access: this patient is not on your panel.", Words(html));
+            Assert.Contains("Emergency access. This isn't one of your patients.", Words(html));
         }
 
         Assert.Equal(TimeSpan.FromHours(4), await AccessLengthAsync(clinician.Id, patient));

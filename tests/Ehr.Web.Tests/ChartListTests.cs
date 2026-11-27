@@ -117,7 +117,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Essential (primary) hypertension", chart);
         Assert.DoesNotContain("anxiety", chart, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sertraline", chart, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 2 diagnoses or medications are not shown.", Words(chart));
+        Assert.Contains("Sensitive items hidden. 2 diagnoses or medications are not shown.", Words(chart));
         Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Show sensitive items</a>", chart);
         var history = await session.Client.GetStringAsync($"/patients/{patient}/chart-history", Cancel);
         Assert.DoesNotContain("anxiety", history, StringComparison.OrdinalIgnoreCase);
@@ -128,7 +128,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<strong>Generalized anxiety disorder</strong>", shown);
         Assert.Contains("<strong>sertraline 50 MG Oral Tablet</strong>", shown);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(shown, "<span class=\"sc-tag sc-tag--warning\">Sensitive</span>").Count);
-        Assert.Contains("Sensitive items shown: your view of them is recorded.", Words(shown));
+        Assert.Contains("Sensitive items shown. Your view is logged.", Words(shown));
         Assert.Equal(shownBefore + 1, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
         Assert.Contains("Generalized anxiety disorder", await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel));
         Assert.Equal(shownBefore + 2, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
@@ -225,7 +225,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         var hidden = await ReadAsync(anxiety);
         Assert.Contains("Saved. The diagnosis is sensitive, so it's hidden with the other sensitive items.", Words(hidden));
         Assert.DoesNotContain("anxiety", hidden, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 1 diagnosis or medication is not shown.", Words(hidden));
+        Assert.Contains("Sensitive items hidden. 1 diagnosis or medication is not shown.", Words(hidden));
 
         // An address naming another patient's entry, or none that exists, confirms nothing.
         var other = await apps.InsertPatientAsync("Synthetic", "Not confirmed");
@@ -452,7 +452,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("sensitive=true", saved.RequestMessage!.RequestUri!.Query);
         var back = await ReadAsync(saved);
         Assert.Contains("Saved. Generalized anxiety disorder is listed under Diagnoses.", Words(back));
-        Assert.Contains("Sensitive items shown:", Words(back));
+        Assert.Contains("Sensitive items shown.", Words(back));
 
         // Hidden, nothing carries them.
         var hidden = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);

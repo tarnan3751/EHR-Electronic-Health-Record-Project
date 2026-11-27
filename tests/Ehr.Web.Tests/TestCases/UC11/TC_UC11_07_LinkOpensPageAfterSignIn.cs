@@ -146,7 +146,7 @@ public partial class TC_UC11_07_LinkOpensPageAfterSignIn(WebApps apps) : IClassF
         Assert.Equal($"/patients/{patient}", PathOf(landed));
         Assert.Equal(query, landed.RequestMessage!.RequestUri!.Query);
         var words = Words(await ReadAsync(landed));
-        Assert.Contains("Sensitive items hidden:", words);
+        Assert.Contains("Sensitive items hidden.", words);
         Assert.DoesNotContain("sertraline", words);
         Assert.DoesNotContain("Generalized anxiety disorder", words);
     }

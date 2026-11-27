@@ -52,7 +52,7 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         var views = await ViewsAsync();
 
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Contains("Sensitive items hidden: 1 signed note is not shown.", Words(chart));
+        Assert.Contains("Sensitive items hidden. 1 signed note is not shown.", Words(chart));
         Assert.Contains(NotePath(patient, ordinary), chart);
         Assert.DoesNotContain(NotePath(patient, sensitive), chart);
         Assert.Equal(views, await ViewsAsync());

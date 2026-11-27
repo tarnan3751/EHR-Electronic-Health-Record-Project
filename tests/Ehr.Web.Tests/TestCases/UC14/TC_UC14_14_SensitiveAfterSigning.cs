@@ -92,7 +92,7 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         Assert.Equal(text, await ProxyTests.QueryAsync(apps, "SELECT subjective || objective || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
 
         var chart = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
-        Assert.Contains("Sensitive items hidden: 1 signed note is not shown.", chart);
+        Assert.Contains("Sensitive items hidden. 1 signed note is not shown.", chart);
         // The desktop's next sync, from where it left off: the draft comes again, with no text, to be emptied there.
         var drafts = await PullAsync(watermark);
         Assert.Matches("\"body\":\"\",\"version\":\\d+,\"withheld\":true", drafts);

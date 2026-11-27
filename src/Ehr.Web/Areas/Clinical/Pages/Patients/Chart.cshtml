@@ -42,7 +42,7 @@
 </div>
 @if (Model.EmergencyUntil is { } until)
 {
-    <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Emergency access:</span> this patient is not on your panel. Your access and the reason you gave are recorded for review. It lasts until @Clinic.Format(until).</p>
+    <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Emergency access.</span> This isn't one of your patients. Your access and your reason are logged and reviewed. It lasts until @Clinic.Format(until).</p>
 }
 @if (Model.Chart.FormToReview)
 {
@@ -98,7 +98,7 @@ else if (Model.Chart.Saved is { } saved)
 }
 @if (Model.Chart.SensitiveShown)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="Chart" asp-all-route-data="sensitiveRoute">Hide sensitive items</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown.</span> Your view is logged. <a asp-page="Chart" asp-all-route-data="sensitiveRoute">Hide sensitive items</a></p>
 }
 else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0)
 {
@@ -106,7 +106,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
     @* Step 10: signed notes marked sensitive are counted beside the sensitive diagnoses and medications. *@
     var hiddenLists = Model.Chart.SensitiveHidden == 0 ? "" : $"{Model.Chart.SensitiveHidden} {(Model.Chart.SensitiveHidden == 1 ? "diagnosis or medication is" : "diagnoses or medications are")} not shown. ";
     var hiddenNotes = Model.Chart.SensitiveNotesHidden == 0 ? "" : $"{Model.Chart.SensitiveNotesHidden} signed {(Model.Chart.SensitiveNotesHidden == 1 ? "note is" : "notes are")} not shown. ";
-    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @hiddenLists@hiddenNotes<a asp-page="Chart" asp-all-route-data="sensitiveRoute">Show sensitive items</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden.</span> @hiddenLists@hiddenNotes<a asp-page="Chart" asp-all-route-data="sensitiveRoute">Show sensitive items</a></p>
 }
 <p><a asp-page="Lists/History" asp-all-route-data="historyRoute">History of allergies, medications and diagnoses</a></p>
 
