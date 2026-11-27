@@ -33,9 +33,9 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   7. On the enrollment page, enter a wrong code, then the current code.
 //   8. Open /patients, and read the audit log.
 // Expected result: Step 1 ends on /denied and no account is created. Step 2 shows the setup link once ("It isn't shown
-//   again"). Step 3 shows "Use at least 12 characters." Step 4 goes to /sign-in. Step 5 shows "This setup link isn't
-//   valid or has already been used." Step 6 lands on /sign-in/enroll, and /patients redirects to /sign-in. Step 7 shows
-//   "That code did not match.", then "Your recovery codes" with 8 codes. Step 8 opens the patients page (200), and the
+//   again"). Step 3 shows "Password must be at least 12 characters." Step 4 goes to /sign-in. Step 5 shows "This setup link has
+//   expired or has been used." Step 6 lands on /sign-in/enroll, and /patients redirects to /sign-in. Step 7 shows
+//   "Wrong code.", then "Your recovery codes" with 8 codes. Step 8 opens the patients page (200), and the
 //   log has one staff_invited event by the admin and one each of password_changed, mfa_enrolled and sign_in by the new
 //   account.
 // Creator: Luke Garcia
@@ -72,7 +72,7 @@ public partial class TC_UC11_03_NewStaffFirstSignIn(WebApps apps) : IClassFixtur
         var jar = new CookieContainer();
         var client = Client(apps.OnPrem, jar);
         using var tooShort = await PostFormAsync(client, setupPath, setupPath, ("Input.Password", "short-pw-1"), ("Input.Confirm", "short-pw-1"));
-        Assert.Contains("Use at least 12 characters.", await ReadAsync(tooShort));
+        Assert.Contains("Password must be at least 12 characters.", await ReadAsync(tooShort));
 
         // 4.
         const string password = "nurse-test-password-1234";
@@ -81,7 +81,7 @@ public partial class TC_UC11_03_NewStaffFirstSignIn(WebApps apps) : IClassFixtur
 
         // 5. The link works once.
         using var again = await client.GetAsync(setupPath, Cancel);
-        Assert.Contains("This setup link isn't valid or has already been used.", await ReadAsync(again));
+        Assert.Contains("This setup link has expired or has been used.", await ReadAsync(again));
 
         // 6. The first sign-in goes to enrollment, and nothing is reachable before it's done.
         using var enrollPage = await PostFormAsync(client, "/sign-in", afterSetup, ("Input.Email", email), ("Input.Password", password));
@@ -92,7 +92,7 @@ public partial class TC_UC11_03_NewStaffFirstSignIn(WebApps apps) : IClassFixtur
         // 7.
         var key = AuthenticatorSecret().Match(await enrollPage.Content.ReadAsStringAsync(Cancel)).Groups[1].Value;
         using var wrong = await PostFormAsync(client, "/sign-in/enroll", enrollPage, ("Code", Totp.WrongCode(key)));
-        Assert.Contains("That code did not match.", await ReadAsync(wrong));
+        Assert.Contains("Wrong code.", await ReadAsync(wrong));
         using var recoveryPage = await PostFormAsync(client, "/sign-in/enroll", wrong, ("Code", Totp.Code(key)));
         var recoveryHtml = await ReadAsync(recoveryPage);
         Assert.Contains("Your recovery codes", recoveryHtml);

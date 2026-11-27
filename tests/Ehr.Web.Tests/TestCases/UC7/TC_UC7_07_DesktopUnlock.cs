@@ -35,7 +35,7 @@ namespace Ehr.Web.Tests.TestCases.UC7;
 //   4. Let 12 hours pass; unlock Dr. Overnight with the right password.
 // Expected result: Step 1: 204; 403 "Wrong password.", recorded as a failed sign-in with the desktop session; 204, the
 //   address ignored; 204 through the cloud app; 503 cut off. Two unlocks recorded. Step 2: 401. Step 3: four 403s
-//   "Wrong password.", then "This account is locked after too many failed attempts. Try again in 15 minutes."; the
+//   "Wrong password.", then "Account locked. Try again in 15 minutes."; the
 //   sync is refused with 401 and no Ehr-Sign-In header: that session is over. Step 4: 401 with "Ehr-Sign-In: ended".
 // Creator: Tahseen Arnan
 public class TC_UC7_07_DesktopUnlock(WebApps apps) : IClassFixture<WebApps>
@@ -93,7 +93,7 @@ public class TC_UC7_07_DesktopUnlock(WebApps apps) : IClassFixture<WebApps>
             using var wrong = await UnlockAsync(apps.OnPrem, mistypingToken, new { password = "not-the-password" });
             Assert.Equal(HttpStatusCode.Forbidden, wrong.StatusCode);
             Assert.Equal(
-                attempt < 5 ? "Wrong password." : "This account is locked after too many failed attempts. Try again in 15 minutes.",
+                attempt < 5 ? "Wrong password." : "Account locked. Try again in 15 minutes.",
                 await ProblemAsync(wrong));
         }
 

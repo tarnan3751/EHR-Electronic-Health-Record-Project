@@ -94,7 +94,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
 
         var notice = Assert.Single(EmailsTo(apps, email));
         Assert.Equal("Something new in your patient portal", notice.Subject);
-        Assert.Equal("Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.", notice.Body);
+        Assert.Equal("Your clinic added something to your patient portal. Sign in to see it.", notice.Body);
         var action = apps.Emails.Actions[notice.Body];
         Assert.Equal(("See what's new", Base + "portal/summaries"), (action.Label, action.Link));
         foreach (var word in new[] { "cough", "chest", "fluids", "summary", "Dr. Test", "quartzwing", "attacker" })

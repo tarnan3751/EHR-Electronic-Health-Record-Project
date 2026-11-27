@@ -26,8 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   2. On the code page, enter the wrong code.
 //   3. Without a correct code, open /patients directly.
 //   4. Read the audit log for the account.
-// Expected result: Step 2 stays on /sign-in/code with "That code did not match. Try the current code from your app, or
-//   a recovery code." Step 3 is redirected to /sign-in and shows no patient data. Step 4 finds no sign_in event and a
+// Expected result: Step 2 stays on /sign-in/code with "Wrong code." Step 3 is redirected to /sign-in and shows no patient data. Step 4 finds no sign_in event and a
 //   sign_in_failed event with the reason "wrong code".
 // Creator: Luke Garcia
 public class TC_UC11_02_WrongOrSkippedCode(WebApps apps) : IClassFixture<WebApps>
@@ -42,7 +41,7 @@ public class TC_UC11_02_WrongOrSkippedCode(WebApps apps) : IClassFixture<WebApps
         using var codePage = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", clinician.Email), ("Input.Password", clinician.Password));
         using var wrong = await PostFormAsync(client, "/sign-in/code", codePage, ("Code", Totp.WrongCode(clinician.AuthenticatorKey)));
         Assert.Equal("/sign-in/code", PathOf(wrong));
-        Assert.Contains("That code did not match. Try the current code from your app, or a recovery code.", await ReadAsync(wrong));
+        Assert.Contains("Wrong code.", await ReadAsync(wrong));
 
         using var skipped = await Client(apps.Cloud, jar, followRedirects: false).GetAsync("/patients", Cancel);
         Assert.Equal(HttpStatusCode.Redirect, skipped.StatusCode);

@@ -69,7 +69,7 @@
             try {
                 const answer = await post(add);
                 if (!answer) {
-                    say(problem, "Not saved. The clinic's server couldn't be reached. Try again in a moment.");
+                    say(problem, "Not saved. The clinic's server can't be reached.");
                     return;
                 }
 
@@ -88,7 +88,7 @@
                 try {
                     credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(answer.body.options) });
                 } catch {
-                    say(problem, "Not saved. No passkey was made. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again.");
+                    say(problem, "Not saved. No passkey was made. Try again.");
                     return;
                 }
 
@@ -117,7 +117,7 @@
             try {
                 const answer = await post(use);
                 if (!answer) {
-                    say(problem, "Not signed in. The clinic's server couldn't be reached. Try again in a moment.");
+                    say(problem, "Not signed in. The clinic's server can't be reached.");
                     return;
                 }
 
@@ -130,7 +130,7 @@
                 try {
                     credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(answer.body.options) });
                 } catch {
-                    say(problem, "Not signed in. The passkey wasn't used. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again, or enter a code below.");
+                    say(problem, "Not signed in. The passkey wasn't used. Try again or enter a code.");
                     return;
                 }
 

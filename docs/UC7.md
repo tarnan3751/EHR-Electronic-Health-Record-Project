@@ -103,7 +103,7 @@ asks for (Tahseen's ruling 11b of 25 November 2026, proposed FR-68; `src/Ehr.Web
 - **Whose password.** The token's account's. The request names no account, so it can't be used to learn which addresses
   have one.
 - **The answers.** 204 when it's right. 403 with the reason when it's wrong ("Wrong password.") or the account is now
-  locked out ("This account is locked after too many failed attempts. Try again in 15 minutes."): the token was good, so
+  locked out ("Account locked. Try again in 15 minutes."): the token was good, so
   this isn't a 401, which always means the token was refused. Once the sign-in is 12 hours old the token is refused with
   `Ehr-Sign-In: ended` (`docs/UC8.md`), and the lock asks for a full sign-in instead.
 - **As sign-in counts it.** A wrong password counts towards the account's lockout (5, then 15 minutes, on every site and

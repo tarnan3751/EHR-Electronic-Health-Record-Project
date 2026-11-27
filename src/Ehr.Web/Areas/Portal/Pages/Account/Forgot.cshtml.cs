@@ -13,7 +13,7 @@ public class ForgotModel(PatientAccounts accounts, IOptions<SiteAddresses> links
 {
     [BindProperty]
     [Required(ErrorMessage = "Enter your email address.")]
-    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+    [EmailAddress(ErrorMessage = "Enter an email address like name@example.com.")]
     public string? Email { get; set; }
 
     public bool Sent { get; private set; }

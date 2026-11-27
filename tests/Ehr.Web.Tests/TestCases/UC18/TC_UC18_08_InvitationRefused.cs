@@ -26,10 +26,9 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //      accept the invitation with a password of the owner's choosing.
 //   5. As the new account, viewing the record, post the "Share your record" form.
 //   6. As the patient, remove the new account's access. As the new account, open "Results".
-// Expected result: Step 1: "This invitation link isn't valid any more." and no form. Step 2: "The passwords don't
-//   match." with the form still there and no account; then "Account created."; then "isn't valid any more", and still one
-//   account. Step 3: "isn't valid any more" and no account. Step 4: "You already have a portal account with this email
-//   address." and that patient's account is unchanged. Step 4b: "Account created."; the address signs in with the owner's
+// Expected result: Step 1: "This invitation has expired or has been used." and no form. Step 2: "Passwords don't
+//   match." with the form still there and no account; then "Account created."; then "has expired or has been used", and still one
+//   account. Step 3: "has expired or has been used" and no account. Step 4: "You already have a portal account." and that patient's account is unchanged. Step 4b: "Account created."; the address signs in with the owner's
 //   password and not with the unconfirmed account's, which no longer has the address. Step 5: nothing is saved. Step 6: the new account lands on
 //   "Whose record?" with "Access ended." and "Nobody is sharing a record with you."
 // Creator: Tahseen Arnan
@@ -47,18 +46,18 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
         foreach (var path in new[] { "/portal/invitation?code=0123456789ABCDEF0123456789ABCDEF01234567", "/portal/invitation" })
         {
             var page = await anonymous.GetStringAsync(path, Cancel);
-            Assert.Contains("This invitation link isn't valid any more.", Words(page));
+            Assert.Contains("This invitation has expired or has been used.", Words(page));
             Assert.DoesNotContain("name=\"Input.Password\"", page);
         }
 
         await GiveAsync(patient, first);
         var link = InvitationPath(apps, first);
         var mismatch = await AcceptAsync(apps, link, "Synthetic First", confirm: "a-different-password-entirely");
-        Assert.Contains("The passwords don&#x27;t match.", mismatch);
+        Assert.Contains("Passwords don&#x27;t match.", mismatch);
         Assert.Contains("name=\"Input.Password\"", mismatch);
         Assert.Empty(await Accounts(first));
         Assert.Contains("Account created.", await AcceptAsync(apps, link, "Synthetic First"));
-        Assert.Contains("This invitation link isn't valid any more.", Words(await AcceptAsync(apps, link, "Synthetic Again")));
+        Assert.Contains("This invitation has expired or has been used.", Words(await AcceptAsync(apps, link, "Synthetic Again")));
         Assert.Equal(["Synthetic First"], await Accounts(first));
 
         await GiveAsync(patient, second);
@@ -67,7 +66,7 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
         var usedCode = System.Web.HttpUtility.ParseQueryString(link[(link.IndexOf('?') + 1)..])["code"]!;
         using var again = await anonymous.PostAsync("/portal/invitation", Form(("__RequestVerificationToken", Token(await anonymous.GetStringAsync(expired, Cancel))),
             ("Input.Code", usedCode), ("Input.Name", "Synthetic Twice"), ("Input.Password", Password), ("Input.Confirm", Password)), Cancel);
-        Assert.Contains("This invitation link isn't valid any more.", Words(await again.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("This invitation has expired or has been used.", Words(await again.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal(["Synthetic First"], await Accounts(first));
         await using (var db = await apps.OpenDatabaseAsync())
         {
@@ -76,12 +75,12 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(1, await age.ExecuteNonQueryAsync(Cancel));
         }
 
-        Assert.Contains("This invitation link isn't valid any more.", Words(await anonymous.GetStringAsync(expired, Cancel)));
-        Assert.Contains("This invitation link isn't valid any more.", Words(await AcceptAsync(apps, expired, "Synthetic Late")));
+        Assert.Contains("This invitation has expired or has been used.", Words(await anonymous.GetStringAsync(expired, Cancel)));
+        Assert.Contains("This invitation has expired or has been used.", Words(await AcceptAsync(apps, expired, "Synthetic Late")));
         Assert.Empty(await Accounts(second));
 
         await GiveAsync(patient, existing.Email);
-        Assert.Contains("You already have a portal account with this email address.", Words(await AcceptAsync(apps, InvitationPath(apps, existing.Email), "Synthetic Impostor")));
+        Assert.Contains("You already have a portal account.", Words(await AcceptAsync(apps, InvitationPath(apps, existing.Email), "Synthetic Impostor")));
         Assert.Equal([""], await Accounts(existing.Email));
         Assert.Equal("/portal/choose", (await SignInAsync(apps, existing.Email)).Path);
 

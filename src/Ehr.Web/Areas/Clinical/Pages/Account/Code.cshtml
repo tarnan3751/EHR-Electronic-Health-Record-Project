@@ -14,7 +14,6 @@
 {
     @* Shown by passkeys.js where this browser can use a passkey; without it, the page is the code alone. *@
     <form method="post" asp-page-handler="Options" class="sc-form" data-passkey-use hidden>
-        <p>Sign in with a passkey on this device, your phone or a security key.</p>
         <p class="sc-notice sc-notice--danger" role="alert" data-passkey-problem hidden></p>
         <button class="sc-btn">Use a passkey</button>
     </form>
@@ -29,7 +28,7 @@
     <div class="sc-field">
         <label asp-for="Code" class="sc-field__label">Code</label>
         <input asp-for="Code" class="sc-field__input sc-field__input--mono" autocomplete="one-time-code" required autofocus aria-describedby="code-hint">
-        <p class="sc-field__hint" id="code-hint">From your authenticator app, or one of your recovery codes. Five wrong attempts lock the account for 15 minutes.</p>
+        <p class="sc-field__hint" id="code-hint">From your authenticator app, or a recovery code.</p>
         <span asp-validation-for="Code" class="sc-field__error"></span>
     </div>
     @* An alert, so a refused code or passkey is announced wherever the focus is (on "Use a passkey", for one). *@

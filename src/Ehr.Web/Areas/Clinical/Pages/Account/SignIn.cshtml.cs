@@ -34,7 +34,7 @@ public class SignInModel(StaffSignIn signIn) : PageModel
         switch (check.Outcome)
         {
             case PasswordOutcome.LockedOut:
-                ModelState.AddModelError("", "This account is locked after too many failed attempts. Try again in 15 minutes.");
+                ModelState.AddModelError("", "Account locked. Try again in 15 minutes.");
                 return Page();
             case PasswordOutcome.Failed:
                 ModelState.AddModelError("", "Wrong email or password.");

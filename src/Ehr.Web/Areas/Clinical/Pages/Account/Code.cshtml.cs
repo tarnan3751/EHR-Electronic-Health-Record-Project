@@ -67,7 +67,7 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
 
         if (!await signIn.VerifyCodeAsync(user, Code!, HttpContext.RequestAborted))
         {
-            ModelState.AddModelError("", "That code did not match. Try the current code from your app, or a recovery code.");
+            ModelState.AddModelError("", "Wrong code.");
             return Page();
         }
 
@@ -82,7 +82,7 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
         var user = await HeldAsync();
         var ceremony = user is not null && await OfferAsync(user)
             ? await passkeys.BeginSignInAsync(HttpContext, user, await StaffSignIn.PendingAsync(HttpContext))
-            : PasskeyCeremony.Refused(null, "Not signed in. This sign-in took too long. Start again with your password.");
+            : PasskeyCeremony.Refused(null, "Sign-in timed out. Start again with your password.");
         return ceremony.Problem is { } problem
             ? new JsonResult(new { problem }) { StatusCode = StatusCodes.Status400BadRequest }
             : new JsonResult(new { options = JsonSerializer.Deserialize<JsonElement>(ceremony.Options!), state = ceremony.State });
@@ -115,14 +115,14 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
 
         if (await signIn.VerifyPasskeyAsync(HttpContext, user, credential, state, HttpContext.RequestAborted) is not { } used)
         {
-            ModelState.AddModelError("", "That passkey didn't work. Try again, or enter the code from your authenticator app.");
+            ModelState.AddModelError("", "Passkey not accepted.");
             return Page();
         }
 
         return await SignedInAsync(user, used);
     }
 
-    const string Locked = "This account is locked after too many failed attempts. Try again in 15 minutes.";
+    const string Locked = "Account locked. Try again in 15 minutes.";
 
     // The account held by the password step, if its next step is this one.
     async Task<StaffUser?> HeldAsync() =>

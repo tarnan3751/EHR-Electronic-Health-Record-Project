@@ -18,7 +18,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Account;
 public class EnrollModel(StaffSignIn signIn) : PageModel
 {
     [BindProperty]
-    [Required(ErrorMessage = "Enter the code from your app.")]
+    [Required(ErrorMessage = "Enter the code.")]
     public string? Code { get; set; }
 
     [BindProperty(SupportsGet = true)]
@@ -60,7 +60,7 @@ public class EnrollModel(StaffSignIn signIn) : PageModel
         {
             if (ModelState.IsValid)
             {
-                ModelState.AddModelError(nameof(Code), "That code did not match. Enter the current code from your app.");
+                ModelState.AddModelError(nameof(Code), "Wrong code.");
             }
 
             Setup = await signIn.EnrollmentAsync(user, newKey: false);

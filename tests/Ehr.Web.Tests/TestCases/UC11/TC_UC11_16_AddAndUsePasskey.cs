@@ -24,8 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   2. On the passkeys page, type the name and a current code, and press Enter.
 //   3. Sign out, give the password, and press Enter on the focused "Use a passkey".
 //   4. Remove the passkey; sign out; give the password.
-// Expected result: Step 1: the code page offers no passkey. Step 2: "Passkey added. Use it at your next sign-in, after
-//   your password." with "This Mac" listed. Step 3: the code page shows "Use a passkey" with the focus on it, and the
+// Expected result: Step 1: the code page offers no passkey. Step 2: "Passkey added." with "This Mac" listed. Step 3: the code page shows "Use a passkey" with the focus on it, and the
 //   code below; Enter signs in, to the clinician's patients, and the sign-in names the passkey in the audit log. Step
 //   4: "Passkey removed"; the code page offers no passkey. No script error on any page.
 // Creator: Tahseen Arnan
@@ -79,7 +78,7 @@ public class TC_UC11_16_AddAndUsePasskey(WebApps apps) : IClassFixture<WebApps>
         await page.GotoAsync($"{server.Url}{PasskeysPage}");
         await page.FocusAsync("form[action*='handler=Remove'] button");
         await page.Keyboard.PressAsync("Enter");
-        await page.WaitForSelectorAsync("text=Passkey removed. It can't be used to sign in any more.");
+        await page.WaitForSelectorAsync("text=Passkey removed.");
         await page.ClickAsync(".sc-appbar__signout");
         await page.WaitForURLAsync("**/sign-out");
         await PasswordInBrowserAsync(page, server.Url, clinician);

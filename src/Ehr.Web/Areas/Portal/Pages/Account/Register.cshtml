@@ -6,11 +6,10 @@
 <h1>Register for the patient portal</h1>
 @if (Model.Registered)
 {
-    <p class="sc-notice sc-notice--success"><span class="sc-notice__state">Check your email.</span> We've sent a link to confirm your address. Once you've opened it, you can <a asp-page="SignIn">sign in</a>.</p>
+    <p class="sc-notice sc-notice--success"><span class="sc-notice__state">Check your email.</span> Open the link we sent you, then <a asp-page="SignIn">sign in</a>.</p>
 }
 else
 {
-    <p>You need the enrollment code the clinic gave you.</p>
     <form method="post" class="sc-form">
         <div class="sc-field">
             <label asp-for="Input.Code" class="sc-field__label">Enrollment code</label>
@@ -35,5 +34,5 @@ else
         <div asp-validation-summary="ModelOnly" class="sc-notice sc-notice--danger"></div>
         <button class="sc-btn sc-btn--primary">Register</button>
     </form>
-    <p>Already registered? <a asp-page="SignIn">Sign in</a>.</p>
+    <p>Already registered? <a asp-page="SignIn">Sign in</a></p>
 }

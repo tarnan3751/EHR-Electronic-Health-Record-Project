@@ -6,7 +6,7 @@ namespace Ehr.Web.Accounts;
 public class Credentials
 {
     [Required(ErrorMessage = "Enter your email address.")]
-    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+    [EmailAddress(ErrorMessage = "Enter an email address like name@example.com.")]
     public string? Email { get; set; }
 
     [Required(ErrorMessage = "Enter your password.")]

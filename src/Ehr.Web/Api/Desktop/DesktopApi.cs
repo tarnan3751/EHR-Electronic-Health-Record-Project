@@ -70,7 +70,7 @@ public static class DesktopApi
                 signIn.Token!, signIn.ExpiresAt!.Value, signIn.DisplayName!,
                 new OfflineAccess(signIn.ClinicianId!.Value, signIn.ExpiresAt!.Value.ToUnixTimeSeconds()))),
             DesktopSignInOutcome.LockedOut => Results.Json(
-                new Refusal("This account is locked after too many failed attempts. Try again in 15 minutes."), statusCode: StatusCodes.Status401Unauthorized),
+                new Refusal("Account locked. Try again in 15 minutes."), statusCode: StatusCodes.Status401Unauthorized),
             DesktopSignInOutcome.NotSetUp => Results.Json(
                 new Refusal("Finish setting up your account in the web app first."), statusCode: StatusCodes.Status403Forbidden),
             DesktopSignInOutcome.NotAClinician => Results.Json(
@@ -138,7 +138,7 @@ public static class DesktopApi
         {
             DesktopUnlockOutcome.Unlocked => Results.NoContent(),
             DesktopUnlockOutcome.LockedOut => Results.Json(
-                new Refusal("This account is locked after too many failed attempts. Try again in 15 minutes."), statusCode: StatusCodes.Status403Forbidden),
+                new Refusal("Account locked. Try again in 15 minutes."), statusCode: StatusCodes.Status403Forbidden),
             _ => Results.Json(new Refusal("Wrong password."), statusCode: StatusCodes.Status403Forbidden),
         };
     }

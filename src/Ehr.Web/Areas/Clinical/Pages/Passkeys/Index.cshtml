@@ -8,7 +8,6 @@
     <script src="~/_content/Ehr.Design/js/passkeys.js" defer></script>
 }
 <h1>Passkeys</h1>
-<p class="sc-lede">After your password, a passkey signs you in instead of your authenticator app's code, at the clinic and off-site. It asks for your PIN, fingerprint or face each time. Your authenticator's code still works too.</p>
 
 @* Each notice starts with its state, a sentence of its own ("Passkey added.", "Not saved."), marked up as the guide's
    notices have it. *@
@@ -23,7 +22,7 @@
 
 @if (Model.Passkeys.Count == 0)
 {
-    <p class="sc-empty">You haven't added a passkey.</p>
+    <p class="sc-empty">No passkeys.</p>
 }
 else
 {
@@ -49,7 +48,7 @@ else
             </tbody>
         </table>
     </div>
-    <p class="sc-muted">Removing a passkey doesn't sign out a session already signed in with it. If you lose a device, ask an administrator to reset your authenticator. That signs out every session.</p>
+    <p class="sc-muted">Lost a device? Ask an administrator to reset your authenticator.</p>
 }
 
 <div class="sc-sheet">
@@ -61,17 +60,16 @@ else
 }
 else if (Model.Passkeys.Count >= StaffPasskeys.MostPerAccount)
 {
-    <p class="sc-muted">You have @StaffPasskeys.MostPerAccount passkeys, the most an account can have. Remove one to add another.</p>
+    <p class="sc-muted">You have the maximum of @StaffPasskeys.MostPerAccount passkeys. Remove one to add another.</p>
 }
 else
 {
     @* Shown until passkeys.js finds this browser can make a passkey, and so without JavaScript. *@
-    <p data-passkey-unsupported>This browser can't make a passkey. A current Safari, Chrome, Edge or Firefox can.</p>
+    <p data-passkey-unsupported>This browser doesn't support passkeys.</p>
     <form method="post" asp-page-handler="Options" class="sc-form" data-passkey-add hidden>
         <div class="sc-field">
             <label for="passkey-name" class="sc-field__label">Name</label>
-            <input id="passkey-name" name="name" class="sc-field__input" maxlength="@StaffPasskeys.LongestName" autocomplete="off" required aria-describedby="passkey-name-hint">
-            <span id="passkey-name-hint" class="sc-field__hint">So you can tell it from another, such as This Mac.</span>
+            <input id="passkey-name" name="name" class="sc-field__input" maxlength="@StaffPasskeys.LongestName" autocomplete="off" required>
         </div>
         <div class="sc-field">
             <label for="passkey-code" class="sc-field__label">Code from your authenticator app</label>

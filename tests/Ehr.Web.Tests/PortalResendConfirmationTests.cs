@@ -11,7 +11,7 @@ namespace Ehr.Web.Tests;
 // address. Through the cloud app, as patients come. Supporting tests for UC5, not numbered test cases in the SE document.
 public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture<WebApps>
 {
-    const string SentMessage = "If that address has a portal account waiting to be confirmed, we've sent it a new link.";
+    const string SentMessage = "If that address has an unconfirmed portal account, we've sent it a new link.";
 
     [Fact]
     public async Task A_link_that_no_longer_works_offers_a_new_one()
@@ -25,7 +25,7 @@ public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture
         using var confirmed = await PostFormAsync(client, path, path);
 
         var html = await ReadAsync(confirmed);
-        Assert.Contains("This link isn't valid or has expired.", html);
+        Assert.Contains("This link has expired.", html);
         Assert.Contains("href=\"/portal/resend\"", html);
         Assert.DoesNotContain(apps.Emails.Sent, m => m.To == email);
     }
@@ -38,7 +38,7 @@ public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture
         var client = Client(apps.Cloud, new CookieContainer());
 
         using var early = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password));
-        Assert.Contains("If it expired, ask for a new one below.", await ReadAsync(early));
+        Assert.Contains("Resend the confirmation email", await ReadAsync(early));
 
         using var asked = await PostFormAsync(client, "/portal/resend", "/portal/resend", ("Email", email));
         Assert.Contains(SentMessage, await ReadAsync(asked));
@@ -77,7 +77,7 @@ public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture
         using var asked = await PostFormAsync(client, "/portal/resend", "/portal/resend", ("Email", "jordan.lee@"));
 
         var html = await ReadAsync(asked);
-        Assert.Contains("Enter a valid email address.", html);
+        Assert.Contains("Enter an email address like name@example.com.", html);
         Assert.DoesNotContain(SentMessage, html);
     }
 

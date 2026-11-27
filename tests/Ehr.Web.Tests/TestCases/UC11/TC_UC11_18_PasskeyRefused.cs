@@ -31,15 +31,13 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   2. Give the password, then the code.
 //   3. Without a password step, ask for a passkey's options.
 //   4. Give the password, then five unverified passkeys, then the good one, then the code.
-// Expected result: Step 1: each stays on /sign-in/code with "That passkey didn't work. Try again, or enter the code from
-//   your authenticator app." and the code's field, and is a sign_in_failed, "passkey refused". Step 2: signed in.
-//   Step 3: 400, "Not signed in. This sign-in took too long. Start again with your password.", and no options. Step 4:
-//   after the fifth the account is locked; the good passkey is refused with "This account is locked after too many
-//   failed attempts. Try again in 15 minutes." and a sign_in_failed, "locked out"; no sign_in.
+// Expected result: Step 1: each stays on /sign-in/code with "Passkey not accepted." and the code's field, and is a sign_in_failed, "passkey refused". Step 2: signed in.
+//   Step 3: 400, "Sign-in timed out. Start again with your password.", and no options. Step 4:
+//   after the fifth the account is locked; the good passkey is refused with "Account locked. Try again in 15 minutes." and a sign_in_failed, "locked out"; no sign_in.
 // Creator: Tahseen Arnan
 public class TC_UC11_18_PasskeyRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    const string Refused = "That passkey didn't work. Try again, or enter the code from your authenticator app.";
+    const string Refused = "Passkey not accepted.";
 
     [Fact]
     public async Task Each_wrong_passkey_is_refused_like_a_wrong_code_and_the_code_still_signs_in()
@@ -102,7 +100,7 @@ public class TC_UC11_18_PasskeyRefused(WebApps apps) : IClassFixture<WebApps>
         using var noPasswordStep = await fresh.PostAsync($"{CodePage}?handler=Options", Form(("__RequestVerificationToken", Token(signInPage))), Cancel);
         Assert.Equal(HttpStatusCode.BadRequest, noPasswordStep.StatusCode);
         var answerWithout = JsonSerializer.Deserialize<JsonElement>(await noPasswordStep.Content.ReadAsStringAsync(Cancel));
-        Assert.Equal("Not signed in. This sign-in took too long. Start again with your password.", answerWithout.GetProperty("problem").GetString());
+        Assert.Equal("Sign-in timed out. Start again with your password.", answerWithout.GetProperty("problem").GetString());
         Assert.False(answerWithout.TryGetProperty("options", out _));
     }
 
@@ -128,7 +126,7 @@ public class TC_UC11_18_PasskeyRefused(WebApps apps) : IClassFixture<WebApps>
         using var locked = await PasskeyAsync(client, codePage, authenticator.Get(good, WebApps.OnSiteOrigin), goodState);
 
         Assert.Equal(CodePage, PathOf(locked));
-        Assert.Contains("This account is locked after too many failed attempts. Try again in 15 minutes.", Words(await ReadAsync(locked)));
+        Assert.Contains("Account locked. Try again in 15 minutes.", Words(await ReadAsync(locked)));
         Assert.Equal(1, await ReasonsAsync(clinician, "locked out"));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: clinician.Id));
         await using var scope = apps.OnPrem.Services.CreateAsyncScope();

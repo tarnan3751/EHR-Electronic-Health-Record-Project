@@ -6,8 +6,7 @@
 @if (Model.RecoveryCodes is { } codes)
 {
     <h1>Your recovery codes</h1>
-    <p>Your authenticator is set up, and you're signed in. If you lose your phone, sign in with one of these codes instead. Each works once.</p>
-    <p><strong>Save them somewhere safe now.</strong> They aren't shown again.</p>
+    <p><strong>Save these codes now.</strong> They aren't shown again.</p>
     <ul class="sc-codes">
         @foreach (var code in codes)
         {
@@ -19,8 +18,8 @@
 else
 {
     <h1>Set up your authenticator</h1>
-    <p>Every staff sign-in needs a code from an authenticator app on your phone, wherever you sign in from. Add this account to your app, then enter the code it shows.</p>
-    <p><a href="@Model.Setup!.Uri">Open in an authenticator app</a>, or enter this key by hand:</p>
+    <p>Add this account to your authenticator app, then enter the code it shows.</p>
+    <p><a href="@Model.Setup!.Uri">Open in an authenticator app</a>, or enter this key:</p>
     <p class="sc-code mono-code">@Model.KeyGrouped</p>
     <form method="post" class="sc-form">
         <input type="hidden" asp-for="ReturnUrl">

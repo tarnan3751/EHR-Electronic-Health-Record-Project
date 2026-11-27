@@ -28,7 +28,7 @@ public partial class StaffAdminTests(WebApps apps) : IClassFixture<WebApps>
         var setupPath = new Uri(setupLink).PathAndQuery;
         const string newPassword = "chosen-after-the-reset";
         using var afterSetup = await PostFormAsync(client, setupPath, setupPath, ("Input.Password", newPassword), ("Input.Confirm", newPassword));
-        Assert.Contains("Your password is set.", await ReadAsync(afterSetup));
+        Assert.Contains("Password set.", await ReadAsync(afterSetup));
         var session = await SignInAsync(apps.OnPrem, account with { Password = newPassword });
         Assert.Contains("Dr. Forgot", await session.Client.GetStringAsync("/", Cancel));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.PasswordReset));
@@ -63,7 +63,7 @@ public partial class StaffAdminTests(WebApps apps) : IClassFixture<WebApps>
 
         var client = Client(apps.OnPrem, new CookieContainer());
         using var refused = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
-        Assert.Contains("This account is locked", await ReadAsync(refused));
+        Assert.Contains("Account locked.", await ReadAsync(refused));
         using var desktop = CreateClient(apps.OnPrem);
         desktop.DefaultRequestHeaders.Authorization = new("Bearer", token);
         using var sync = await desktop.GetAsync("/api/sync/quick-texts?since=0", Cancel);

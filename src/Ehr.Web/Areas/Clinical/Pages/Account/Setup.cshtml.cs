@@ -55,7 +55,7 @@ public class SetupModel(StaffAccounts accounts) : PageModel
             return Page();
         }
 
-        Message = "Your password is set. Sign in to continue.";
+        Message = "Password set. Sign in to continue.";
         return RedirectToPage("SignIn");
     }
 }

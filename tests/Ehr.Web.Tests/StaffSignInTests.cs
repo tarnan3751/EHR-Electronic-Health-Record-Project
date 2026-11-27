@@ -55,7 +55,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         using var response = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
 
-        Assert.Contains("This account is locked", await ReadAsync(response));
+        Assert.Contains("Account locked.", await ReadAsync(response));
     }
 
     // Wrong codes lock the account as wrong passwords do, and then the right code signs it in no more than the right
@@ -69,13 +69,13 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         for (var attempt = 0; attempt < 5; attempt++)
         {
             using var wrong = await PostFormAsync(client, "/sign-in/code", "/sign-in/code", ("Code", Totp.WrongCode(account.AuthenticatorKey)));
-            Assert.Contains("That code did not match.", await ReadAsync(wrong));
+            Assert.Contains("Wrong code.", await ReadAsync(wrong));
         }
 
         using var response = await PostFormAsync(client, "/sign-in/code", "/sign-in/code", ("Code", Totp.Code(account.AuthenticatorKey)));
 
         Assert.Equal("/sign-in/code", PathOf(response));
-        Assert.Contains("This account is locked after too many failed attempts. Try again in 15 minutes.", await ReadAsync(response));
+        Assert.Contains("Account locked. Try again in 15 minutes.", await ReadAsync(response));
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
         Assert.Contains("locked out", await ReasonsAsync(account));
     }
@@ -99,8 +99,8 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         }));
 
         Assert.All(answers, a => Assert.Equal(HttpStatusCode.OK, a.StatusCode));
-        Assert.Equal(5, answers.Count(a => a.Body.Contains("That code did not match.", StringComparison.Ordinal)));
-        Assert.Equal(Sent - 5, answers.Count(a => a.Body.Contains("This account is locked", StringComparison.Ordinal)));
+        Assert.Equal(5, answers.Count(a => a.Body.Contains("Wrong code.", StringComparison.Ordinal)));
+        Assert.Equal(Sent - 5, answers.Count(a => a.Body.Contains("Account locked.", StringComparison.Ordinal)));
         var reasons = await ReasonsAsync(account);
         Assert.Equal(5, reasons.Count(r => r == "wrong code"));
         Assert.Equal(Sent - 5, reasons.Count(r => r == "locked out"));
@@ -133,7 +133,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
             }));
 
             Assert.True(answers.Count(a => a.Path == "/patients") == 1, $"Run {run}: signed in {answers.Count(a => a.Path == "/patients")} times.");
-            Assert.Single(answers, a => a.Words.Contains("That passkey didn't work.", StringComparison.Ordinal));
+            Assert.Single(answers, a => a.Words.Contains("Passkey not accepted.", StringComparison.Ordinal));
             // The add's sign-in, with the code, and one with the passkey.
             Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
             Assert.Equal(1u, (await StoredPasskeyAsync(account)).SignCount);
@@ -177,7 +177,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         using var refused = await posting;
 
         Assert.Equal(CodePage, PathOf(refused));
-        Assert.Contains("That passkey didn't work.", Words(await ReadAsync(refused)));
+        Assert.Contains("Passkey not accepted.", Words(await ReadAsync(refused)));
         Assert.Equal(50u, (await StoredPasskeyAsync(account)).SignCount);
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
         Assert.Equal(new[] { "passkey refused" }, await ReasonsAsync(account));
@@ -255,7 +255,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         using var refused = await PostFormAsync(again, CodePage, CodePage, ("Code", code));
 
         Assert.Equal(CodePage, PathOf(refused));
-        Assert.Contains("That code did not match.", await ReadAsync(refused));
+        Assert.Contains("Wrong code.", await ReadAsync(refused));
         Assert.Equal(new[] { "wrong code" }, await ReasonsAsync(account));
         Assert.Equal(1, (await AccountOfAsync(account)).AccessFailedCount);
     }
@@ -273,7 +273,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         var (client, _) = await PasswordAsync(apps.OnPrem, account);
         using var refused = await PostFormAsync(client, CodePage, CodePage, ("Code", wrong));
 
-        Assert.Contains("That code did not match.", await ReadAsync(refused));
+        Assert.Contains("Wrong code.", await ReadAsync(refused));
         Assert.Equal(new[] { "wrong code" }, await ReasonsAsync(account));
         Assert.Equal(1, (await AccountOfAsync(account)).AccessFailedCount);
         Assert.Equal(StaffSignIn.RecoveryCodes, await RecoveryCodesLeftAsync(account));
@@ -406,7 +406,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
     }
 
-    const string LockedWords = "This account is locked after too many failed attempts. Try again in 15 minutes.";
+    const string LockedWords = "Account locked. Try again in 15 minutes.";
 
     // Step 19.2: ten wrong passwords sent at once for one account, ten times over. Each password is checked, then the
     // account held and read again before anything is counted: five are counted and recorded as wrong, the fifth locking
@@ -688,8 +688,8 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         using var codePage = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
         Assert.Equal("/sign-in/code", PathOf(codePage));
-        // Wrong codes and wrong passwords count together toward the lockout, so the hint says attempts.
-        Assert.Contains("Five wrong attempts lock the account for 15 minutes.", await ReadAsync(codePage));
+        // The code page says which code it takes.
+        Assert.Contains("From your authenticator app, or a recovery code.", await ReadAsync(codePage));
 
         using var home = await Client(apps.OnPrem, jar, followRedirects: false).GetAsync("/", Cancel);
         Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
@@ -705,7 +705,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         using var response = await PostFormAsync(client, "/sign-in/code", codePage, ("Code", Totp.WrongCode(account.AuthenticatorKey)));
 
-        Assert.Contains("That code did not match", await ReadAsync(response));
+        Assert.Contains("Wrong code.", await ReadAsync(response));
         Assert.Equal("/sign-in/code", PathOf(response));
     }
 
@@ -826,11 +826,11 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         const string password = "chosen-by-the-clinician";
         using var afterSetup = await PostFormAsync(client, setupPath, setupPath, ("Input.Password", password), ("Input.Confirm", password));
         Assert.Equal("/sign-in", PathOf(afterSetup));
-        Assert.Contains("Your password is set.", await ReadAsync(afterSetup));
+        Assert.Contains("Password set.", await ReadAsync(afterSetup));
 
         // The link is spent.
         using var again = await client.GetAsync(setupPath, Cancel);
-        Assert.Contains("isn't valid or has already been used", await ReadAsync(again));
+        Assert.Contains("has expired or has been used", await ReadAsync(again));
 
         using var enrollPage = await PostFormAsync(client, "/sign-in", afterSetup, ("Input.Email", email), ("Input.Password", password));
         Assert.Equal("/sign-in/enroll", PathOf(enrollPage));

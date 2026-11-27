@@ -34,10 +34,10 @@ public class SignInModel(PatientSignIn signIn) : PageModel
                 // shared with it (step 6b; UC 6's alternative course).
                 return LocalRedirect(Links.LocalPage(Url, ReturnUrl, AccountSchemes.PortalPath + "/choose"));
             case PatientSignInOutcome.EmailNotConfirmed:
-                ModelState.AddModelError("", "Confirm your email address first: open the link we sent you when you registered. If it expired, ask for a new one below.");
+                ModelState.AddModelError("", "Confirm your email address first, with the link we sent you.");
                 return Page();
             case PatientSignInOutcome.LockedOut:
-                ModelState.AddModelError("", "This account is locked after too many failed attempts. Try again in 15 minutes.");
+                ModelState.AddModelError("", "Account locked. Try again in 15 minutes.");
                 return Page();
             default:
                 ModelState.AddModelError("", "Wrong email or password.");
