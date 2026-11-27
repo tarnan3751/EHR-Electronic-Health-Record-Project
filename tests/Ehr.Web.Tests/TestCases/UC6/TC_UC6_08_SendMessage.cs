@@ -19,11 +19,11 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test data: Clinician "Dr. Portal Messages". Subject "Synthetic: question about my inhaler". Message "Synthetic: how
 //   often should I use it?". Reply "Synthetic: two puffs every four hours as needed."
 // Steps:
-//   1. In the portal, open "Messages", then "Write to your care team", and send the subject and message.
+//   1. In the portal, open "Messages", then "New message", and send the subject and message.
 //   2. As the clinician, reply in the conversation.
 //   3. In the portal, open "Messages", then the conversation.
 //   4. Open "Messages" again.
-// Expected result: Step 1: the conversation opens with "Sent:" and the message from "You"; one item is in the
+// Expected result: Step 1: the conversation opens with "Sent." and the message from "You"; one item is in the
 //   clinician's inbox, saying only "A patient sent a message". Step 2: one email goes to the patient's address:
 //   subject "New message from your clinic", a button "Read your message" to /portal/messages, and none of
 //   the subject, the message or the reply in it. Step 3: the list marks the conversation "New"; the conversation
@@ -39,13 +39,13 @@ public class TC_UC6_08_SendMessage(WebApps apps) : IClassFixture<WebApps>
     {
         var (clinician, patient, staff, portal) = await CareAsync(apps, "Dr. Portal Messages");
         var list = await portal.Client.GetStringAsync("/portal/messages", Cancel);
-        Assert.Contains("You have no messages.", list);
+        Assert.Contains("No messages.", list);
         Assert.Contains("href=\"/portal/messages/new\"", list);
         Assert.Contains("For an emergency, call your local emergency number.", list);
 
         var thread = await StartAsync(portal.Client, "Synthetic: question about my inhaler", "Synthetic: how often should I use it?");
         var opened = await portal.Client.GetStringAsync($"/portal/messages/{thread}?sent=true", Cancel);
-        Assert.Contains("Sent: your care team will see your message.", Words(opened));
+        Assert.Contains("Sent. Replies from your care team appear here.", Words(opened));
         Assert.Contains("<strong>You</strong>", opened);
         Assert.Contains("Synthetic: how often should I use it?", opened);
         Assert.Equal([clinician.Id.ToString()], await OpenInboxAsync(apps, patient));

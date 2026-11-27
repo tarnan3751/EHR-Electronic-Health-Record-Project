@@ -59,7 +59,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotMatch("<input id=\"message-subject\"[^>]*autofocus", form);
         Assert.Matches("<form(?=[^>]*class=\"sc-form\")[^>]*action=\"/portal/messages/new\"", form);
         // Nothing was saved by filling the form in.
-        Assert.Contains("You have no messages.", await portal.Client.GetStringAsync("/portal/messages", Cancel));
+        Assert.Contains("No messages.", await portal.Client.GetStringAsync("/portal/messages", Cancel));
 
         var thread = await StartAsync(portal.Client, subject, "Synthetic: should I change anything?");
         Assert.Contains(WebUtility.HtmlEncode(subject), await portal.Client.GetStringAsync($"/portal/messages/{thread}", Cancel));

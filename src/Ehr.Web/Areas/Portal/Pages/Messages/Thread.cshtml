@@ -6,23 +6,23 @@
 @{
     ViewData["Title"] = Model.Thread.Subject;
 }
-<p><a asp-page="Index">@(Model.Acting ? "Back to the messages" : "Back to your messages")</a></p>
+<p><a asp-page="Index">Back to messages</a></p>
 <h1>@Model.Thread.Subject</h1>
 @if (Model.Sent && Model.Error is null)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent:</span> @(Model.Acting ? "the care team will see your message." : "your care team will see your message.") Replies appear here.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent.</span> @(Model.Acting ? "Replies from the care team appear here." : "Replies from your care team appear here.")</p>
 }
 <partial name="_Thread" model="(Model.Thread.Messages, MessageSender.Patient)" />
 @if (!OnPrem.IsReachable)
 {
-    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> messages can't be sent until the clinic's server is back.</p>
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Messages can't be sent until the clinic's server is back.</p>
 }
 else
 {
     <form method="post" class="sc-form">
         @if (Model.Error is not null)
         {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> fix what is marked below and send again.</p>
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted fields and try again.</p>
         }
         <div class="sc-field">
             <label for="message-body">Your reply</label>

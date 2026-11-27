@@ -3,13 +3,13 @@
 @model Ehr.Web.Areas.Portal.Pages.Messages.NewModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
-    ViewData["Title"] = Model.Acting ? "Write to the care team" : "Write to your care team";
+    ViewData["Title"] = "New message";
 }
-<p><a asp-page="Index">@(Model.Acting ? "Back to the messages" : "Back to your messages")</a></p>
+<p><a asp-page="Index">Back to messages</a></p>
 <h1>@ViewData["Title"]</h1>
 @if (!OnPrem.IsReachable)
 {
-    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> messages can't be sent until the clinic's server is back.</p>
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Messages can't be sent until the clinic's server is back.</p>
 }
 else
 {
@@ -17,7 +17,7 @@ else
     <form method="post" asp-page="New" class="sc-form">
         @if (Model.Errors.Count > 0)
         {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> fix what is marked below and send again.</p>
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted fields and try again.</p>
         }
         <div class="sc-field">
             <label for="message-subject">Subject</label>

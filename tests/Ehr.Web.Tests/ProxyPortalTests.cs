@@ -57,8 +57,8 @@ public class ProxyPortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Note from the care team:", Words(results));
 
         var messages = Words(await proxy.Client.GetStringAsync("/portal/messages", Cancel));
-        Assert.Contains("Write to the care team", messages);
-        Assert.Contains("There are no messages.", messages);
+        Assert.Contains("New message", messages);
+        Assert.Contains("No messages.", messages);
         Assert.DoesNotContain("your care team", messages);
     }
 }

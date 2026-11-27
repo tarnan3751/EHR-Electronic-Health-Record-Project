@@ -12,11 +12,11 @@
 }
 @if (OnPrem.IsReachable)
 {
-    <p><a asp-page="New" class="sc-btn sc-btn--primary">@(Model.Acting ? "Write to the care team" : "Write to your care team")</a></p>
+    <p><a asp-page="New" class="sc-btn sc-btn--primary">New message</a></p>
 }
 else
 {
-    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> messages can't be sent until the clinic's server is back. You can still read them.</p>
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Messages can't be sent until the clinic's server is back. You can still read them.</p>
 }
 <p class="sc-muted">For an emergency, call your local emergency number. Messages are read during clinic hours.</p>
 @if (Model.Threads is not { } threads)
@@ -25,7 +25,7 @@ else
 }
 else if (threads.Threads.Count == 0)
 {
-    <p class="sc-muted">@(Model.Acting ? "There are no messages." : "You have no messages.")</p>
+    <p class="sc-muted">No messages.</p>
 }
 else
 {
