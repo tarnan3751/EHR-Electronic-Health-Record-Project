@@ -2786,6 +2786,146 @@
        comment; anything two areas share belongs in the components layer.
        ---- */
 
+    /* The way back above a portal page's title, at the portal's size: as tall as its controls, so a finger finds it. */
+    .sc-app--portal .sc-pagehead {
+        margin: calc(-1 * var(--space-4)) 0 var(--space-2);
+    }
+
+    .sc-app--portal .sc-back {
+        min-height: var(--control-height-portal);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    /* A page's title with its one action on the right ("New message"), under it where the line is too short. */
+    .sc-titlebar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3) var(--space-4);
+        margin: 0 0 var(--space-4);
+    }
+
+    .sc-titlebar > h1 {
+        margin: 0;
+    }
+
+    /* A list as rows on one card (appointments, conversations): what a row is about on the left, semibold, its date
+       or state on the right (sc-rows__end), and a muted line under it (sc-rows__meta). A row that opens something is a
+       target as big as the row, its link keeping the focus ring. One column on a phone, the right-hand part under the
+       rest. */
+    .sc-rows {
+        list-style: none;
+        margin: 0 0 var(--space-6);
+        padding: 0;
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-rows > li {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: var(--space-6);
+        align-items: baseline;
+        margin: 0;
+        padding: var(--space-4) var(--space-6);
+        border-top: 1px solid var(--line);
+        overflow-wrap: anywhere;
+    }
+
+    .sc-rows > li:first-child {
+        border-top: 0;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .sc-rows > li:last-child {
+        border-bottom-left-radius: var(--radius-lg);
+        border-bottom-right-radius: var(--radius-lg);
+    }
+
+    .sc-rows > li > * {
+        grid-column: 1;
+        margin: 0;
+    }
+
+    .sc-rows > li > :is(h2, h3) {
+        font-family: var(--font-sans);
+        font-size: 18px;
+        line-height: 28px;
+        font-weight: 600;
+        letter-spacing: normal;
+    }
+
+    .sc-rows__meta {
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+    }
+
+    .sc-rows > li > .sc-rows__end {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: var(--space-2);
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sc-rows a:not(.sc-btn) {
+        text-decoration: none;
+    }
+
+    .sc-rows a:not(.sc-btn):hover,
+    .sc-rows a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    .sc-rows__link::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+    }
+
+    .sc-rows > li:has(.sc-rows__link):hover {
+        background: var(--surface-subtle);
+    }
+
+    @media (max-width: 40rem) {
+        .sc-rows > li {
+            grid-template-columns: minmax(0, 1fr);
+            padding: var(--space-4);
+        }
+
+        .sc-rows > li > .sc-rows__end {
+            grid-column: 1;
+            grid-row: auto;
+            justify-content: flex-start;
+            white-space: normal;
+        }
+    }
+
+    /* A plain link beside a form's button ("Cancel"), at the portal's size and as tall as the button. */
+    .sc-app--portal .sc-actions > a:not(.sc-btn) {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--control-height-portal);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    /* An empty list has the corners of the portal's cards. */
+    .sc-app--portal .sc-empty {
+        border-radius: var(--radius-lg);
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */

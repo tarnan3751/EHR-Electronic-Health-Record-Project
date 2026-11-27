@@ -1,17 +1,18 @@
-@* A patient's appointments, as cards down one column (docs/brand: the portal). Dates are written out; times are the
-   clinic's, labeled with its zone, as the clinic's schedule shows them. *@
+@* A patient's appointments, as rows of one list (sc-rows; docs/brand: the portal): the date, then the time and who
+   with, then what for, and a status that isn't "booked" on the right. Dates are written out; times are the clinic's,
+   labeled with its zone, as the clinic's schedule shows them. *@
 @using Ehr.Data.Scheduling
 @model IReadOnlyList<Ehr.Domain.Scheduling.AppointmentEntry>
-<ul class="sc-results">
+<ul class="sc-rows">
     @foreach (var appointment in Model)
     {
-        <li class="sc-result" data-appointment="@appointment.Status">
+        <li data-appointment="@appointment.Status">
             <h3>@Clinic.Plain(appointment.StartsAt, "dddd, MMM d, yyyy")</h3>
             <p>@Clinic.Format(appointment.StartsAt, "HH:mm"), for @appointment.Minutes minutes, with @appointment.Clinician</p>
-            <p>@appointment.Reason</p>
+            <p class="sc-rows__meta">@appointment.Reason</p>
             @if (appointment.Status != AppointmentStatus.Booked)
             {
-                <p><span class="sc-tag">@(appointment.Status == AppointmentStatus.Fulfilled ? "Attended" : appointment.Status == AppointmentStatus.NoShow ? "Missed" : "Cancelled")</span></p>
+                <p class="sc-rows__end"><span class="sc-tag">@(appointment.Status == AppointmentStatus.Fulfilled ? "Attended" : appointment.Status == AppointmentStatus.NoShow ? "Missed" : "Cancelled")</span></p>
             }
         </li>
     }
