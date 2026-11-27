@@ -68,7 +68,7 @@ public class TC_UC6_11_ProxyLimits(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<dd>Synthetic Guarded</dd>", await proxy.Client.GetStringAsync("/portal", Cancel));
 
         var passedOn = await GiveAsync(proxy, third.Email);
-        Assert.Contains("Go back to your own to see or change who can see yours.", passedOn);
+        Assert.Contains("To see or change this, go back to your own record.", passedOn);
         Assert.DoesNotContain("name=\"Email\"", passedOn);
         Assert.Single(await GrantsAsync(apps, patient.Patient));
         Assert.Empty(await GrantsAsync(apps, proxy.Patient));
@@ -84,13 +84,13 @@ public class TC_UC6_11_ProxyLimits(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Sharing can't be changed until the clinic's server is back.", Words(await Client(apps.CloudCutOff, patient.Jar).GetStringAsync("/portal/access", Cancel)));
 
         using var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", grant));
-        Assert.Contains("Sharing removed.", await ReadAsync(removed));
+        Assert.Contains("Sharing stopped.", await ReadAsync(removed));
         using var after = await proxy.Client.GetAsync("/portal/results", Cancel);
         Assert.Equal("/portal", PathOf(after));
         var ended = await ReadAsync(after);
         Assert.Contains("Access ended. You can no longer see that record.", Words(ended));
         Assert.Contains("<dd>Synthetic Helper</dd>", ended);
         Assert.DoesNotContain("data-acting", ended);
-        Assert.Contains("Nobody has shared a record with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
+        Assert.Contains("No records shared with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
     }
 }

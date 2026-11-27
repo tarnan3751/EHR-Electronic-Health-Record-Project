@@ -63,12 +63,12 @@ public class TC_UC18_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             await expire.ExecuteNonQueryAsync(Cancel);
         }
 
-        Assert.Contains("Nobody has shared a record with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
+        Assert.Contains("No records shared with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
         using var tooLate = await PostFormAsync(proxy.Client, "/portal/acting", "/portal/access", ("grantId", grant));
         Assert.Equal(HttpStatusCode.NotFound, tooLate.StatusCode);
         var own = await patient.Client.GetStringAsync("/portal/access", Cancel);
         Assert.Contains("Sharing that has ended", own);
         Assert.Contains("· ended ", own);
-        Assert.Contains("You haven't shared your record with anyone.", own);
+        Assert.Contains("Not shared with anyone.", own);
     }
 }

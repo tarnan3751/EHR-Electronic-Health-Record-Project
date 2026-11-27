@@ -20,10 +20,10 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   2. Choose "Share sensitive items too" for that person.
 //   3. Choose "Stop sharing".
 // Expected result: Step 1: the page says "Shared." and lists the email under "Who can see your record" with the scope,
-//   an end date, "Shared by you." and "They can't see sensitive items or your pre-visit forms."; one email goes to that
+//   an end date, "Shared by you." and "No sensitive items or pre-visit forms."; one email goes to that
 //   address, subject "Someone shared their record with you", saying where to sign in, with a button that creates
-//   an account for someone who has none, and neither person's name in it. Step 2: "Saved.", and the entry now says they can also see sensitive items. Step 3: "Sharing removed."; the
-//   entry moves to "Sharing that has ended"; "You haven't shared your record with anyone."
+//   an account for someone who has none, and neither person's name in it. Step 2: "Saved.", and the entry now says they can also see sensitive items. Step 3: "Sharing stopped."; the
+//   entry moves to "Sharing that has ended"; "Not shared with anyone."
 // Creator: Tahseen Arnan
 public class TC_UC18_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -33,8 +33,8 @@ public class TC_UC18_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         var patient = await PersonAsync(apps, "Synthetic", "Grantor");
         var proxy = await PersonAsync(apps, "Synthetic", "Relative");
         var empty = await patient.Client.GetStringAsync("/portal/access", Cancel);
-        Assert.Contains("You haven't shared your record with anyone.", empty);
-        Assert.Contains("Nobody has shared a record with you.", empty);
+        Assert.Contains("Not shared with anyone.", empty);
+        Assert.Contains("No records shared with you.", empty);
         Assert.Contains("href=\"/portal/access\"", empty);
 
         var emails = apps.Emails.Sent.Count;
@@ -43,7 +43,7 @@ public class TC_UC18_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"<h3>{proxy.Email}</h3>", given);
         Assert.Contains("Record, results, appointments and messages. Until ", Words(given));
         Assert.Contains("Shared by you.", given);
-        Assert.Contains("They can't see sensitive items or your pre-visit forms.", Words(given));
+        Assert.Contains("No sensitive items or pre-visit forms.", Words(given));
         Assert.Equal([$"{proxy.Email} record-and-messages false patient in-force"], await GrantsAsync(apps, patient.Patient));
         Assert.Equal(emails + 1, apps.Emails.Sent.Count);
         var email = apps.Emails.Sent.Last();
@@ -62,15 +62,15 @@ public class TC_UC18_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         using var allowed = await PostFormAsync(patient.Client, "/portal/access?handler=Sensitive", "/portal/access", ("grantId", grant), ("allow", "true"));
         var shown = await ReadAsync(allowed);
         Assert.Contains("Saved.", shown);
-        Assert.Contains("They can also see sensitive items, and see and fill in your pre-visit forms.", shown);
+        Assert.Contains("Includes sensitive items and pre-visit forms.", shown);
         Assert.Equal([$"{proxy.Email} record-and-messages true patient in-force"], await GrantsAsync(apps, patient.Patient));
 
         using var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", grant));
         var after = await ReadAsync(removed);
-        Assert.Contains("Sharing removed.", after);
-        Assert.Contains("You haven't shared your record with anyone.", after);
+        Assert.Contains("Sharing stopped.", after);
+        Assert.Contains("Not shared with anyone.", after);
         Assert.Contains("Sharing that has ended", after);
         Assert.Equal([$"{proxy.Email} record-and-messages true patient revoked"], await GrantsAsync(apps, patient.Patient));
-        Assert.Contains("Nobody has shared a record with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
+        Assert.Contains("No records shared with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
     }
 }

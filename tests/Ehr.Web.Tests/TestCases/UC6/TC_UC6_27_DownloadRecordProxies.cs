@@ -31,7 +31,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   offered the box, and their file with sensitive items holds sertraline and the anxiety disorder, marked restricted,
 //   recorded as a download of sensitive items; the other two get no box, and the same file whether they ask or not, with
 //   neither. Every event is under the proxy's account and the patient. Step 2: sent to their own record, which says the
-//   access ended, with nothing of the patient's; from then on the copy is of their own record. Step 3: sent to "Whose record?" each time; nothing is recorded.
+//   access ended, with nothing of the patient's; from then on the copy is of their own record. Step 3: sent to "Records" each time; nothing is recorded.
 // Creator: Tahseen Arnan
 public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebApps>
 {
@@ -86,7 +86,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         var ended = proxies[1];
         using (var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", ended.Grant)))
         {
-            Assert.Contains("Sharing removed.", await ReadAsync(removed));
+            Assert.Contains("Sharing stopped.", await ReadAsync(removed));
         }
 
         var downloads = await apps.AuditEventsAsync(AuditActions.Download, ended.Proxy.Account, patient.Patient);
@@ -116,7 +116,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
             using var sent = await session.Client.GetAsync(path, Cancel);
             Assert.Equal("/portal/choose", PathOf(sent));
             var choose = await ReadAsync(sent);
-            Assert.Contains("<h1>Whose record?</h1>", choose);
+            Assert.Contains("<h1>Records</h1>", choose);
             Assert.DoesNotContain(chart.Mrn, choose);
         }
 

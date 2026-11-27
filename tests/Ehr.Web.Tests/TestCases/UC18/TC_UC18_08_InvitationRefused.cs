@@ -8,7 +8,7 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Test Case ID: TC-UC18-08
 // Purpose / scenario: What an invitation and a proxy-only account refuse. A link works once and not after it expires;
 //   a mistyped password leaves it usable; an address that already has an account is told to sign in; and the account
-//   it creates can't share anything, and is back to an empty "Whose record?" when the access is removed.
+//   it creates can't share anything, and is back to an empty "Records" when the access is removed.
 // Type: Functional (invalid input and exceptional condition)
 // Requirements: FR-19, proposed FR-44, proposed FR-46
 // Use case: UC 18, Give someone proxy access to a record
@@ -30,7 +30,7 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   match." with the form still there and no account; then "Account created."; then "has expired or has been used", and still one
 //   account. Step 3: "has expired or has been used" and no account. Step 4: "You already have a portal account." and that patient's account is unchanged. Step 4b: "Account created."; the address signs in with the owner's
 //   password and not with the unconfirmed account's, which no longer has the address. Step 5: nothing is saved. Step 6: the new account lands on
-//   "Whose record?" with "Access ended." and "Nobody is sharing a record with you."
+//   "Records" with "Access ended." and "No records shared with you."
 // Creator: Tahseen Arnan
 public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
 {
@@ -110,12 +110,12 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(grants, await GrantsAsync(apps, patient.Patient));
 
         using var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", grant));
-        Assert.Contains("Sharing removed.", await ReadAsync(removed));
+        Assert.Contains("Sharing stopped.", await ReadAsync(removed));
         using var after = await session.Client.GetAsync("/portal/results", Cancel);
         Assert.Equal("/portal/choose", PathOf(after));
         var ended = await ReadAsync(after);
         Assert.Contains("Access ended. You can no longer see that record.", Words(ended));
-        Assert.Contains("Nobody is sharing a record with you.", ended);
+        Assert.Contains("No records shared with you.", ended);
         Assert.DoesNotContain("Synthetic Inviter", ended);
     }
 
