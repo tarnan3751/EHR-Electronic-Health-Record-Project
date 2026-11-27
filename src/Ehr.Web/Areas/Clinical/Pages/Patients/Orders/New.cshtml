@@ -72,7 +72,7 @@ else
         else if (Model.ProposalDecided)
         {
             @* Step 15: nothing was ordered, so nothing waits to be undone. *@
-            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This proposal was decided first, in another tab or window. Nothing was ordered. <a href="@Model.ReviewLink">Back to review</a></p>
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This proposal was already decided. <a href="@Model.ReviewLink">Back to review</a></p>
         }
         else
         {

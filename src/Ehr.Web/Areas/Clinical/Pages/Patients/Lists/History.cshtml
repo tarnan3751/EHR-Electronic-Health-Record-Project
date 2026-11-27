@@ -4,7 +4,7 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.History.Patient;
-    ViewData["Title"] = $"History of allergies, medications and diagnoses: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "History of allergies, medications and diagnoses";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.History.Allergies, Model.OnPanel, Model.EmergencyUntil)" />
@@ -12,7 +12,7 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.Route(sensitive: Model.History.SensitiveShown)" class="sc-back">Back to chart</a></p>
 </div>
-<h1>History of allergies, medications and diagnoses: @patient.FamilyName, @patient.GivenName</h1>
+<h1>History of allergies, medications and diagnoses</h1>
 
 @if (Model.History.SensitiveShown)
 {
@@ -61,6 +61,6 @@ else
     </div>
     @if (Model.History.More)
     {
-        <p class="sc-muted">Showing the @HistoryModel.Limit most recent changes.</p>
+        <p class="sc-muted">Latest @HistoryModel.Limit changes.</p>
     }
 }

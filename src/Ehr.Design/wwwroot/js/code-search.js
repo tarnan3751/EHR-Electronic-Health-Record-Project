@@ -44,7 +44,7 @@
                 if (response.redirected) {
                     // Signed out: the answer is the sign-in page, not suggestions.
                     list.replaceChildren();
-                    say(" Signed out. Sign in again to see suggestions. What you typed is still here.");
+                    say(" Signed out. Sign in again to see suggestions.");
                     return;
                 }
 

@@ -646,7 +646,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var responses = await Task.WhenAll(sent);
         Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], responses.Select(r => r.StatusCode).Order());
         var refused = responses.Single(r => r.StatusCode == HttpStatusCode.Conflict);
-        Assert.Contains("Not saved. This proposal was decided first, in another tab or window.", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This proposal was already decided.", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
         var written = await QueryAsync(apps, $"SELECT id FROM ehr.{table} WHERE patient_id = @id", dictated.Patient);
         Assert.Single(written);
         Assert.Equal(kind == "order" ? $"ordered|{written[0]}|-" : $"recorded|-|{written[0]}", await StateAsync(apps, proposal));

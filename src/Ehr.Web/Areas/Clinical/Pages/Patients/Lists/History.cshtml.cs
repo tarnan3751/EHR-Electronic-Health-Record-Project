@@ -39,7 +39,7 @@ public class HistoryModel(PhiReader phi, PatientAssignments assignments, BreakGl
     static readonly (string Column, string Label)[] Fields =
     [
         ("display", "Name"), ("clinical_status", "Status"), ("status", "Status"), ("reaction", "Reaction"), ("severity", "Severity"),
-        ("criticality", "Risk"), ("dosage", "How it is taken"), ("effective_start", "Started"), ("effective_end", "Stopped"),
+        ("criticality", "Criticality"), ("dosage", "Dosage"), ("effective_start", "Started"), ("effective_end", "Stopped"),
         ("onset_date", "Onset"), ("sensitive", "Sensitive"),
     ];
 

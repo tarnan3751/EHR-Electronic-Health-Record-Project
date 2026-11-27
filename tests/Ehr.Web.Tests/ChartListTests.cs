@@ -243,7 +243,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(HttpStatusCode.Conflict, posted.StatusCode);
         var page = await posted.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Not saved. This isn't one of your patients. What you entered is below, to copy.", Words(page));
+        Assert.Contains("Not saved. This isn't one of your patients.", Words(page));
         Assert.Contains("Essential (primary) hypertension</textarea>", page);
         Assert.DoesNotContain("Left the panel", page);
         Assert.DoesNotContain("sc-banner", page);
@@ -338,7 +338,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 
         var byCode = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", anxietyId), Cancel);
         Assert.Contains(fixedBox, byCode);
-        Assert.Contains("Sensitive because of its code.", Words(byCode));
+        Assert.Contains("Always sensitive for this code.", Words(byCode));
         var other = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", hypertensionId), Cancel);
         Assert.DoesNotContain("disabled", other);
         Assert.Contains("name=\"Sensitive\" value=\"true\"", other);
@@ -413,7 +413,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         using var crossed = await session.Client.PostAsync(EntryPath(other, "allergies"),
             Form(("__RequestVerificationToken", token), ("NewEntryId", newId), ("Name", "Penicillin G"), ("Status", "active")), Cancel);
         Assert.Equal(HttpStatusCode.Conflict, crossed.StatusCode);
-        Assert.Contains("Not saved. The entry may have changed, or this patient may no longer be one of your patients.", Words(await crossed.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. The entry changed, or this isn't one of your patients.", Words(await crossed.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal([$"{newId} Peanut Rash"], await RowsAsync(apps, "allergy_intolerances", patient, "concat_ws(' ', id, display, reaction)"));
         Assert.Empty(await RowsAsync(apps, "allergy_intolerances", other, "display"));
     }

@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   4. As Dr. Test, open another patient's order form, of their panel too, with the second dictation's order proposal;
 //      sign from it, the proposal in the address and then in the form.
 // Expected result: Step 1: the first signs and goes back to the review; the second is 409, "Not saved. This proposal was
-//   decided first, in another tab or window. Nothing was ordered.", and the patient has the first order alone. Step 2: back
+//   already decided.", and the patient has the first order alone. Step 2: back
 //   to the review; to the chart, and 404 with nothing signed; 400; 400. Step 3: the colleague is sent to the chart,
 //   shown nothing of it, and the proposal still waits. Step 4: to that patient's chart, then 404 twice; nothing is
 //   ordered for either patient, the proposal still waits, and no read of it or its review is recorded against the other
@@ -55,7 +55,7 @@ public class TC_UC1_24_OrderFromDictationRefused(WebApps apps) : IClassFixture<W
         using (var refused = await SignOnAsync(dictated, path, second, "Hemoglobin A1c"))
         {
             Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-            Assert.Contains("Not saved. This proposal was decided first, in another tab or window. Nothing was ordered.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("Not saved. This proposal was already decided.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Equal(["SYN-LAB-004"], await QueryAsync(apps, "SELECT catalog_code FROM ehr.orders WHERE patient_id = @id", dictated.Patient));

@@ -49,7 +49,7 @@ public class TC_UC4_07_AddEntrySuccessfulFlow(WebApps apps) : IClassFixture<WebA
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses"), Cancel);
-        Assert.Contains("Add diagnosis: Listed, Synthetic", form);
+        Assert.Contains("<h1>Add diagnosis</h1>", form);
         Assert.Matches("<input [^>]*name=\"Name\"[^>]*required[^>]*autofocus[^>]*data-code-search=\"condition\"", form);
         Assert.Contains("/_content/Ehr.Design/js/code-search.", form);
         Assert.Contains(">Save diagnosis</button>", form);

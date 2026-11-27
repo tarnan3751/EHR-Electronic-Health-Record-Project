@@ -145,7 +145,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
 
     // What was typed into the free-text fields, for the page that says the post wasn't saved.
     public IReadOnlyList<(string Field, string Value)> Typed =>
-        [.. new (string Label, string? Text)[] { (About.Label, Name), ("Reaction", Reaction), ("How it is taken", Dosage) }
+        [.. new (string Label, string? Text)[] { (About.Label, Name), ("Reaction", Reaction), ("Dosage", Dosage) }
             .Where(typed => !string.IsNullOrWhiteSpace(typed.Text)).Select(typed => (typed.Label, typed.Text!))];
 
     // The way back to the chart: with the search, and with sensitive items shown when they were.
@@ -215,34 +215,34 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         var code = kept ? null : await lists.FindAsync(About.Kind, name, HttpContext.RequestAborted);
         if (name.Length == 0)
         {
-            errors[nameof(Name)] = $"Enter the {About.Label.ToLowerInvariant()}.";
+            errors[nameof(Name)] = $"{About.Label} is required.";
         }
         else if (!kept && code is null)
         {
-            errors[nameof(Name)] = $"Choose a {About.Label.ToLowerInvariant()} from the list.";
+            errors[nameof(Name)] = $"{About.Label} must be selected from the list.";
         }
 
         if (!Statuses.Any(status => status.Code == Status))
         {
-            errors[nameof(Status)] = "Choose a status.";
+            errors[nameof(Status)] = "Status is required.";
         }
 
         foreach (var (field, value) in new[] { (nameof(Reaction), Reaction), (nameof(Dosage), Dosage) })
         {
             if (value?.Trim().Length > ChartLists.MaximumLength)
             {
-                errors[field] = $"Shorten this to {ChartLists.MaximumLength} characters or fewer.";
+                errors[field] = $"{field} must be {ChartLists.MaximumLength} characters or less.";
             }
         }
 
         if (Severity is not null && !AllergySeverity.All.Contains(Severity))
         {
-            errors[nameof(Severity)] = "Choose a severity.";
+            errors[nameof(Severity)] = "Severity must be selected from the list.";
         }
 
         if (Criticality is not null && !AllergyCriticality.All.Contains(Criticality))
         {
-            errors[nameof(Criticality)] = "Choose a risk.";
+            errors[nameof(Criticality)] = "Criticality must be selected from the list.";
         }
 
         var started = Parse(nameof(Started), Started, errors);
@@ -250,7 +250,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
         var onset = Parse(nameof(Onset), Onset, errors);
         if (started is not null && stopped is not null && stopped < started)
         {
-            errors[nameof(Stopped)] = "The stop date is before the start date.";
+            errors[nameof(Stopped)] = "Stopped must be on or after Started.";
         }
 
         // A diagnosis sensitive by its code stays sensitive whatever was posted (its box is fixed, and a disabled box
@@ -385,7 +385,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
             return date;
         }
 
-        errors[field] = "Enter a date that exists and isn't in the future, as year-month-day.";
+        errors[field] = $"{field} must be a real date, not in the future.";
         return null;
     }
 
