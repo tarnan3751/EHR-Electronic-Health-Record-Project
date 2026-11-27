@@ -24,12 +24,12 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   Chicago's clock, labeled, with no "UTC" anywhere on the page. Step 2: the clinician's table is headed "Taken (clinic
 //   time)" and lists the same readings, the same way.
 // Creator: Tahseen Arnan
-public class TC_UC4_24_PortalTimesUnchanged(WebApps apps) : IClassFixture<WebApps>
+public class TC_UC4_24_PortalTimesOnTheClinicsClock(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task The_portal_still_shows_UTC_when_the_clinic_has_a_time_zone()
+    public async Task The_portal_shows_the_clinics_clock_when_the_clinic_has_a_time_zone()
     {
         var clock = ClinicTimeTests.ChicagoClock;
         using var chicago = ClinicTimeTests.Chicago(apps);
