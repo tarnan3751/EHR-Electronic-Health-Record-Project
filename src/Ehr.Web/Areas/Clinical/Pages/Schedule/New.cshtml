@@ -11,10 +11,10 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Header.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
 <h1>Book appointment: @patient.FamilyName, @patient.GivenName</h1>
-<form method="post" class="sc-form">
+<form method="post" class="sc-form sc-formcard sc-formcard--wide sc-formgrid">
     @if (Model.Errors.Count > 0)
     {
         <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> Fix the highlighted fields and try again.</p>
