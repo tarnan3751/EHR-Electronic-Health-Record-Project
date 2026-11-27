@@ -2378,16 +2378,119 @@
         line-height: 20px;
     }
 
-    /* Chart: panels side by side where there is room. */
+    /* Chart (docs/brand: the chart): three columns, each a stack of panels, so no panel leaves a hole beside a taller
+       one. The standing facts first (allergies, medications, diagnoses, vital signs), then the notes and orders, then
+       results, appointments, messages and the portal; recent visits across the foot. One column on a narrow screen. */
     .sc-chart {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-        gap: var(--space-6);
+        gap: var(--space-4);
         align-items: start;
     }
 
     .sc-chart > .sc-panel--wide {
         grid-column: 1 / -1;
+    }
+
+    .sc-chart__col {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        min-width: 0;
+    }
+
+    .sc-chart__col > * {
+        margin: 0;
+    }
+
+    /* A chart panel: a grid whose first row is its head, the title on the left and the panel's one action ("Add
+       allergy", "New order") on the right, over a hairline; everything after it spans the panel. A sentence in the
+       action's place (off-site) is the first line under the head. The markup stays a title followed by its action. */
+    .sc-chart .sc-panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-content: start;
+        row-gap: var(--space-2);
+        padding-top: 0;
+    }
+
+    .sc-chart .sc-panel > * {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
+
+    .sc-chart .sc-panel > .sc-panel__title {
+        display: flex;
+        align-items: center;
+        min-height: calc(28px + 2 * var(--space-3));
+        margin: 0 calc(-1 * var(--space-4)) var(--space-1);
+        padding: 0 var(--space-4);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-chart .sc-panel > .sc-panel__title:has(+ p.sc-actions) {
+        grid-column: 1;
+        margin-right: 0;
+        padding-right: 0;
+    }
+
+    .sc-chart .sc-panel > .sc-panel__title + p.sc-actions {
+        grid-column: 2;
+        grid-row: 1;
+        margin: 0 calc(-1 * var(--space-4)) var(--space-1) 0;
+        padding: 0 var(--space-4) 0 var(--space-3);
+        border-bottom: 1px solid var(--line);
+    }
+
+    /* Dense: the record lines and their dates in body-sm, a date after a line never broken. */
+    .sc-chart .sc-list {
+        margin: 0;
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-chart .sc-list span.sc-muted {
+        white-space: nowrap;
+    }
+
+    .sc-chart .sc-panel > p,
+    .sc-chart .sc-panel > form {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-chart .sc-panel > h3 {
+        margin-top: var(--space-2);
+    }
+
+    /* The history of the standing facts, under their column. */
+    .sc-chart__more {
+        padding: 0 var(--space-1);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-chart__more a {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-chart__more a:hover,
+    .sc-chart__more a:focus-visible {
+        text-decoration: underline;
+    }
+
+    /* The quiet way to a panel's fuller page ("Discontinued orders", "Flowsheet, trends and recording"), at its foot. */
+    .sc-chart .sc-panel > p > a:only-child {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-chart .sc-panel > p > a:only-child:hover,
+    .sc-chart .sc-panel > p > a:only-child:focus-visible {
+        text-decoration: underline;
     }
 
     /* A clinical note: the three fields at reading width, their text kept as it was typed. */
