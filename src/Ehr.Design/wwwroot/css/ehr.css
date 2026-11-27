@@ -3776,6 +3776,31 @@
         font-weight: 600;
     }
 
+    /* Sharing (step 6): the records shared with the account and the people the record is shared with as rows, the
+       latter with their buttons under what they can see; sharing that has ended as a quiet list on a card. */
+    .sc-rows > li > .sc-actions {
+        margin-top: var(--space-3);
+    }
+
+    .sc-ended {
+        padding: var(--space-2) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-ended > li {
+        padding: var(--space-3) 0;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-ended {
+            padding-inline: var(--space-4);
+        }
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */
