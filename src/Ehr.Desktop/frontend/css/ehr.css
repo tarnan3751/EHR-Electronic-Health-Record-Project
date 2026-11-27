@@ -2351,17 +2351,31 @@
         border-radius: var(--radius-sm);
     }
 
-    /* Patient search: the three criteria in a row, then the results. */
+    /* Patient search: the three criteria in a row on a toolbar, the name widest, then the results. */
     .sc-search {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--space-3);
+        gap: var(--space-3) var(--space-4);
         align-items: flex-end;
         margin: 0 0 var(--space-6);
+        padding: var(--space-4);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
     }
 
     .sc-search .sc-field {
         flex: 1 1 12rem;
+    }
+
+    .sc-search .sc-field:first-child {
+        flex-grow: 2;
+    }
+
+    .sc-search .sc-field__input {
+        min-height: var(--control-height);
+        font-size: 14px;
+        line-height: 20px;
     }
 
     /* Chart: panels side by side where there is room. */
