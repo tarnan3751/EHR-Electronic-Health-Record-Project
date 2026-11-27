@@ -49,7 +49,7 @@ public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<W
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(DiscontinuePath(patient, order), Cancel);
-        Assert.Contains("Discontinue order: Orderable, Synthetic", form);
+        Assert.Contains("<h1>Discontinue order</h1>", form);
         Assert.Contains("<strong>Penicillin</strong>: Hives", form);
         Assert.Contains("<strong>Complete blood count (CBC)</strong> Reason for the test: Synthetic fatigue", form);
         Assert.Matches("<textarea [^>]*name=\"Reason\"[^>]*required autofocus", form);
@@ -69,7 +69,7 @@ public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<W
         Assert.DoesNotContain("data-discontinue-order", confirmed);
 
         var listed = await session.Client.GetStringAsync($"/patients/{patient}/orders/discontinued", Cancel);
-        Assert.Contains("Discontinued orders: Orderable, Synthetic", listed);
+        Assert.Contains("<h1>Discontinued orders</h1>", listed);
         Assert.Contains("<strong>Complete blood count (CBC)</strong> (Lab)", listed);
         Assert.Contains("Reason for the test: Synthetic fatigue", listed);
         Assert.Contains("<td>Dr. Test</td>", listed);

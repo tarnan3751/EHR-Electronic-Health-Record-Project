@@ -44,15 +44,15 @@ public static class OrderSafetyText
     // The one general line for a level, or for an allergy.
     public static string Advice(SafetyWarning warning) => warning.Kind switch
     {
-        "allergy" => $"The chart records an allergy to {warning.Against}. Don't order it unless the allergy has been ruled out.",
-        "allergy-class" when warning.Source == "cross-reactivity" => "A drug of a related class can cause the same reaction. Check what the reaction was before ordering.",
-        "allergy-class" => "Check what the reaction was.",
+        "allergy" => $"Recorded allergy to {warning.Against}. Don't order unless the allergy is ruled out.",
+        "allergy-class" when warning.Source == "cross-reactivity" => "A related class can cause the same reaction. Check the reaction before ordering.",
+        "allergy-class" => "Check the reaction.",
         _ => warning.Severity switch
         {
-            DrugInteractionLevel.HighPriority => "On the list of interactions an electronic record should always stop for. Avoid the combination.",
+            DrugInteractionLevel.HighPriority => "Avoid the combination.",
             DrugInteractionLevel.Major => "Avoid the combination unless the benefit clearly outweighs the risk.",
-            DrugInteractionLevel.Moderate => "Use together with caution: monitor the patient, and consider adjusting a dose.",
-            _ => "A small effect is expected. No change is usually needed.",
+            DrugInteractionLevel.Moderate => "Use with caution. Monitor the patient and consider adjusting a dose.",
+            _ => "Usually no change needed.",
         },
     };
 

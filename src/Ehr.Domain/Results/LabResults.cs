@@ -36,22 +36,22 @@ public sealed class LabResults(EhrDbContext db)
             }
             else
             {
-                errors[code] = "Enter a number, like 5.4.";
+                errors[code] = "Result must be a number.";
             }
         }
 
         if (errors.Count == 0 && values.Count == 0)
         {
-            errors[""] = "Enter at least one result.";
+            errors[""] = "At least one result is required.";
         }
 
         if (collectedAt is null)
         {
-            errors["CollectedAt"] = "Enter when the sample was collected.";
+            errors["CollectedAt"] = "Sample collected is required.";
         }
         else if (collectedAt > DateTimeOffset.UtcNow.AddMinutes(1))
         {
-            errors["CollectedAt"] = "The collection time can't be in the future.";
+            errors["CollectedAt"] = "Sample collected must not be in the future.";
         }
 
         return errors;

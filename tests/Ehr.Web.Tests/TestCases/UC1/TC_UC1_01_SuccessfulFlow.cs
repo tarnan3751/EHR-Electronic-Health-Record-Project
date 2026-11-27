@@ -49,7 +49,7 @@ public class TC_UC1_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(FormPath(patient, "lab"), Cancel);
-        Assert.Contains("New order: Orderable, Synthetic", form);
+        Assert.Contains("<h1>New order</h1>", form);
         Assert.Contains("<strong>Penicillin</strong>: Hives", form);
         Assert.Contains("High risk", form);
         Assert.Contains("<option value=\"Complete blood count (CBC)\"></option>", form);

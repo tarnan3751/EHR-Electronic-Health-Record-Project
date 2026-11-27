@@ -140,7 +140,7 @@ public class TC_UC20_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             await MigratedDatabase.ExecuteAsync(apps.Database.OwnerConnectionString, $"SELECT ehr.set_lab_key('{MigratedDatabase.LabKeyHash}')");
         }
 
-        Assert.Contains("<span class=\"sc-notice__state\">Lab connected.</span> The lab files these results here when they're ready",
+        Assert.Contains("<span class=\"sc-notice__state\">Lab connected.</span> Enter results only if the lab can",
             await session.Client.GetStringAsync(Path(patient, order), Cancel));
         Assert.Equal(["0"], await ResultsOnFileAsync(apps, patient));
         Assert.Equal(0, await apps.AuditEventsAsync("sent_to_lab", patientId: patient));

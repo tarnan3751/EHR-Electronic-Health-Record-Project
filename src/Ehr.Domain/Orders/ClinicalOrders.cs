@@ -72,7 +72,7 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
             : await db.OrderCatalogItems.AsNoTracking().SingleOrDefaultAsync(i => i.Type == type && i.DisplayKey == display, cancellationToken);
         if (found is null)
         {
-            errors["Item"] = string.IsNullOrWhiteSpace(item) ? "Choose an item." : "Choose an item from the list.";
+            errors["Item"] = string.IsNullOrWhiteSpace(item) ? "Item is required." : "Item must be selected from the list.";
         }
 
         foreach (var field in OrderForms.Fields[type])
@@ -80,11 +80,11 @@ public sealed partial class ClinicalOrders(EhrDbContext db)
             var value = details.GetValueOrDefault(field.Name);
             if (field.Required && string.IsNullOrWhiteSpace(value))
             {
-                errors[field.Name] = $"Enter the {field.Label.ToLowerInvariant()}.";
+                errors[field.Name] = $"{field.Label} is required.";
             }
             else if (value?.Trim().Length > OrderForms.MaximumLength)
             {
-                errors[field.Name] = $"Shorten this to {OrderForms.MaximumLength} characters or fewer.";
+                errors[field.Name] = $"{field.Label} must be {OrderForms.MaximumLength} characters or less.";
             }
         }
 

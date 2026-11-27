@@ -28,8 +28,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   4. Request the results under another patient's address.
 //   5. As the second clinician, acknowledge. Then, as the first, post hematocrit 41 and an acknowledgment from a page
 //      that was already open.
-// Expected result: Step 1: each is answered 422 with "Not saved." and "Enter a number, like 5.4.", "Enter at least one
-//   result." and "The collection time can't be in the future."; what was typed stays; nothing is filed. Step 2: both
+// Expected result: Step 1: each is answered 422 with "Not saved." and "Result must be a number.", "At least one
+//   result is required." and "Sample collected must not be in the future."; what was typed stays; nothing is filed. Step 2: both
 //   are saved; the form then offers only the tests still waiting; one inbox item exists, for the first clinician.
 //   The acknowledgment from the older page is answered 409, the page comes back showing the low platelets, and
 //   nothing is recorded.
@@ -51,14 +51,14 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
         Assert.Equal(HttpStatusCode.UnprocessableEntity, notANumber.StatusCode);
         var refused = await notANumber.Content.ReadAsStringAsync(Cancel);
         Assert.Contains("Not saved.", refused);
-        Assert.Contains("Enter a number, like 5.4.", refused);
+        Assert.Contains("Result must be a number.", refused);
         Assert.Contains($"name=\"Values[{Hemoglobin}]\" value=\"abc\"", refused);
         using var nothing = await FileAsync(apps, session.Client, patient, order);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, nothing.StatusCode);
-        Assert.Contains("Enter at least one result.", await nothing.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("At least one result is required.", await nothing.Content.ReadAsStringAsync(Cancel));
         using var tomorrow = await PostFormAsync(session.Client, path, path, ($"Values[{Hemoglobin}]", "14.2"), ("CollectedAt", DateTime.UtcNow.AddDays(1).ToString("yyyy-MM-ddTHH:mm")));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, tomorrow.StatusCode);
-        Assert.Contains("The collection time can&#x27;t be in the future.", await tomorrow.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("Sample collected must not be in the future.", await tomorrow.Content.ReadAsStringAsync(Cancel));
         Assert.Empty(await FiledAsync(apps, patient));
         Assert.Equal("active", await StatusAsync(apps, patient));
 
@@ -71,7 +71,7 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
         await apps.AssignAsync(second, patient);
         var colleague = await SignInAsync(apps.OnPrem, second);
         using var later = await FileAsync(apps, colleague.Client, patient, order, (Platelets, "90"));
-        Assert.Contains("Saved.", await ReadAsync(later));
+        Assert.Contains("Results filed.", await ReadAsync(later));
 
         // The first clinician's page still shows one result. Acknowledging from it covers only what it showed: the
         // page comes back with the low platelets, and nothing is recorded.

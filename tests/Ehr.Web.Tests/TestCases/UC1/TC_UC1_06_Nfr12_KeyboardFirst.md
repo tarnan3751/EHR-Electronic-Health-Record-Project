@@ -13,7 +13,7 @@ is `TC_UC1_06_Nfr12_KeyboardFirst.cs` in this folder.
 | Preconditions | The local stack is running (`infra/compose/README.md`), and the example accounts exist (`dotnet run infra/compose/test-accounts.cs -- setup`). The mouse is not used after step 1. |
 | Inputs and system conditions | The on-site app at `https://ehr.example.com:8443`, in a desktop browser. The clinic's server is up. |
 | Test data | Clinician `clinician@example.com`, with the example patient (MRN `SYN0000001`) on their panel. Order type Lab, item "Lipid panel", Reason for the test "Synthetic annual check". |
-| Expected result | Alt+Shift+O (Option+Shift+O on a Mac) opens the order form. The cursor is in **Item** once a type is chosen. Tab moves through the type links, Item, the details, **Sign order** and **Cancel**, in that order, each with a visible focus outline. Typing "lip" in Item suggests "Lipid panel". Enter in a field signs the order, and the chart shows "Order signed. Lipid panel" and lists it under "Active orders". With a required field empty, the form comes back with the cursor in that field and "Enter the reason for the test." |
+| Expected result | Alt+Shift+O (Option+Shift+O on a Mac) opens the order form. The cursor is in **Item** once a type is chosen. Tab moves through the type links, Item, the details, **Sign order** and **Cancel**, in that order, each with a visible focus outline. Typing "lip" in Item suggests "Lipid panel". Enter in a field signs the order, and the chart shows "Order signed. Lipid panel" and lists it under "Active orders". With a required field empty, the form comes back with the cursor in that field and "Reason for the test is required." |
 | Creator | Tahseen Arnan |
 
 ## Steps

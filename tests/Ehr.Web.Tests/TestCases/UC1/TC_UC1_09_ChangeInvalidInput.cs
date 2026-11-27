@@ -21,10 +21,10 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   1. Choose "Discontinue order" with no reason, then with only spaces, then with 501 letters.
 //   2. Sign a change with the dose empty.
 //   3. Sign a change with a reason of 501 letters.
-// Expected result: Each is answered 422. Discontinuing: "Enter the reason for discontinuing the order." (or "Shorten
-//   the reason to 500 characters or fewer."), with the reason field marked invalid and described by the message.
-//   Changing: "Enter the dose." with the dose marked invalid and "Once a day" still in its field; then "Shorten the
-//   reason to 500 characters or fewer." The order is still active and unchanged, and it is still the patient's only
+// Expected result: Each is answered 422. Discontinuing: "Reason for discontinuing is required." (or "Reason must be
+//   500 characters or less."), with the reason field marked invalid and described by the message.
+//   Changing: "Dose is required." with the dose marked invalid and "Once a day" still in its field; then "Reason must
+//   be 500 characters or less." The order is still active and unchanged, and it is still the patient's only
 //   order.
 // Creator: Tahseen Arnan
 public class TC_UC1_09_ChangeInvalidInput(WebApps apps) : IClassFixture<WebApps>
@@ -41,9 +41,9 @@ public class TC_UC1_09_ChangeInvalidInput(WebApps apps) : IClassFixture<WebApps>
 
         foreach (var (reason, message) in new[]
         {
-            ((string?)null, "Enter the reason for discontinuing the order."),
-            ("   ", "Enter the reason for discontinuing the order."),
-            (tooLong, "Shorten the reason to 500 characters or fewer."),
+            ((string?)null, "Reason for discontinuing is required."),
+            ("   ", "Reason for discontinuing is required."),
+            (tooLong, "Reason must be 500 characters or less."),
         })
         {
             using var refused = await DiscontinueAsync(session.Client, patient, order, reason);
@@ -57,14 +57,14 @@ public class TC_UC1_09_ChangeInvalidInput(WebApps apps) : IClassFixture<WebApps>
             [("dose", ""), ("route", "By mouth"), ("frequency", "Once a day")]);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, noDose.StatusCode);
         var form = await noDose.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("<p class=\"sc-field__error\" id=\"order-dose-error\">Enter the dose.</p>", form);
+        Assert.Contains("<p class=\"sc-field__error\" id=\"order-dose-error\">Dose is required.</p>", form);
         Assert.Contains("name=\"Details[frequency]\" value=\"Once a day\"", form);
         Assert.Contains("data-order-replaces", form);
 
         using var longReason = await ChangeAsync(session.Client, patient, "medication", order, "Metformin 500 mg tablet",
             [("dose", "850 mg"), ("route", "By mouth"), ("frequency", "Once a day")], changeReason: tooLong);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, longReason.StatusCode);
-        Assert.Contains("<p class=\"sc-field__error\" id=\"order-change-reason-error\">Shorten the reason to 500 characters or fewer.</p>",
+        Assert.Contains("<p class=\"sc-field__error\" id=\"order-change-reason-error\">Reason must be 500 characters or less.</p>",
             await longReason.Content.ReadAsStringAsync(Cancel));
 
         Assert.Equal("active|-|-|-|-", await RowAsync(apps, order));

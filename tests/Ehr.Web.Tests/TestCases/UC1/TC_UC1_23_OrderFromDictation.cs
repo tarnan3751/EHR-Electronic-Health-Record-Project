@@ -42,7 +42,7 @@ public class TC_UC1_23_OrderFromDictation(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Proposed from dictation. Check every field. Nothing here was filled in from it.", said);
         Assert.Contains($"As heard: Chest is clear. {DictationSidecarStub.OrderSaid}. Heard after it: {DictationSidecarStub.AllergySaid}.", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
-        Assert.Contains("Choose the type of order.", said);
+        Assert.Contains("Select an order type.", said);
         Assert.Contains($"type=lab&amp;proposal={dictated.Order}", html);
 
         var lab = await dictated.Session.Client.GetStringAsync(OrderFormPath(dictated.Patient, dictated.Order, "lab"), Cancel);
@@ -74,7 +74,7 @@ public class TC_UC1_23_OrderFromDictation(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var words = Said(await refused.Content.ReadAsStringAsync(Cancel));
             Assert.Contains("Already ordered An active order for Lisinopril 10 mg tablet was signed", words);
-            Assert.Contains("Give a reason to sign this order despite the warnings, or cancel.", words);
+            Assert.Contains("Override reason is required.", words);
             Assert.Contains("Proposed from dictation.", words);
         }
 

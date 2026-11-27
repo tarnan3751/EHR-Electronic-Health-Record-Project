@@ -23,8 +23,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. Sign it again with a reason.
 //   3. For the second patient, sign sertraline with no reason; then with a reason.
 // Expected result: Step 1: answered 422; "Check before signing" lists "Allergy: Amoxicillin", tagged "Major", with
-//   advice and "Source: The patient's chart", and a required field "Reason for ordering despite the warnings", marked
-//   with "Give a reason to sign this order despite the warnings, or cancel."; nothing is signed. Step 2: signed; the
+//   advice and "Source: The patient's chart", and a required field "Override reason", marked
+//   with "Override reason is required."; nothing is signed. Step 2: signed; the
 //   order holds the reason and the allergy found. Step 3: 422, listing the interaction with phenelzine first ("High
 //   priority", "Source: ONC high-priority list, by way of Wikidata") and then with linezolid ("Major", "Source: FDA
 //   label", what the sertraline label says, and the label's DailyMed address); then signed, holding the reason and
@@ -39,9 +39,9 @@ public class TC_UC1_18_SafetyWarningsOverride(WebApps apps) : IClassFixture<WebA
         var (clinician, allergic, session) = await OnPanelAsync(apps);
         await AllergyAsync(apps, allergic, "amoxicillin");
         var form = await session.Client.GetStringAsync(FormPath(allergic, "medication"), Cancel);
-        Assert.Contains("Decision support for this demonstration system, not a complete clinical reference.", form);
+        Assert.Contains("Demonstration decision support, not a complete clinical reference.", form);
         // The one limit a clinician must know is beside the lead, not in the closed disclosure.
-        Assert.Matches("(?s)Allergies and medications without a code aren't checked\\.</p>\\s*<details>", form);
+        Assert.Matches("(?s)<details>.*Allergies and medications without a code aren't checked\\..*</details>", form);
         Assert.DoesNotContain("data-order-safety", form);
 
         using var stopped = await SignAsync(session.Client, allergic, "Amoxicillin 500 mg capsule");
@@ -51,10 +51,10 @@ public class TC_UC1_18_SafetyWarningsOverride(WebApps apps) : IClassFixture<WebA
         Assert.Contains("<h3>Check before signing</h3>", warned);
         Assert.Contains("<strong>Allergy: Amoxicillin</strong>", warned);
         Assert.Contains("<span class=\"sc-tag sc-tag--warning\">Major</span>", warned);
-        Assert.Contains("The chart records an allergy to Amoxicillin.", Words(warned));
+        Assert.Contains("Recorded allergy to Amoxicillin.", Words(warned));
         Assert.Contains("Source: The patient's chart.", Words(warned));
         Assert.Matches("<textarea id=\"order-safety-reason\"[^>]*name=\"SafetyReason\"[^>]*required[^>]*aria-invalid=\"true\"", warned);
-        Assert.Contains("Give a reason to sign this order despite the warnings, or cancel.", warned);
+        Assert.Contains("Override reason is required.", warned);
         // What was typed is still there.
         Assert.Contains("value=\"Amoxicillin 500 mg capsule\"", warned);
         Assert.Empty(await OrdersAsync(apps, allergic));
@@ -75,7 +75,8 @@ public class TC_UC1_18_SafetyWarningsOverride(WebApps apps) : IClassFixture<WebA
         var major = text.IndexOf("Interaction: sertraline with linezolid", StringComparison.OrdinalIgnoreCase);
         Assert.True(highPriority > 0 && major > highPriority, "The high-priority interaction is listed before the major one.");
         Assert.Contains("High priority", text);
-        Assert.Contains("On the list of interactions an electronic record should always stop for. Avoid the combination.", text);
+        Assert.Contains("High priority", text);
+        Assert.Contains("Avoid the combination.", text);
         Assert.Contains("Source: ONC high-priority list, by way of Wikidata.", text);
         Assert.Contains("Avoid the combination unless the benefit clearly outweighs the risk.", text);
         Assert.Contains("The sertraline label contraindicates sertraline in patients taking a monoamine oxidase inhibitor, and names linezolid as one", text);

@@ -19,7 +19,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   1. Open the lab order form.
 //   2. Enter the item and the notes, leave the reason empty, and select "Sign order".
 // Expected result: The answer is 422 with the form again: the Reason for the test field has aria-invalid="true" and
-//   the message "Enter the reason for the test."; the item still reads "Complete blood count (CBC)" and the notes
+//   the message "Reason for the test is required."; the item still reads "Complete blood count (CBC)" and the notes
 //   "Fasting". No order is saved.
 // Creator: Tahseen Arnan
 public class TC_UC1_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
@@ -37,7 +37,7 @@ public class TC_UC1_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         var html = await response.Content.ReadAsStringAsync(Cancel);
         Assert.Contains("id=\"order-indication\"", html);
         Assert.Matches("id=\"order-indication\"[^>]* aria-invalid=\"true\"", html);
-        Assert.Contains("<p class=\"sc-field__error\" id=\"order-indication-error\">Enter the reason for the test.</p>", html);
+        Assert.Contains("<p class=\"sc-field__error\" id=\"order-indication-error\">Reason for the test is required.</p>", html);
         Assert.Contains("value=\"Complete blood count (CBC)\"", html);
         Assert.Contains("value=\"Fasting\"", html);
         Assert.Equal(0, await OrdersAsync(apps, patient));

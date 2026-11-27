@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. Open the inbox.
 //   3. Follow "Open the results" and choose "Acknowledge results".
 //   4. Open the inbox and the chart.
-// Expected result: Step 1: the page says "Saved."; hemoglobin is listed first with "Low" and its reference range,
+// Expected result: Step 1: the page says "Results filed."; hemoglobin is listed first with "Low" and its reference range,
 //   platelets after it with no flag; "Abnormal. 1 of 2 results is outside the reference range"; the names, units and ranges are
 //   the clinic's own; the order is completed. Step 2: one "Result to acknowledge" item, "Results are in", tagged
 //   "Abnormal", with the patient's name and no value, and no "Mark done" button. Step 3: "Results acknowledged.", then
@@ -47,8 +47,8 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
 
         using var filed = await FileAsync(apps, session.Client, patient, order, (Platelets, "250"), (Hemoglobin, "9.1"));
         var page = await ReadAsync(filed);
-        Assert.Contains("Saved.", page);
-        Assert.Contains("Abnormal. 1 of 2 results is outside the reference range, listed first.", Words(page));
+        Assert.Contains("Results filed.", page);
+        Assert.Contains("Abnormal. 1 of 2 results is outside the reference range.", Words(page));
         Assert.True(page.IndexOf("Hemoglobin [Mass/volume]", StringComparison.Ordinal) < page.IndexOf("Platelets [#/volume]", StringComparison.Ordinal));
         Assert.Matches("(?s)data-result=\"abnormal\".*?9.1 g/dL.*?<span class=\"sc-tag sc-tag--warning\">Low</span>.*?12 to 17.5 g/dL", page);
         Assert.Matches("(?s)data-result=\"normal\".*?250 10&#xB3;/&#xB5;L", page);

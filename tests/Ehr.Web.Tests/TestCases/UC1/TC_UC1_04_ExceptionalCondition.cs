@@ -24,8 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   3. Sign the order as the script sends it.
 //   4. Sign the order as a plain form post.
 // Expected result: The chart offers no "New order", under the read-only band. The script's post is answered 503, on which js/orders.js leaves the form on screen with its entries
-//   and shows "Not saved. The clinic's server can't be reached. What you entered is still here, to try again once
-//   it's back." The plain post is answered 503 with the "Not saved" page: "Not saved. The clinic's server can't be
+//   and shows "Not saved. The clinic's server can't be reached." The plain post is answered 503 with the "Not saved" page: "Not saved. The clinic's server can't be
 //   reached." No order is saved.
 // Creator: Tahseen Arnan
 public class TC_UC1_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
