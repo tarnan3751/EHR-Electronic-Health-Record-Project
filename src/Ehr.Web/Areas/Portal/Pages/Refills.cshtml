@@ -8,6 +8,7 @@
     var own = Model.Own;
 }
 @* Step 13d. No ID anywhere: a medication is named by its protected reference, and a request by nothing at all. *@
+<div class="sc-pagehead"><a asp-page="/Index" class="sc-back">Back to home</a></div>
 <h1>Ask for a refill</h1>
 @if (Model.Refills is not { } refills)
 {
@@ -53,7 +54,7 @@ else
         {
             var medicationError = Model.Errors.GetValueOrDefault("Medication");
             var noteError = Model.Errors.GetValueOrDefault("Note");
-            <form method="post" class="sc-form" data-refill-form="ask">
+            <form method="post" class="sc-form sc-formcard" data-refill-form="ask">
                 @if (Model.Errors.Count > 0)
                 {
                     <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted fields and try again.</p>
@@ -94,16 +95,18 @@ else
         <h2 id="refills-requests">@(own ? "Your requests" : "Requests")</h2>
         @if (refills.Requests.Count == 0)
         {
-            <p class="sc-muted">No requests yet.</p>
+            <p class="sc-empty">No requests yet.</p>
         }
         else
         {
-            <ul class="sc-results">
+            @* One row a request: the medication, and its state on the right; when it was asked under it, then the
+               answer. *@
+            <ul class="sc-rows">
                 @foreach (var request in refills.Requests)
                 {
-                    <li class="sc-result sc-result--plain" data-refill="@request.Status">
+                    <li data-refill="@request.Status">
                         <h3>@request.MedicationDisplay</h3>
-                        <p>
+                        <p class="sc-rows__end">
                             @switch (request.Status)
                             {
                                 case RefillRequestStatus.Completed:
@@ -120,8 +123,8 @@ else
                             {
                                 <span class="sc-tag sc-tag--warning">Sensitive</span>
                             }
-                            <span class="sc-muted">Asked @Clinic.Format(request.RequestedAt, "MMM d, yyyy")@(request.Asked switch { "you" => " by you", "proxy" => " by someone you share your record with", _ => "" })</span>
                         </p>
+                        <p class="sc-rows__meta">Asked @Clinic.Format(request.RequestedAt, "MMM d, yyyy")@(request.Asked switch { "you" => " by you", "proxy" => " by someone you share your record with", _ => "" })</p>
                         @if (request.Note is { } note)
                         {
                             <p class="sc-note__text" data-refill-note>@note</p>
@@ -145,4 +148,3 @@ else
         }
     </section>
 }
-<p><a asp-page="/Index">Back to home</a></p>

@@ -3707,6 +3707,75 @@
         }
     }
 
+    /* Asking for a refill (step 13d): each medication a choice as tall as a portal control, drawn as a pre-visit form's
+       answers are; the requests as rows, each one's state on the right and its note and answer under it. */
+    [data-refill-form="ask"] > fieldset {
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    [data-refill-form="ask"] > fieldset > legend {
+        margin-bottom: var(--space-2);
+        padding: 0;
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    [data-refill-form="ask"] .sc-check {
+        max-width: none;
+        min-height: var(--control-height-portal);
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        cursor: pointer;
+    }
+
+    [data-refill-form="ask"] .sc-check:has(input:checked) {
+        border-color: var(--primary);
+        background: var(--surface-subtle);
+    }
+
+    li[data-refill] > p:not(.sc-rows__end, .sc-rows__meta) {
+        margin-top: var(--space-2);
+    }
+
+    /* Pre-visit forms (step 13e): the questions on a card, and the answers sent on one too. */
+    .sc-app--portal .sc-answers {
+        max-width: none;
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-app--portal .sc-answers > dd:last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-formcard .sc-choice:last-of-type {
+        margin-bottom: 0;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-app--portal .sc-answers {
+            padding: var(--space-4);
+        }
+    }
+
+    /* On a phone a row's button (fill in a form, look at a record) is as wide as the row. */
+    @media (max-width: 40rem) {
+        .sc-rows__end > .sc-btn {
+            flex: 1 1 100%;
+        }
+    }
+
+    /* A link on a row's right ("See your answers") has a list's link weight. */
+    .sc-rows__end > a:not(.sc-btn) {
+        font-weight: 600;
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */

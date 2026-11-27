@@ -14,6 +14,7 @@
     var next = toFill.FirstOrDefault(form => form.OpenAt(now));
     string When(DateTimeOffset moment) => Clinic.Format(moment, "MMM d, yyyy, HH:mm");
 }
+<div class="sc-pagehead"><a asp-page="/Index" class="sc-back">Back to home</a></div>
 <h1>Pre-visit forms</h1>
 @if (Model.Forms is null)
 {
@@ -25,24 +26,25 @@ else
     <h2>To fill in</h2>
     @if (toFill.Count == 0)
     {
-        <p>No forms to fill in.</p>
+        <p class="sc-empty">No forms to fill in.</p>
     }
     else
     {
-        <ul class="sc-results">
+        @* One row a form: its name and its visit, and the way to fill it in on the right. *@
+        <ul class="sc-rows">
             @foreach (var form in toFill)
             {
-                <li class="sc-result" data-form="open">
+                <li data-form="open">
                     <h3>@form.Title</h3>
                     <p>Before @(own ? "your" : "the") appointment on @When(form.AppointmentStartsAt) with @form.AppointmentClinician.</p>
                     @if (form.OpenAt(now))
                     {
-                        <p>Fill it in by @When(form.ClosesAt).</p>
-                        <p><a asp-page="Form" asp-route-requestId="@form.Id" class="@(form == next ? "sc-btn sc-btn--primary" : "sc-btn")">Fill in the form</a></p>
+                        <p class="sc-rows__meta">Fill it in by @When(form.ClosesAt).</p>
+                        <p class="sc-rows__end"><a asp-page="Form" asp-route-requestId="@form.Id" class="@(form == next ? "sc-btn sc-btn--primary" : "sc-btn")">Fill in the form</a></p>
                     }
                     else
                     {
-                        <p>You can fill it in from @When(form.OpensAt) until @When(form.ClosesAt).</p>
+                        <p class="sc-rows__meta">You can fill it in from @When(form.OpensAt) until @When(form.ClosesAt).</p>
                     }
                 </li>
             }
@@ -51,16 +53,15 @@ else
     @if (sent.Count > 0)
     {
         <h2>Sent</h2>
-        <ul class="sc-results">
+        <ul class="sc-rows">
             @foreach (var form in sent)
             {
-                <li class="sc-result" data-form="sent">
+                <li data-form="sent">
                     <h3>@form.Title</h3>
-                    <p>Sent @When(form.Response!.AnsweredAt), before the appointment on @When(form.AppointmentStartsAt).</p>
-                    <p><a asp-page="Form" asp-route-requestId="@form.Id">@(own ? "See your answers" : "See the answers")</a></p>
+                    <p class="sc-rows__meta">Sent @When(form.Response!.AnsweredAt), before the appointment on @When(form.AppointmentStartsAt).</p>
+                    <p class="sc-rows__end"><a asp-page="Form" asp-route-requestId="@form.Id">@(own ? "See your answers" : "See the answers")</a></p>
                 </li>
             }
         </ul>
     }
 }
-<p><a asp-page="/Index">Back to home</a></p>

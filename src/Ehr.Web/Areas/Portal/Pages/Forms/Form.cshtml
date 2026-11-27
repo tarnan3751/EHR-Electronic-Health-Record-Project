@@ -11,6 +11,7 @@
     var now = DateTimeOffset.UtcNow;
     string When(DateTimeOffset moment) => Clinic.Format(moment, "MMM d, yyyy, HH:mm");
 }
+<div class="sc-pagehead"><a asp-page="Index" class="sc-back">Back to pre-visit forms</a></div>
 <h1>Pre-visit form</h1>
 @foreach (var help in Model.Help)
 {
@@ -65,7 +66,7 @@ else
     {
         <p>You are answering for @Model.ActingFor. The questions ask how they have been.</p>
     }
-    <form method="post" asp-route-requestId="@form.Id" class="sc-stack">
+    <form method="post" asp-route-requestId="@form.Id" class="sc-stack sc-formcard">
         @if (Model.Missing.Count > 0)
         {
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Answer the highlighted questions and try again.</p>
@@ -103,4 +104,3 @@ else
 {
     <p class="sc-muted">@attribution</p>
 }
-<p><a asp-page="Index">Back to pre-visit forms</a></p>
