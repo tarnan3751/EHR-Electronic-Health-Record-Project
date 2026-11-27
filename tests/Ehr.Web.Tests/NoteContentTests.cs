@@ -14,7 +14,7 @@ public class NoteContentTests
     {
         var content = new NoteContent("", " \t\n", "", "");
         Assert.Empty(content.Validate(signing: false));
-        Assert.Equal(["Enter Subjective before signing.", "Enter Objective before signing.", "Enter Assessment before signing.", "Enter Plan before signing."],
+        Assert.Equal(["Subjective is required.", "Objective is required.", "Assessment is required.", "Plan is required."],
             content.Validate(signing: true));
     }
 
@@ -22,8 +22,8 @@ public class NoteContentTests
     public void Field_length_null_characters_and_utf8_bytes_are_bounded()
     {
         Assert.Empty(new NoteContent(new string('a', 16000), "Objective", "Assessment", "Plan").Validate(true));
-        Assert.Contains("Shorten Subjective", Assert.Single(new NoteContent(new string('a', 16001), "Objective", "Assessment", "Plan").Validate(true)));
-        Assert.Contains("Shorten Objective", Assert.Single(new NoteContent("Subjective", new string('a', 16001), "Assessment", "Plan").Validate(true)));
+        Assert.Contains("Subjective must be", Assert.Single(new NoteContent(new string('a', 16001), "Objective", "Assessment", "Plan").Validate(true)));
+        Assert.Contains("Objective must be", Assert.Single(new NoteContent("Subjective", new string('a', 16001), "Assessment", "Plan").Validate(true)));
         Assert.Contains("null character", Assert.Single(new NoteContent("Subjective", "Objective\0", "Assessment", "Plan").Validate(true)));
         var unicode = new NoteContent(new string('界', 16000), new string('界', 16000), "Assessment", "Plan");
         Assert.Contains("over the 64 KB size limit", Assert.Single(unicode.Validate(true)));
@@ -53,7 +53,7 @@ public class NoteContentTests
         Assert.Equal(NoteOrigin.Body, NoteContent.OriginOf(draft));
         Assert.Equal(new NoteContent(draft.Body, "", "", ""), NoteContent.From(draft));
         Assert.Equal([new NoteSection(NoteSections.DraftText, draft.Body)], NoteSections.AsSaved(draft));
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("another window or app", StringComparison.Ordinal));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("changed elsewhere", StringComparison.Ordinal));
         draft.StructuredVersion = 3;
         Assert.Equal(new NoteContent("Old subjective", "Old objective", "Old assessment", "Old plan"), NoteContent.From(draft));
         Assert.Empty(ClinicalNotes.SigningProblems(draft));
@@ -81,8 +81,8 @@ public class NoteContentTests
         Assert.Equal([new(NoteSections.History, "Old history"), new(NoteSections.Assessment, "Old assessment"), new NoteSection(NoteSections.Plan, "Old plan")],
             NoteSections.AsSaved(draft));
         Assert.Equal(("Old history", (string?)null, (string?)null, 4L), (draft.History, draft.Subjective, draft.Objective, draft.Version));
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("History section", StringComparison.Ordinal));
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p == "Enter Objective before signing.");
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("out of History", StringComparison.Ordinal));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p == "Objective is required.");
 
         (opened with { Objective = "Blood pressure 126/80." }).ApplyTo(draft);
         Assert.Equal((null, "Old history", "Blood pressure 126/80.", 5L, 5L), (draft.History, draft.Subjective, draft.Objective, draft.Version, draft.StructuredVersion));

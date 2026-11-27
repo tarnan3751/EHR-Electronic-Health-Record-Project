@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   1. Off-site, open the note, follow "Add addendum" and sign the text.
 //   2. On the app that is cut off, open the note, and post an addendum to its addendum page.
 // Expected result: Step 1: the post is forwarded and the addendum is saved once, under the clinician. Step 2: the
-//   note and the addendum are shown, with "An addendum can't be signed until the clinic's server is back." and no
+//   note and the addendum are shown, under the read-only band, and no
 //   link; the post is answered 503 and nothing more is saved.
 // Creator: Tahseen Arnan
 public class TC_UC14_10_AddendumOffSite(WebApps apps) : IClassFixture<WebApps>
@@ -47,11 +47,11 @@ public class TC_UC14_10_AddendumOffSite(WebApps apps) : IClassFixture<WebApps>
         var readOnly = await cutOff.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.Contains(Subjective, readOnly);
         Assert.Contains("Synthetic addendum signed off-site.", readOnly);
-        Assert.Contains("An addendum can't be signed until the clinic's server is back.", readOnly);
+        Assert.Contains("sc-notice--band", readOnly);
         Assert.DoesNotContain("data-add-addendum", readOnly);
         // The addendum page itself, reached by Back or a tab left open: no form either.
         var page = await cutOff.GetStringAsync(AddendumPath(patient, note), Cancel);
-        Assert.Contains("An addendum can't be signed until the clinic's server is back.", page);
+        Assert.Contains("sc-notice--band", page);
         Assert.DoesNotContain("data-sign-addendum", page);
         // As the browser sends its own form (Sec-Fetch-Site), which is what lets the page show the text again.
         using var request = new HttpRequestMessage(HttpMethod.Post, AddendumPath(patient, note))

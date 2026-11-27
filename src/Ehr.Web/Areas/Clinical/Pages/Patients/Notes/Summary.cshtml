@@ -20,23 +20,14 @@
 @* The form beside the note it is written from. *@
 <div class="sc-split">
 <div class="sc-formcard sc-formcard--wide">
-@* What the patient should be told first, then the rest as a short list. *@
-<div class="sc-prose">
-    <p>For the note signed @Clinic.Format(Model.Note.SignedAt). Write what the patient should know, in plain words.</p>
-    <ul>
-        <li>The patient reads it in the portal exactly as you write it, and so does anyone they share their record with.</li>
-        <li>Leave out codes, record numbers and anything only the care team needs.</li>
-        <li>Once released, it can't be changed. To correct it, withdraw it and write a new one.</li>
-    </ul>
-</div>
 @if (Model.SourcesSensitive)
 {
-    <p class="sc-notice sc-notice--info" data-summary-sensitive><span class="sc-notice__state">Sensitive note.</span> The note or one of its addenda is sensitive, so this summary is too. Someone the patient shares their record with sees it only if the patient allows sensitive items.</p>
+    <p class="sc-notice sc-notice--info" data-summary-sensitive><span class="sc-notice__state">Sensitive summary.</span> Proxies see it only if the patient allows sensitive items.</p>
 }
 @if (!OnPrem.IsReachable)
 {
-    @* UC 2: reached by Back or a tab opened before the outage. Nothing to release until the server is back. *@
-    <p class="sc-muted">A summary can't be released until the clinic's server is back.</p>
+    @* UC 2: reached by Back or a tab opened before the outage. Nothing to release until the server is back: no form,
+       under the layout's read-only band. *@
 }
 else if (Model.Standing is not null)
 {
@@ -46,7 +37,7 @@ else if (Model.Standing is not null)
             @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not released.</span> @error</p> }
         </div>
     }
-    <p class="sc-notice sc-notice--info" data-summary-standing><span class="sc-notice__state">Already released.</span> A summary of this note was released by @Model.Standing.ReleasedBy, @Clinic.Format(Model.Standing.ReleasedAt). To write another, withdraw it on the note's page.</p>
+    <p class="sc-notice sc-notice--info" data-summary-standing><span class="sc-notice__state">Already released.</span> Released by @Model.Standing.ReleasedBy, @Clinic.Format(Model.Standing.ReleasedAt). To write another, withdraw it first.</p>
 }
 else
 {
@@ -59,20 +50,29 @@ else
     }
     @for (var i = 0; i < VisitSummaries.Parts.Length; i++)
     {
-        @* Only the parts an error is about are invalid, each described by its errors first, then the hint. *@
+        @* Only the parts an error is about are invalid, each described by its errors. *@
         string[] about = [.. Enumerable.Range(0, Model.ErrorParts.Count).Where(e => Model.ErrorParts[e] == i).Select(e => $"summary-error-{e}")];
         <div class="sc-field">
             <label for="@fields[i]">@VisitSummaries.Parts[i] <span>(required)</span></label>
             <textarea id="@fields[i]" class="sc-field__input" name="@names[i]" rows="5" maxlength="@VisitSummaries.MaxLength" required autofocus="@(i == 0 ? "autofocus" : null)"
-                      aria-describedby="@string.Join(' ', [.. about, "summary-hint"])" aria-invalid="@(about.Length > 0 ? "true" : null)">@values[i]</textarea>
+                      aria-describedby="@(about.Length > 0 ? string.Join(' ', about) : null)" aria-invalid="@(about.Length > 0 ? "true" : null)">@values[i]</textarea>
         </div>
     }
-    <p class="sc-field__hint" id="summary-hint">Up to @VisitSummaries.MaxLength.ToString("N0") characters each. Line breaks are kept.</p>
     @if (!Model.SourcesSensitive)
     {
         <label class="sc-check" for="summary-sensitive"><input type="checkbox" id="summary-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="summary-sensitive-hint"> Sensitive</label>
-        <p class="sc-field__hint" id="summary-sensitive-hint">Hidden on the note's page unless someone chooses to show sensitive items. In the portal, the patient sees it when they choose to, and someone they share their record with only if the patient allows sensitive items. Views are logged.</p>
+        <p class="sc-field__hint" id="summary-sensitive-hint">Views are logged.</p>
     }
+    @* What the patient will read, at the moment of releasing it; the rest under the disclosure. *@
+    <p class="sc-muted">The patient sees it in the portal as written. It can't be edited after release.</p>
+    <details>
+        <summary>More about visit summaries</summary>
+        <ul>
+            <li>Proxies see it too; a sensitive one only if the patient allows sensitive items.</li>
+            <li>Leave out codes and record numbers.</li>
+            <li>To correct a released summary, withdraw it and write a new one.</li>
+        </ul>
+    </details>
     <div class="sc-actions">
         <button type="submit" class="sc-btn sc-btn--primary" data-release-summary>Release visit summary</button>
         <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Cancel</a>
@@ -83,8 +83,7 @@ else
 
 @* For reference only: nothing of it is copied into the summary, which the clinician writes for the patient. *@
 <section class="sc-sheet" aria-labelledby="signed-note">
-<h2 id="signed-note">The signed note, for reference</h2>
-<p class="sc-muted">Not copied into the summary.</p>
+<h2 id="signed-note">Signed note</h2>
 <partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
 </section>
 </div>

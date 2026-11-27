@@ -20,8 +20,8 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Steps:
 //   1. As the clinician, sign an addendum of only spaces, then one of 16,001 characters.
 //   2. As the covering clinician, open the note, open the addendum page, and post an addendum to it.
-// Expected result: Step 1: each is answered 422 with "Not signed." and "Write the addendum before signing it." or
-//   "An addendum can be up to 16,000 characters."; nothing is saved. Step 2: the note is shown with "To sign an addendum, add
+// Expected result: Step 1: each is answered 422 with "Not signed." and "Addendum is required." or
+//   "Addendum must be 16,000 characters or less."; nothing is saved. Step 2: the note is shown with "To sign an addendum, add
 //   this patient to My patients." and no link; the addendum page and the post both send them back to the note;
 //   nothing is saved.
 // Creator: Tahseen Arnan
@@ -33,7 +33,7 @@ public class TC_UC14_09_AddendumInvalidAndRefused(WebApps apps) : IClassFixture<
         var (_, patient, session) = await OnPanelAsync(apps);
         var note = await SignedNoteAsync(session.Client, patient);
 
-        foreach (var (text, message) in new[] { ("   ", "Write the addendum before signing it."), (new string('x', 16001), "An addendum can be up to 16,000 characters.") })
+        foreach (var (text, message) in new[] { ("   ", "Addendum is required."), (new string('x', 16001), "Addendum must be 16,000 characters or less.") })
         {
             using var refused = await AddAsync(session.Client, patient, note, text);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
@@ -83,7 +83,7 @@ public class TC_UC14_09_AddendumInvalidAndRefused(WebApps apps) : IClassFixture<
         Assert.Equal(HttpStatusCode.OK, same.StatusCode);
         using var changed = await PostAsync(path + "/confirm", 2, ("Confirmed", true), ("Sensitive", true));
         Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
-        Assert.Contains("already signed, and not as sensitive", await changed.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("already signed, not as sensitive", await changed.Content.ReadAsStringAsync(Cancel));
         Assert.Equal(["false"], await ProxyTests.QueryAsync(apps, "SELECT sensitive::text FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
     }
 }

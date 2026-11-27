@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   3. On the app that is cut off, open the note and the page, and post to it.
 // Expected result: Step 1: the note has no "Mark this note sensitive" link; the page and the post send them back to
 //   the note; nothing changes. Step 2: forwarded, and the note is sensitive, marked by the clinician. Step 3: the
-//   note has no link; the page says "This can't be changed until the clinic's server is back." with no form; the post
+//   note has no link; the page shows the read-only band and no form; the post
 //   is answered 503; the note is still sensitive.
 // Creator: Tahseen Arnan
 public class TC_UC14_15_SensitivityRefusedAndOffSite(WebApps apps) : IClassFixture<WebApps>
@@ -58,7 +58,7 @@ public class TC_UC14_15_SensitivityRefusedAndOffSite(WebApps apps) : IClassFixtu
         var cutOff = Client(apps.CloudCutOff, session.Jar);
         Assert.DoesNotContain("data-note-sensitivity", await cutOff.GetStringAsync(NotePath(patient, note), Cancel));
         var readOnly = await cutOff.GetStringAsync(SensitivityPath(patient, note), Cancel);
-        Assert.Contains("This can't be changed until the clinic's server is back.", readOnly);
+        Assert.Contains("sc-notice--band", readOnly);
         Assert.DoesNotContain("data-change-sensitivity", readOnly);
         using var notSaved = await cutOff.PostAsync(SensitivityPath(patient, note), Form(("__RequestVerificationToken", own), ("Mark", false), ("Reason", "During the outage.")), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);

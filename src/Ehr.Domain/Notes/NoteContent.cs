@@ -66,12 +66,12 @@ public sealed record NoteContent(string Subjective, string Objective, string Ass
         {
             if (signing && IsBlank(value))
             {
-                problems.Add($"Enter {name} before signing.");
+                problems.Add($"{name} is required.");
             }
 
             if (value.Length > MaximumFieldLength)
             {
-                problems.Add($"Shorten {name} to {MaximumFieldLength:N0} characters or fewer.");
+                problems.Add($"{name} must be {MaximumFieldLength:N0} characters or less.");
             }
 
             if (value.Contains('\0'))

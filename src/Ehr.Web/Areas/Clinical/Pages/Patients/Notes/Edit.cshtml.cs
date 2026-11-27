@@ -106,7 +106,7 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         var content = new NoteContent(Subjective ?? "", Objective ?? "", Assessment ?? "", Plan ?? "");
         var result = ModelState.IsValid
             ? await notes.SaveAsync(patientId, draftId, Version, content, HttpContext.RequestAborted, NoteTemplateCode)
-            : new NoteResult(422, ["Send a valid saved draft version."]);
+            : new NoteResult(422, ["Reload the page and try again."]);
         var errors = result.Errors;
         if (review && result.Draft is { } saved)
         {

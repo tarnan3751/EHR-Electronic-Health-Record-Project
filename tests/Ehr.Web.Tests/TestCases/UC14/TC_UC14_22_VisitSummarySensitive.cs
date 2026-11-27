@@ -60,7 +60,7 @@ public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebA
         foreach (var note in new[] { sensitiveNote, withAddendum })
         {
             var form = await session.Client.GetStringAsync(SummaryPath(patient, note), Cancel);
-            Assert.Contains("Sensitive note. The note or one of its addenda is sensitive, so this summary is too.", Words(form));
+            Assert.Contains("Sensitive summary. Proxies see it only if the patient allows sensitive items.", Words(form));
             Assert.DoesNotContain("name=\"Sensitive\"", form);
             using var released = await ReleaseAsync(session.Client, patient, note);
             Assert.Contains("Released.", Words(await ReadAsync(released)));
@@ -86,7 +86,7 @@ public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebA
         var viewsBefore = await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient);
         var shown = await session.Client.GetStringAsync(NotePath(patient, ownNote) + "?sensitive=true", Cancel);
         Assert.Contains(TalkedAbout, shown);
-        Assert.Contains("Sensitive summaries shown. Your view of them is logged.", Words(shown));
+        Assert.Contains("Sensitive summaries shown. Your view is logged.", Words(shown));
         Assert.Equal(viewsBefore + 1, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
 
         // 4. A summary of an ordinary note follows the note and its addenda afterwards.
@@ -111,13 +111,13 @@ public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebA
         var laterAddendum = Guid.Parse((await ProxyTests.QueryAsync(apps, $"SELECT id::text FROM ehr.note_addenda WHERE patient_id = @patient AND note_id = '{later}'", patient)).Single());
         using (var marked = await ChangeSensitivityAsync(session.Client, patient, later, mark: true, "Names a relative.", laterAddendum))
         {
-            Assert.Contains("Saved.", Words(await ReadAsync(marked)));
+            Assert.Contains("Marked sensitive.", Words(await ReadAsync(marked)));
         }
 
         Assert.Equal(["true true none"], await MarkAsync(later));
         using (var unmarked = await ChangeSensitivityAsync(session.Client, patient, later, mark: false, "Not about a relative.", laterAddendum))
         {
-            Assert.Contains("Saved.", Words(await ReadAsync(unmarked)));
+            Assert.Contains("Unmarked as sensitive.", Words(await ReadAsync(unmarked)));
         }
 
         Assert.Equal(["false false none"], await MarkAsync(later));
@@ -143,7 +143,7 @@ public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebA
         Assert.Equal([$"true false {clinician.Id}"], await MarkAsync(ownNote));
         using (var unmarked = await ChangeSummarySensitivityAsync(session.Client, patient, ownNote, ownSummary, mark: false, "Reviewed with the patient."))
         {
-            Assert.Contains("Saved.", Words(await ReadAsync(unmarked)));
+            Assert.Contains("Unmarked as sensitive.", Words(await ReadAsync(unmarked)));
         }
 
         Assert.Equal(["false false none"], await MarkAsync(ownNote));
@@ -155,7 +155,7 @@ public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebA
     static async Task ChangeAsync(HttpClient client, Guid patient, Guid note, bool mark, string reason)
     {
         using var changed = await ChangeSensitivityAsync(client, patient, note, mark, reason);
-        Assert.Contains("Saved.", Words(await ReadAsync(changed)));
+        Assert.Contains(mark ? "Marked sensitive." : "Unmarked as sensitive.", Words(await ReadAsync(changed)));
     }
 
     // The standing summary of one of the patient's notes.

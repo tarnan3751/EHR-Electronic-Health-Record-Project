@@ -42,7 +42,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
         {
             if (parts[i].Length == 0)
             {
-                errors.Add($"Write “{Parts[i]}”.");
+                errors.Add($"“{Parts[i]}” is required.");
                 errorParts.Add(i);
             }
             else if (parts[i].Length > MaxLength)
@@ -101,7 +101,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
             return refusal.SqlState switch
             {
                 PostgresErrorCodes.InsufficientPrivilege => new(403, ["To write a visit summary, add this patient to My patients."]),
-                PostgresErrorCodes.UniqueViolation => new(409, ["A summary of this note has already been released. Withdraw it first to write another."]),
+                PostgresErrorCodes.UniqueViolation => new(409, ["A summary is already released. Withdraw it first to write another."]),
                 _ => new(404, ["This note is unavailable."]),
             };
         }
@@ -124,12 +124,12 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
         reason = reason?.Trim();
         if (string.IsNullOrEmpty(reason))
         {
-            return new(422, ["Say why, so the record shows it."]);
+            return new(422, ["Reason is required."]);
         }
 
         if (reason.Length > MaxReasonLength)
         {
-            return new(422, [$"The reason can be up to {MaxReasonLength} characters. This one has {reason.Length}."]);
+            return new(422, [$"Reason must be {MaxReasonLength} characters or less."]);
         }
 
         if (!await phi.IsAssignedAsync(patient, cancel))
@@ -160,7 +160,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
             return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
                 ? new(403, ["To withdraw a visit summary, add this patient to My patients."])
-                : new(409, ["This summary has already been withdrawn. Nothing was changed."]);
+                : new(409, ["Already withdrawn."]);
         }
         finally
         {

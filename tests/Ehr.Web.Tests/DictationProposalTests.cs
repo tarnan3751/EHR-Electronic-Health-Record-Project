@@ -331,8 +331,8 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var html = await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel);
         var said = RefillRequestTests.Said(html);
         Assert.Contains("Proposed orders and allergies", said);
-        Assert.Contains("Proposed from what you said. Dictation doesn't place or save any of them.", said);
-        Assert.Contains("Each shows what you said after it, in case you corrected it.", said);
+        Assert.Contains("Open in the order form", said);
+        Assert.Contains("Dismiss proposal", said);
         Assert.Contains($"Order Awaiting review As heard: Chest is clear. {DictationSidecarStub.OrderSaid}. Heard after it: {DictationSidecarStub.AllergySaid}. Open in the order form", said);
         Assert.Equal(1, CountOf(html, "data-chart-proposal-heard-after"));
         Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
@@ -382,7 +382,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         var editor = await client.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel);
         Assert.NotEmpty(LinkTo(editor, dictated.ReviewPath));
-        Assert.Contains("Awaiting review. 2 orders or allergies proposed from dictation. Review them.", RefillRequestTests.Said(editor));
+        Assert.Contains("Awaiting review. 2 orders or allergies proposed from dictation. Review them", RefillRequestTests.Said(editor));
         var review = await client.GetStringAsync(dictated.ReviewPath, Cancel);
         Assert.NotEmpty(LinkTo(review.Replace("&amp;", "&", StringComparison.Ordinal), link));
         Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Order));
@@ -490,7 +490,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Contains("Allergy to add Allergy added", said);
             Assert.DoesNotContain("Check. You may have corrected", said);
             Assert.Contains("data-chart-proposal-made", LinkTo(html, $"/patients/{dictated.Patient}#allergy-{allergy}"));
-            Assert.Contains("See the allergy on the chart", said);
+            Assert.Contains("View allergy on chart", said);
         }
 
         using (var ordered = await UC1OrderAsync(dictated, "Lipid panel"))
@@ -498,7 +498,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             var html = await ReadAsync(ordered);
             var order = (await StateAsync(apps, dictated.Order)).Split('|')[1];
             Assert.Contains("data-chart-proposal-made", LinkTo(html, $"/patients/{dictated.Patient}#order-{order}"));
-            Assert.Contains("See the order on the chart", RefillRequestTests.Said(html));
+            Assert.Contains("View order on chart", RefillRequestTests.Said(html));
             var chart = await dictated.Session.Client.GetStringAsync($"/patients/{dictated.Patient}", Cancel);
             Assert.Contains($"id=\"order-{order}\"", chart);
             Assert.Contains($"id=\"allergy-{(await StateAsync(apps, dictated.Allergy)).Split('|')[2]}\"", chart);
@@ -544,7 +544,8 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         using var page = await cutOff.GetAsync(dictated.ReviewPath, Cancel);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         var said = RefillRequestTests.Said(await ReadAsync(page));
-        Assert.Contains("Opening or dismissing a proposal needs the clinic's server. The review remains readable.", said);
+        Assert.Contains("Read-only.", said);
+        Assert.DoesNotContain("Dismiss proposal", said);
         Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.DoesNotContain("Open in the allergy form", said);
         Assert.DoesNotContain("Dismiss proposal", said);
@@ -591,7 +592,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         var editor = RefillRequestTests.Said(await cutOff.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel));
 
-        Assert.Contains("This draft can't be changed or signed until the clinic's server is back.", editor);
+        Assert.Contains("Read-only.", editor);
         Assert.DoesNotContain("proposed from dictation", editor);
         var queued = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue).Events
             .Where(e => e.PatientId == dictated.Patient).Select(e => e.TableName).ToList();

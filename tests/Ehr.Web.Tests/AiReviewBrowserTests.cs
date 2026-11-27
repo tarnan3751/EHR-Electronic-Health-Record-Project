@@ -431,11 +431,12 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
         await page.Keyboard.PressAsync("Enter");
         await page.Keyboard.PressAsync("Tab");
-        Assert.StartsWith("Dictation in Spanish and review saved ", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.StartsWith("Dictation in Spanish reviewed ", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/review/*");
         var reopened = page.Url;
-        Assert.Contains("Signed. This review is read-only.", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Signed.", await page.Locator("main").TextContentAsync());
+        Assert.Equal(0, await page.Locator("[data-review-controls]").CountAsync());
         await TabToAsync(page, "[data-dictation-field=plan] .sc-translation__pair");
         Assert.Equal(plan.Spanish, await HighlightedAsync(page));
         await TabToAsync(page, "[data-dictation-field=subjective] .sc-translation__pair:nth-child(2)");

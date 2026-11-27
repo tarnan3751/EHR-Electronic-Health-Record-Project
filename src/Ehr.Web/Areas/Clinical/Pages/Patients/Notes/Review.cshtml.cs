@@ -124,7 +124,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
             ? Task.FromResult(ReviewResult.Invalid(FinishAtTheClinic))
             : reviews.RejectAllAndFinishAsync(reviewId, Version, HttpContext.RequestAborted), complete: true);
 
-    public const string FinishAtTheClinic = "Finish this review at the clinic, where the conversation can be read.";
+    public const string FinishAtTheClinic = "Finish this review at the clinic.";
 
     // Finishing a visit's review deletes its transcript: at the clinic too, while it is kept.
     public Task<IActionResult> OnPostCompleteAsync(Guid patientId, Guid draftId, Guid reviewId) =>
@@ -155,7 +155,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     {
         if (await LoadAsync(patientId, draftId, reviewId, read: false) is { } denied) return denied;
         // Route identity is checked before invoking the domain operation; extra form metadata is never authoritative.
-        var result = ModelState.IsValid ? await action() : ReviewResult.Invalid("Supply a valid draft version and decision.");
+        var result = ModelState.IsValid ? await action() : ReviewResult.Invalid("Reload the page and try again.");
         var url = complete && result.Status == 200 ? Url.Page("Edit", new { patientId, draftId }) : null;
         if (Request.Headers.ContainsKey("HX-Request"))
         {

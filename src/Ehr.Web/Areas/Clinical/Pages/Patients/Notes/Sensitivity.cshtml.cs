@@ -73,7 +73,7 @@ public class SensitivityModel(PhiReader phi, PatientAssignments assignments, Bre
         }
 
         var result = mark == Sensitive
-            ? new SensitivityResult(StatusCodes.Status409Conflict, [mark ? "It is already marked sensitive. Nothing was changed." : "It is already unmarked. Nothing was changed."])
+            ? new SensitivityResult(StatusCodes.Status409Conflict, [mark ? "Already marked sensitive." : "Already unmarked."])
             : await notes.SetSensitivityAsync(patientId, noteId, Addendum, mark, Reason, HttpContext.RequestAborted, Summary);
         if (result.Status == StatusCodes.Status200OK)
         {

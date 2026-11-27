@@ -17,13 +17,9 @@
 @* The form beside the note it follows. *@
 <div class="sc-split">
 <div class="sc-formcard sc-formcard--wide">
-<p class="sc-prose">The note, signed @Clinic.Format(Model.Note.SignedAt), can't be changed. An addendum is added after it, signed by you. It can't be edited or removed.</p>
-@if (!OnPrem.IsReachable)
-{
-    @* UC 2: reached by Back or a tab opened before the outage. Nothing to sign with until the server is back. *@
-    <p class="sc-muted">An addendum can't be signed until the clinic's server is back.</p>
-}
-else
+@* UC 2: reached by Back or a tab opened before the outage, there is nothing to sign with until the server is back: no
+   form, under the layout's read-only band. *@
+@if (OnPrem.IsReachable)
 {
 <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">
     @if (Model.Errors.Count > 0)
@@ -39,13 +35,14 @@ else
     </div>
     @if (Model.Note.Sensitive)
     {
-        <p class="sc-muted">This note is sensitive, so its addenda are too.</p>
+        <p class="sc-muted">Sensitive, as the note is.</p>
     }
     else
     {
         <label class="sc-check" for="addendum-sensitive"><input type="checkbox" id="addendum-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="addendum-sensitive-hint"> Sensitive</label>
-        <p class="sc-field__hint" id="addendum-sensitive-hint">Hidden on the note's page unless someone chooses to show sensitive items. Views are logged.</p>
+        <p class="sc-field__hint" id="addendum-sensitive-hint">Views are logged.</p>
     }
+    <p class="sc-muted">This can't be undone.</p>
     <div class="sc-actions">
         <button type="submit" class="sc-btn sc-btn--primary" data-sign-addendum>Sign addendum</button>
         <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Cancel</a>
@@ -55,7 +52,7 @@ else
 </div>
 
 <section class="sc-sheet" aria-labelledby="signed-note">
-<h2 id="signed-note">The signed note</h2>
+<h2 id="signed-note">Signed note</h2>
 <partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
 </section>
 </div>

@@ -62,7 +62,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (await phi.SignedDraftAsync(id, patient, cancel) is not null)
         {
-            return new(409, ["This note is signed. Open the signed note from the chart."]);
+            return new(409, ["This note is signed."]);
         }
 
         if (draft.Version != version)
@@ -77,7 +77,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (template is not null && !await db.NoteTemplates.AnyAsync(t => t.Code == template, cancel))
         {
-            return new(422, ["Choose a visit type from the list."]);
+            return new(422, ["Visit type must be selected from the list."]);
         }
 
         draft.NoteTemplateCode = template;
@@ -91,17 +91,17 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         var errors = NoteContent.From(draft).Validate(signing: true).ToList();
         if (draft.StructuredVersion != draft.Version)
         {
-            errors.Add("This draft changed in another window or app. Reopen it, check all four sections, and save before signing.");
+            errors.Add("This draft changed elsewhere. Reopen it and save before signing.");
         }
         else if (draft.History is not null)
         {
             // Written before notes had four sections (step 14): the database signs it only once its author has saved it so.
-            errors.Add("This draft was written with a History section. Open it, move what belongs in Objective, and save before signing.");
+            errors.Add("Move what belongs in Objective out of History, then save before signing.");
         }
 
         if (draft.HasUnreviewedProposals)
         {
-            errors.Add("Review every dictated field before signing. Resume the dictation review to do it.");
+            errors.Add("Review every dictated field before signing.");
         }
 
         return errors;
@@ -149,7 +149,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (!confirmed)
         {
-            return new(422, ["Confirm that you have reviewed this note before signing."]);
+            return new(422, ["Confirm that you have reviewed this note."]);
         }
 
         if (await phi.SignedDraftAsync(id, patient, cancel) is { } existing)
@@ -158,8 +158,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             {
                 // A retry that ticks or clears "Sensitive" can't change a note that was already signed (step 10).
                 return new(409, [existing.Sensitive
-                    ? "This note was already signed, as sensitive. Open the signed note from the chart."
-                    : "This note was already signed, and not as sensitive. A signed note can't be changed. Open it from the chart."]);
+                    ? "This note is already signed, as sensitive."
+                    : "This note is already signed, not as sensitive."]);
             }
 
             return existing.DraftVersion == version
@@ -211,12 +211,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         reason = reason?.Trim();
         if (string.IsNullOrEmpty(reason))
         {
-            return new(422, ["Say why, so the record shows it."]);
+            return new(422, ["Reason is required."]);
         }
 
         if (reason.Length > 500)
         {
-            return new(422, [$"The reason can be up to 500 characters. This one has {reason.Length}."]);
+            return new(422, ["Reason must be 500 characters or less."]);
         }
 
         if (!await phi.IsAssignedAsync(patient, cancel))
@@ -259,8 +259,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
                 ? new(403, ["Only the person who marked it sensitive, or the note's signer, can unmark it."])
                 : new(409, [(addendum, summary, sensitive) switch
                 {
-                    (not null, _, false) => "This can't be unmarked. An addendum to a sensitive note is sensitive too, or it was already unmarked.",
-                    (_, not null, false) => "This can't be unmarked. A summary of a sensitive note or addendum is sensitive too, or it was already unmarked.",
+                    (not null, _, false) => "This can't be unmarked. The note is sensitive, or it was already unmarked.",
+                    (_, not null, false) => "This can't be unmarked. The note or an addendum is sensitive, or it was already unmarked.",
                     _ => "This has already been changed. Open the note again.",
                 }]);
         }
@@ -269,7 +269,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             // Someone changed the note's sensitivity and an addendum's at the same moment, and the database refused
             // this one of the two. Nothing was changed.
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
-            return new(409, ["Someone else was changing this note at the same moment. Nothing was changed. Open the note again."]);
+            return new(409, ["This note changed at the same moment. Open the note again."]);
         }
         finally
         {
@@ -290,12 +290,12 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         text = text?.ReplaceLineEndings("\n").Trim();
         if (string.IsNullOrEmpty(text))
         {
-            return new(422, ["Write the addendum before signing it."]);
+            return new(422, ["Addendum is required."]);
         }
 
         if (text.Length > NoteAddendumConfiguration.MaxLength)
         {
-            return new(422, [$"An addendum can be up to {NoteAddendumConfiguration.MaxLength:N0} characters. This one has {text.Length:N0}."]);
+            return new(422, [$"Addendum must be {NoteAddendumConfiguration.MaxLength:N0} characters or less."]);
         }
 
         if (!await phi.IsAssignedAsync(patient, cancel))
@@ -342,7 +342,7 @@ public sealed record AddendumResult(int Status, IReadOnlyList<string> Errors);
 public sealed record NoteResult(int Status, IReadOnlyList<string> Errors, ClinicalDraft? Draft = null, ClinicalNote? Note = null)
 {
     public static NoteResult Missing => new(404, ["This draft isn't available. Check that the patient is in My patients and the draft is yours."]);
-    public static NoteResult Conflict => new(409, ["This draft changed elsewhere. Your text is still here. Open the saved draft in another tab and compare before saving again."]);
+    public static NoteResult Conflict => new(409, ["This draft changed elsewhere. Open the saved draft in another tab and compare before saving again."]);
 }
 
 // Host configuration, never supplied by an HTTP request. PostgreSQL additionally refuses replica/read-only writes.

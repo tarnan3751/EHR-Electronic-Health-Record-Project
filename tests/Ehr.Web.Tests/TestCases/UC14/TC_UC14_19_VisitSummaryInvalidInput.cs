@@ -66,7 +66,7 @@ public class TC_UC14_19_VisitSummaryInvalidInput(WebApps apps) : IClassFixture<W
         using (var empty = await ReleaseAsync(session.Client, patient, note, nextSteps: "   "))
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
-            Assert.Contains("Not released. Write “What happens next”.", Words(await empty.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("Not released. “What happens next” is required.", Words(await empty.Content.ReadAsStringAsync(Cancel)));
         }
 
         using (var tooLong = await ReleaseAsync(session.Client, patient, note, talkedAbout: new string('a', 4001)))

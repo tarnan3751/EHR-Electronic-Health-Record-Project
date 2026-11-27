@@ -19,73 +19,70 @@
 <div class="sc-formcard sc-formcard--wide">
 @if (Model.Entry is { } entry)
 {
-    <p class="sc-prose">The addendum by <strong>@entry.AuthorName</strong>, signed @Clinic.Format(entry.SignedAt), to the note signed @Clinic.Format(Model.Note.SignedAt).</p>
+    <p class="sc-prose">Addendum by <strong>@entry.AuthorName</strong>, signed @Clinic.Format(entry.SignedAt).</p>
 }
 else if (Model.SummaryEntry is { } summary)
 {
     @* Step 13a: who released it and when, not its text. *@
-    <p class="sc-prose">The visit summary released to the patient by <strong>@summary.ReleasedBy</strong>, @Clinic.Format(summary.ReleasedAt), from the note signed @Clinic.Format(Model.Note.SignedAt).</p>
+    <p class="sc-prose">Visit summary released by <strong>@summary.ReleasedBy</strong>, @Clinic.Format(summary.ReleasedAt).</p>
 }
 else
 {
-    <p class="sc-prose">The note signed @Clinic.Format(Model.Note.SignedAt).</p>
+    <p class="sc-prose">Note signed @Clinic.Format(Model.Note.SignedAt).</p>
 }
-@* What marking or unmarking does: the one thing that changes first, then the rest as a short list. *@
-<div class="sc-prose">
-    @if (Model.SummaryEntry is not null && !Model.Sensitive)
-    {
-        <p>Hidden on the note's page unless someone chooses to show sensitive items. The text doesn't change.</p>
-        <ul>
+@* That views are logged, when marking; what else marking or unmarking changes, under the disclosure. *@
+@if (!Model.Sensitive)
+{
+    <p class="sc-prose">Views are logged.</p>
+}
+<details>
+    <summary>@(Model.Sensitive ? "More about unmarking" : "More about sensitive items")</summary>
+    <ul>
+        @if (Model.SummaryEntry is not null && !Model.Sensitive)
+        {
+            <li>Hidden on the note's page until someone shows sensitive items.</li>
             <li>In the portal, the patient sees it when they choose to.</li>
-            <li>Someone the patient shares their record with sees it only if the patient allows sensitive items.</li>
-            <li>Views are logged. Earlier views stay in the log.</li>
+            <li>Proxies see it only if the patient allows sensitive items.</li>
             <li>Only you or the note's signer can unmark it.</li>
-        </ul>
-    }
-    else if (Model.SummaryEntry is not null)
-    {
-        <p>Shown with the note again, and in the portal to everyone the patient shares their record with. The text doesn't change.</p>
-    }
-    else if (!Model.Sensitive)
-    {
-        <p>Hidden from the chart unless someone chooses to show sensitive items. The text doesn't change.</p>
-        <ul>
-            <li>@(Model.Entry is null ? "Its addenda and visit summaries become sensitive too, until it's unmarked." : "The note's visit summaries become sensitive too, until it's unmarked.")</li>
-            <li>It isn't kept offline.</li>
-            <li>Views are logged. Earlier views stay in the log.</li>
-            <li>@(Model.IsSigner ? "Only you can unmark it, as the note's signer." : "Only you or the note's signer can unmark it.")</li>
-        </ul>
-    }
-    else if (Model.Entry is null)
-    {
-        <p>Shown with the rest of the chart again. The text doesn't change.</p>
-        <ul>
-            <li>Addenda that are sensitive only because of this note are unmarked too.</li>
+        }
+        else if (Model.SummaryEntry is not null)
+        {
+            <li>Shown with the note again, and in the portal to the patient's proxies.</li>
+        }
+        else if (!Model.Sensitive)
+        {
+            <li>Hidden from the chart until someone shows sensitive items.</li>
+            <li>@(Model.Entry is null ? "Its addenda and visit summaries become sensitive too." : "The note's visit summaries become sensitive too.")</li>
+            <li>Not kept offline.</li>
+            <li>@(Model.IsSigner ? "Only you can unmark it." : "Only you or the note's signer can unmark it.")</li>
+        }
+        else if (Model.Entry is null)
+        {
+            <li>Addenda sensitive only because of this note are unmarked too.</li>
             <li>Its visit summaries are unmarked too, unless an addendum is still sensitive.</li>
             <li>An addendum marked on its own stays marked.</li>
-        </ul>
-    }
-    else
-    {
-        <p>Shown with the rest of the chart again. The text doesn't change.</p>
-        <p>The note's visit summaries are unmarked too, unless the note or another addendum is still sensitive.</p>
-    }
-</div>
+        }
+        else
+        {
+            <li>The note's visit summaries are unmarked too, unless the note or another addendum is still sensitive.</li>
+        }
+    </ul>
+</details>
 @if (!OnPrem.IsReachable)
 {
-    <p class="sc-muted">This can't be changed until the clinic's server is back.</p>
+    @* Off-site with the clinic's server down: no form, under the layout's read-only band. *@
 }
 else if (Model.Sensitive && Model.HeldByNote && Model.SummaryEntry is not null)
 {
-    <p class="sc-notice sc-notice--info" data-held-by-sources><span class="sc-notice__state">Can't unmark yet.</span> The note or one of its addenda is sensitive, so its summaries are too. Unmark them first.</p>
+    <p class="sc-notice sc-notice--info" data-held-by-sources><span class="sc-notice__state">Can't unmark yet.</span> Unmark the note and its sensitive addenda first.</p>
 }
 else if (Model.Sensitive && Model.HeldByNote)
 {
-    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">Can't unmark yet.</span> The note is sensitive, so its addenda are too. Unmark the note first.</p>
+    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">Can't unmark yet.</span> Unmark the note first.</p>
 }
 else if (Model.Sensitive && !Model.MayUnmark)
 {
-    <p class="sc-notice sc-notice--info" data-may-not-unmark><span class="sc-notice__state">Can't unmark.</span> Only the person who marked it sensitive, or the note's signer, can.</p>
+    <p class="sc-notice sc-notice--info" data-may-not-unmark><span class="sc-notice__state">Can't unmark.</span> Only the person who marked it or the note's signer can.</p>
 }
 else
 {
@@ -100,8 +97,7 @@ else
         <div class="sc-field">
             <label for="sensitivity-reason">Reason <span>(required)</span></label>
             <input id="sensitivity-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="500" required autofocus autocomplete="off"
-                   aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)" aria-describedby="sensitivity-reason-hint">
-            <p class="sc-field__hint" id="sensitivity-reason-hint">Shown on the note with your name and the time.</p>
+                   aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)">
         </div>
         <div class="sc-actions">
             <button type="submit" class="sc-btn sc-btn--primary" data-change-sensitivity>@(Model.Sensitive ? "Unmark as sensitive" : "Mark sensitive")</button>

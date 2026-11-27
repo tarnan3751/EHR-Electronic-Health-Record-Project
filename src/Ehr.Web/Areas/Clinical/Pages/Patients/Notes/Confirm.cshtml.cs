@@ -47,7 +47,7 @@ public class ConfirmModel(PhiReader phi, PatientAssignments assignments, BreakGl
         Response.Headers.CacheControl = "no-store";
         var result = ModelState.IsValid
             ? await notes.SignAsync(patientId, draftId, Version, Confirmed, HttpContext.RequestAborted, Sensitive)
-            : new NoteResult(422, ["Send a valid draft version and confirm your signature."]);
+            : new NoteResult(422, ["Reload the page and try again."]);
         var url = result.Note is { } note ? Url.Page("View", new { patientId, noteId = note.Id, signed = true }) : null;
         if (Request.Headers.ContainsKey("HX-Request"))
         {

@@ -26,11 +26,11 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   4. Save with the unknown visit type.
 //   5. In the other draft, save the four sections that show nothing and choose "Sign note…"; then try to sign that
 //      version.
-// Expected result: Step 1: the draft is saved, "Sign note…" answers "Enter Objective before signing." and signing that
-//   version is refused with the same; nothing is signed. Steps 2 and 3: nothing is saved ("Shorten Objective to 16,000
-//   characters or fewer."; the null character with 400). Step 4: nothing is saved ("Choose a visit type from the
-//   list."). The draft keeps the text of step 1, with no visit type. Step 5: the draft is saved as written, and "Sign
-//   note…" and signing that version answer "Enter Subjective before signing.", and so for each section; nothing is
+// Expected result: Step 1: the draft is saved, "Sign note…" answers "Objective is required." and signing that
+//   version is refused with the same; nothing is signed. Steps 2 and 3: nothing is saved ("Objective must be 16,000
+//   characters or less."; the null character with 400). Step 4: nothing is saved ("Visit type must be selected from
+//   the list."). The draft keeps the text of step 1, with no visit type. Step 5: the draft is saved as written, and "Sign
+//   note…" and signing that version answer "Subjective is required.", and so for each section; nothing is
 //   signed.
 // Creator: Tahseen Arnan
 public class TC_UC14_28_FourSectionsInvalidInput(WebApps apps) : IClassFixture<WebApps>
@@ -66,14 +66,14 @@ public class TC_UC14_28_FourSectionsInvalidInput(WebApps apps) : IClassFixture<W
             Assert.Contains(error, errors);
         }
 
-        await RefusedAsync(path + "?handler=Review", 1, "", "Enter Objective before signing.");
-        await RefusedAsync(path + "/confirm", 2, "", "Enter Objective before signing.", ("Confirmed", true));
-        await RefusedAsync(path + "?handler=Save", 2, new string('o', 16_001), "Shorten Objective to 16,000 characters or fewer.");
+        await RefusedAsync(path + "?handler=Review", 1, "", "Objective is required.");
+        await RefusedAsync(path + "/confirm", 2, "", "Objective is required.", ("Confirmed", true));
+        await RefusedAsync(path + "?handler=Save", 2, new string('o', 16_001), "Objective must be 16,000 characters or less.");
         // A null character is refused with 400 and no body, not with the page's own message ("Remove the null character
         // from Objective.", which NoteContentTests checks); either way nothing is saved.
         var (nullStatus, _) = await PostAsync(path + "?handler=Save", 2, "Synthetic objective\0");
         Assert.Equal(HttpStatusCode.BadRequest, nullStatus);
-        await RefusedAsync(path + "?handler=Save", 2, "Synthetic objective", "Choose a visit type from the list.", ("NoteTemplateCode", "general-surgery"));
+        await RefusedAsync(path + "?handler=Save", 2, "Synthetic objective", "Visit type must be selected from the list.", ("NoteTemplateCode", "general-surgery"));
 
         Assert.Equal(["2|Synthetic subjective: headache.||0"], await ProxyTests.QueryAsync(apps,
             "SELECT d.version || '|' || d.subjective || '|' || d.objective || '|' || (SELECT count(*) FROM ehr.clinical_notes n WHERE n.draft_id = d.id) || coalesce(d.note_template_code, '') FROM ehr.clinical_drafts d WHERE d.patient_id = @patient", patient));
@@ -98,7 +98,7 @@ public class TC_UC14_28_FourSectionsInvalidInput(WebApps apps) : IClassFixture<W
             return (response.StatusCode, [.. errors.EnumerateArray().Select(error => error.GetString()!)]);
         }
 
-        string[] every = ["Enter Subjective before signing.", "Enter Objective before signing.", "Enter Assessment before signing.", "Enter Plan before signing."];
+        string[] every = ["Subjective is required.", "Objective is required.", "Assessment is required.", "Plan is required."];
         foreach (var (status, errors) in new[] { await PostAsync(path + "?handler=Review", 1), await PostAsync(path + "/confirm", 2, ("Confirmed", true)) })
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, status);

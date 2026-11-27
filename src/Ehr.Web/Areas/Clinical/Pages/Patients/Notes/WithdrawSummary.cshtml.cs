@@ -43,7 +43,7 @@ public class WithdrawSummaryModel(PhiReader phi, PatientAssignments assignments,
         }
 
         var result = Summary.WithdrawnAt is not null
-            ? new SummaryResult(StatusCodes.Status409Conflict, ["This summary has already been withdrawn. Nothing was changed."])
+            ? new SummaryResult(StatusCodes.Status409Conflict, ["Already withdrawn."])
             : await summaries.WithdrawAsync(patientId, summaryId, Reason, HttpContext.RequestAborted);
         if (result.Status == StatusCodes.Status200OK)
         {

@@ -85,8 +85,8 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var offSite = await SignInAsync(apps.Cloud, await apps.ClinicianAsync(), via: apps.OnPrem);
         var html = await offSite.Client.GetStringAsync(d.ReviewUrl, Cancel);
         Assert.Contains("Read-only here.</span>", html);
-        Assert.Contains("Finish this review at the clinic, where the conversation can be read.", html);
-        Assert.Contains(">The conversation can be read only at the clinic.</p>", html);
+        Assert.Contains("Finish this review at the clinic.", html);
+        Assert.Contains(">Readable only at the clinic.</p>", html);
         Assert.DoesNotContain("clinic&#x27;s network", html);
         Assert.Contains("Your chest is clear.", html);
         Assert.DoesNotContain("What brings you in today?", html);
@@ -258,7 +258,7 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var editor = await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/notes/drafts/{draft}", Cancel);
         Assert.Contains("Resume dictation review", editor);
         var html = await l.Session.Client.GetStringAsync(url, Cancel);
-        Assert.Matches(@"Not drafted yet\.</span> A visit was recorded at [A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2} UTC\. If you named its voices a moment ago, wait a minute, then retrieve its draft\. Otherwise, discard it and dictate or listen again\.", WebUtility.HtmlDecode(html));
+        Assert.Matches(@"Not drafted yet\.</span> Visit recorded [A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2} UTC\. If you just named its voices, wait a minute before retrieving its draft\.", WebUtility.HtmlDecode(html));
 
         using (var retrieved = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version }))
         {
@@ -320,7 +320,7 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.True(await PurgeAsync(apps, l.Review) >= 1);
 
         var html = await l.Session.Client.GetStringAsync(d.ReviewUrl, Cancel);
-        Assert.Contains("transcript was deleted after 7 days, so its proposals can", html);
+        Assert.Contains("Transcript deleted after 7 days. Reject each proposal, or edit it into your own words.", html);
         Assert.DoesNotContain("value=\"accepted\"", html);
         // Nor offered, ready to approve, in the box to edit it: the page says why.
         Assert.Matches("<textarea id=\"edited-objective\"[^>]*aria-describedby=\"edited-objective-hint\"[^>]*></textarea>", html);
@@ -331,14 +331,14 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         {
             using var refused = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals["objective"].Id, d.Version, decision, words);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
-            Assert.Contains("transcript was deleted after 7 days, so its proposals can", await refused.Content.ReadAsStringAsync(Cancel));
+            Assert.Contains("Transcript deleted after 7 days. Reject each proposal", await refused.Content.ReadAsStringAsync(Cancel));
         }
 
         // The days it says are the clinic's setting.
         await using (var shorter = apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting(AmbientTranscriptPurgeService.Setting, "3")))
         {
             var session = await SignInAsync(shorter, await apps.ClinicianAsync());
-            Assert.Contains("transcript was deleted after 3 days, so its proposals can", await session.Client.GetStringAsync(d.ReviewUrl, Cancel));
+            Assert.Contains("Transcript deleted after 3 days. Reject each proposal", await session.Client.GetStringAsync(d.ReviewUrl, Cancel));
         }
 
         using var edited = await Decide(l.Session.Client, l.Token, d.ReviewUrl, proposals["objective"].Id, d.Version, "edited", "Synthetic: chest clear.");

@@ -118,7 +118,7 @@ public class AmbientSwitchTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(["0"], await RowsAsync(apps, "SELECT count(*) FROM ehr.ambient_transcripts WHERE id = @id", d.Listening.Review));
         var html = await again.Client.GetStringAsync(d.ReviewUrl, Cancel);
-        Assert.Contains("transcript was deleted after 7 days, so its proposals can", html);
+        Assert.Contains("Transcript deleted after 7 days. Reject each proposal", html);
         using var rejected = await ReviewPost(again.Client, Token(html), d.ReviewUrl, "RejectAll", ("Version", d.Version));
         Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);
         Assert.Equal(["completed"], await RowsAsync(apps, "SELECT state FROM ehr.ai_note_reviews WHERE id = @id", d.Listening.Review));

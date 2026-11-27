@@ -28,7 +28,7 @@ public sealed class NoteWriteExceptionFilter : IExceptionFilter
             return;
         }
 
-        const string message = "The saved draft changed, was signed, or is no longer eligible for signing. Your displayed work is still here. Open the chart in another tab and compare before retrying.";
+        const string message = "The saved draft changed or was signed. Open the chart in another tab and compare before trying again.";
         context.Result = context.HttpContext.Request.Headers.ContainsKey("HX-Request")
             ? new JsonResult(new { errors = new[] { message } }) { StatusCode = 409 }
             : new ContentResult { Content = message, StatusCode = 409 };
