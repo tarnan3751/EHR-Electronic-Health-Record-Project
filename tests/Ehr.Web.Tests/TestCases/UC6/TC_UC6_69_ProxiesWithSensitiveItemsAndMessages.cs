@@ -6,7 +6,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test Case ID: TC-UC6-69
 // Purpose / scenario: Someone the patient shares their record with, with sensitive items, is told every part a
 //   care-team member viewed, as the patient is, but a conversation only when their access includes messages: without
-//   messages, writing to the patient reads as "The record", and opening a conversation isn't listed at all.
+//   messages, writing to the patient reads as "Record", and opening a conversation isn't listed at all.
 // Type: Functional (alternative flow: proxies)
 // Requirements: proposed FR-57, FR-19
 // Use case: UC 6, View my results and appointments in the portal
@@ -19,8 +19,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. The patient starts the conversation; Dr. Test opens the pages.
 //   2. Each proxy opens Who viewed the record.
-// Expected result: With messages: Dr. Test's lines are "The allergies, medications and diagnoses" and "The messages".
-//   Without: "The allergies, medications and diagnoses" and "The record", and no line about messages.
+// Expected result: With messages: Dr. Test's lines are "Allergies, medications and diagnoses" and "Messages".
+//   Without: "Allergies, medications and diagnoses" and "Record", and no line about messages.
 // Creator: Tahseen Arnan
 public class TC_UC6_69_ProxiesWithSensitiveItemsAndMessages(WebApps apps) : IClassFixture<WebApps>
 {
@@ -43,10 +43,10 @@ public class TC_UC6_69_ProxiesWithSensitiveItemsAndMessages(WebApps apps) : ICla
         }
 
         // Step 2.
-        Assert.Equal(["The allergies, medications and diagnoses", "The messages"],
+        Assert.Equal(["Allergies, medications and diagnoses", "Messages"],
             PartsOf(await PageAsync(withMessages.Client), "staff").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
         var without = PartsOf(await PageAsync(withoutMessages.Client), "staff");
-        Assert.Equal(["The allergies, medications and diagnoses", "The record"], without.Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
-        Assert.Equal(1, without.Count(part => Uncounted(part) == "The record"));
+        Assert.Equal(["Allergies, medications and diagnoses", "Record"], without.Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
+        Assert.Equal(1, without.Count(part => Uncounted(part) == "Record"));
     }
 }

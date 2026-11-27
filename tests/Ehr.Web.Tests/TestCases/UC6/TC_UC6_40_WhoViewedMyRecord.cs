@@ -19,12 +19,10 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test opens the chart. The patient opens the home and follows "Who viewed my record".
 //   2. The patient opens the page again.
-// Expected result: Step 1: the page sends Cache-Control: no-store and says "in the last 12 months, newest first"; its
-//   lines are "You, Your portal home page, with your appointments" (the home), "Dr. Test, clinician, Your chart, with
-//   the list of your visit notes" at the chart's time as "MMM d, yyyy, HH:mm UTC", then "You, Your portal
-//   home page, with your appointments" (the home after signing in). Opening it is one recorded read by the patient's
-//   own account, of the patient's part of the audit log, with no row. Step 2: the first line is "You, Who viewed your
-//   record".
+// Expected result: Step 1: the page sends Cache-Control: no-store and says "Last 12 months."; its lines are "You, Home
+//   page" (the home), "Dr. Test, clinician, Chart" at the chart's time as "MMM d, yyyy, HH:mm UTC", then "You, Home
+//   page" (the home after signing in). Opening it is one recorded read by the patient's own account, of the patient's
+//   part of the audit log, with no row. Step 2: the first line is "You, Who viewed the record".
 // Creator: Tahseen Arnan
 public class TC_UC6_40_WhoViewedMyRecord(WebApps apps) : IClassFixture<WebApps>
 {
@@ -50,13 +48,13 @@ public class TC_UC6_40_WhoViewedMyRecord(WebApps apps) : IClassFixture<WebApps>
         var html = await Browser.ReadAsync(response);
 
         Assert.True(response.Headers.CacheControl?.NoStore);
-        Assert.Contains("in the last 12 months, newest first", Browser.Words(html));
+        Assert.Contains("Last 12 months.", Browser.Words(html));
         var lines = Lines(html);
         Assert.Equal(
             [
-                "you | You | Your portal home page, with your appointments",
-                $"staff | Dr. Test, clinician | Your chart, with the list of your visit notes | {Shown(charted)}",
-                "you | You | Your portal home page, with your appointments",
+                "you | You | Home page",
+                $"staff | Dr. Test, clinician | Chart | {Shown(charted)}",
+                "you | You | Home page",
             ],
             lines.Select(line => line.StartsWith("staff", StringComparison.Ordinal) ? line : string.Join(" | ", line.Split(" | ").Take(3))));
         Assert.All(lines, line => Assert.Matches(@"\| [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2} UTC$", line));
@@ -68,6 +66,6 @@ public class TC_UC6_40_WhoViewedMyRecord(WebApps apps) : IClassFixture<WebApps>
             """, patient.Patient));
 
         // Step 2.
-        Assert.StartsWith("you | You | Who viewed your record | ", Lines(await PageAsync(patient.Client))[0], StringComparison.Ordinal);
+        Assert.StartsWith("you | You | Who viewed the record | ", Lines(await PageAsync(patient.Client))[0], StringComparison.Ordinal);
     }
 }

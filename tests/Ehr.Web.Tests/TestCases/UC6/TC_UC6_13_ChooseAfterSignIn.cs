@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   3. Choose "View my record".
 //   4. Open /portal/choose again, choose the first patient's record, then open /portal/choose once more and request
 //      /portal.
-// Expected result: Step 1: lands on "My record". Step 2: lands on "Whose record?", which lists "My record" first and
+// Expected result: Step 1: lands on "My record". Step 2: lands on "Records", which lists "My record" first and
 //   then "Synthetic Sharer", shared, with what it covers and until when. Step 3: the second patient's own record, with
 //   no band. Step 4: the first patient's record with the band; after opening the choice again, /portal is the second
 //   patient's own record with no band.
@@ -45,7 +45,7 @@ public class TC_UC6_13_ChooseAfterSignIn(WebApps apps) : IClassFixture<WebApps>
         var mine = session.Page.IndexOf("data-record=\"own\"", StringComparison.Ordinal);
         var shared = session.Page.IndexOf("<h2>Synthetic Sharer</h2>", StringComparison.Ordinal);
         Assert.True(mine > 0 && shared > mine, "My record is listed first, then the record shared with the account.");
-        Assert.Contains("Shared with you. Record, results and appointments. Until ", Words(session.Page));
+        Assert.Contains("Record, results and appointments. Until ", Words(session.Page));
 
         using var own = await PostFormAsync(session.Client, "/portal/acting?handler=Mine", "/portal/choose");
         var record = await ReadAsync(own);
@@ -59,7 +59,7 @@ public class TC_UC6_13_ChooseAfterSignIn(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("data-acting", theirs);
         Assert.Contains("Back to my record", theirs);
 
-        Assert.Contains("<h1>Whose record?</h1>", await session.Client.GetStringAsync("/portal/choose", Cancel));
+        Assert.Contains("<h1>Records</h1>", await session.Client.GetStringAsync("/portal/choose", Cancel));
         var back = await session.Client.GetStringAsync("/portal", Cancel);
         Assert.Contains("<dd>Synthetic Chooser</dd>", back);
         Assert.DoesNotContain("data-acting", back);

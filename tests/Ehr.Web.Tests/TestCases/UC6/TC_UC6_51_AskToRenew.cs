@@ -66,12 +66,12 @@ public class TC_UC6_51_AskToRenew(WebApps apps) : IClassFixture<WebApps>
         var words = Words(await ReadAsync(sent));
 
         Assert.Equal(PortalPath, PathOf(sent));
-        Assert.Contains("Sent. Your care team will answer here.", words);
+        Assert.Contains("Sent.", words);
         Assert.Contains("Waiting", words);
         Assert.Contains("by you", words);
         Assert.Contains("Synthetic: I have three days left.", words);
-        Assert.Contains("No other medications can be refilled here right now.", words);
-        Assert.DoesNotContain("None of your medications", words);
+        Assert.Contains("No other medications can be refilled here.", words);
+        Assert.DoesNotContain("No medications can be refilled here.", words);
         Assert.Equal([$"requested|{Lisinopril}|Synthetic: I have three days left.|{patient.Account}|-|-|-"], await RequestsAsync(apps, patient.Patient));
         var request = await RequestIdAsync(apps, patient.Patient);
         Assert.Equal(

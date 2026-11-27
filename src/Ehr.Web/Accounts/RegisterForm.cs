@@ -6,9 +6,9 @@ namespace Ehr.Web.Accounts;
 public class RegisterForm : NewPassword
 {
     [Required(ErrorMessage = "Enter your email address.")]
-    [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+    [EmailAddress(ErrorMessage = "Enter an email address like name@example.com.")]
     public string? Email { get; set; }
 
-    [Required(ErrorMessage = "Enter the enrollment code the clinic gave you.")]
+    [Required(ErrorMessage = "Enter your enrollment code.")]
     public string? Code { get; set; }
 }

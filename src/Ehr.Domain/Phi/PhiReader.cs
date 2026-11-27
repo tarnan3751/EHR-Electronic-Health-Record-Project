@@ -123,13 +123,12 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
         var visitVitals = encounters.ToDictionary(e => e.Id, e => VisitVitals.Of(pressures.FirstOrDefault(p => p.Systolic.EncounterId == e.Id), At(e.Id, VitalSign.HeartRate)));
         var latestVitals = newestVitals.Where(o => !VitalSign.BloodPressure.Contains(o.Code)).Select(LatestVital.Of);
         var orders = await ActiveOrders(id, catalogCode: null).ToListAsync(cancellationToken);
-        // Only when the discontinue page sent the clinician here: that order's name, when it is this patient's and
-        // discontinued.
-        var discontinuedName = discontinued is null ? null : await (
+        // Only when the discontinue page sent the clinician here: whether that order is this patient's and discontinued.
+        var confirmsDiscontinued = discontinued is not null && await (
             from order in db.Orders.AsNoTracking()
             join item in db.OrderCatalogItems on order.CatalogCode equals item.Code
             where order.Id == discontinued && order.PatientId == id && order.Status == OrderStatus.Revoked
-            select item.Display).FirstOrDefaultAsync(cancellationToken);
+            select order.Id).AnyAsync(cancellationToken);
         // Only when the order form sent the clinician here: when the order just signed replaced one (a change), the
         // name of the order it replaced, when both are this patient's.
         var replacedName = ordered is null ? null : await (
@@ -203,7 +202,7 @@ public sealed partial class PhiReader(EhrDbContext db, AuditRecorder audit, User
             Resulted = resulted,
             Threads = threads,
             Upcoming = upcoming,
-            DiscontinuedName = discontinuedName,
+            ConfirmsDiscontinued = confirmsDiscontinued,
             ReplacedName = replacedName,
             SensitiveHidden = hidden,
             SensitiveNotesHidden = sensitive ? 0 : found.SensitiveNotes,

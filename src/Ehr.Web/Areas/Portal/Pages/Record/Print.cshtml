@@ -13,7 +13,7 @@
 @if (Model.Record is not { } record || record.Summaries is not { } summaries)
 {
     <h1>Health record</h1>
-    <p class="sc-notice sc-notice--danger">@(own ? "Your record is" : "The record is") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(own ? "Your record is" : "The record is") not available right now.</p>
 }
 else
 {
@@ -21,9 +21,8 @@ else
     var hidden = record.SensitiveHidden + summaries.SensitiveHidden;
     var anyShown = record.Medications.Entries.Any(m => m.Sensitive) || record.Conditions.Entries.Any(c => c.Sensitive)
         || summaries.Summaries.Any(s => s.Sensitive) || summaries.Withdrawn.Any(w => w.Sensitive);
-    <h1>Health record of @patient.GivenName @patient.FamilyName</h1>
+    <h1>Health record</h1>
     <p class="sc-muted">A copy from the SwiftChart patient portal, as of @Clinic.Format(Model.At, "MMM d, yyyy HH:mm").</p>
-    <p class="sc-muted sc-screen-only">To print it or save it as a PDF, use your browser's Print command.</p>
     @if (Model.MaySeeSensitive && hidden > 0)
     {
         @* Left out until asked for (docs/brand: sensitive items). On screen only: paper never says that anything was left out. *@
@@ -255,7 +254,7 @@ else
         {
             @* The reader gives the newest of them, as Visit summaries has them, and doesn't say whether there are more: so
                the page says what it holds at most, true whether or not any were left out. *@
-            <p class="sc-muted" data-summaries-cut>This page shows at most the @SummariesModel.Limit newest visit summaries.</p>
+            <p class="sc-muted" data-summaries-cut>At most the @SummariesModel.Limit newest are shown.</p>
         }
         @if (items.Count == 0)
         {

@@ -58,7 +58,7 @@ public class TC_UC14_17_SensitiveNotesAddendaInherit(WebApps apps) : IClassFixtu
 
         // 1. Marked: every addendum is sensitive, the unmarked one by inheritance; one signed afterwards too.
         using var marked = await ChangeSensitivityAsync(session.Client, patient, note, mark: true, "Patient asked for it.");
-        Assert.Contains("Saved. Marked sensitive, with your reason.", Words(await ReadAsync(marked)));
+        Assert.Contains("Marked sensitive.", Words(await ReadAsync(marked)));
         using var third = await AddAsync(session.Client, patient, note, three);
         Assert.Equal(["Synthetic addendum one true true", "Synthetic addendum two true false", "Synthetic addendum thr true true"], await MarksAsync());
 
@@ -69,7 +69,7 @@ public class TC_UC14_17_SensitiveNotesAddendaInherit(WebApps apps) : IClassFixtu
         Assert.DoesNotContain(NotePath(patient, note), chart);
         Assert.Equal(views, await ViewsAsync());
         var page = await session.Client.GetStringAsync(NotePath(patient, note), Cancel);
-        Assert.Contains("Sensitive note. Your view of it is logged.", Words(page));
+        Assert.Contains("Sensitive note. Your view is logged.", Words(page));
         Assert.All(new[] { one, two, three }, text => Assert.Contains(text, page));
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(page, "data-addendum-sensitive=\"inherited\">Sensitive with the note</span>").Count);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(page, "data-addendum-sensitive=\"own\">Sensitive</span>"));

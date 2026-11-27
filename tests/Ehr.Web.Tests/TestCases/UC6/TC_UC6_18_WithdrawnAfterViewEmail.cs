@@ -78,7 +78,7 @@ public class TC_UC6_18_WithdrawnAfterViewEmail(WebApps apps) : IClassFixture<Web
         foreach (var (_, subject, body) in EmailsTo(apps, patient.Email))
         {
             Assert.Equal("Something new in your patient portal", subject);
-            Assert.Equal("Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.", body);
+            Assert.Equal("Your clinic added something to your patient portal. Sign in to see it.", body);
             var action = apps.Emails.Actions[body];
             Assert.Equal(("See what's new", Base + "portal/summaries"), (action.Label, action.Link));
             foreach (var word in new[] { "cough", "reason", "withdrawn", "Dr. Test", "attacker" })

@@ -1,5 +1,6 @@
 @page "/patients/{patientId:guid}/orders/{orderId:guid}/results"
 @using Ehr.Data.Orders
+@using Ehr.Domain.Results
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Orders.ResultsModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
@@ -26,7 +27,7 @@
 <p class="sc-muted">Ordered by @order.SignedBy, @Clinic.Format(order.SignedAt).</p>
 @if (Model.Done is "filed")
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Saved.</span> The patient can now see these results. They're in @order.SignedBy's inbox to acknowledge.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Results filed.</span></p>
 }
 else if (Model.Done is "acknowledged")
 {
@@ -34,18 +35,18 @@ else if (Model.Done is "acknowledged")
 }
 @if (Model.Stale)
 {
-    <p class="sc-notice sc-notice--warning" role="alert" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Not saved.</span> This order changed while the page was open. Below is how it stands now.</p>
+    <p class="sc-notice sc-notice--warning" role="alert" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Not saved.</span> This order changed while the page was open.</p>
 }
 
 @if (filed.Count == 0)
 {
-    <p class="sc-empty">@(order.Status == OrderStatus.Revoked ? "This order was discontinued. It has no results." : "No results yet.")</p>
+    <p class="sc-empty">@(order.Status == OrderStatus.Revoked ? "Order discontinued. No results." : "No results yet.")</p>
 }
 else
 {
     @if (abnormal > 0)
     {
-        <p class="sc-notice sc-notice--warning" data-abnormal><span class="sc-notice__state">Abnormal.</span> @abnormal of @filed.Count @(filed.Count == 1 ? "result" : "results") @(abnormal == 1 ? "is" : "are") outside the reference range, listed first.</p>
+        <p class="sc-notice sc-notice--warning" data-abnormal><span class="sc-notice__state">Abnormal.</span> @abnormal of @filed.Count @(filed.Count == 1 ? "result" : "results") @(abnormal == 1 ? "is" : "are") outside the reference range.</p>
     }
     <div class="sc-table-wrap">
         <table class="sc-table">
@@ -56,15 +57,15 @@ else
                 @foreach (var test in filed)
                 {
                     <tr class="@(test.Flag is null ? null : "sc-table__flagged")" data-result="@(test.Flag is null ? "normal" : "abnormal")">
-                        <th scope="row">@test.Display</th>
-                        <td class="sc-table__mono">@test.Value!.Value.ToString("0.####") @test.Unit</td>
+                        <th scope="row" title="@TestNames.Full(test.Code, test.Display)">@TestNames.Short(test.Code, test.Display)</th>
+                        <td class="sc-table__mono">@test.Value!.Value.ToString("0.####") @Units.Shown(test.Unit)</td>
                         <td>
                             @if (test.Flag is { } flag)
                             {
                                 <span class="sc-tag sc-tag--warning">@flag</span>
                             }
                         </td>
-                        <td class="sc-table__mono">@test.Range @(test.Range.Length > 0 ? test.Unit : null)</td>
+                        <td class="sc-table__mono">@test.Range @(test.Range.Length > 0 ? Units.Shown(test.Unit) : null)</td>
                         <td class="sc-table__mono">@Clinic.Format(test.CollectedAt!.Value)</td>
                     </tr>
                 }
@@ -94,7 +95,7 @@ else
     {
         <form method="post" asp-page-handler="Acknowledge" asp-route-patientId="@patient.Id" asp-route-orderId="@order.OrderId">
             <input type="hidden" name="Seen" value="@order.Seen">
-            <p class="sc-muted">This confirms you've seen these results. It can't be undone.</p>
+            <p class="sc-muted">This can't be undone.</p>
             <button type="submit" class="sc-btn sc-btn--primary" data-acknowledge autofocus="@(!answered && (waiting.Count == 0 || !order.OpenToResults))">Acknowledge results</button>
         </form>
     }
@@ -104,27 +105,24 @@ else
     }
     else
     {
-        <p class="sc-muted">Not acknowledged. Results can't be acknowledged until the clinic's server is back.</p>
+        <p class="sc-muted">Not acknowledged.</p>
     }
     </div>
 }
 
-@if (order.OpenToResults)
+@* Off-site with the clinic's server down, for a patient on the panel, nothing can be entered: the layout's band says so. *@
+@if (order.OpenToResults && (OnPrem.IsReachable || !Model.OnPanel))
 {
     <div class="sc-sheet">
     <h2>@(filed.Count == 0 ? "Enter results" : "Enter the remaining results")</h2>
     @if (Model.LabConnected)
     {
         @* Step 12: a connected lab files these itself. The form stays, for when it can't. *@
-        <p class="sc-notice sc-notice--info" data-lab-connected><span class="sc-notice__state">Lab connected.</span> The lab files these results here when they're ready. Enter them below only if the lab can't send them.</p>
+        <p class="sc-notice sc-notice--info" data-lab-connected><span class="sc-notice__state">Lab connected.</span> Enter results only if the lab can't send them.</p>
     }
     @if (!Model.OnPanel)
     {
         <p class="sc-muted">To enter results, add this patient to My patients.</p>
-    }
-    else if (!OnPrem.IsReachable)
-    {
-        <p class="sc-muted">Results can't be entered until the clinic's server is back.</p>
     }
     else
     {
@@ -133,14 +131,14 @@ else
             {
                 <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : "Fix the highlighted fields and try again.")</p>
             }
-            <p class="sc-muted">Enter the values the lab reported, in the units shown. Leave a test empty if its result hasn't come in.</p>
+            <p class="sc-muted">Leave a test empty if its result hasn't come in.</p>
             @{ var first = true; }
             @foreach (var test in waiting)
             {
                 var id = $"result-{test.Code}";
                 var error = Model.Errors.GetValueOrDefault(test.Code);
                 <div class="sc-field">
-                    <label for="@id">@test.Display <span>(@(string.IsNullOrEmpty(test.Unit) ? "no unit" : test.Unit)@(test.Range.Length > 0 ? $"; reference {test.Range}" : null))</span></label>
+                    <label for="@id" title="@TestNames.Full(test.Code, test.Display)">@TestNames.Short(test.Code, test.Display) <span>(@(string.IsNullOrEmpty(test.Unit) ? "no unit" : Units.Shown(test.Unit))@(test.Range.Length > 0 ? $"; reference {test.Range}" : null))</span></label>
                     <input id="@id" class="sc-field__input" name="Values[@test.Code]" value="@Model.Values.GetValueOrDefault(test.Code)" inputmode="decimal" autocomplete="off" autofocus="@(first && filed.Count == 0 && !answered)"
                            aria-invalid="@(error is null ? null : "true")" aria-describedby="@(error is null ? null : id + "-error")">
                     @if (error is not null)
@@ -168,5 +166,5 @@ else
 }
 else if (order.Type == OrderType.Lab && order.Tests.Count == 0)
 {
-    <p class="sc-muted">This test has no result fields set up, so its results can't be entered here.</p>
+    <p class="sc-muted">No result fields set up for this test.</p>
 }

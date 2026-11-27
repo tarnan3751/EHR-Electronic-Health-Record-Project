@@ -11,25 +11,25 @@
 <h1>Sharing</h1>
 @if (Model.Done is "given")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Shared.</span> They can see your record when they sign in with that email address. We've emailed them a link to sign in, or to create an account.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Shared.</span></p>
 }
 else if (Model.Done is "removed")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sharing removed.</span> They can no longer see your record.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sharing stopped.</span></p>
 }
 else if (Model.Done is "changed")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved.</span> What they can see has changed.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved.</span></p>
 }
 
 <h2>Records shared with you</h2>
 @if (Model.Acting)
 {
-    <p class="sc-muted">You're looking at one of them now. Go back to your own record to choose another.</p>
+    <p class="sc-muted">To choose another, go back to your own record.</p>
 }
 else if (Model.Records.Count == 0)
 {
-    <p class="sc-muted">Nobody has shared a record with you.</p>
+    <p class="sc-muted">No records shared with you.</p>
 }
 else
 {
@@ -57,13 +57,13 @@ else
 <h2>Who can see your record</h2>
 @if (Model.Acting)
 {
-    <p class="sc-muted">You're looking at someone else's record. Go back to your own to see or change who can see yours.</p>
+    <p class="sc-muted">To see or change this, go back to your own record.</p>
 }
 else
 {
     @if (inForce.Count == 0)
     {
-        <p class="sc-muted">You haven't shared your record with anyone.</p>
+        <p class="sc-muted">Not shared with anyone.</p>
     }
     else
     {
@@ -77,7 +77,7 @@ else
                         @ProxyAccess.ScopeLabel(grant.Scope). Until @Clinic.Plain(grant.ExpiresAt, "MMM d, yyyy").
                         @(grant.ByClinic ? "Shared by your clinic." : "Shared by you.")
                     </p>
-                    <p class="sc-rows__meta">@(grant.IncludeSensitive ? "They can also see sensitive items, and see and fill in your pre-visit forms." : "They can't see sensitive items or your pre-visit forms.")</p>
+                    <p class="sc-rows__meta">@(grant.IncludeSensitive ? "Includes sensitive items and pre-visit forms." : "No sensitive items or pre-visit forms.")</p>
                     @if (OnPrem.IsReachable)
                     {
                         <div class="sc-actions">
@@ -104,14 +104,6 @@ else
     }
     else
     {
-        <div class="sc-prose sc-muted">
-            <p>For a family member or carer who helps with your care.</p>
-            <ul>
-                <li>They sign in with their own portal account, never yours.</li>
-                <li>We email them a link to sign in, or to create an account. The email doesn't say whose record it is.</li>
-                <li>Sharing ends after the time you choose, and you can stop it at any time.</li>
-            </ul>
-        </div>
         <form method="post" class="sc-form sc-formcard">
             @if (Model.Errors.Count > 0)
             {
@@ -143,7 +135,7 @@ else
             <div class="sc-field">
                 <label class="sc-check" for="access-sensitive"><input type="checkbox" id="access-sensitive" name="IncludeSensitive" value="true" checked="@Model.IncludeSensitive" aria-describedby="access-sensitive-hint"> Also share sensitive items</label>
                 @* Step 13e: pre-visit forms are sensitive items, and a proxy allowed them can answer them too. *@
-                <p class="sc-field__hint" id="access-sensitive-hint">Items your care team marked sensitive, and your pre-visit forms, which they can then fill in.</p>
+                <p class="sc-field__hint" id="access-sensitive-hint">Includes pre-visit forms, which they can fill in.</p>
             </div>
             <div class="sc-field">
                 <label for="access-days">For how long</label>

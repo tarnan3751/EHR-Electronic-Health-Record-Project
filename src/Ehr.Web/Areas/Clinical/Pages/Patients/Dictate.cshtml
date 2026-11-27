@@ -26,13 +26,13 @@
 <div class="sc-pagehead">
     <p><a asp-page="Chart" asp-all-route-data="chartRoute" class="sc-back">Back to chart</a></p>
 </div>
-<h1>Dictate a note: @Model.Patient.FamilyName, @Model.Patient.GivenName</h1>
+<h1>Dictate a note</h1>
 
 @if (!OnPrem.IsReachable)
 {
     @* The dictation service runs beside the on-prem app, so off-site with the clinic's server down there is nothing to
        send the audio to (UC 2). *@
-    <p class="sc-notice sc-notice--warning" data-dictation-offline><span class="sc-notice__state">Unavailable.</span> Dictation needs the clinic's server, which can't be reached. You can type the note once it's back.</p>
+    <p class="sc-notice sc-notice--warning" data-dictation-offline><span class="sc-notice__state">Dictation unavailable.</span></p>
 }
 else
 {
@@ -40,12 +40,11 @@ else
        what the on-prem app already holds; the cloud app doesn't hold it, and says nothing. Nothing else changes. *@
     @if (HttpContext.RequestServices.GetService(typeof(Ehr.Web.Api.Dictation.DictationSidecar)) is Ehr.Web.Api.Dictation.DictationSidecar { IsConfigured: false })
     {
-        <p class="sc-notice sc-notice--warning" data-dictation-not-set-up><span class="sc-notice__state">Unavailable.</span> Dictation isn't set up on this server. You can type the note.</p>
+        <p class="sc-notice sc-notice--warning" data-dictation-not-set-up><span class="sc-notice__state">Dictation unavailable.</span></p>
     }
     <section data-dictation data-dictation-api="@Ehr.Web.Api.Dictation.DictationApi.Path" data-patient-id="@Model.Patient.Id" data-draft-id="@Model.DraftId" data-draft-version="@Model.DraftVersion">
         @Html.AntiForgeryToken()
-        <p class="sc-notice sc-notice--info">Dictate in English or Spanish, with a microphone. Nothing goes into the note until you review it. The proposals and the transcript they came from are kept with your review. Orders and allergy changes are never filled in from dictation.</p>
-        <noscript><p class="sc-notice sc-notice--danger">Dictation needs JavaScript. You can still type the note.</p></noscript>
+        <noscript><p class="sc-notice sc-notice--danger">Dictation needs JavaScript.</p></noscript>
 
         @* The controls and the transcript beside the proposed fields, each in its frame. *@
         <div class="sc-review">
@@ -56,12 +55,12 @@ else
            the choice while a dictation is under way. Spanish is labelled experimental (the owner's ruling of
            2026-11-25): in its choice's words, and with a tag at the head of its hint. *@
         <div class="sc-field">
-            <label for="dictation-language">Language of this dictation</label>
+            <label for="dictation-language">Language</label>
             <select id="dictation-language" class="sc-field__input" autocomplete="off" data-dictation-language>
                 <option value="en" selected>English</option>
                 <option value="es">Spanish, experimental (proposals in English)</option>
             </select>
-            <p class="sc-field__hint" id="dictation-language-hint" data-dictation-language-hint hidden><span class="sc-tag sc-tag--warning">Experimental</span> Speak Spanish. The transcript stays in Spanish, and the proposed note is in English for you to check. You don't need to say punctuation. Up to 2 minutes in Spanish.</p>
+            <p class="sc-field__hint" id="dictation-language-hint" data-dictation-language-hint hidden><span class="sc-tag sc-tag--warning">Experimental</span> The transcript stays in Spanish; the proposed note is in English.</p>
         </div>
 
         @* "Dictate" is the page's one primary button; its shortcut is printed on it (js/dictation.js binds it). While
@@ -91,13 +90,13 @@ else
                 <span class="sc-transcript__rec" data-dictation-recording hidden>Recording</span>
             </div>
             <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder">Your words appear here as you speak.</p></div>
-            <p class="sc-transcript__note" data-dictation-unclear hidden>Highlighted passages may be wrong. They were too quiet or noisy, not heard as Spanish in a Spanish dictation, or the speech model wasn't sure. Say them again, or correct them during review.</p>
+            <p class="sc-transcript__note" data-dictation-unclear hidden>Highlighted passages may be wrong. Say them again, or correct them during review.</p>
         </section>
         </div>
 
         <div class="sc-sheet">
         <h2>Proposed fields</h2>
-        <p class="sc-status" data-dictation-sort-message>The fields are proposed once you stop.</p>
+        <p class="sc-status" data-dictation-sort-message></p>
         <dl class="sc-proposals">
             @foreach (var (key, label) in new[] { ("subjective", "Subjective"), ("objective", "Objective"), ("assessment", "Assessment"), ("plan", "Plan") })
             {
@@ -110,7 +109,7 @@ else
 
         <section class="sc-notice sc-notice--warning" data-dictation-not-carried hidden>
             <h3>Orders and allergy changes you dictated</h3>
-            <p>Dictation never places orders or changes the allergy list. Those marked proposed wait in the review, to open in their form. Place the others yourself.</p>
+            <p>Dictation never places orders or changes allergies. Place any not marked proposed yourself.</p>
             <ul data-dictation-not-carried-list></ul>
         </section>
         </div>

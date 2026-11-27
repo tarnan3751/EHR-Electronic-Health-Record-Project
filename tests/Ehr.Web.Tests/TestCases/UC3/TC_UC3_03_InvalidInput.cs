@@ -17,7 +17,7 @@ namespace Ehr.Web.Tests.TestCases.UC3;
 // Steps:
 //   1. Sign in as a clinician.
 //   2. Submit the search with every field empty.
-// Expected result: The page says "Enter a name, date of birth, or MRN", shows no "Search results", and lists no chart
+// Expected result: The page says "Enter a name, date of birth or MRN", shows no "Search results", and lists no chart
 //   link.
 // Creator: Diego Valenzuela
 public class TC_UC3_03_InvalidInput(WebApps apps)
@@ -39,7 +39,7 @@ public class TC_UC3_03_InvalidInput(WebApps apps)
         // Assert: The system should prompt the clinician
         // to provide identifying information.
         Assert.Contains(
-            "Enter a name, date of birth, or MRN",
+            "Enter a name, date of birth or MRN",
             html,
             StringComparison.OrdinalIgnoreCase);
 

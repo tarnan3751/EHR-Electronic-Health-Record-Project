@@ -15,10 +15,8 @@ public sealed record PatientChart(
     IReadOnlyList<ActiveOrder> Orders)
 {
     // UC 1: set when the chart was asked to confirm a discontinuation and that order is this patient's and
-    // discontinued: the order's name. Part of the same recorded read.
-    public string? DiscontinuedName { get; init; }
-
-    public bool ConfirmsDiscontinued => DiscontinuedName is not null;
+    // discontinued. Part of the same recorded read.
+    public bool ConfirmsDiscontinued { get; init; }
 
     // UC 1: set when the chart was asked to confirm an order just signed that replaced another (a change): the name
     // of the order it replaced. Part of the same recorded read.

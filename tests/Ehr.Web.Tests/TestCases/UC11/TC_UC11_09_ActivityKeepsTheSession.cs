@@ -160,6 +160,6 @@ public class TC_UC11_09_ActivityKeepsTheSession(WebApps apps) : IClassFixture<We
         await IdleAsync(apps, page, TimeSpan.FromMinutes(13));
         await page.WaitForSelectorAsync(OpenWarning);
         Assert.True(await page.IsVisibleAsync("[data-session-waiting]"));
-        Assert.Contains("The listening service discards a visit left like that for 10 minutes", await page.TextContentAsync("[data-session-waiting]"));
+        Assert.Contains("A paused visit is discarded after 10 minutes", await page.TextContentAsync("[data-session-waiting]"));
     }
 }

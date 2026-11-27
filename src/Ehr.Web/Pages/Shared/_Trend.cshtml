@@ -8,9 +8,9 @@
 @* One test's or vital sign's values over time (step 9; docs/brand: sc-trend). Drawn here as SVG: no script, colored
    by the stylesheet's tokens, the reference range as a band behind the line, values outside it marked by shape as well
    as color. For a child's blood pressure the band is what lies below its screening value, and a value at or above it
-   needs follow-up (step 9d; VitalFlag). The sentence under it says what it shows, and the table under that has every
-   number: the chart is never the only way to read them. The table has two narrow columns so it fits the card; the unit
-   is in the title. *@
+   needs follow-up (step 9d; VitalFlag). The sentence under it says what it shows (what the diamonds mean, for a screen
+   reader only: the drawing shows it), and the table under that has every number: the chart is never the only way to
+   read them. The table has two narrow columns so it fits the card; the unit is in the title. *@
 <figure class="sc-trend" data-trend="@Model.Code">
     <figcaption class="sc-trend__title">@Model.Title@(Model.Unit is null ? "" : $" ({Model.Unit})")</figcaption>
     <svg class="sc-trend__chart" viewBox="0 0 @Trend.Width @Trend.Height" role="img" aria-label="Chart of @Model.Title.ToLowerInvariant(), described under it" focusable="false">
@@ -33,7 +33,7 @@
             }
         }
     </svg>
-    <p class="sc-trend__summary">@(zoned ? Model.SummaryIn(Clinic) : Model.Summary)@(!Model.HasRange ? "" : Model.IsScreening ? " Values at or above the shaded band need follow-up and are diamonds." : " Values outside the shaded reference range are diamonds.")</p>
+    <p class="sc-trend__summary">@(zoned ? Model.SummaryIn(Clinic) : Model.Summary)@if (Model.HasRange) {<span class="sc-visually-hidden">@(Model.IsScreening ? " Values at or above the shaded band need follow-up and are diamonds." : " Values outside the shaded reference range are diamonds.")</span>}</p>
     <details class="sc-trend__values">
         <summary>The values as a table</summary>
         <div class="sc-table-wrap">
@@ -43,7 +43,7 @@
                     @foreach (var point in Model.Points.Reverse())
                     {
                         <tr>
-                            <td class="sc-table__mono">@(zoned ? Clinic.Format(point.At) : point.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm"))</td>
+                            <td class="sc-table__mono">@(zoned ? Clinic.Format(point.At) : point.At.UtcDateTime.ToString("MMM d, yyyy HH:mm"))</td>
                             <td class="sc-table__mono">@point.Value.ToString("0.####")@(point.Flag is null ? "" : point.Flag == VitalFlag.FollowUp ? ", needs follow-up" : ", outside the range")</td>
                         </tr>
                     }

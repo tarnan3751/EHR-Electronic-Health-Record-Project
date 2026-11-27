@@ -73,7 +73,7 @@ static class DraftSyncApi
             || request.BaseVersion is <= 0 || string.IsNullOrWhiteSpace(request.Body)
             || request.Body.Contains('\0') || Encoding.UTF8.GetByteCount(request.Body) > 65_536)
         {
-            return Results.Ok(new PushResult("invalid", Problem: "Enter a draft of up to 64 KiB."));
+            return Results.Ok(new PushResult("invalid", Problem: "Draft must have text, up to 64 KiB."));
         }
 
         // Scope receipts to the clinician, draft and operation, independently of the Quick text keys.

@@ -20,7 +20,6 @@
     Func<string, string?> current = start => here.StartsWith(start, StringComparison.Ordinal) ? "page" : null;
     // The session's page (step 18), which session.js asks: the portal's sign-in on its pages, the staff's on the rest.
     var sessionPage = isPatient ? "/portal/session" : "/session";
-    var keeps = isPatient ? "your health information" : "patient information";
     var button = isPatient ? "sc-btn sc-btn--portal" : "sc-btn";
 }
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
@@ -158,7 +157,7 @@
     {
         @* FR-34: off-site, with the clinic's server down, records can still be read but nothing can be saved. The band
            runs the full width under the app bar on every page; its words start where the app bar's do. *@
-        <p class="sc-notice sc-notice--warning sc-notice--band" role="status"><span class="sc-band__line"><span class="sc-notice__state">Read-only.</span> The clinic's server can't be reached, so nothing can be saved until it's back. The newest changes may not show yet.</span></p>
+        <p class="sc-notice sc-notice--warning sc-notice--band" role="status"><span class="sc-band__line"><span class="sc-notice__state">Read-only.</span> The clinic's server can't be reached.</span></p>
     }
     @if (acting is not null)
     {
@@ -207,11 +206,11 @@
                 data-session-home="@(isPatient ? "/portal" : "/")" data-session-choose="/portal/choose" data-session-acting-url="/portal/acting">
             <h2 class="sc-dialog__title" id="session-warning-title">You'll be signed out soon</h2>
             <div id="session-warning-text">
-                <p data-session-idle-text>Nothing has been done here for a while. To keep @keeps safe, you'll be signed out in <span data-session-countdown>2:00</span> unless you stay signed in.</p>
-                <p data-session-final-text hidden>A sign-in lasts at most 12 hours, and yours ends in <span data-session-countdown>2:00</span>. Save what you're doing, then sign in again.</p>
-                <p data-session-typed hidden>If you're signed out, what you've typed on this page is kept until you sign in again.</p>
-                <p data-session-unreachable hidden>The server couldn't be reached, so you may still be signed out. Check the connection, then select Stay signed in again.</p>
-                <p data-session-waiting hidden>The visit on this page is paused, or waiting for its voices to be named. The listening service discards a visit left like that for 10 minutes, whether or not you stay signed in.</p>
+                <p data-session-idle-text>You'll be signed out in <span data-session-countdown>2:00</span>.</p>
+                <p data-session-final-text hidden>Your 12-hour sign-in ends in <span data-session-countdown>2:00</span>. Save your work.</p>
+                <p data-session-typed hidden>What you've typed is kept if you're signed out.</p>
+                <p data-session-unreachable hidden>The server can't be reached. Check the connection and try again.</p>
+                <p data-session-waiting hidden>A paused visit is discarded after 10 minutes, even if you stay signed in.</p>
             </div>
             <div class="sc-dialog__actions">
                 <button type="button" class="@button sc-btn--primary" data-session-stay>Stay signed in</button>
@@ -226,11 +225,11 @@
         <template data-session-ended>
             <main id="main" class="sc-page sc-page--form sc-signed-out">
                 <h1 data-session-ended-heading>Signed out</h1>
-                <p class="sc-notice sc-notice--info" data-session-why="idle"><span class="sc-notice__state">Signed out.</span> Nothing was done here for 15 minutes, so you were signed out to keep @keeps safe.</p>
-                <p class="sc-notice sc-notice--info" data-session-why="longest"><span class="sc-notice__state">Signed out.</span> A sign-in lasts at most 12 hours.</p>
-                <p class="sc-notice sc-notice--info" data-session-why="ended"><span class="sc-notice__state">Signed out.</span> This sign-in has ended, in this window or another.</p>
-                <p class="sc-notice sc-notice--info" data-session-why="signed-out"><span class="sc-notice__state">Signed out.</span> You signed out.</p>
-                <p data-session-kept>What you typed is kept in this tab and comes back when you sign in again. If anyone else signs in here, it's cleared.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="idle"><span class="sc-notice__state">Signed out.</span> No activity for 15 minutes.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="longest"><span class="sc-notice__state">Signed out.</span> The 12-hour sign-in limit was reached.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="ended"><span class="sc-notice__state">Signed out.</span> This sign-in has ended.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="signed-out"><span class="sc-notice__state">Signed out.</span></p>
+                <p data-session-kept>Sign in again in this tab to get back what you typed.</p>
                 <p><button type="button" class="@button sc-btn--primary" data-session-sign-in>Sign in again</button></p>
                 <iframe class="sc-signed-out__frame" title="Sign in again" data-session-frame hidden></iframe>
             </main>

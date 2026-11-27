@@ -27,8 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. With the link down, open the results; post platelets 300 and an acknowledgment from the page that was open.
 //   3. With the link back, acknowledge off-site.
 // Expected result: Step 1: the read arrives on the clinic's server with source "cloud"; the post is forwarded and the
-//   result filed. Step 2: the page shows the result and says "Results can't be entered until the clinic's server is
-//   back." and "Not acknowledged. Results can't be acknowledged until the clinic's server is back.", with no form or
+//   result filed. Step 2: the page shows the result, the read-only band and "Not acknowledged.", with no form or
 //   button; both posts are answered 503 and nothing is saved. Step 3: forwarded, and the acknowledgment is recorded.
 // Creator: Tahseen Arnan
 public class TC_UC1_15_ResultsExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
@@ -53,8 +52,8 @@ public class TC_UC1_15_ResultsExceptionalCondition(WebApps apps) : IClassFixture
         var cutOff = Client(apps.CloudCutOff, session.Jar);
         var readOnly = await cutOff.GetStringAsync(path, Cancel);
         Assert.Contains("13.5 g/dL", readOnly);
-        Assert.Contains("Results can't be entered until the clinic's server is back.", readOnly);
-        Assert.Contains("Not acknowledged. Results can't be acknowledged until the clinic's server is back.", readOnly);
+        Assert.Contains("sc-notice--band", readOnly);
+        Assert.Contains("Not acknowledged.", readOnly);
         Assert.DoesNotContain("data-file-results", readOnly);
         Assert.DoesNotContain("data-acknowledge", readOnly);
         foreach (var target in new[] { path, path + "?handler=Acknowledge" })

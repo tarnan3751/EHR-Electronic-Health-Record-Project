@@ -35,7 +35,7 @@
             tag.className = proposal.state === "pending" ? "sc-tag sc-tag--warning"
                 : proposal.state === "accepted" || proposal.state === "edited" ? "sc-tag sc-tag--success" : "sc-tag";
             card.querySelector("[data-approved-value]").textContent = proposal.state === "rejected"
-                ? "Rejected. Nothing from it will be added." : proposal.approvedValue ? `Approved value: ${proposal.approvedValue}` : "";
+                ? "Rejected." : proposal.approvedValue ? `Approved value: ${proposal.approvedValue}` : "";
             const controls = card.querySelector("[data-review-controls]");
             if (controls) controls.hidden = proposal.state !== "pending";
         }
@@ -81,7 +81,7 @@
             render();
         } catch {
             status.textContent = "Not saved";
-            showErrors(["The clinic's server didn't confirm this decision. Your edited text is still here. Try again. It won't be recorded twice."]);
+            showErrors(["The clinic's server didn't confirm this decision. Try again."]);
         } finally {
             busy = false;
             buttons().forEach(button => { button.disabled = false; });
@@ -105,11 +105,11 @@
             });
             const result = await response.json();
             if (response.ok && result.url) { window.location.assign(result.url); return; }
-            showErrors(result.errors || [result.message || "The dictation couldn't be retrieved. Your saved draft is unchanged. Try again, or write the note yourself."]);
+            showErrors(result.errors || [result.message || "The dictation couldn't be retrieved. Try again."]);
             status.textContent = "Not retrieved";
         } catch {
             status.textContent = "Not retrieved";
-            showErrors(["The clinic's server couldn't retrieve the dictation. Your saved draft is unchanged. Try again, or discard the dictation and write the note yourself."]);
+            showErrors(["The clinic's server couldn't retrieve the dictation. Try again, or discard it."]);
         } finally { busy = false; }
     });
     window.addEventListener("beforeunload", event => {

@@ -129,7 +129,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForFunctionAsync("typeof window.__heldUpload === 'function'");
         await TabToAsync(page, "[data-dictation-cancel]");
         await page.Keyboard.PressAsync("Enter");
-        const string Discarded = "Dictation discarded. The draft is kept, with nothing from the dictation in it.";
+        const string Discarded = "Dictation discarded.";
         await page.WaitForFunctionAsync("words => document.querySelector('[data-dictation-status]').textContent === words", Discarded);
         Assert.Contains(await AmbientBrowserTests.EventsAsync(page), e => e.StartsWith("DELETE ", StringComparison.Ordinal) && e.EndsWith(" 204", StringComparison.Ordinal));
 
@@ -431,11 +431,12 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
 
         await page.Keyboard.PressAsync("Enter");
         await page.Keyboard.PressAsync("Tab");
-        Assert.StartsWith("Dictation in Spanish and review saved ", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.StartsWith("Dictation in Spanish reviewed ", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/review/*");
         var reopened = page.Url;
-        Assert.Contains("Signed. This review is read-only.", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Signed.", await page.Locator("main").TextContentAsync());
+        Assert.Equal(0, await page.Locator("[data-review-controls]").CountAsync());
         await TabToAsync(page, "[data-dictation-field=plan] .sc-translation__pair");
         Assert.Equal(plan.Spanish, await HighlightedAsync(page));
         await TabToAsync(page, "[data-dictation-field=subjective] .sc-translation__pair:nth-child(2)");

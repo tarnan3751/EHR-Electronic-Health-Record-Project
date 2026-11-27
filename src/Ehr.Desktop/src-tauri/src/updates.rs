@@ -160,12 +160,12 @@ impl Updates {
         }
     }
 
-    /// Get it ready: downloaded and checked, then on macOS installed on disk for the next start, and elsewhere held
+    /// Download update: downloaded and checked, then on macOS installed on disk for the next start, and elsewhere held
     /// for Restart now.
     pub async fn accept(&self) -> Result<(), String> {
         let update = held(&self.update)
             .clone()
-            .ok_or_else(|| "There is no update to get ready.".to_owned())?;
+            .ok_or_else(|| "No update available.".to_owned())?;
         let version = update.version.clone();
         self.offer(Offer::Downloading {
             version: version.clone(),
@@ -188,8 +188,7 @@ impl Updates {
             }
             Err(error) => {
                 let problem = format!(
-                    "SwiftChart {version} couldn't be downloaded or installed, or its signature didn't match. \
-                     Nothing was changed ({error})."
+                    "SwiftChart {version} couldn't be downloaded, verified or installed ({error})."
                 );
                 self.offer(Offer::Failed {
                     problem: problem.clone(),
@@ -203,7 +202,7 @@ impl Updates {
     /// macOS the new one is on disk already, and the app starts again.
     pub fn restart(&self, handle: &AppHandle) -> Result<(), String> {
         if !matches!(*held(&self.offer), Some(Offer::Ready { .. })) {
-            return Err("There is no update ready to install.".to_owned());
+            return Err("No update ready to install.".to_owned());
         }
         if let (Some(update), Some(bytes)) =
             (held(&self.update).clone(), held(&self.downloaded).take())

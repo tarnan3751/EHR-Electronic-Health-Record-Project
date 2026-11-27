@@ -19,9 +19,9 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Steps:
 //   1. As the first clinician, record each of the five in turn.
 //   2. As the second clinician, open the patient's vital signs, and post a set to it.
-// Expected result: Step 1: each is answered 422 with "Not saved." and, in turn, "Enter both numbers of the blood
-//   pressure.", "Enter a number, like 36.8.", "Enter a value from 20 to 45 °C.", "Enter at least one
-//   vital sign." and "The time can't be in the future."; what was typed is still in the form; nothing is saved. Step
+// Expected result: Step 1: each is answered 422 with "Not saved." and, in turn, "Both blood pressure numbers
+//   are required.", "Heart rate must be a number.", "Temperature must be 20 to 45 °C.", "At least one vital sign
+//   is required." and "Taken must not be in the future."; what was typed is still in the form; nothing is saved. Step
 //   2: both are sent back to the chart, and nothing is saved.
 // Creator: Tahseen Arnan
 public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture<WebApps>
@@ -37,11 +37,11 @@ public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture
 
         foreach (var (values, at, message) in new ((string, string)[] Values, string At, string Message)[]
         {
-            ([(Systolic, "148")], now, "Enter both numbers of the blood pressure."),
-            ([(HeartRate, "fast")], now, "Enter a number, like 36.8."),
-            ([(Temperature, "60")], now, "Enter a value from 20 to 45 °C."),
-            ([], now, "Enter at least one vital sign."),
-            ([(HeartRate, "72")], tomorrow, "The time can't be in the future."),
+            ([(Systolic, "148")], now, "Both blood pressure numbers are required."),
+            ([(HeartRate, "fast")], now, "Heart rate must be a number."),
+            ([(Temperature, "60")], now, "Temperature must be 20 to 45 °C."),
+            ([], now, "At least one vital sign is required."),
+            ([(HeartRate, "72")], tomorrow, "Taken must not be in the future."),
         })
         {
             using var refused = await RecordAtAsync(session.Client, patient, at, values);

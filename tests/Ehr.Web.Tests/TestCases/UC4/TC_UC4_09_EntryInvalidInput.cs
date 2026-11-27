@@ -23,11 +23,11 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   1. Save a diagnosis with no name; then with the made-up name.
 //   2. Save the real diagnosis with each bad onset date; then with the status "deleted".
 //   3. Save a medication whose stop date is before its start date.
-//   4. Save the allergy with each bad severity, risk and reaction.
-// Expected result: Each is answered 422 with "Not saved." and, in turn: "Enter the diagnosis."; "Choose a diagnosis
-//   from the list."; "Enter a date that exists and isn't in the future, as year-month-day." (twice); "Choose a
-//   status."; "The stop date is before the start date."; "Choose a severity."; "Choose a risk."; "Shorten this to
-//   200 characters or fewer." The name typed is still in its field, marked invalid where it is the problem, and the
+//   4. Save the allergy with each bad severity, criticality and reaction.
+// Expected result: Each is answered 422 with "Not saved." and, in turn: "Diagnosis is required."; "Diagnosis must
+//   be selected from the list."; "Onset must be a real date, not in the future." (twice); "Status is required.";
+//   "Stopped must be on or after Started."; "Severity must be selected from the list."; "Criticality must be
+//   selected from the list."; "Reaction must be 200 characters or less." The name typed is still in its field, marked invalid where it is the problem, and the
 //   field at fault is marked invalid. No row exists in any of the three lists.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_09_EntryInvalidInput(WebApps apps) : IClassFixture<WebApps>
@@ -42,11 +42,11 @@ public class TC_UC4_09_EntryInvalidInput(WebApps apps) : IClassFixture<WebApps>
 
         foreach (var (fields, message) in new ((string, object)[] Fields, string Message)[]
         {
-            ([("Name", ""), ("Status", "active")], "Enter the diagnosis."),
-            ([("Name", "Synthetic made-up disease"), ("Status", "active")], "Choose a diagnosis from the list."),
-            ([("Name", real), ("Status", "active"), ("Onset", "2024-02-30")], "Enter a date that exists and isn&#x27;t in the future, as year-month-day."),
-            ([("Name", real), ("Status", "active"), ("Onset", "2999-01-01")], "Enter a date that exists and isn&#x27;t in the future, as year-month-day."),
-            ([("Name", real), ("Status", "deleted")], "Choose a status."),
+            ([("Name", ""), ("Status", "active")], "Diagnosis is required."),
+            ([("Name", "Synthetic made-up disease"), ("Status", "active")], "Diagnosis must be selected from the list."),
+            ([("Name", real), ("Status", "active"), ("Onset", "2024-02-30")], "Onset must be a real date, not in the future."),
+            ([("Name", real), ("Status", "active"), ("Onset", "2999-01-01")], "Onset must be a real date, not in the future."),
+            ([("Name", real), ("Status", "deleted")], "Status is required."),
         })
         {
             using var refused = await SaveAsync(session.Client, patient, "diagnoses", null, fields);
@@ -67,13 +67,13 @@ public class TC_UC4_09_EntryInvalidInput(WebApps apps) : IClassFixture<WebApps>
         using var dates = await SaveAsync(session.Client, patient, "medications", null,
             ("Name", "lisinopril 10 MG Oral Tablet"), ("Status", "stopped"), ("Started", "2024-06-01"), ("Stopped", "2024-01-01"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, dates.StatusCode);
-        Assert.Contains("The stop date is before the start date.", await dates.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("Stopped must be on or after Started.", await dates.Content.ReadAsStringAsync(Cancel));
 
         foreach (var (field, value, id, message) in new[]
         {
-            ("Severity", "extreme", "entry-severity", "Choose a severity."),
-            ("Criticality", "certain", "entry-criticality", "Choose a risk."),
-            ("Reaction", new string('x', 201), "entry-reaction", "Shorten this to 200 characters or fewer."),
+            ("Severity", "extreme", "entry-severity", "Severity must be selected from the list."),
+            ("Criticality", "certain", "entry-criticality", "Criticality must be selected from the list."),
+            ("Reaction", new string('x', 201), "entry-reaction", "Reaction must be 200 characters or less."),
         })
         {
             using var refused = await SaveAsync(session.Client, patient, "allergies", null, ("Name", "Peanut"), ("Status", "active"), (field, value));

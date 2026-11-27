@@ -35,7 +35,7 @@ public class NotFoundPageTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
             var html = await response.Content.ReadAsStringAsync(Cancel);
             Assert.Contains("<title>Page not found</title>", html);
-            Assert.Contains("There's nothing to show at this address.", Words(html));
+            Assert.Contains("<h1>Page not found</h1>", html);
             // The clinic's app bar, signed in, and its session warning, as on every signed-in page.
             Assert.Contains("sc-appbar--clinician", html);
             Assert.Contains("data-session-warning", html);
@@ -59,7 +59,7 @@ public class NotFoundPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.NotFound, lost.StatusCode);
         var html = await lost.Content.ReadAsStringAsync(Cancel);
         Assert.Contains("<title>Page not found</title>", html);
-        Assert.Contains("There's nothing to show at this address.", Words(html));
+        Assert.Contains("<h1>Page not found</h1>", html);
         Assert.Contains("sc-appbar--portal", html);
         Assert.Contains("<a href=\"/portal\">Back to home</a>", html);
     }

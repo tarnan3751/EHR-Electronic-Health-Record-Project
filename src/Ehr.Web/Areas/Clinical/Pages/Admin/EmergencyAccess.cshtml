@@ -4,7 +4,7 @@
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["UseHtmx"] = false;
-    ViewData["Title"] = "Emergency access to review";
+    ViewData["Title"] = "Break-the-glass access";
     var access = Model.Access;
     var review = access.Review;
     var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
@@ -17,18 +17,17 @@
    left, the review beside them on the right, which a narrow window puts under them. *@
 <div class="sc-pagehead">
     <a class="sc-back" asp-page="/Inbox/Index">Back to inbox</a>
-    <a asp-page="Audit" asp-route-flagged="true">Emergency access in the audit log</a>
+    <a asp-page="Audit" asp-route-flagged="true">Audit log</a>
 </div>
-<h1>Emergency access @if (review is null) {<span class="sc-tag sc-tag--danger">Review</span>} else {<span class="sc-tag">Reviewed</span>}</h1>
-<p class="sc-lede">Check that the chart was needed. The patient is shown by ID only, since administrators can't see patient data.</p>
+<h1>Break-the-glass access @if (review is null) {<span class="sc-tag sc-tag--danger">Review</span>} else {<span class="sc-tag">Reviewed</span>}</h1>
 @if (review is null && !ended)
 {
     @* Said at the top, with the time, so nobody looks for the form while the access lasts. *@
-    <p class="sc-notice sc-notice--info" data-review-in-force><span class="sc-notice__state">In force until @Utc(access.ExpiresAt).</span> It can be marked reviewed once it ends, so the review covers everything done under it.</p>
+    <p class="sc-notice sc-notice--info" data-review-in-force><span class="sc-notice__state">In force until @Utc(access.ExpiresAt).</span> Review it once it ends.</p>
 }
 @if (Model.Reviewed && review is not null)
 {
-    <p class="sc-notice sc-notice--success" role="status" data-review-saved><span class="sc-notice__state">Reviewed.</span> It's done in every administrator's inbox.</p>
+    <p class="sc-notice sc-notice--success" role="status" data-review-saved><span class="sc-notice__state">Reviewed.</span></p>
 }
 @if (Model.Problem is { } problem)
 {
@@ -49,7 +48,6 @@
             <dd><span class="sc-note__text">@access.Reason</span></dd>
         </dl>
         <h2>What they did</h2>
-        <p class="sc-muted">What this clinician viewed or changed for this patient while the access lasted, from the audit log. Never the values.</p>
         @if (access.Events.Count == 0)
         {
             <p class="sc-empty">No events.</p>
@@ -59,14 +57,14 @@
             <div class="sc-table-wrap">
                 <table class="sc-table" data-access-events>
                     <thead>
-                        <tr><th scope="col" class="sc-table__fit">When (UTC)</th><th scope="col" class="sc-table__fit">What</th><th scope="col" class="sc-table__fit">Part</th><th scope="col">Row</th><th scope="col" class="sc-table__fit">Site</th></tr>
+                        <tr><th scope="col" class="sc-table__fit">When (UTC)</th><th scope="col" class="sc-table__fit">Action</th><th scope="col" class="sc-table__fit">Part</th><th scope="col">Record</th><th scope="col" class="sc-table__fit">Site</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var e in access.Events)
                         {
                             <tr>
                                 <td class="sc-table__mono">@e.OccurredAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                <td>@(e.Action == AuditActions.BreakGlass ? "Emergency access" : e.Action)</td>
+                                <td>@AuditModel.ActionName(e.Action)</td>
                                 @if (e.Part is { } part) { <td class="sc-table__mono">@part</td> } else { <td class="sc-table__muted">—</td> }
                                 @if (e.TableName is { } table) { <td class="sc-table__id">@table @e.RowId</td> } else { <td class="sc-table__muted">—</td> }
                                 <td>@(e.Source == AuditSources.Cloud ? "Off-site" : "On-site")</td>
@@ -94,11 +92,11 @@
         }
         else if (access.ClinicianId == userId)
         {
-            <p class="sc-notice sc-notice--info" data-review-own><span class="sc-notice__state">Your own emergency access.</span> Another administrator reviews it.</p>
+            <p class="sc-notice sc-notice--info" data-review-own><span class="sc-notice__state">Your own access.</span> Another administrator reviews it.</p>
         }
         else if (!OnPrem.IsReachable)
         {
-            <p class="sc-muted" data-review-offline>Marking an access reviewed needs the clinic's server. The access remains readable.</p>
+            <p class="sc-muted" data-review-offline>Marking an access reviewed needs the clinic's server.</p>
         }
         else
         {
@@ -117,14 +115,14 @@
                 <div class="sc-field">
                     <label for="review-note" class="sc-field__label">Note</label>
                     <textarea id="review-note" class="sc-field__input" name="Note" rows="4" maxlength="500" required
-                              aria-invalid="@(Model.Errors.ContainsKey("Note") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Note") ? "review-note-error review-note-hint" : "review-note-hint")">@Model.Note</textarea>
+                              aria-invalid="@(Model.Errors.ContainsKey("Note") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Note") ? "review-note-error" : null)">@Model.Note</textarea>
                     @if (Model.Errors.TryGetValue("Note", out var noteError))
                     {
                         <p class="sc-field__error" id="review-note-error">@noteError</p>
                     }
-                    <p class="sc-field__hint" id="review-note-hint">What you checked and found, in 10 to 500 characters. It's kept with the review and can't be changed. The clinician doesn't see it.</p>
                 </div>
-                <button class="sc-btn sc-btn--primary">Mark reviewed</button>
+                <p class="sc-muted" id="review-done-note">This can't be undone.</p>
+                <button class="sc-btn sc-btn--primary" aria-describedby="review-done-note">Mark reviewed</button>
             </form>
         }
     </section>

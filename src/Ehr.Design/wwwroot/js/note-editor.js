@@ -88,7 +88,7 @@
                 setStatus(revision === savedRevision ? 'Saved' : 'Unsaved changes');
             } catch {
                 setStatus('Not saved');
-                showErrors(['The clinic\'s server didn\'t confirm this save. Your text is still here. Select Save draft to try again.']);
+                showErrors(['The clinic\'s server didn\'t confirm this save. Select Save draft to try again.']);
             }
         })();
         pending = operation;
@@ -154,7 +154,7 @@
                 offer.hidden = true;
                 objective.focus();
                 objective.setSelectionRange(objective.value.length, objective.value.length);
-                vitalsStatus.textContent = 'Vital signs added to Objective. Check them before signing.';
+                vitalsStatus.textContent = 'Vital signs added to Objective.';
             });
         }
         form.addEventListener('submit', async event => {

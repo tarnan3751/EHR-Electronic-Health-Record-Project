@@ -68,10 +68,10 @@ public class AccessModel(PhiReader phi, ProxyAccess access, ProxyInvitations inv
                         Links.Build(addresses.Value.PortalBaseUrl, $"/portal/invitation?code={code}"), HttpContext.RequestAborted);
                     return RedirectToPage(new { done = "given" });
                 case GiveResult.Yourself:
-                    errors["Email"] = "That's your own email address. Enter the other person's.";
+                    errors["Email"] = "Enter the other person's email address, not your own.";
                     break;
                 case GiveResult.TooMany:
-                    errors["Email"] = "You've shared your record with as many people as the portal allows. Stop sharing with one first.";
+                    errors["Email"] = "You can't share with anyone else. Stop sharing with someone first.";
                     break;
                 default:
                     errors["Email"] = "Your record couldn't be shared. Try again, or contact the clinic.";

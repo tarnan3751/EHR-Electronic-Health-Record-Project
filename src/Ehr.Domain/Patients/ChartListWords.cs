@@ -41,7 +41,7 @@ public static class ChartListWords
     public static readonly IReadOnlyList<(string Code, string Name)> Severities =
         [(AllergySeverity.Mild, "Mild"), (AllergySeverity.Moderate, "Moderate"), (AllergySeverity.Severe, "Severe")];
 
-    // The chart tags a high one "High risk"; the form asks for the "Risk from another exposure".
+    // The chart tags a high one "High risk"; the form asks for the "Criticality".
     public static readonly IReadOnlyList<(string Code, string Name)> Criticalities =
         [(AllergyCriticality.Low, "Low risk"), (AllergyCriticality.High, "High risk"), (AllergyCriticality.UnableToAssess, "Unable to assess")];
 

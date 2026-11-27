@@ -24,11 +24,10 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. Change the dose, give the reason and choose "Sign changed order".
 //   3. Open the address the answer gives (the chart), then "Discontinued orders".
 //   4. Sign a Lisinopril order; then change the new Metformin order's item to Lisinopril and sign, with no reason for
-//      ordering it again; then sign again with one.
+//      the duplicate order; then sign again with one.
 // Expected result: The change form is titled "Change order", shows "Order being changed." with the old order, opens filled with
 //   its item and details, offers no choice of type, and its button says "Sign changed order". Step 2 is answered 200
-//   with no duplicate warning. The chart says "Order changed. Metformin 500 mg tablet replaces Metformin 500 mg
-//   tablet" and lists one active Metformin order, dose 1000 mg. The old order is revoked with
+//   with no duplicate warning. The chart says "Order changed." and lists one active Metformin order, dose 1000 mg. The old order is revoked with
 //   the reason and names the new order; the new order names the old one; the discontinued list shows the old order
 //   with a "Changed" tag. In step 4 the first attempt is answered 422 with the duplicate warning and nothing changes;
 //   the second saves, and the Metformin order is discontinued with the default reason "Replaced by a changed order".
@@ -44,7 +43,7 @@ public class TC_UC1_08_ChangeAlternativeFlow(WebApps apps) : IClassFixture<WebAp
         var old = await SignedAsync(session.Client, patient, "medication", "Metformin 500 mg tablet", Metformin("500 mg"));
 
         var form = await session.Client.GetStringAsync(ChangePath(patient, "medication", old), Cancel);
-        Assert.Contains("Change order: Orderable, Synthetic", form);
+        Assert.Contains("<h1>Change order</h1>", form);
         Assert.Contains("data-order-replaces", form);
         Assert.Contains("Order being changed. Metformin 500 mg tablet Dose: 500 mg; Route: By mouth; Frequency: Twice a day", Words(form));
         Assert.Contains("name=\"Item\" value=\"Metformin 500 mg tablet\"", form);
@@ -59,7 +58,7 @@ public class TC_UC1_08_ChangeAlternativeFlow(WebApps apps) : IClassFixture<WebAp
         var replacement = Guid.Parse(System.Web.HttpUtility.ParseQueryString(new Uri(Base, url).Query)["ordered"]!);
 
         var chart = await session.Client.GetStringAsync(url, Cancel);
-        Assert.Contains("Order changed. Metformin 500 mg tablet replaces Metformin 500 mg tablet,", Words(chart));
+        Assert.Contains("Order changed.", Words(chart));
         Assert.Contains("Dose: 1000 mg", chart);
         Assert.DoesNotContain("Dose: 500 mg", chart);
         Assert.Equal(1, await ActiveAsync(apps, patient));

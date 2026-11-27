@@ -6,20 +6,20 @@
 <h1>Create your portal account</h1>
 @if (Model.State == "created")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Account created.</span> <a asp-page="SignIn">Sign in</a> with the email address the invitation was sent to and your new password.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Account created.</span> <a asp-page="SignIn">Sign in</a> with the email address the invitation was sent to.</p>
 }
 else if (Model.State == "has-account")
 {
-    <p class="sc-notice sc-notice--info">You already have a portal account with this email address. <a asp-page="SignIn">Sign in</a> to see the record that was shared with you. If you've forgotten your password, you can <a asp-page="Forgot">reset it</a>.</p>
+    <p class="sc-notice sc-notice--info">You already have a portal account. <a asp-page="SignIn">Sign in</a> to see the shared record.</p>
 }
 else if (Model.State == "invalid")
 {
-    <p class="sc-notice sc-notice--danger">This invitation link isn't valid any more. It works once and expires after 7 days. Ask the person who shared their record with you, or their clinic, to share it again.</p>
-    <p>Already have an account? <a asp-page="SignIn">Sign in</a>.</p>
+    <p class="sc-notice sc-notice--danger">This invitation has expired or has been used. Ask the person who shared their record to share it again.</p>
+    <p>Already have an account? <a asp-page="SignIn">Sign in</a></p>
 }
 else
 {
-    <p>Someone shared their record with you. Create an account to see it. It uses the email address the invitation was sent to, and has no record of its own.</p>
+    <p>Create an account to see the record shared with you.</p>
     <form method="post" class="sc-form">
         <input type="hidden" asp-for="Input.Code">
         <div class="sc-field">

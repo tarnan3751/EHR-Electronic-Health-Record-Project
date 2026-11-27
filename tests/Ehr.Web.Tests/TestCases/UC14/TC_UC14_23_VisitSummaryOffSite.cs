@@ -25,9 +25,8 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   2. On the app that is cut off, open the note, its summary page and the standing summary's withdraw page, and post a
 //      second summary as the browser would.
 // Expected result: Step 1: each post is forwarded and saved once, under the clinician. Step 2: the note shows the
-//   standing summary and the withdrawn one, with "A summary can't be released until the clinic's server is back." and
-//   no link to write or withdraw; the summary page has the same sentence and no form; the withdraw page says "A summary
-//   can't be withdrawn until the clinic's server is back." and has no form; the post is answered 503, shows the text
+//   standing summary and the withdrawn one, under the read-only band, and no link to write
+//   or withdraw; the summary page and the withdraw page have the band and no form; the post is answered 503, shows the text
 //   typed, and saves nothing.
 // Creator: Tahseen Arnan
 public class TC_UC14_23_VisitSummaryOffSite(WebApps apps) : IClassFixture<WebApps>
@@ -68,14 +67,14 @@ public class TC_UC14_23_VisitSummaryOffSite(WebApps apps) : IClassFixture<WebApp
         var readOnly = await cutOff.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.Contains(TalkedAbout, readOnly);
         Assert.Contains("<s>We talked about it off-site.</s>", readOnly);
-        Assert.Contains("A summary can't be released until the clinic's server is back.", Words(readOnly));
+        Assert.Contains("sc-notice--band", readOnly);
         Assert.DoesNotContain("data-write-summary", readOnly);
         Assert.DoesNotContain("data-withdraw-summary", readOnly);
         var form = await cutOff.GetStringAsync(SummaryPath(patient, note), Cancel);
-        Assert.Contains("A summary can't be released until the clinic's server is back.", Words(form));
+        Assert.Contains("sc-notice--band", form);
         Assert.DoesNotContain("data-release-summary", form);
         var withdrawForm = await cutOff.GetStringAsync(WithdrawPath(patient, note, standing), Cancel);
-        Assert.Contains("A summary can't be withdrawn until the clinic's server is back.", Words(withdrawForm));
+        Assert.Contains("sc-notice--band", withdrawForm);
         Assert.DoesNotContain("data-withdraw-summary", withdrawForm);
 
         // As the browser sends its own form (Sec-Fetch-Site), which is what lets the page show the text again.

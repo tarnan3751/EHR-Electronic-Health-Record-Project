@@ -40,10 +40,11 @@ public sealed record ObjectiveVitals(string? Day, bool Today, string Text)
         }
 
         // One time for the set when every value shares it; otherwise each value's own.
+        var shown = clinic.Plain(latest, "MMM d, yyyy");
         var text = values.Select(value => value.TakenAt).Distinct().Count() == 1
             ? $"Vital signs, {clinic.Format(values[0].TakenAt)}: {string.Join(", ", values.Select(value => value.Text))}."
-            : $"Vital signs, {day}: {string.Join("; ", values.Select(value => $"{value.Text} at {clinic.Format(value.TakenAt, "HH:mm")}"))}.";
-        return new(day, day == clinic.Day(clinic.Now), text);
+            : $"Vital signs, {shown}: {string.Join("; ", values.Select(value => $"{value.Text} at {clinic.Format(value.TakenAt, "HH:mm")}"))}.";
+        return new(shown, day == clinic.Day(clinic.Now), text);
     }
 
     static string Shown(string name, string value, string? unit) =>

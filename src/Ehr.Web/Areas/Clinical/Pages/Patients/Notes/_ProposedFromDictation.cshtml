@@ -4,9 +4,9 @@
    recognition's, which may have misheard them) and marked in what they said around them, with what was heard after
    them (step 15.1), to check every field against. *@
 <section class="sc-notice sc-notice--warning" data-proposed-from-dictation="@Model.Row.Id" aria-labelledby="proposed-from-dictation">
-    <p id="proposed-from-dictation"><span class="sc-notice__state">Proposed from dictation.</span> Check every field. Nothing here was filled in from it. @(Model.IsOrder
-        ? "It opens one order. Order anything else it names from the chart."
-        : "It adds one allergy. Add anything else it names from the chart.")</p>
+    <p id="proposed-from-dictation"><span class="sc-notice__state">Proposed from dictation.</span> Nothing is filled in from it. @(Model.IsOrder
+        ? "One order only."
+        : "One allergy only.")</p>
     <p class="sc-proposal__value" data-proposed-words><span class="sc-proposal__field">As heard:</span> @Model.Before<mark class="sc-transcript__source">@Model.Words</mark>@Model.After</p>
     @if (Model.HeardAfter.Length > 0)
     {

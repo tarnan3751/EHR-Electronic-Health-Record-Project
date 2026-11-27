@@ -145,9 +145,8 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
         {
             var page = await coded.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, coded.StatusCode);
-            Assert.Equal(
-                [("summary-talked-about", "summary-hint", ""), ("summary-found", "summary-error-0 summary-error-1 summary-hint", "true"), ("summary-next-steps", "summary-hint", "")],
-                Fields(page));
+            Assert.Equal([("summary-found", "summary-error-0 summary-error-1", "true")], Fields(page));
+            Assert.DoesNotMatch("<textarea id=\"summary-(?:talked-about|next-steps)\"[^>]*aria-invalid", page);
             Assert.StartsWith("Not released. “E11.9” in What we found", Message(page, 0));
             Assert.StartsWith("Not released. “4548-4” in What we found", Message(page, 1));
         }
@@ -156,11 +155,10 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
         {
             var page = await empty.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
-            Assert.Equal(
-                [("summary-talked-about", "summary-error-0 summary-hint", "true"), ("summary-found", "summary-hint", ""), ("summary-next-steps", "summary-error-1 summary-hint", "true")],
-                Fields(page));
-            Assert.Equal("Not released. Write “What we talked about”.", Message(page, 0));
-            Assert.Equal("Not released. Write “What happens next”.", Message(page, 1));
+            Assert.Equal([("summary-talked-about", "summary-error-0", "true"), ("summary-next-steps", "summary-error-1", "true")], Fields(page));
+            Assert.DoesNotMatch("<textarea id=\"summary-found\"[^>]*aria-invalid", page);
+            Assert.Equal("Not released. “What we talked about” is required.", Message(page, 0));
+            Assert.Equal("Not released. “What happens next” is required.", Message(page, 1));
         }
 
         // Each part's ID, what describes it and whether it is invalid, in the page's order.

@@ -68,11 +68,10 @@ struct App {
 }
 
 /// Said when the app starts with servers other than the ones the kept sign-in was made with (step 19a's final review).
-const OTHER_SERVERS: &str = "Signed out. SwiftChart started with different servers from the ones you signed in with. \
-                             Sign in again. Nothing on this computer was deleted.";
+const OTHER_SERVERS: &str = "Signed out. The servers changed since you signed in.";
 
 /// What the commands that read the offline charts answer while the window is locked.
-const LOCKED: &str = "Locked. Unlock the window to see the offline charts.";
+const LOCKED: &str = "Locked.";
 
 impl App {
     fn store(&self) -> Result<MutexGuard<'_, Store>, String> {
@@ -640,8 +639,7 @@ fn after_unlock(answer: sync::Unlock) -> Next {
         sync::Unlock::Refused(problem) => Next::Refused(problem),
         sync::Unlock::SignInEnded => Next::Ended(
             sync::Ending::SignIn,
-            "A sign-in lasts at most 12 hours. Enter the code from your authenticator app too."
-                .to_owned(),
+            "Sign-in expired. Enter the code from your authenticator app.".to_owned(),
         ),
         sync::Unlock::SessionOver => Next::Ended(sync::Ending::Session, SESSION_OVER.to_owned()),
         sync::Unlock::Revoked => Next::Ended(sync::Ending::Revoked, DELETED.to_owned()),
@@ -654,10 +652,9 @@ fn after_unlock(answer: sync::Unlock) -> Next {
 fn after_sign_in(answer: Result<(), sync::SignInFailure>, need: Need, code: &str) -> Next {
     match answer {
         Ok(()) => Next::Opened,
-        Err(sync::SignInFailure::Refused(_)) if code.trim().is_empty() => Next::Refused(
-            "Enter the code from your authenticator app too. The clinic's server can be reached, so it takes both."
-                .to_owned(),
-        ),
+        Err(sync::SignInFailure::Refused(_)) if code.trim().is_empty() => {
+            Next::Refused("Code is required.".to_owned())
+        }
         Err(sync::SignInFailure::Refused(problem)) => Next::Refused(problem),
         Err(sync::SignInFailure::Unreachable(_)) if need == Need::SignIn => Next::CheckHere,
         Err(sync::SignInFailure::Unreachable(problem)) => Next::Refused(format!(
@@ -666,8 +663,7 @@ fn after_sign_in(answer: Result<(), sync::SignInFailure>, need: Need, code: &str
     }
 }
 
-const SESSION_OVER: &str = "Signed out. The server ended this sign-in. Sign in again with your password and the code from \
-                            your authenticator app.";
+const SESSION_OVER: &str = "Signed out. Sign in again.";
 
 /// The lock's password, checked on this computer against its hash, when no server could check it. Wrong ones are
 /// counted (ehr_desktop::unlock): after 5 it waits 15 minutes, after 10 only a full sign-in opens it.
@@ -706,8 +702,7 @@ async fn open_here(app: &App, password: String) -> Result<(), String> {
     Err(match allowed {
         Some(Allowed::WaitUntil(until)) => wait_problem(until - now),
         Some(Allowed::SignIn) => TOO_MANY.to_owned(),
-        _ => "Wrong password. The clinic's server can't be reached, so this computer checked it."
-            .to_owned(),
+        _ => "Wrong password.".to_owned(),
     })
 }
 
@@ -744,7 +739,7 @@ fn restart_for_update(app: State<'_, App>, handle: AppHandle) -> Result<(), Stri
             return Err(LOCKED.to_owned());
         }
         if lock.recording_now(Moment::now()) {
-            return Err("Finish the recording first. Restarting would stop it.".to_owned());
+            return Err("Stop the recording first.".to_owned());
         }
     }
     app.updates.restart(&handle)
@@ -794,8 +789,7 @@ fn quit(handle: AppHandle) {
     handle.exit(0);
 }
 
-const TOO_MANY: &str = "Too many wrong passwords. Once the clinic's server can be reached, sign in with your password \
-                        and the code from your authenticator app. Nothing on this computer was deleted.";
+const TOO_MANY: &str = "Too many wrong passwords. Sign in when the clinic's server can be reached.";
 
 fn wait_problem(seconds: i64) -> String {
     let minutes = (seconds.max(1) + 59) / 60;
@@ -1355,7 +1349,7 @@ mod tests {
                 Need::SignIn,
                 ""
             ),
-            Next::Refused(problem) if problem.starts_with("Enter the code")
+            Next::Refused(problem) if problem == "Code is required."
         ));
         assert!(matches!(
             after_sign_in(unreachable(), Need::SignedOut, "123456"),

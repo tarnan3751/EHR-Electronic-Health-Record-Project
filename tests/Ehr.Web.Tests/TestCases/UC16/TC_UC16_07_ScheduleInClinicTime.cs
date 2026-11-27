@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 //   5. Try to book 02:30 on 14 March 2027.
 // Expected result: Step 1: the time field is labeled "clinic time"; the chart lists the appointment at
 //   23:30 with the zone's abbreviation; it is stored at that moment, which in UTC is early the next day. Step 2: the
-//   day's schedule lists it as "23:30 to 23:50" with the abbreviation and says times are clinic time; the next day's
+//   day's schedule lists it as "23:30 to 23:50" with the abbreviation in its time column; the next day's
 //   doesn't list it. Step 3: the page shows the clinic's day and time, and the form to reschedule holds them. Step 4:
 //   the UTC clinic lists the same appointment on the next day at its UTC time. Step 5: 422, "The clocks go forward
 //   that day, so that time doesn't exist. Enter another time.", and nothing is booked.
@@ -49,7 +49,7 @@ public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("Time, clinic time <span>(required)</span>", form);
         using var booked = await BookAsync(session.Client, patient, clinician.Id, Day(7), "23:30", "Synthetic: late clinic");
         Assert.Equal(HttpStatusCode.OK, booked.StatusCode);
-        Assert.Contains($"<strong>{Day(7)} 23:30 {label}</strong> · 20 minutes · Dr. Schedule Central", await ReadAsync(booked));
+        Assert.Contains($"<strong>{day:MMM d, yyyy} 23:30 {label}</strong> · 20 minutes · Dr. Schedule Central", await ReadAsync(booked));
         // The same moment, stored in UTC: early the next day.
         Assert.Equal([start.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)],
             await RowsAsync(apps, patient, "to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')"));
@@ -57,7 +57,7 @@ public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebAp
 
         var listed = await session.Client.GetStringAsync($"/schedule?day={Day(7)}", Cancel);
         Assert.Contains($"23:30 to 23:50 {label}", listed);
-        Assert.Contains("Times are clinic time.", listed);
+        Assert.Contains($"<td class=\"sc-table__mono\">23:30 to 23:50 {label}</td>", listed);
         Assert.Contains($"<a href=\"/patients/{patient}\">Booked, Synthetic</a>", listed);
         Assert.DoesNotContain($"/patients/{patient}\"", await session.Client.GetStringAsync($"/schedule?day={next}", Cancel));
 
@@ -70,7 +70,7 @@ public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebAp
         // A clinic in UTC has the same appointment on the next day, at its UTC time.
         var utc = await utcSession.Client.GetStringAsync($"/schedule?day={next}", Cancel);
         Assert.Contains($"{start.UtcDateTime:HH:mm} to {start.UtcDateTime.AddMinutes(20):HH:mm} UTC", utc);
-        Assert.Contains("Times are UTC.", utc);
+        Assert.Contains($"<td class=\"sc-table__mono\">{start.UtcDateTime:HH:mm} to {start.UtcDateTime.AddMinutes(20):HH:mm} UTC</td>", utc);
 
         // The hour the clocks skip.
         using var skipped = await BookAsync(session.Client, patient, clinician.Id, "2027-03-14", "02:30", "Synthetic: spring forward");

@@ -89,7 +89,7 @@ public class DictationSpanishTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("""<select id="dictation-language" class="sc-field__input" autocomplete="off" data-dictation-language>""", html);
         Assert.Contains("""<option value="en" selected>English</option>""", html);
         Assert.Contains("""<option value="es">Spanish, experimental (proposals in English)</option>""", html);
-        Assert.Contains("Dictate in English or Spanish, with a microphone.", html);
+        Assert.Contains("""<label for="dictation-language">Language</label>""", html);
 
         using (var started = await StartAsync(note.Session.Client, note.Token, note.Patient, null))
         {

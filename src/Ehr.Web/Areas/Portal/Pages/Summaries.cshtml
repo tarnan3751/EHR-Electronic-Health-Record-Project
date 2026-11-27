@@ -9,7 +9,7 @@
 <h1>Visit summaries</h1>
 @if (Model.Summaries is not { } summaries)
 {
-    <p class="sc-notice sc-notice--danger">@(own ? "Your visit summaries are" : "Visit summaries are") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(own ? "Your visit summaries are" : "Visit summaries are") not available right now.</p>
 }
 else
 {
@@ -19,7 +19,6 @@ else
     var items = summaries.Summaries.Select(s => (Date: s.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)s, Sensitive: s.Sensitive))
         .Concat(summaries.Withdrawn.Select(w => (Date: w.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)null, Sensitive: w.Sensitive)))
         .OrderByDescending(item => item.Date.UtcDateTime.Date).ThenBy(item => item.Summary is null).ThenByDescending(item => item.Date).ToList();
-    <p class="sc-muted">@(own ? "From your care team after each visit" : "From the care team after each visit"), newest first. Each is dated the day the visit's notes were signed.</p>
     @if (Model.MaySeeSensitive && summaries.SensitiveHidden > 0)
     {
         @* Left out until asked for (docs/brand: sensitive items). Asking is a link, a read the cloud app answers too. *@

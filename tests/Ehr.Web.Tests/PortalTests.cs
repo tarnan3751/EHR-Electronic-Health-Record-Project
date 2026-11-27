@@ -253,7 +253,7 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RegistrationReplaced, patientId: patient));
 
         using var old = await PostFormAsync(client, oldPath, oldPath);
-        Assert.Contains("This link isn't valid or has expired.", await ReadAsync(old));
+        Assert.Contains("This link has expired.", await ReadAsync(old));
 
         var newPath = new Uri(ConfirmLink().Match(Assert.Single(apps.Emails.Sent, m => m.To == right).Body).Value).PathAndQuery;
         using var confirmed = await PostFormAsync(client, newPath, newPath);
@@ -300,9 +300,9 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
             ("Input.Code", "AAAA-BBBB-CCCC"), ("Input.Email", email), ("Input.Password", "short"), ("Input.Confirm", "different"));
 
         var html = await ReadAsync(refused);
-        Assert.Contains("Use at least 12 characters.", html);
+        Assert.Contains("Password must be at least 12 characters.", html);
         // The page's HTML encodes the apostrophe.
-        Assert.Contains("The passwords don&#x27;t match.", html);
+        Assert.Contains("Passwords don&#x27;t match.", html);
         Assert.DoesNotContain(apps.Emails.Sent, m => m.To == email);
     }
 

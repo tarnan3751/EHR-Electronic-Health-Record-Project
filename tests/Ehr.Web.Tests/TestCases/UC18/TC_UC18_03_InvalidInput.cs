@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   2. Give access to the second patient for the record only, then again with messages.
 //   3. Post the third patient's grant ID to Remove and to Show sensitive items.
 // Expected result: Step 1: each is answered 422 with "Not saved." and, in turn, "Enter the person's email address.",
-//   "Enter an email address, like name@example.com.", "That's your own email address. Enter the other person's.",
+//   "Enter an email address, like name@example.com.", "Enter the other person's email address, not your own.",
 //   "Choose what they can see." and "Choose how long the access lasts."; what was typed stays in the field; nothing is
 //   saved and no email is sent. Step 2: one grant is in force, with messages; the first is ended. Step 3: both are
 //   answered 404, and the third patient's grant is unchanged.
@@ -43,7 +43,7 @@ public class TC_UC18_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         {
             ("", "record", 90, "Enter the person's email address."),
             ("not an email", "record", 90, "Enter an email address, like name@example.com."),
-            (patient.Email, "record", 90, "That's your own email address. Enter the other person's."),
+            (patient.Email, "record", 90, "Enter the other person's email address, not your own."),
             (proxy.Email, "everything", 90, "Choose what they can see."),
             (proxy.Email, "record", 3650, "Choose how long the access lasts."),
         })

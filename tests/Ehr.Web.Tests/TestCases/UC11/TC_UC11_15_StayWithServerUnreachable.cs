@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   1. Leave the page 13 minutes.
 //   2. With the session page unreachable, press Enter on "Stay signed in".
 //   3. With it reachable again, press Enter.
-// Expected result: Step 1: the warning opens. Step 2: it stays open, saying the server couldn't be reached. Step 3: it
+// Expected result: Step 1: the warning opens. Step 2: it stays open, saying the server can't be reached. Step 3: it
 //   closes, and the server gives the session its 15 minutes again.
 // Creator: Tahseen Arnan
 [Collection(BrowserTests.Collection)]
@@ -48,7 +48,7 @@ public class TC_UC11_15_StayWithServerUnreachable(WebApps apps) : IClassFixture<
         await page.RouteAsync("**/session", route => route.AbortAsync());
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForSelectorAsync("[data-session-unreachable]", new() { State = WaitForSelectorState.Visible });
-        Assert.Contains("The server couldn't be reached", await page.TextContentAsync("[data-session-unreachable]"));
+        Assert.Contains("The server can't be reached", await page.TextContentAsync("[data-session-unreachable]"));
         Assert.True(await page.IsVisibleAsync(OpenWarning));
 
         // 3.

@@ -23,9 +23,9 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Steps:
 //   1. For one patient of each pair: record 120/80, then check them in (their visit starts now).
 //   2. For the other: check them in, then record 120/80 taken before the check-in.
-//   3. For each: on the set's "Mark in error" page tick the blood pressure, give the reason and mark it; record 120/78
+//   3. For each: on the set's "Mark as entered in error" page tick the blood pressure, give the reason and mark it; record 120/78
 //      for the same time; record a heart rate of 70 taken just after the check-in.
-// Expected result: For every patient: "Marked in error. 1 reading"; both numbers of the first reading are entered in error; the
+// Expected result: For every patient: "Entered in error." and "1 reading entered in error is not shown."; both numbers of the first reading are entered in error; the
 //   new systolic and diastolic share one reading, not the first's. Taken ten minutes before the check-in, all four
 //   values have the visit, in whichever order they were typed; taken twenty minutes before, none of them has it, in
 //   whichever order. The heart rate taken after the check-in has the visit.
@@ -60,7 +60,9 @@ public class TC_UC4_25_ReadingAcrossCheckIn(WebApps apps) : IClassFixture<WebApp
 
         // The diastolic was misread: the blood pressure is ticked, one reading, by its systolic.
         using var marked = await MarkAsync(apps, session.Client, patient, taken + ":00", "Synthetic: diastolic misread.", Systolic);
-        Assert.Contains("Marked in error. 1 reading is now left out", Words(await ReadAsync(marked)));
+        var markedPage = Words(await ReadAsync(marked));
+        Assert.Contains("Entered in error.", markedPage);
+        Assert.Contains("1 reading entered in error is not shown.", markedPage);
         using var corrected = await RecordAtAsync(session.Client, patient, taken, (Systolic, "120"), (Diastolic, "78"));
         Assert.Contains("Saved.", await ReadAsync(corrected));
         // To the second, just after the check-in.

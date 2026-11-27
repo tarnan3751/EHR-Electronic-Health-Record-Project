@@ -8,7 +8,7 @@
 @if (Model.SetupLink is { } link)
 {
     <section class="sc-notice sc-notice--success">
-        <p><span class="sc-notice__state">Account created.</span> Send this setup link to the person. They choose their password with it, and it works once. It isn't shown again.</p>
+        <p><span class="sc-notice__state">Account created.</span> Send this setup link to the person. It isn't shown again.</p>
         <p class="sc-copy">@link</p>
     </section>
 }
@@ -76,14 +76,14 @@
         <span asp-validation-for="Input.Email" class="sc-field__error"></span>
     </div>
     <div class="sc-field">
-        <label asp-for="Input.DisplayName" class="sc-field__label">Name to show</label>
+        <label asp-for="Input.DisplayName" class="sc-field__label">Display name</label>
         <input asp-for="Input.DisplayName" class="sc-field__input" autocomplete="off" required>
         <span asp-validation-for="Input.DisplayName" class="sc-field__error"></span>
     </div>
     <fieldset class="sc-stack">
         <legend>Roles</legend>
-        <label class="sc-check"><input asp-for="Input.Clinician" type="checkbox"> Clinician: finds patients, reads charts, writes notes, places orders</label>
-        <label class="sc-check"><input asp-for="Input.Admin" type="checkbox"> Admin: manages staff accounts and reads the audit log</label>
+        <label class="sc-check"><input asp-for="Input.Clinician" type="checkbox"> Clinician</label>
+        <label class="sc-check"><input asp-for="Input.Admin" type="checkbox"> Admin</label>
     </fieldset>
     <button class="sc-btn sc-btn--primary">Create account</button>
 </form>

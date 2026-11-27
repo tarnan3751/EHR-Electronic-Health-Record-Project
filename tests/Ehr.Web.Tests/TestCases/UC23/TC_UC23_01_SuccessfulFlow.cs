@@ -58,9 +58,8 @@ public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("patients_own_words", html);
         // A visit's words, not a dictation's (looking at the pages): what was said, and this draft's.
         Assert.Contains("Back to chart</a>", html);
-        Assert.Contains("Check each proposal against what was said.", html);
-        Assert.Contains("This draft doesn't propose these.", html);
-        Assert.DoesNotContain("your own words", html);
+        Assert.Contains("Patient's own words.", html);
+        Assert.Contains("Place any that still apply yourself.", html);
         Assert.Contains("\"speaker\":\"patient\"", html);
         const string Reads = "SELECT part || ' ' || count(*) FROM ehr.audit_events WHERE table_name = 'ambient_transcripts' AND action = 'read' AND row_id = @id GROUP BY part";
         Assert.Equal(["note-draft 1"], await RowsAsync(apps, Reads, l.Review));
@@ -89,7 +88,7 @@ public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["completed 0"], await RowsAsync(apps,
             "SELECT r.state || ' ' || (SELECT count(*) FROM ehr.ambient_transcripts t WHERE t.id = r.id) FROM ehr.ai_note_reviews r WHERE r.id = @id", l.Review));
         var after = await l.Session.Client.GetStringAsync(d.ReviewUrl, Cancel);
-        Assert.Contains("transcript was deleted when its review was finished.", after);
+        Assert.Contains("Transcript deleted when the review was finished.", after);
         Assert.DoesNotContain("What brings you in today?", after);
     }
 

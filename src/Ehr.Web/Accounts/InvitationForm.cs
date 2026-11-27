@@ -9,6 +9,6 @@ public class InvitationForm : NewPassword
     public string? Code { get; set; }
 
     [Required(ErrorMessage = "Enter your name.")]
-    [StringLength(100, ErrorMessage = "Use 100 characters or fewer.")]
+    [StringLength(100, ErrorMessage = "Name must be 100 characters or fewer.")]
     public string? Name { get; set; }
 }

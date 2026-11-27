@@ -75,7 +75,7 @@ public sealed class VitalSigns(EhrDbContext db)
     {
         var errors = new Dictionary<string, string>();
         values = [];
-        foreach (var (code, _, unit, least, most) in Fields)
+        foreach (var (code, label, unit, least, most) in Fields)
         {
             if (!typed.TryGetValue(code, out var text) || string.IsNullOrWhiteSpace(text))
             {
@@ -84,11 +84,11 @@ public sealed class VitalSigns(EhrDbContext db)
 
             if (!decimal.TryParse(text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value) || decimal.Round(value, 1) != value)
             {
-                errors[code] = "Enter a number, like 36.8.";
+                errors[code] = $"{label} must be a number.";
             }
             else if (value < least || value > most)
             {
-                errors[code] = $"Enter a value from {least:0.#} to {most:0.#} {unit}.";
+                errors[code] = $"{label} must be {least:0.#} to {most:0.#} {unit}.";
             }
             else
             {
@@ -99,21 +99,21 @@ public sealed class VitalSigns(EhrDbContext db)
         var entered = values.Select(value => value.Code).ToHashSet();
         if (entered.Contains(VitalSign.Systolic) != entered.Contains(VitalSign.Diastolic) && !errors.ContainsKey(VitalSign.Systolic) && !errors.ContainsKey(VitalSign.Diastolic))
         {
-            errors[entered.Contains(VitalSign.Systolic) ? VitalSign.Diastolic : VitalSign.Systolic] = "Enter both numbers of the blood pressure.";
+            errors[entered.Contains(VitalSign.Systolic) ? VitalSign.Diastolic : VitalSign.Systolic] = "Both blood pressure numbers are required.";
         }
 
         if (errors.Count == 0 && values.Count == 0)
         {
-            errors[""] = "Enter at least one vital sign.";
+            errors[""] = "At least one vital sign is required.";
         }
 
         if (takenAt is null)
         {
-            errors["TakenAt"] = "Enter when they were taken.";
+            errors["TakenAt"] = "Taken is required.";
         }
         else if (takenAt > DateTimeOffset.UtcNow.AddMinutes(1))
         {
-            errors["TakenAt"] = "The time can't be in the future.";
+            errors["TakenAt"] = "Taken must not be in the future.";
         }
 
         return errors;
@@ -303,8 +303,8 @@ public sealed class Trend
     // Always with a point for the decimal, whatever the server's language: these go into SVG attributes.
     public static string Number(decimal value) => decimal.Round(value, 1).ToString("0.#", CultureInfo.InvariantCulture);
 
-    // One trend for each test or vital sign with at least two numeric values, a vital sign titled as the flowsheet's
-    // row names it (VitalSigns.Name), in the order given by `order` when there is one, by name otherwise.
+    // One trend for each test or vital sign with at least two numeric values, titled by its short name (TestNames), a
+    // vital sign as the flowsheet's row names it, in the order given by `order` when there is one, by name otherwise.
     public static IReadOnlyList<Trend> From(IEnumerable<Observation> observations, IReadOnlyList<string>? order = null)
     {
         // Never a value marked entered in error (step 9b), or one not finished.
@@ -315,7 +315,7 @@ public sealed class Trend
             {
                 var latest = group.OrderByDescending(o => o.EffectiveAt).ThenByDescending(o => o.IssuedAt).First();
                 // Two values of one moment stay in the order they were released (the chart's own sort keeps it).
-                return new Trend(group.Key, VitalSigns.Name(group.Key, latest.Display), latest.Unit, latest.ReferenceLow, latest.ReferenceHigh,
+                return new Trend(group.Key, TestNames.Short(group.Key, latest.Display), latest.Unit, latest.ReferenceLow, latest.ReferenceHigh,
                     group.OrderBy(o => o.EffectiveAt).ThenBy(o => o.IssuedAt).ThenBy(o => o.Id)
                         .Select(o => new TrendPoint(o.EffectiveAt, o.Value!.Value, o.ReferenceLow, o.ReferenceHigh, o.ReferenceKind)), latest.ReferenceKind);
             });
@@ -327,7 +327,9 @@ public sealed class Trend
 }
 
 // A unit as a person reads it. The record keeps UCUM's spelling ("mm[Hg]", "Cel"), which is for machines; the few
-// whose spelling a reader would stumble on are shown the usual way, and every other unit as it is.
+// whose spelling a reader would stumble on are shown the usual way, or as UCUM prints them ("10³/µL", Tahseen's
+// decisions of 26 November 2026 for the portal and of 27 November 2026 for clinician pages), and every other unit as
+// it is.
 public static class Units
 {
     public static string? Shown(string? ucum) => ucum switch
@@ -336,18 +338,14 @@ public static class Units
         "Cel" => "°C",
         "kg/m2" => "kg/m²",
         "/min" => "per minute",
-        _ => ucum,
-    };
-
-    // For patients (Tahseen's decision of 26 November 2026), in the portal's names, trends, results and printable record:
-    // UCUM's print form for the units whose code reads badly to a patient, and any other as Shown gives it.
-    public static string? ForPatients(string? ucum) => ucum switch
-    {
         "10*3/uL" => "10³/µL",
         "10*6/uL" => "10⁶/µL",
         "m[IU]/L" => "mIU/L",
-        _ => Shown(ucum),
+        _ => ucum,
     };
+
+    // The portal's name for the same forms, from when only patients were shown UCUM's print form.
+    public static string? ForPatients(string? ucum) => Shown(ucum);
 }
 
 // A patient's vital signs for the flowsheet page: every one recorded (the latest first, up to a limit), already

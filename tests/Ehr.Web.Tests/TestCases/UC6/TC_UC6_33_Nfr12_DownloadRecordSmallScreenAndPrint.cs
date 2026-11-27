@@ -38,14 +38,13 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   6. As the clinician, open the patient's vital signs and emulate print; then the chart off-site, printed.
 // Expected result: Step 1: no sideways scroll. Step 2: the focus ring on each; a download named health-record-<date>.json
 //   whose file holds sertraline. Step 3: /portal/record/print?sensitive=true, with "Sensitive items shown.", no sideways
-//   scroll. Step 4: printed, the app bar, the sign-out button and "use your browser's Print command" aren't displayed;
+//   scroll. Step 4: printed, the app bar, the sign-out button and "Back to download" aren't displayed;
 //   the body's text is rgb(14, 27, 44) on a transparent ground, in the light scheme, in both themes; a table row avoids a break; nothing
 //   overflows. On screen, the light theme's text is rgb(14, 27, 44) on white and the dark theme's rgb(232, 238, 243).
 //   Without sensitive items, "Sensitive items hidden." is displayed on screen and not printed, and the paper says
 //   nothing of sensitive items. Step 5: each printout keeps the band "Shared record. You're viewing Synthetic Fhirchart's
 //   record, not your own.", without its button. Step 6: no app bar, the patient banner not stuck, the flowsheet's
-//   wrapper not clipping it; off-site, the band "Read-only. The clinic's server can't be reached, so nothing can be
-//   saved until it's back." prints. No script errors.
+//   wrapper not clipping it; off-site, the band "Read-only. The clinic's server can't be reached." prints. No script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -164,7 +163,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         await chartOffSite.EmulateMediaAsync(new() { Media = Media.Print });
         Assert.Equal("none", await DisplayAsync(chartOffSite, ".sc-appbar"));
         Assert.NotEqual("none", await DisplayAsync(chartOffSite, "p.sc-notice--band"));
-        Assert.StartsWith("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back.", await chartOffSite.Locator("p.sc-notice--band").InnerTextAsync());
+        Assert.StartsWith("Read-only. The clinic's server can't be reached.", await chartOffSite.Locator("p.sc-notice--band").InnerTextAsync());
     }
 
     static Task<string> DisplayAsync(IPage page, string selector) =>

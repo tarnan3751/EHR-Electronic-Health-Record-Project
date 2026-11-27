@@ -29,7 +29,6 @@
   </header>
   <main id="page" class="sc-page">
     <h1>Quick text</h1>
-    <p class="sc-lede">Shared phrases, each inserted by typing its shortcut. Changes are saved on this computer first, then sent.</p>
 
     <section aria-label="Sync">
       <p class="sc-status"><span id="waiting"></span> <span id="checked"></span> <span id="version"></span></p>
@@ -41,7 +40,7 @@
     <section id="update" aria-label="Update" hidden>
       <p id="update-text" class="sc-notice sc-notice--info" role="status"></p>
       <div class="sc-actions">
-        <button type="button" id="update-accept" class="sc-btn sc-btn--primary">Get it ready</button>
+        <button type="button" id="update-accept" class="sc-btn sc-btn--primary">Download update</button>
         <button type="button" id="update-dismiss" class="sc-btn sc-btn--quiet">Not now</button>
         <button type="button" id="update-restart" class="sc-btn sc-btn--primary">Restart now</button>
       </div>
@@ -57,8 +56,7 @@
     </section>
 
     <form id="sign-in" class="sc-form sc-card desktop-card" hidden>
-      <h2>Sign in to sync</h2>
-      <p>Use your clinic account and the code from your authenticator app, or one of your recovery codes.</p>
+      <h2>Sign in</h2>
       <!-- Where the password goes: the servers this build was made for (src-tauri/src/sync.rs). -->
       <p id="sign-in-servers" class="sc-muted"></p>
       <!-- Why the kept sign-in was forgotten as the app started, when it was (src-tauri/src/main.rs, starting_lock). -->
@@ -73,7 +71,8 @@
       </div>
       <div class="sc-field">
         <label class="sc-field__label" for="sign-in-code">Code</label>
-        <input class="sc-field__input sc-field__input--mono" id="sign-in-code" name="code" autocomplete="one-time-code" required>
+        <input class="sc-field__input sc-field__input--mono" id="sign-in-code" name="code" autocomplete="one-time-code" required aria-describedby="sign-in-code-hint">
+        <p class="sc-field__hint" id="sign-in-code-hint">From your authenticator app, or a recovery code.</p>
       </div>
       <p id="sign-in-problem" class="sc-notice sc-notice--danger" role="alert" hidden></p>
       <button class="sc-btn sc-btn--primary">Sign in</button>
@@ -83,7 +82,6 @@
 
     <section id="offline-charts" hidden>
       <h2>Offline charts</h2>
-      <p class="sc-lede">Download up to 25 charts from My patients while you're connected. Drafts and recordings wait on this computer until they're sent.</p>
       <!-- When the charts were last downloaded: nothing refreshes them but Download my charts (the expansion plan's step 19a). -->
       <p id="charts-updated" class="sc-status"></p>
       <div class="sc-actions">
@@ -108,14 +106,14 @@
               </div>
               <div class="sc-actions">
                 <button class="sc-btn">Save draft</button>
-                <button type="button" id="cancel-draft-edit" class="sc-btn sc-btn--quiet" hidden>Cancel edit</button>
+                <button type="button" id="cancel-draft-edit" class="sc-btn sc-btn--quiet" hidden>Cancel</button>
               </div>
             </form>
             <h4>Dictation</h4>
             <div class="sc-actions">
               <button type="button" id="record-audio" class="sc-btn">Record audio</button>
             </div>
-            <p class="sc-muted">Recordings are transcribed in English. To dictate in Spanish, use Dictate in the web app.</p>
+            <p class="sc-muted">English only. For Spanish, use Dictate in the web app.</p>
             <p id="recording-message" class="sc-status" role="status"></p>
             <ul id="saved-recordings" class="sc-list"></ul>
           </div>
@@ -126,7 +124,7 @@
         </div>
       </section>
     </section>
-    <p id="offline-sign-in" class="sc-notice sc-notice--info" hidden>Sign out and sign in on the updated server to use offline charts.</p>
+    <p id="offline-sign-in" class="sc-notice sc-notice--info" hidden>Offline charts unavailable. Sign out and sign in again.</p>
 
     <section id="conflicts" hidden>
       <h2>Changes not saved</h2>
@@ -180,8 +178,7 @@
       <div class="sc-actions">
         <button id="lock-submit" class="sc-btn sc-btn--primary">Unlock</button>
       </div>
-      <p class="sc-muted">Signed in as <span id="lock-account"></span>. Someone else? Sign out. The offline charts close, and
-        anything typed here and not saved is lost.</p>
+      <p class="sc-muted">Signed in as <span id="lock-account"></span>. Signing out loses unsaved work.</p>
       <div class="sc-actions">
         <button type="button" id="lock-sign-out" class="sc-btn sc-btn--quiet">Sign out</button>
       </div>
@@ -210,9 +207,8 @@
   <dialog id="lock-warning" class="sc-dialog" role="alertdialog" aria-labelledby="lock-warning-title" aria-describedby="lock-warning-text">
     <h2 class="sc-dialog__title" id="lock-warning-title">This window will lock soon</h2>
     <div id="lock-warning-text">
-      <p id="lock-warning-idle">Nothing has been done here for a while. To keep patients' information safe, this window locks in <span data-countdown>2:00</span> unless you stay.</p>
-      <p id="lock-warning-last" hidden>A sign-in lasts at most 12 hours, and yours ends in <span data-countdown>2:00</span>. Then this window locks, and opens again with your password and the code from your authenticator app.</p>
-      <p>What you've typed stays, and sync carries on while it's locked.</p>
+      <p id="lock-warning-idle">This window locks in <span data-countdown>2:00</span>.</p>
+      <p id="lock-warning-last" hidden>Your sign-in ends in <span data-countdown>2:00</span>.</p>
     </div>
     <div class="sc-dialog__actions">
       <button type="button" id="lock-stay" class="sc-btn sc-btn--primary">Stay unlocked</button>

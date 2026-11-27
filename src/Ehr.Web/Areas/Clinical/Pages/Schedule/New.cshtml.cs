@@ -76,7 +76,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, Appointment
         var errors = new Dictionary<string, string>();
         if (Clinician is not { } clinician || Clinicians.All(c => c.Id != clinician))
         {
-            errors["Clinician"] = "Choose a clinician.";
+            errors["Clinician"] = "Clinician is required.";
         }
 
         var start = AppointmentForm.Check(clinic, Day, Time, Minutes, Reason, errors);
@@ -87,7 +87,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, Appointment
                 case AppointmentResult.Saved:
                     return Redirect(Url.Page("/Patients/Chart", Search.ChartRouteValues(id)) + "#chart-appointments");
                 case AppointmentResult.Overlap:
-                    errors["Time"] = "This clinician already has an appointment booked then. Choose another time.";
+                    errors["Time"] = "This clinician is already booked at that time.";
                     break;
                 default:
                     return RedirectToPage("/Patients/Chart", Search.ChartRouteValues(id));

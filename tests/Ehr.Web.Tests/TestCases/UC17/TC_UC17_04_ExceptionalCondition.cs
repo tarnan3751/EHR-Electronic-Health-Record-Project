@@ -26,9 +26,9 @@ namespace Ehr.Web.Tests.TestCases.UC17;
 //   2. With the link down, open the chart and the conversation.
 //   3. Post a reply as a plain form.
 // Expected result: Step 1: the read arrives on the clinic's server as a read of the thread with source "cloud"; the
-//   reply is forwarded and saved. Step 2: the chart says "Messages can't be sent until the clinic's server is back.";
-//   the conversation shows both messages and "Messages can't be sent until the clinic's server is back. The
-//   conversation remains readable.", with no form. Step 3: answered 503 with the "Not saved" page showing the typed
+//   reply is forwarded and saved. Step 2: the chart offers no "New message", under the read-only band;
+//   the conversation shows both messages and "Messages can't be sent until the clinic's server is back.", with no form.
+//   Step 3: answered 503 with the "Not saved" page showing the typed
 //   reply; no message is added.
 // Creator: Tahseen Arnan
 public class TC_UC17_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
@@ -51,10 +51,12 @@ public class TC_UC17_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
 
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Client(apps.CloudCutOff, staff.Jar);
-        Assert.Contains("Messages can't be sent until the clinic's server is back.", await cutOff.GetStringAsync($"/patients/{patient}", Cancel));
+        var cutOffChart = await cutOff.GetStringAsync($"/patients/{patient}", Cancel);
+        Assert.DoesNotContain("data-new-message", cutOffChart);
+        Assert.Contains("sc-notice--band", cutOffChart);
         var readOnly = await cutOff.GetStringAsync(path, Cancel);
         Assert.Contains("Synthetic: sent from off-site", readOnly);
-        Assert.Contains("Messages can't be sent until the clinic's server is back. The conversation remains readable.", readOnly);
+        Assert.Contains("Messages can't be sent until the clinic's server is back.", readOnly);
         Assert.DoesNotContain("<textarea", readOnly);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, path);

@@ -12,9 +12,9 @@ pub fn check(shortcut: &str, body: &str) -> Problems {
 
     let rest = shortcut.strip_prefix('.').unwrap_or_default();
     if shortcut.trim().is_empty() {
-        problems.insert("shortcut", "Enter a shortcut.");
+        problems.insert("shortcut", "Shortcut is required.");
     } else if shortcut.encode_utf16().count() > 32 {
-        problems.insert("shortcut", "Use 32 characters or fewer.");
+        problems.insert("shortcut", "Shortcut must be 32 characters or fewer.");
     } else if rest.is_empty()
         || !rest
             .chars()
@@ -22,14 +22,14 @@ pub fn check(shortcut: &str, body: &str) -> Problems {
     {
         problems.insert(
             "shortcut",
-            "Start with a period, then letters, numbers, - or _.",
+            "Shortcut must start with a period, then letters, numbers, - or _.",
         );
     }
 
     if body.trim().is_empty() {
-        problems.insert("body", "Enter the text.");
+        problems.insert("body", "Text is required.");
     } else if body.encode_utf16().count() > 4000 {
-        problems.insert("body", "Use 4,000 characters or fewer.");
+        problems.insert("body", "Text must be 4,000 characters or fewer.");
     }
 
     problems
@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn the_text_is_required_and_limited() {
-        assert_eq!(check(".nad", "  ").get("body"), Some(&"Enter the text."));
+        assert_eq!(check(".nad", "  ").get("body"), Some(&"Text is required."));
         assert!(check(".nad", &"a".repeat(4001)).contains_key("body"));
         assert!(check(".nad", &"a".repeat(4000)).is_empty());
     }

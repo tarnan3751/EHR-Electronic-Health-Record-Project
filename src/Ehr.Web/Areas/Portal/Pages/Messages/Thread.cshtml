@@ -10,7 +10,7 @@
 <h1>@Model.Thread.Subject</h1>
 @if (Model.Sent && Model.Error is null)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent.</span> @(Model.Acting ? "Replies from the care team appear here." : "Replies from your care team appear here.")</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent.</span></p>
 }
 <partial name="_Thread" model="(Model.Thread.Messages, MessageSender.Patient)" />
 @if (!OnPrem.IsReachable)

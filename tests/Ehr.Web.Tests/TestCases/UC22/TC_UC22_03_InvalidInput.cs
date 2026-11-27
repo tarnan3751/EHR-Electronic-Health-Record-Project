@@ -28,9 +28,9 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Expected result: Step 1: 422, "Not sent. Answer the highlighted questions and try again.", "Choose an answer." beside the
 //   two questions, the cursor on the first of them, the other answers still chosen; nothing stored. Step 2: stored
 //   with the database's score of 27, Severe, needing follow-up. Step 3: the answers page; still one set of answers.
-//   Step 4: the first says when it can be filled in and has no form to send; the cancelled one says it can no longer be
-//   filled in; sending either is 409, "Not sent." with why ("This form
-//   can't be filled in yet." and "This form can no longer be filled in."), and stores nothing. Step 5: 404 for both.
+//   Step 4: the first says when it opens and has no form to send; the cancelled one says it is closed; sending either is
+//   409, "Not sent." with why ("This form isn't open yet." and "This form is closed."), and stores nothing. Step 5: 404
+//   for both.
 // Creator: Tahseen Arnan
 public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
@@ -84,11 +84,11 @@ public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 
         var notYet = await RequestAsync(apps, early, Phq9);
         var notYetPage = Text(await portal.GetStringAsync(FormPath(notYet), Cancel));
-        Assert.Contains("You can fill it in from", notYetPage);
+        Assert.Contains("Opens ", notYetPage);
         Assert.DoesNotContain("Send to my care team", notYetPage);
         var closed = await RequestAsync(apps, cancelled, Phq9);
-        Assert.Contains("This form can no longer be filled in.", Text(await portal.GetStringAsync(FormPath(closed), Cancel)));
-        foreach (var (shut, why) in new[] { (notYet, "This form can't be filled in yet."), (closed, "This form can no longer be filled in.") })
+        Assert.Contains("This form is closed.", Text(await portal.GetStringAsync(FormPath(closed), Cancel)));
+        foreach (var (shut, why) in new[] { (notYet, "This form isn't open yet."), (closed, "This form is closed.") })
         {
             using var refused = await SendAsync(portal, shut, Answers(PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 0));
             Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);

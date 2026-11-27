@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   Test, each once, newest first; the last page has no "Older views", and the newest no "Newer views". Each link is
 //   /portal/views with only "older" or "newer" and a moment to the microsecond in UTC. Step 2: the same pages in
 //   reverse order, then one of the patient's own looks at this page since, which has no "Newer views". Step 3: the
-//   newest page; then "No more views to show." with a link to the newest views.
+//   newest page; then "No more views." with a link to the newest views.
 // Creator: Tahseen Arnan
 public partial class TC_UC6_46_WhoViewedPages(WebApps apps) : IClassFixture<WebApps>
 {
@@ -55,7 +55,7 @@ public partial class TC_UC6_46_WhoViewedPages(WebApps apps) : IClassFixture<WebA
 
         Assert.Equal([50, 50, 21], older.Select(page => page.Count));
         var all = older.SelectMany(page => page).ToList();
-        Assert.Equal(120, all.Count(line => line.StartsWith("staff | Dr. Test, clinician | Your record | ", StringComparison.Ordinal)));
+        Assert.Equal(120, all.Count(line => line.StartsWith("staff | Dr. Test, clinician | Record | ", StringComparison.Ordinal)));
         Assert.Single(all, line => line.StartsWith("you | ", StringComparison.Ordinal));
         Assert.Null(Links(await PageAsync(patient.Client)).Newer);
 
@@ -81,12 +81,12 @@ public partial class TC_UC6_46_WhoViewedPages(WebApps apps) : IClassFixture<WebA
         Assert.Equal(plain.Take(plain.Count - 1), garbage);
         var past = await PageAsync(patient.Client, "?older=" + Uri.EscapeDataString(DateTimeOffset.UtcNow.AddMonths(-13).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ", System.Globalization.CultureInfo.InvariantCulture)));
         Assert.Empty(Lines(past));
-        Assert.Contains("No more views to show.", Words(past));
+        Assert.Contains("No more views.", Words(past));
         Assert.Contains("href=\"/portal/views\"", past);
     }
 
     // The patient's own looks at this page, which each GET adds to the top.
-    const string Looks = "you | You | Who viewed your record";
+    const string Looks = "you | You | Who viewed the record";
 
     static List<string> Others(string html) => [.. Lines(html).Where(line => !line.StartsWith(Looks, StringComparison.Ordinal))];
 

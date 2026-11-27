@@ -24,8 +24,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Open the printable page, and the page that offers it.
 // Expected result: Step 1: a valid file with 600 results, "Synthetic glucose 1" among them and "Synthetic glucose 601"
 //   not, the heart rate, and the warning "Only the newest 600 of the 601 test results are in this file.". Step 2: 600
-//   results and "Only the newest 600 of the 601 test results are shown."; 50 summaries and "This page shows at most the
-//   50 newest visit summaries.", which nothing says before there are 50; Download my record says the printable page has "the 50 most recent visit summaries".
+//   results and "Only the newest 600 of the 601 test results are shown."; 50 summaries and "At most the 50 newest are
+//   shown.", which nothing says before there are 50; Download my record says the printable page has "the 50 most recent visit summaries".
 // Creator: Tahseen Arnan
 public class TC_UC6_31_DownloadLongRecord(WebApps apps) : IClassFixture<WebApps>
 {
@@ -54,7 +54,7 @@ public class TC_UC6_31_DownloadLongRecord(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("Only the newest 600 of the 601 test results are in this file.", issue.Diagnostics);
         Assert.Equal(R4.OperationOutcome.IssueSeverity.Warning, issue.Severity);
 
-        Assert.DoesNotContain("newest visit summaries", Words(await PrintAsync(patient.Client)));
+        Assert.DoesNotContain("At most the 50 newest are shown.", Words(await PrintAsync(patient.Client)));
         for (var i = 0; i < 50; i++)
         {
             var note = await NoteAddendumTests.SignedNoteAsync(session.Client, patient.Patient);
@@ -65,7 +65,7 @@ public class TC_UC6_31_DownloadLongRecord(WebApps apps) : IClassFixture<WebApps>
         var page = await PrintAsync(patient.Client);
         Assert.Contains("Only the newest 600 of the 601 test results are shown.", Words(page));
         Assert.Equal(600, page.Split("Synthetic glucose ").Length - 1);
-        Assert.Contains("This page shows at most the 50 newest visit summaries.", Words(page));
+        Assert.Contains("At most the 50 newest are shown.", Words(page));
         Assert.Equal(50, page.Split("data-summary=\"standing\"").Length - 1);
         Assert.Contains("the 50 most recent visit summaries", Words(await patient.Client.GetStringAsync(PagePath, TestContext.Current.CancellationToken)));
     }

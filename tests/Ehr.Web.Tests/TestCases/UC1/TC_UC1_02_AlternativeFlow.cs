@@ -15,7 +15,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Inputs and system conditions: POST /patients/{id}/orders/new?type=lab as js/orders.js sends it, on the on-site app,
 //   three times in turn, then five times at once for another item.
 // Test data: Patient Synthetic Orderable. Item "Complete blood count (CBC)" (SYN-LAB-001), Reason for the test
-//   "Synthetic fatigue". Reason for ordering it again "Synthetic repeat: sample clotted". For the five at once:
+//   "Synthetic fatigue". Reason for duplicate order "Synthetic repeat: sample clotted". For the five at once:
 //   "Lipid panel" (SYN-LAB-004).
 // Steps:
 //   1. Sign a Complete blood count (CBC) order.
@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   3. Sign it again with the reason.
 //   4. Send five Lipid panel orders at the same moment.
 // Expected result: Step 2 is answered 422 with the warning "An active order for Complete blood count (CBC) was signed
-//   ... UTC." and "Cancel, or give a reason and sign to order it again.", a field named DuplicateReason, the entries
+//   ... UTC." and a field "Reason for duplicate order", named DuplicateReason, the entries
 //   still filled in, and still one order saved. Step 3 saves a second order for SYN-LAB-001. Of the five at once,
 //   exactly one is saved and the others get the warning.
 // Creator: Tahseen Arnan
@@ -43,7 +43,7 @@ public class TC_UC1_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var html = await warned.Content.ReadAsStringAsync(Cancel);
         Assert.Contains("data-order-duplicate", html);
         Assert.Contains("An active order for <strong>Complete blood count (CBC)</strong> was signed", html);
-        Assert.Contains("Cancel, or give a reason and sign to order it again.", html);
+        Assert.Contains("Reason for duplicate order <span>(required)</span>", html);
         Assert.Contains("name=\"DuplicateReason\"", html);
         Assert.Contains("value=\"Synthetic fatigue\"", html);
         Assert.Equal(1, await OrdersAsync(apps, patient));

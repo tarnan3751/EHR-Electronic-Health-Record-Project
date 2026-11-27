@@ -16,24 +16,14 @@
 @* The form beside the summary it withdraws. *@
 <div class="sc-split">
 <div class="sc-formcard sc-formcard--wide">
-<p class="sc-prose">Released to the patient by <strong>@Model.Summary.ReleasedBy</strong>, @Clinic.Format(Model.Summary.ReleasedAt), from the note signed @Clinic.Format(Model.Note.SignedAt).</p>
-@* What withdrawing does: the one thing that changes for the patient first, then the rest as a short list. *@
-<div class="sc-prose">
-    <p>The patient, and anyone they share their record with, will no longer see its text in the portal.</p>
-    <ul>
-        <li>The portal says only that a summary from that date was withdrawn by the care team.</li>
-        <li>It stays on the note, struck through, with your reason.</li>
-        <li>If it was viewed in the portal, the patient is emailed that there's something new, with no details.</li>
-        <li>You can then write a new summary.</li>
-    </ul>
-</div>
+<p class="sc-prose">Released by <strong>@Model.Summary.ReleasedBy</strong>, @Clinic.Format(Model.Summary.ReleasedAt).</p>
 @if (!OnPrem.IsReachable)
 {
-    <p class="sc-muted">A summary can't be withdrawn until the clinic's server is back.</p>
+    @* Off-site with the clinic's server down: no form, under the layout's read-only band. *@
 }
 else if (Model.Summary.WithdrawnAt is not null)
 {
-    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">Already withdrawn.</span> Withdrawn by @Model.Summary.WithdrawnBy, @Clinic.Format(Model.Summary.WithdrawnAt).</p>
+    <p class="sc-notice sc-notice--info"><span class="sc-notice__state">Already withdrawn.</span> By @Model.Summary.WithdrawnBy, @Clinic.Format(Model.Summary.WithdrawnAt).</p>
 }
 else
 {
@@ -47,9 +37,18 @@ else
         <div class="sc-field">
             <label for="withdraw-reason">Reason <span>(required)</span></label>
             <input id="withdraw-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="@Ehr.Domain.Notes.VisitSummaries.MaxReasonLength" required autofocus autocomplete="off"
-                   aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)" aria-describedby="withdraw-reason-hint">
-            <p class="sc-field__hint" id="withdraw-reason-hint">Shown on the note with your name and the time.</p>
+                   aria-invalid="@(Model.Errors.Count > 0 ? "true" : null)">
         </div>
+        @* What the patient will no longer read, at the moment of withdrawing it; the rest under the disclosure. *@
+        <p class="sc-muted">The patient and proxies will no longer see it in the portal.</p>
+        <details>
+            <summary>More about withdrawing</summary>
+            <ul>
+                <li>The portal says a summary from that date was withdrawn by the care team.</li>
+                <li>It stays on the note, struck through, with your reason.</li>
+                <li>If the patient viewed it, they're emailed that there's something new, with no details.</li>
+            </ul>
+        </details>
         <div class="sc-actions">
             <button type="submit" class="sc-btn sc-btn--primary" data-withdraw-summary>Withdraw summary</button>
             <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="summary">Cancel</a>
@@ -59,7 +58,7 @@ else
 </div>
 
 <section class="sc-sheet" aria-labelledby="the-summary">
-<h2 id="the-summary">The summary</h2>
+<h2 id="the-summary">Summary</h2>
 <partial name="_SummaryContent" model="Model.Summary" />
 </section>
 </div>

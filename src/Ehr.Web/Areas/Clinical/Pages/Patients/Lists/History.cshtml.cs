@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Ehr.Domain.Patients;
 using Ehr.Domain.Phi;
@@ -38,7 +39,7 @@ public class HistoryModel(PhiReader phi, PatientAssignments assignments, BreakGl
     static readonly (string Column, string Label)[] Fields =
     [
         ("display", "Name"), ("clinical_status", "Status"), ("status", "Status"), ("reaction", "Reaction"), ("severity", "Severity"),
-        ("criticality", "Risk"), ("dosage", "How it is taken"), ("effective_start", "Started"), ("effective_end", "Stopped"),
+        ("criticality", "Criticality"), ("dosage", "Dosage"), ("effective_start", "Started"), ("effective_end", "Stopped"),
         ("onset_date", "Onset"), ("sensitive", "Sensitive"),
     ];
 
@@ -86,6 +87,7 @@ public class HistoryModel(PhiReader phi, PatientAssignments assignments, BreakGl
                 "clinical_status" or "status" => ChartListWords.Status(change.TableName, value.ToString()),
                 "severity" => ChartListWords.Severity(value.ToString()),
                 "criticality" => ChartListWords.Criticality(value.ToString()),
+                "effective_start" or "effective_end" or "onset_date" => DateOnly.ParseExact(value.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture).ToString("MMM d, yyyy", CultureInfo.InvariantCulture),
                 _ => value.ToString(),
             },
         };

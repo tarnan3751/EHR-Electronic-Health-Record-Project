@@ -41,15 +41,16 @@ public class TC_UC16_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(NewPath(patient), Cancel);
-        Assert.Contains("Book appointment: Booked, Synthetic", form);
+        Assert.Contains("<h1>Book appointment</h1>", form);
+        Assert.Contains("Booked, Synthetic", form);
         Assert.Contains($"<option value=\"{clinician.Id}\" selected=\"selected\">Dr. Schedule One</option>", form);
-        Assert.Contains("The patient sees this in the portal.", form);
+        Assert.Contains("Reason (shown to the patient) <span>(required)</span>", form);
         Assert.Equal(reads + 1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
 
         using var booked = await BookAsync(session.Client, patient, clinician.Id, Day(1), "09:30", "Synthetic: blood pressure check");
         Assert.Equal(HttpStatusCode.OK, booked.StatusCode);
         var listed = await ReadAsync(booked);
-        Assert.Contains($"<strong>{Day(1)} 09:30 UTC</strong> · 20 minutes · Dr. Schedule One", listed);
+        Assert.Contains($"<strong>{DateOnly.ParseExact(Day(1), "yyyy-MM-dd", null):MMM d, yyyy} 09:30 UTC</strong> · 20 minutes · Dr. Schedule One", listed);
         Assert.Contains("Synthetic: blood pressure check", listed);
         Assert.Equal([$"booked {clinician.Id}"], await RowsAsync(apps, patient, "status || ' ' || booked_by_id"));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Insert, clinician.Id, patient));
@@ -63,7 +64,7 @@ public class TC_UC16_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         using var checkedIn = await ChangeAsync(session.Client, appointment, "CheckIn");
         var after = await ReadAsync(checkedIn);
-        Assert.Contains("Checked in. The visit has started and is on the chart.", Words(after));
+        Assert.Contains("Checked in.", Words(after));
         Assert.DoesNotContain("Cancel appointment</button>", after);
         Assert.Equal(["fulfilled in-progress Synthetic: blood pressure check"], await RowsAsync(apps, patient,
             "status || ' ' || (SELECT e.status || ' ' || e.reason FROM ehr.encounters e WHERE e.id = encounter_id AND e.patient_id = appointments.patient_id)"));

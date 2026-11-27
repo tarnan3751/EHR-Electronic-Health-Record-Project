@@ -425,7 +425,7 @@ public static partial class DictationApi
     // In a visit's words for a visit's session, which the Listen page shows after Start.
     static IResult Unavailable(bool ambient = false) =>
         Refuse(StatusCodes.Status503ServiceUnavailable, "unavailable",
-            ambient ? "Listening isn't available right now. You can type the note." : "Dictation isn't available right now.");
+            ambient ? "Listening unavailable." : "Dictation isn't available right now.");
 
     static IResult BadAnswer() =>
         Refuse(StatusCodes.Status502BadGateway, "bad_answer", "Dictation isn't working right now.");

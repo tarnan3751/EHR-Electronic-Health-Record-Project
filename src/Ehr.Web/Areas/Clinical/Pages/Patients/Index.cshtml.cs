@@ -80,7 +80,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
 
             if (Request.Query.ContainsKey("name") || Request.Query.ContainsKey("birthdate") || Request.Query.ContainsKey("mrn"))
             {
-                Problems = ["Enter a name, date of birth, or MRN to search."];
+                Problems = ["Enter a name, date of birth or MRN."];
                 return;
             }
 
@@ -94,27 +94,27 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
         var problems = new List<string>();
         if (name is { Length: < PhiReader.MinimumNameLength })
         {
-            problems.Add($"Type at least {PhiReader.MinimumNameLength} letters of the name.");
+            problems.Add($"Name must be at least {PhiReader.MinimumNameLength} letters.");
         }
         else if (name is { Length: > MaximumNameLength })
         {
-            problems.Add($"A name can be at most {MaximumNameLength} characters.");
+            problems.Add($"Name must be {MaximumNameLength} characters or fewer.");
         }
         else if (name?.Any(char.IsControl) == true)
         {
             // Such as a NUL, which PostgreSQL refuses in text.
-            problems.Add("The name has a control character in it. Type it again.");
+            problems.Add("Name contains an unsupported character.");
         }
 
         if (Search.Birthdate?.Trim() is { Length: > 0 } text)
         {
             if (!DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
             {
-                problems.Add("Enter the date of birth as a full date, such as 1980-05-02.");
+                problems.Add("Date of birth must be a full date, such as 1980-05-02.");
             }
             else if (date > LatestBirthDate)
             {
-                problems.Add("That date of birth is in the future. Check the year.");
+                problems.Add("Date of birth must be in the past.");
             }
             else
             {
@@ -125,8 +125,8 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments) : PageMod
         if (mrn is not null && !PhiReader.CouldBeMrn(mrn))
         {
             problems.Add(mrn.Length > PhiReader.MaximumMrnLength
-                ? $"An MRN has at most {PhiReader.MaximumMrnLength} characters."
-                : "The MRN has a control character in it. Type it again.");
+                ? $"MRN must be {PhiReader.MaximumMrnLength} characters or fewer."
+                : "MRN contains an unsupported character.");
         }
 
         Problems = problems;

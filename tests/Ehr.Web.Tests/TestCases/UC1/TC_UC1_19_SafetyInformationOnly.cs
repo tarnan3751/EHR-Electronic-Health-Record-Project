@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   3. Choose "Sign order" for lisinopril; choose it again. Then ask for the same order again off-site.
 // Expected result: Step 1: signed with nothing found (the uncoded allergy can't be checked, and the form says
 //   allergies and medications without a code aren't). Step 2: no line about safety checks. Step 3: the first press signs nothing and
-//   brings the form back with "Be aware" and "Sign again to go ahead, or cancel.", the cursor on "Sign order" and no
+//   brings the form back with "Be aware" and "Sign again to continue.", the cursor on "Sign order" and no
 //   reason field; the second signs; the order holds the moderate interaction with metformin from DDInter and no reason. Off-site, the form for the same
 //   drug shows "Be aware" with "Interaction: lisinopril with metformin", "Moderate", "Source: DDInter 2.0" with a link
 //   to DDInter's interaction checker, "These don't stop the order.", and no reason field.
@@ -42,7 +42,7 @@ public class TC_UC1_19_SafetyInformationOnly(WebApps apps) : IClassFixture<WebAp
         Assert.Equal($"/patients/{patient}", PathOf(uncoded));
         Assert.Equal(["-|-"], await OrdersAsync(apps, patient));
         var medicationForm = Words(await session.Client.GetStringAsync(FormPath(patient, "medication"), Cancel));
-        Assert.Contains("Only items with a drug code are checked.", medicationForm);
+        Assert.Contains("Demonstration decision support, not a complete clinical reference.", medicationForm);
         Assert.Contains("Allergies and medications without a code aren't checked.", medicationForm);
         Assert.Contains("No warning doesn't mean a combination is safe.", medicationForm);
         Assert.DoesNotContain("data-safety-disclaimer", await session.Client.GetStringAsync(FormPath(patient, "lab"), Cancel));
@@ -54,7 +54,7 @@ public class TC_UC1_19_SafetyInformationOnly(WebApps apps) : IClassFixture<WebAp
         Assert.Equal(HttpStatusCode.UnprocessableEntity, first.StatusCode);
         var notes = await first.Content.ReadAsStringAsync(Cancel);
         Assert.Contains("data-order-safety=\"information\"", notes);
-        Assert.Contains("These don't stop the order. They are kept on it. Sign again to go ahead, or cancel.", Words(notes));
+        Assert.Contains("These don't stop the order. Sign again to continue.", Words(notes));
         Assert.Contains("name=\"SafetySeen\" value=\"true\"", notes);
         Assert.DoesNotContain("name=\"SafetyReason\"", notes);
         Assert.DoesNotContain("aria-invalid", notes);
@@ -74,10 +74,10 @@ public class TC_UC1_19_SafetyInformationOnly(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("Be aware", text);
         Assert.Contains("Interaction: lisinopril with metformin", text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("<span class=\"sc-tag sc-tag--warning\">Moderate</span>", page);
-        Assert.Contains("Use together with caution: monitor the patient, and consider adjusting a dose.", text);
+        Assert.Contains("Use with caution. Monitor the patient and consider adjusting a dose.", text);
         Assert.Contains("Source: DDInter 2.0.", text);
         Assert.Contains("href=\"https://ddinter2.scbdd.com/inter-checker/\"", page);
-        Assert.Contains("These don't stop the order. They are kept on it.", text);
+        Assert.Contains("These don't stop the order.", text);
         Assert.DoesNotContain("name=\"SafetyReason\"", page);
         Assert.Contains("Already ordered", page);
     }

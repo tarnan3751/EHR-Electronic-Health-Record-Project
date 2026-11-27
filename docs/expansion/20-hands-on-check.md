@@ -46,7 +46,7 @@ seal is broken.
 
 **M2. Where the password goes.** Under the form: "Signs in to: ehr.example.com:8443, ehr-remote.example.com:9443". Sign
 in as the clinician; note any Keychain prompt (choose **Always Allow**). Choose **Download my charts**, open a chart, and
-**Record audio**: macOS asks for the microphone once (allow it); it records and says "Recording saved on this device".
+**Record audio**: macOS asks for the microphone once (allow it); it records and says "Recording saved."
 If it can't record, note the message: the hardened runtime is the suspect.
 
 **M3. Its servers are its own.** Quit SwiftChart, and start it naming another server:
@@ -69,16 +69,16 @@ Copy `target/release/bundle/macos/SwiftChart.app.tar.gz` into `infra/compose/des
 `infra/compose/desktop-updates/latest.json` as `infra/compose/README.md` shows, with `"version": "0.2.1"` and only the
 `darwin-aarch64` entry, its signature the contents of `SwiftChart.app.tar.gz.sig`. Then:
 
-- Open SwiftChart (the 0.2.0 in Applications) and unlock. Within a few seconds: "Update available. Get SwiftChart 0.2.1 ready, …",
-  with **Get it ready** and **Not now**. Choose **Not now**: it goes. Quit and open it again, and unlock: it's back.
+- Open SwiftChart (the 0.2.0 in Applications) and unlock. Within a few seconds: "Update available. SwiftChart 0.2.1.",
+  with **Download update** and **Not now**. Choose **Not now**: it goes. Quit and open it again, and unlock: it's back.
 - Lock it (**Lock now** from the idle warning, or wait): the offer isn't over the lock. Unlock.
-- **Get it ready**: "Getting it ready. …", then "Ready. SwiftChart 0.2.1 is ready to install. …" with **Restart now**.
+- **Download update**: "Downloading. …", then "Ready to install. SwiftChart 0.2.1. …" with **Restart now**.
   **Restart now**: SwiftChart opens again on the lock; unlock: "SwiftChart 0.2.1." in the status line, your charts
   and drafts as they were. Note any Gatekeeper, Keychain or microphone prompt after the update.
 
 **M5. What it won't take.** Edit `latest.json`'s `version` to `0.2.2`, leaving the 0.2.1 file and its signature: a
-release that says it's newer than what was signed. Quit, open and unlock SwiftChart: "Update available. Get SwiftChart
-0.2.2 ready, …"; **Get it ready**: "Not installed. … its signature didn't match. Nothing was changed …", and the status line
+release that says it's newer than what was signed. Quit, open and unlock SwiftChart: "Update available. SwiftChart
+0.2.2."; **Download update**: "Not installed. SwiftChart 0.2.2 couldn't be downloaded, verified or installed (…)", and the status line
 still says 0.2.1. Then, from `infra/compose`, restart the two apps with a minimum above it:
 
 ```
@@ -116,7 +116,7 @@ the administrator. The draft saved in M6 never reached the server: that is the l
 since the final review couldn't: `ls ~/Library/Saved\ Application\ State/ | grep -i swiftchart` (macOS may keep a
 picture of the window there: note whether anything is, and whether it shows a chart).
 
-**M8. After.** Choose **Quit SwiftChart**, and open it again: "Sign in to sync", empty. In Safari, **Enable** the
+**M8. After.** Choose **Quit SwiftChart**, and open it again: "Sign in", empty. In Safari, **Enable** the
 clinician, then sign in as them in SwiftChart: it works. To leave nothing behind, quit, drag SwiftChart to the Trash,
 run the three lines in `docs/desktop-install.md` under "From a build named EHR", with `io.github.tarnan3751.swiftchart`
 in place of `com.example.ehr`, and remove `~/Library/WebKit/io.github.tarnan3751.swiftchart` and
@@ -168,17 +168,17 @@ and volumes, SwiftChart's own folders and credentials, and the hosts line; every
 anyway**). Run the setup: note SmartScreen's words, choose **More info**, then **Run anyway**. It installs without asking
 for an administrator's password, and SwiftChart is in the Start menu.
 
-**W2. The first launch.** Open SwiftChart: "Sign in to sync", "SwiftChart 0.2.0." in the status line, and under the form
+**W2. The first launch.** Open SwiftChart: "Sign in", "SwiftChart 0.2.0." in the status line, and under the form
 "Signs in to: ehr.example.com:8443, ehr-remote.example.com:9443". Sign in as the clinician, **Download my charts**, open
-a chart, **Record audio** (allow the microphone): "Recording saved on this device".
+a chart, **Record audio** (allow the microphone): "Recording saved."
 
 **W3. Step 19a's Windows section,** its W1 to W5, with this installed build: it locks after its full 15 idle minutes,
 warned at 13.
 
 **W4. An update.** Copy `SwiftChart_0.2.1_x64-setup.exe` and its `.sig` into `infra\compose\desktop-updates\`, and write
 `latest.json` there as `infra/compose/README.md` shows, with `"version": "0.2.1"` and only the `windows-x86_64` entry,
-its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock: "Update available. Get SwiftChart 0.2.1
-ready, …". **Get it ready**, then **Restart now**: the installer's progress shows, SwiftChart starts again on the lock, and
+its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock: "Update available. SwiftChart 0.2.1.".
+**Download update**, then **Restart now**: the installer's progress shows, SwiftChart starts again on the lock, and
 after unlocking says "SwiftChart 0.2.1.", with the charts as they were. Note whether SmartScreen or anything else asked.
 
 **W5. Disabled, revoked, and the wipe.** As the Mac's M6 and M7, in Edge as the administrator: stop the two apps, save

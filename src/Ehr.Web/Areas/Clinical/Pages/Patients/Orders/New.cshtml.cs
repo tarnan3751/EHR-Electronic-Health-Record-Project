@@ -169,33 +169,33 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
         var reason = string.IsNullOrWhiteSpace(DuplicateReason) ? null : DuplicateReason.Trim();
         if (Form.Duplicates.Count > 0 && reason is null)
         {
-            errors["DuplicateReason"] = "Give a reason to order this again, or cancel.";
+            errors["DuplicateReason"] = "Reason for duplicate order is required.";
         }
         else if (reason?.Length > OrderForms.MaximumReasonLength)
         {
-            errors["DuplicateReason"] = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
+            errors["DuplicateReason"] = $"Reason must be {OrderForms.MaximumReasonLength} characters or less.";
         }
 
         // Step 8: what the database knows against this order was read with the form. Signing needs a reason then.
         var safetyReason = string.IsNullOrWhiteSpace(SafetyReason) ? null : SafetyReason.Trim();
         if (Form.Warnings.Any(OrderSafetyText.NeedsReason) && safetyReason is null)
         {
-            errors["SafetyReason"] = "Give a reason to sign this order despite the warnings, or cancel.";
+            errors["SafetyReason"] = "Override reason is required.";
         }
         else if (safetyReason?.Length > OrderForms.MaximumReasonLength)
         {
-            errors["SafetyReason"] = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
+            errors["SafetyReason"] = $"Reason must be {OrderForms.MaximumReasonLength} characters or less.";
         }
 
         var changeReason = string.IsNullOrWhiteSpace(ChangeReason) ? null : ChangeReason.Trim();
         if (changeReason?.Length > OrderForms.MaximumReasonLength)
         {
-            errors["ChangeReason"] = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
+            errors["ChangeReason"] = $"Reason must be {OrderForms.MaximumReasonLength} characters or less.";
         }
 
         if (Form.Refill is { } asked && !Form.RenewsRefill)
         {
-            errors["Item"] = $"This order renews the same medication, {asked.CatalogItem}. To order another, decline the request and write a new order from the chart.";
+            errors["Item"] = $"Item must be {asked.CatalogItem} for this refill.";
         }
 
         if (errors.Count > 0)
@@ -235,7 +235,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
                 return changed;
             }
 
-            return Refused(new Dictionary<string, string> { ["SafetyReason"] = "Give a reason to sign this order despite the warnings, or cancel." });
+            return Refused(new Dictionary<string, string> { ["SafetyReason"] = "Override reason is required." });
         }
 
         if (order is null)
@@ -246,7 +246,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
                 return gone;
             }
 
-            return Refused(new Dictionary<string, string> { ["DuplicateReason"] = "Give a reason to order this again, or cancel." });
+            return Refused(new Dictionary<string, string> { ["DuplicateReason"] = "Reason for duplicate order is required." });
         }
 
         string url;

@@ -123,9 +123,9 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         using var sign = await PostAsync(page, "Sign", 2, extra: [("Confirmed", true)]);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, sign.StatusCode);
         var errors = await sign.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Enter Objective before signing", errors);
-        Assert.Contains("Enter Assessment before signing", errors);
-        Assert.Contains("Enter Plan before signing", errors);
+        Assert.Contains("Objective is required.", errors);
+        Assert.Contains("Assessment is required.", errors);
+        Assert.Contains("Plan is required.", errors);
         Assert.Equal(0, (await SignedAsync(page.Draft)).Count);
         var html = await page.Session.Client.GetStringAsync(page.Path, Cancel);
         Assert.Contains("Synthetic subjective", html);

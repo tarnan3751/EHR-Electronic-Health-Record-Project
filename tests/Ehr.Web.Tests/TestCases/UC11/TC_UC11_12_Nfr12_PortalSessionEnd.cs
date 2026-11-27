@@ -28,7 +28,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   2. Press Tab, then Shift+Tab, then Escape.
 //   3. Let 15 minutes and 5 seconds pass; sign in again; send.
 //   4. As Synthetic Helper, acting for Synthetic Sharer, type a message; let 20 minutes pass; sign in again; send.
-// Expected result: Step 1: the warning says "To keep your health information safe…", with the focus on "Stay signed
+// Expected result: Step 1: the warning says "You'll be signed out in…", with the focus on "Stay signed
 //   in", and every button in it at least 44 pixels tall within the 360-pixel screen. Step 2: Tab goes to "Sign out now"
 //   and Shift+Tab back, inside the warning; Escape closes it, and the session has its 15 minutes again. Step 3: the page is cleared and comes
 //   back with the message, which is saved in Synthetic Portalwriter's record. Step 4: the page comes back still saying
@@ -82,7 +82,7 @@ public class TC_UC11_12_Nfr12_PortalSessionEnd(WebApps apps) : IClassFixture<Web
         // 1.
         await IdleAsync(apps, page, TimeSpan.FromMinutes(13));
         await page.WaitForSelectorAsync(OpenWarning);
-        Assert.Contains("To keep your health information safe", await page.TextContentAsync("[data-session-idle-text]"));
+        Assert.Contains("You'll be signed out in", await page.TextContentAsync("[data-session-idle-text]"));
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-session-stay]')"));
         var buttons = await page.EvaluateAsync<string>($$"""
             () => [...document.querySelectorAll('{{Warning}} button')].filter(b => !b.hidden)
@@ -107,7 +107,7 @@ public class TC_UC11_12_Nfr12_PortalSessionEnd(WebApps apps) : IClassFixture<Web
         // 3.
         await IdleAsync(apps, page, TimeSpan.FromMinutes(15) + TimeSpan.FromSeconds(5));
         await page.WaitForSelectorAsync("[data-session-why='idle']");
-        Assert.Contains("to keep your health information safe", await SeenAsync(page));
+        Assert.Contains("Signed out. No activity for 15 minutes.", await SeenAsync(page));
         Assert.DoesNotContain(Body, await SeenAsync(page));
         await SignInAgainAsync(page, email, password);
         await page.WaitForSelectorAsync("#message-body");

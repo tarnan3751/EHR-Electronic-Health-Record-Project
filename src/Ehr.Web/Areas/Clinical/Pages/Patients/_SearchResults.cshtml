@@ -22,36 +22,36 @@ else if (Model.Searched)
     {
         @if (Model.Results.Any(patient => !Model.Panel.Contains(patient.Id)))
         {
-            <p class="sc-muted"><span class="sc-tag sc-tag--warning">Restricted</span> Not one of your patients. Opening the chart asks for a reason first.</p>
+            <p class="sc-muted"><span class="sc-tag sc-tag--warning">Restricted</span> Not one of your patients.</p>
         }
         <partial name="_PatientTable" model="new PatientTable(Model.Results, Model.Panel, MarkPanel: true, Model.Search)" />
         @if (Model.More && Model.Live)
         {
-            <p class="sc-muted">More patients match than are shown. Keep typing to narrow them, or press Enter to see more.</p>
+            <p class="sc-muted">More patients match. Keep typing, or press Enter to see more.</p>
         }
         else if (Model.More)
         {
-            <p class="sc-muted">More patients match than are shown. Add more of the name, or a date of birth, to narrow them.</p>
+            <p class="sc-muted">More patients match. Add more of the name, or a date of birth.</p>
         }
     }
 }
 else if (Model.Live)
 {
-    <p class="sc-muted">Type a name, a date of birth or an MRN to search, or press Clear to see your patients.</p>
+    <p class="sc-muted">Enter a name, date of birth or MRN.</p>
 }
 else
 {
     <h2>My patients</h2>
     @if (Model.PanelPatients.Count == 0)
     {
-        <p class="sc-empty">No patients yet. Search for a patient, then add them from their chart.</p>
+        <p class="sc-empty">No patients.</p>
     }
     else
     {
         <partial name="_PatientTable" model="new PatientTable(Model.PanelPatients, Model.Panel, MarkPanel: false, SearchQuery.None)" />
         @if (Model.PanelMore)
         {
-            <p class="sc-muted">Showing the first @IndexModel.PanelLimit, by name. Search to find the others.</p>
+            <p class="sc-muted">Showing the first @IndexModel.PanelLimit. Search to find the others.</p>
         }
     }
 }

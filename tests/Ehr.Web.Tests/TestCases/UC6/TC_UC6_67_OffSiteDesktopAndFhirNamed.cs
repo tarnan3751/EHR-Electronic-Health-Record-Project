@@ -23,8 +23,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Dr. Offline reads the patient through the FHIR API, and the desktop app takes its offline copy.
 //   3. The patient opens Who viewed my record.
 // Expected result: Step 1: the read arrives in the clinic's log from the cloud with the part "results". Step 3: the
-//   patient's own line "Your test results"; Dr. Offline's, "Your record, through the clinic's connection for health apps (FHIR)" and
-//   "Your chart, saved on a clinician's computer to use offline".
+//   patient's own line "Test results"; Dr. Offline's, "Record, through the health app connection (FHIR)" and
+//   "Chart, saved for offline use".
 // Creator: Tahseen Arnan
 public class TC_UC6_67_OffSiteDesktopAndFhirNamed(WebApps apps) : IClassFixture<WebApps>
 {
@@ -60,7 +60,7 @@ public class TC_UC6_67_OffSiteDesktopAndFhirNamed(WebApps apps) : IClassFixture<
 
         // Step 3.
         var html = await PageAsync(patient.Client);
-        Assert.Contains("Your test results", PartsOf(html, "you").Select(Uncounted));
-        Assert.Equal(["Your chart, saved on a clinician's computer to use offline", "Your record, through the clinic's connection for health apps (FHIR)"], PartsOf(html, "staff"));
+        Assert.Contains("Test results", PartsOf(html, "you").Select(Uncounted));
+        Assert.Equal(["Chart, saved for offline use", "Record, through the health app connection (FHIR)"], PartsOf(html, "staff"));
     }
 }

@@ -54,7 +54,7 @@ public sealed class StaffPasskeys(
         name = name?.Trim();
         if (string.IsNullOrEmpty(name) || name.Length > LongestName)
         {
-            return PasskeyCeremony.Refused("Name", $"Not saved. Name the passkey, in {LongestName} characters or fewer, such as This Mac.");
+            return PasskeyCeremony.Refused("Name", $"Not saved. Name must be 1 to {LongestName} characters.");
         }
 
         if (await LockedOutAsync(user, cancellationToken))
@@ -69,7 +69,7 @@ public sealed class StaffPasskeys(
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            return PasskeyCeremony.Refused("Code", "Not saved. Enter the code from your authenticator app.");
+            return PasskeyCeremony.Refused("Code", "Not saved. Code is required.");
         }
 
         if (!await users.VerifyTwoFactorTokenAsync(user, users.Options.Tokens.AuthenticatorTokenProvider, StaffSignIn.Normalize(code)))
@@ -77,7 +77,7 @@ public sealed class StaffPasskeys(
             await users.AccessFailedAsync(user);
             audit.Record(AuditActions.PasskeyRefused, tableName: StaffTable, rowId: user.Id, reason: "wrong code");
             await db.SaveChangesAsync(cancellationToken);
-            return PasskeyCeremony.Refused("Code", "Not saved. That code did not match. Enter the current code from your authenticator app.");
+            return PasskeyCeremony.Refused("Code", "Not saved. Wrong code.");
         }
 
         if (await SignedInAsync(context) is not { } binding)
@@ -111,7 +111,7 @@ public sealed class StaffPasskeys(
         {
             audit.Record(AuditActions.PasskeyRefused, tableName: StaffTable, rowId: user.Id, reason: "account changed");
             await db.SaveChangesAsync(cancellationToken);
-            return "Not saved. Your account's sign-in settings changed while this passkey was being added. Sign in again, then add it.";
+            return "Not saved. Your sign-in settings changed. Sign in again, then add the passkey.";
         }
 
         var made = await handler.PerformAttestationAsync(
@@ -121,7 +121,7 @@ public sealed class StaffPasskeys(
             logger.LogWarning("A passkey wasn't accepted as it was added: {Failure}", made.Failure?.Message);
             audit.Record(AuditActions.PasskeyRefused, tableName: StaffTable, rowId: user.Id, reason: "not accepted");
             await db.SaveChangesAsync(cancellationToken);
-            return "Not saved. The passkey wasn't accepted. A passkey has to ask for your PIN, fingerprint or face. Try again.";
+            return "Not saved. The passkey must ask for a PIN, fingerprint or face.";
         }
 
         if ((await users.GetPasskeysAsync(user)).Count >= MostPerAccount)
@@ -160,7 +160,7 @@ public sealed class StaffPasskeys(
     {
         if (pending is null)
         {
-            return PasskeyCeremony.Refused(null, "Not signed in. This sign-in took too long. Start again with your password.");
+            return PasskeyCeremony.Refused(null, "Sign-in timed out. Start again with your password.");
         }
 
         var made = await handler.MakeRequestOptionsAsync(user, context);
@@ -196,7 +196,7 @@ public sealed class StaffPasskeys(
 
     const string StaffTable = "staff_users";
 
-    const string Locked = "Not saved. This account is locked after too many failed attempts. Try again in 15 minutes.";
+    const string Locked = "Not saved. Account locked. Try again in 15 minutes.";
 
     // The account held for the rest of the request (StaffUserLock), then refused, and the refusal recorded, if it is
     // locked out: by wrong passwords or codes, at sign-in or here, or disabled.
@@ -223,9 +223,9 @@ public sealed class StaffPasskeys(
         }
     }
 
-    const string TooMany = "Not saved. An account can have at most 10 passkeys. Remove one first.";
+    const string TooMany = "Not saved. You have the maximum of 10 passkeys.";
 
-    const string StartAgain = "Not saved. The passkey took too long, or this page was open too long. Try again.";
+    const string StartAgain = "Not saved. Timed out. Try again.";
 
     // This staff sign-in, as its cookie's ticket has it: when it began (SessionTimes), kept by every renewal and
     // different for every sign-in. Null without one.

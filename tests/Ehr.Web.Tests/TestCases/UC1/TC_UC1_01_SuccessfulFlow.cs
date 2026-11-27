@@ -28,7 +28,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   3. Enter the item and the reason, and select "Sign order".
 //   4. Follow the answer back to the chart.
 //   5. Read the order and its audit row from the database.
-// Expected result: The chart shows "Order signed. Complete blood count (CBC)" and lists, under "Active orders",
+// Expected result: The chart shows "Order signed." and lists, under "Active orders",
 //   "Complete blood count (CBC) (Lab) Reason for the test: Synthetic fatigue"; "No active orders." is gone. The form's
 //   banner and allergies are one recorded read. The order's signer is the clinician and its signing time is the
 //   moment of signing; the audit row for the insert names the same clinician, at that time.
@@ -49,7 +49,7 @@ public class TC_UC1_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(FormPath(patient, "lab"), Cancel);
-        Assert.Contains("New order: Orderable, Synthetic", form);
+        Assert.Contains("<h1>New order</h1>", form);
         Assert.Contains("<strong>Penicillin</strong>: Hives", form);
         Assert.Contains("High risk", form);
         Assert.Contains("<option value=\"Complete blood count (CBC)\"></option>", form);
@@ -66,7 +66,7 @@ public class TC_UC1_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         var url = JsonDocument.Parse(await signed.Content.ReadAsStringAsync(Cancel)).RootElement.GetProperty("url").GetString()!;
 
         var confirmed = await session.Client.GetStringAsync(url, Cancel);
-        Assert.Contains("Order signed. Complete blood count (CBC)", Words(confirmed));
+        Assert.Contains("Order signed.", Words(confirmed));
         Assert.Contains("<h3>Active orders</h3>", confirmed);
         Assert.Contains("<strong>Complete blood count (CBC)</strong> (Lab)", confirmed);
         Assert.Contains("Reason for the test: Synthetic fatigue", confirmed);

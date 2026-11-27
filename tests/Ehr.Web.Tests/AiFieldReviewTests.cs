@@ -140,7 +140,8 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.SignNote, patientId: f.Patient));
         var review = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
         Assert.Contains("originalValue", review);
-        Assert.Contains("read-only", review);
+        Assert.Contains("Signed.</span>", review);
+        Assert.DoesNotContain("data-review-controls", review);
         Assert.DoesNotContain("htmx.min.js", review);
     }
 
@@ -588,8 +589,8 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         var html = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
         Assert.Contains("Original transcript, in Spanish", html);
         Assert.Contains("<div class=\"sc-transcript__body\" data-dictation-transcript lang=\"es\">", html);
-        Assert.Contains("<span class=\"sc-notice__state\">Translated from Spanish.</span> Check each English sentence against the Spanish beside it before you accept it.", html);
-        Assert.Contains("A dictation in Spanish never proposes orders or allergy changes.", html);
+        Assert.Contains("<span class=\"sc-notice__state\">Translated from Spanish.</span> Check each English sentence against the Spanish before accepting it.", html);
+        Assert.Contains("None from a Spanish dictation.", html);
         Assert.DoesNotContain("data-chart-proposals ", html);
         foreach (var (field, statements) in DictationSidecarStub.SpanishFields)
         {
@@ -667,14 +668,14 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
         }
 
         var editor = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.Editor, Cancel));
-        Assert.Matches($"(?s)Finished dictation reviews.*{f.Review}\">Dictation in Spanish and review saved ", editor);
+        Assert.Matches($"(?s)Finished dictation reviews.*{f.Review}\">Dictation in Spanish reviewed ", editor);
         using var sign = await EditorPost(f, "Sign", version + 1, extra: [("Confirmed", true)]);
         Assert.Equal(HttpStatusCode.OK, sign.StatusCode);
         var signed = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync((await Json(sign)).GetProperty("url").GetString()!, Cancel));
-        Assert.Matches($"(?s)Finished dictation reviews.*{f.Review}\">Dictation in Spanish and review saved ", signed);
+        Assert.Matches($"(?s)Finished dictation reviews.*{f.Review}\">Dictation in Spanish reviewed ", signed);
 
         var reopened = WebUtility.HtmlDecode(await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel));
-        Assert.Contains("Signed.</span> This review is read-only.", reopened);
+        Assert.Contains("Signed.</span></p>", reopened);
         Assert.Contains("Translated from Spanish.", reopened);
         foreach (var (english, spanish) in DictationSidecarStub.SpanishFields.SelectMany(field => field.Statements))
         {
@@ -695,7 +696,7 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.OK, complete.StatusCode);
         }
 
-        Assert.Matches($"(?s)Finished dictation reviews.*{inEnglish.Review}\">Dictation and review saved ",
+        Assert.Matches($"(?s)Finished dictation reviews.*{inEnglish.Review}\">Dictation reviewed ",
             WebUtility.HtmlDecode(await inEnglish.Session.Client.GetStringAsync(inEnglish.Editor, Cancel)));
     }
 

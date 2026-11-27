@@ -51,7 +51,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
         if (!Forms.Upcoming.Any(appointment => appointment.Id == AppointmentId) || !Questionnaires.Any(q => q.Code == Questionnaire))
         {
-            Error = "Choose a booked appointment and a questionnaire.";
+            Error = "Appointment and questionnaire are required.";
         }
         else
         {

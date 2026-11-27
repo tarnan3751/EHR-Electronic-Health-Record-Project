@@ -52,7 +52,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await NotSavedAsync(response);
         Assert.DoesNotContain("Text another site chose", html);
-        Assert.Contains("What you entered may still be there", html);
+        Assert.Contains("Go back and try again later.", html);
     }
 
     // What is shown again was kept in memory, never on the cloud server's disk, so a form too large for that isn't kept.
@@ -68,7 +68,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await NotSavedAsync(response);
         Assert.DoesNotContain("Too long to keep.", html);
-        Assert.Contains("What you entered may still be there", html);
+        Assert.Contains("Go back and try again later.", html);
     }
 
     // UC 1's order form during an outage: the order is refused, and what was entered is kept. With JavaScript,
@@ -131,7 +131,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         // The draft, reopened off-site, is shown as last saved, without the editor.
         var draft = await offSite.GetStringAsync(path, Cancel);
-        Assert.Contains("This draft can't be changed or signed until the clinic's server is back.", draft);
+        Assert.Contains("sc-notice--band", draft);
         Assert.DoesNotContain("<textarea", draft);
         Assert.DoesNotContain("note-editor.js", draft);
         Assert.Contains(patient.ToString(), draft);
@@ -157,7 +157,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var page = await offSite.GetStringAsync(QuickTexts, Cancel);
         Assert.Contains("Still readable off-site", page);
-        Assert.Contains("Phrases can't be added or changed until the clinic's server is back.", page);
+        Assert.Contains("Quick text can't be added or changed until the clinic's server is back.", page);
         Assert.DoesNotContain("add-quick-text", page);
         Assert.DoesNotContain("handler=Edit", page);
     }
@@ -189,7 +189,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         var panel = await Client(apps.CloudCutOff, session.Jar).GetStringAsync("/patients", Cancel);
 
         Assert.Contains("Panelread, Lior", panel);
-        Assert.Contains("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back.", Words(panel));
+        Assert.Contains("Read-only. The clinic's server can't be reached.", Words(panel));
         Assert.Single(QueuedReads(apps.CloudCutOff), e => e.PatientId == patient && e.ActorId == clinician.Id);
     }
 
@@ -208,7 +208,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         await ShipAsync(apps.CloudCutOff);
         var offSite = Client(apps.CloudCutOff, session.Jar);
         var confirm = await offSite.GetStringAsync($"{path}/confirm?version=2", Cancel);
-        Assert.Contains("This note can't be signed while the clinic's server can't be reached.", confirm);
+        Assert.Contains("sc-notice--band", confirm);
         Assert.DoesNotContain("Sign note", confirm);
 
         // Signed on-site, read off-site.
@@ -274,7 +274,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         var page = await offSite.GetStringAsync($"/patients/{patient}/dictate", Cancel);
         using var start = await HtmxPostAsync(offSite, Ehr.Web.Api.Dictation.DictationApi.Path, Token(page));
 
-        Assert.Contains("Dictation needs the clinic's server", page);
+        Assert.Contains("Dictation unavailable.", page);
         Assert.Contains(QueuedReads(apps.CloudCutOff), e => e.TableName == "patients" && e.PatientId == patient && e.ActorId == clinician.Id);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, start.StatusCode);
     }
@@ -293,7 +293,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         using var signIn = await PlainPostAsync(anonymous, "/sign-in", Token(signInPage), ("Input.Email", clinician.Email), ("Input.Password", clinician.Password));
 
         Assert.Equal("/sign-in", PathOf(home));
-        Assert.Contains("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back.", Words(signInPage));
+        Assert.Contains("Read-only. The clinic's server can't be reached.", Words(signInPage));
         var html = await NotSavedAsync(signIn);
         Assert.DoesNotContain(clinician.Password, html);
         Assert.DoesNotContain(clinician.Email, html);

@@ -104,7 +104,7 @@ public sealed class SecureMessages(EhrDbContext db, IEmailSender email)
         if (address is not null)
         {
             await email.SendAsync(address, "New message from your clinic",
-                "Your clinic sent you a message. For your privacy it isn't included in this email. Sign in to the patient portal to read it.",
+                "Your clinic sent you a message. Sign in to the patient portal to read it.",
                 new EmailAction("Read your message", portalLink), cancellationToken);
         }
     }

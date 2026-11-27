@@ -59,11 +59,11 @@ public class DiscontinueModel(PhiReader phi, PatientAssignments assignments, Cli
         var reason = Reason?.Trim();
         if (string.IsNullOrEmpty(reason))
         {
-            Error = "Enter the reason for discontinuing the order.";
+            Error = "Reason for discontinuing is required.";
         }
         else if (reason.Length > OrderForms.MaximumReasonLength)
         {
-            Error = $"Shorten the reason to {OrderForms.MaximumReasonLength} characters or fewer.";
+            Error = $"Reason must be {OrderForms.MaximumReasonLength} characters or less.";
         }
 
         if (Error is not null)

@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Check the patient in. Type 130/80 for the same time again, then 130/80 with a heart rate of 70.
 //   3. Record a heart rate of 70 taken ten minutes ago. Type 72 for the same time.
 // Expected result: Steps 1 and 2: each is answered 422 with "Not saved.", and the systolic field says "A blood pressure
-//   already stands for that time. Mark it entered in error first, then record the correct one."; what was typed is
+//   is already recorded for that time. Mark it as entered in error first."; what was typed is
 //   still in the form; nothing is saved: 120/80 is the one reading for that time, and the heart rate wasn't saved
 //   either. Taken five minutes before the check-in, the reading is tied to the visit it started (Tahseen's answer on
 //   step 9c). Step 3: 422, and the heart rate field says "A value already stands for this sign at that
@@ -31,7 +31,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    const string Pressure = "A blood pressure already stands for that time. Mark it entered in error first, then record the correct one.";
+    const string Pressure = "A blood pressure is already recorded for that time. Mark it as entered in error first.";
 
     static async Task RefusedAsync(HttpResponseMessage response, string field, string message, params string[] typed)
     {
@@ -73,7 +73,7 @@ public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebAp
         using var rate = await RecordAtAsync(session.Client, patient, earlier, (HeartRate, "70"));
         Assert.Contains("Saved.", await ReadAsync(rate));
         using var other = await RecordAtAsync(session.Client, patient, earlier, (HeartRate, "72"));
-        await RefusedAsync(other, HeartRate, "A value already stands for this sign at that time. Mark it entered in error first, then record the correct one.", "72");
+        await RefusedAsync(other, HeartRate, "A value is already recorded for that time. Mark it as entered in error first.", "72");
         Assert.Equal([$"{HeartRate} 70", $"{Diastolic} 80", $"{Systolic} 120"], await RecordedAsync(apps, patient));
     }
 }

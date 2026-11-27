@@ -86,7 +86,7 @@ public class TC_UC14_33_Nfr12_FourSectionsKeyboardFirst(WebApps apps) : IClassFi
         Assert.StartsWith("Vital signs, ", objective);
         Assert.Contains("heart rate 72 per minute", objective);
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#Objective')"));
-        Assert.Equal("Vital signs added to Objective. Check them before signing.", await page.Locator("[data-note-vitals-status]").TextContentAsync());
+        Assert.Equal("Vital signs added to Objective.", await page.Locator("[data-note-vitals-status]").TextContentAsync());
 
         await AiReviewBrowserTests.TabToAsync(page, "#Assessment");
         await page.Keyboard.InsertTextAsync("Synthetic keyboard assessment");

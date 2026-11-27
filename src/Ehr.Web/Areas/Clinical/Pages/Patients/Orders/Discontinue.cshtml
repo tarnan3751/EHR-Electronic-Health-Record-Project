@@ -5,7 +5,7 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.Form.Patient;
-    ViewData["Title"] = $"Discontinue order: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "Discontinue order";
 }
 @* UC 1 (Tahseen Arnan). js/orders.js posts the form with fetch, and keeps it filled when the clinic's server can't be
    reached; without JavaScript it posts as a normal form. *@
@@ -18,12 +18,12 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
-<h1>Discontinue order: @patient.FamilyName, @patient.GivenName</h1>
+<h1>Discontinue order</h1>
 
 <form method="post" class="sc-form sc-formcard" data-order-form>
     @if (Model.Gone)
     {
-        <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active. Someone discontinued or changed it first.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active.</p>
     }
     else
     {
@@ -33,7 +33,6 @@
     {
         <h2>@OrderForms.TypeNames[order.Type] order</h2>
         <p data-order-discontinues><strong>@order.Display</strong> @OrderForms.Summary(order.Type, order.Details) · signed @Clinic.Format(order.SignedAt)</p>
-        <p class="sc-muted">It moves to discontinued orders, with your reason.</p>
     }
     <div class="sc-field">
         <label for="discontinue-reason">Reason for discontinuing <span>(required)</span></label>

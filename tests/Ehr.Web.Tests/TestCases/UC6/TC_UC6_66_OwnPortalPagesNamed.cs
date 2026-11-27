@@ -18,9 +18,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. The patient opens each page and downloads their record.
 //   2. The patient opens Who viewed my record, twice.
-// Expected result: The patient's own lines name, each once or more and nothing else: "Your portal home page, with your
-//   appointments", "Your appointments", "Your test results", "Your messages", "Your visit summaries", "Who you share your
-//   record with", "Your record, as a page to print", "Your record, downloaded", "Who viewed your record".
+// Expected result: The patient's own lines name, each once or more and nothing else: "Home page", "Appointments", "Test
+//   results", "Messages", "Visit summaries", "Sharing", "Printable record", "Record download", "Who viewed the record".
 // Creator: Tahseen Arnan
 public class TC_UC6_66_OwnPortalPagesNamed(WebApps apps) : IClassFixture<WebApps>
 {
@@ -44,8 +43,8 @@ public class TC_UC6_66_OwnPortalPagesNamed(WebApps apps) : IClassFixture<WebApps
         Assert.Equal(
             new[]
             {
-                "Your portal home page, with your appointments", "Your appointments", "Your test results", "Your messages", "Your visit summaries",
-                "Who you share your record with", "Your record, as a page to print", "Your record, downloaded", "Who viewed your record",
+                "Home page", "Appointments", "Test results", "Messages", "Visit summaries",
+                "Sharing", "Printable record", "Record download", "Who viewed the record",
             }.Order(StringComparer.Ordinal),
             PartsOf(await PageAsync(patient.Client), "you").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
     }

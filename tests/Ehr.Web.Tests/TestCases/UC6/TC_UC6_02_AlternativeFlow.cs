@@ -17,7 +17,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Sign in to the portal as Morgan Waiting.
 //   2. Open /portal/results.
-// Expected result: The page says "No test results yet. If you're expecting one, contact your care team."
+// Expected result: The page says "No test results yet."
 //   and doesn't show "Lipid panel".
 // Creator: Simar Rekhi
 public class TC_UC6_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
@@ -33,7 +33,7 @@ public class TC_UC6_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 
         var html = await client.GetStringAsync("/portal/results", Cancel);
 
-        Assert.Contains("No test results yet. If you're expecting one, contact your care team.", html);
+        Assert.Contains("No test results yet.", html);
         Assert.DoesNotContain("Lipid panel", html);
     }
 }

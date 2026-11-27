@@ -14,8 +14,7 @@ namespace Ehr.Web.Tests;
 [Collection(BrowserTests.Collection)]
 public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
 {
-    const string Hint = "Experimental Speak Spanish. The transcript stays in Spanish, and the proposed note is in English for you to check. "
-        + "You don't need to say punctuation. Up to 2 minutes in Spanish.";
+    const string Hint = "Experimental The transcript stays in Spanish; the proposed note is in English.";
 
     // A stand-in microphone that runs a dictation to its limit in a moment: AiReviewBrowserTests' with no end to its
     // chunks, one every 10 milliseconds, each 2 seconds of audio to the stub. Stopped, it hands over the last of the
@@ -184,7 +183,7 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
         if (language == "es")
         {
             await page.Locator("[data-dictation-language]").SelectOptionAsync("es");
-            Assert.Contains("Up to 2 minutes in Spanish.", await page.Locator("[data-dictation-language-hint]").TextContentAsync());
+            Assert.Contains("the proposed note is in English.", await page.Locator("[data-dictation-language-hint]").TextContentAsync());
         }
 
         await page.Locator("[data-dictation-start]").ClickAsync();
@@ -206,7 +205,7 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
                 $"{stopped} Finishing the transcript and proposing the fields. This can take up to a minute.",
             ],
             await page.EvaluateAsync<string[]>("seen.said"));
-        Assert.Equal($"{stopped} What you recorded is kept and goes on to the review. Start another dictation for the rest once you've reviewed it.",
+        Assert.Equal($"{stopped} Dictate the rest after reviewing this one.",
             await page.Locator("[data-dictation-limit]").TextContentAsync());
         Assert.True(await page.Locator("[data-dictation-limit]").IsVisibleAsync());
         Assert.False(await page.Locator("[data-dictation-time-left]").IsVisibleAsync());

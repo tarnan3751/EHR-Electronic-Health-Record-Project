@@ -7,7 +7,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 
 // Test Case ID: TC-UC6-70
 // Purpose / scenario: Views recorded without their part, before step 13c2 or by an app older than its migration, read
-//   as they did: from what the log says was read, with how many in a minute, "Your record" for most pages and a count of
+//   as they did: from what the log says was read, with how many in a minute, "Record" for most pages and a count of
 //   the notes a chart listed, which can't be told apart from notes opened.
 // Type: Functional (alternative flow: views recorded before parts)
 // Requirements: proposed FR-57
@@ -21,8 +21,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. The patient opens Who viewed my record.
 //   2. The proxy opens Who viewed the record.
-// Expected result: Step 1: Dr. Before's lines are, newest first, "3 visit notes", "Your record", "Your record, including
-//   sensitive items". Step 2: "The record" alone.
+// Expected result: Step 1: Dr. Before's lines are, newest first, "3 visit notes", "Record", "Record, with sensitive
+//   items". Step 2: "Record" alone.
 // Creator: Tahseen Arnan
 public class TC_UC6_70_ViewsRecordedBeforePartsReadAsBefore(WebApps apps) : IClassFixture<WebApps>
 {
@@ -49,9 +49,9 @@ public class TC_UC6_70_ViewsRecordedBeforePartsReadAsBefore(WebApps apps) : ICla
             [(AuditActions.Read, "patients", null), .. Enumerable.Repeat((AuditActions.Read, "clinical_notes", (string?)null), 3)]);
 
         // Step 1.
-        Assert.Equal(["3 visit notes", "Your record", "Your record, including sensitive items"], PartsOf(await PageAsync(patient.Client), "staff"));
+        Assert.Equal(["3 visit notes", "Record", "Record, with sensitive items"], PartsOf(await PageAsync(patient.Client), "staff"));
 
         // Step 2.
-        Assert.Equal(["The record"], PartsOf(await PageAsync(without.Client), "staff"));
+        Assert.Equal(["Record"], PartsOf(await PageAsync(without.Client), "staff"));
     }
 }

@@ -82,7 +82,7 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
         using var reset = await resetting;
         using var signedIn = await signingIn;
 
-        Assert.Contains("will set up an authenticator app again", Words(await ReadAsync(reset)));
+        Assert.Contains("Authenticator reset for ", Words(await ReadAsync(reset)));
         Assert.Equal(HttpStatusCode.Unauthorized, signedIn.StatusCode);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignInFailed, actorId: account.Id));
@@ -129,7 +129,7 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
         }
     }
 
-    const string LockedProblem = "This account is locked after too many failed attempts. Try again in 15 minutes.";
+    const string LockedProblem = "Account locked. Try again in 15 minutes.";
 
     // Step 19.2: ten wrong passwords sent at once from the desktop app for one account, ten times over, as at the web:
     // five counted and recorded as wrong, the fifth locking the account, the rest refused and recorded as locked, every

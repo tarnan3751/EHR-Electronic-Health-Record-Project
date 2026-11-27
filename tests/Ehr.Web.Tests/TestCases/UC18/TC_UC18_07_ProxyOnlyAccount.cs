@@ -28,8 +28,8 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Expected result: Step 1: one email to the carer's address with a button "Create your portal account" to
 //   /portal/invitation with a code, and nobody's name. Step 2: the page says "Account created."; the account has no patient,
 //   a confirmed address and the name typed; the creation is in the audit log under the new account. Step 3: sign-in
-//   lands on "Whose record?", which lists "Synthetic Cared" and no "My record"; the app bar has Access and no record
-//   links; /portal and /portal/results both lead back to "Whose record?". Step 4: the patient's record, with the band
+//   lands on "Records", which lists "Synthetic Cared" and no "My record"; the app bar has Access and no record
+//   links; /portal and /portal/results both lead back to "Records". Step 4: the patient's record, with the band
 //   and "Choose another record"; Results opens; Access lists the record and has no "Who can see your record". Step 5:
 //   the clinician sees the message from "Synthetic Outside Carer (proxy)".
 // Creator: Tahseen Arnan
@@ -61,7 +61,7 @@ public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
 
         var session = await SignInAsync(apps, carer);
         Assert.Equal("/portal/choose", session.Path);
-        Assert.Contains("<h1>Whose record?</h1>", session.Page);
+        Assert.Contains("<h1>Records</h1>", session.Page);
         Assert.Contains("<h2>Synthetic Cared</h2>", session.Page);
         Assert.DoesNotContain("data-record=\"own\"", session.Page);
         Assert.Contains("href=\"/portal/access\"", session.Page);
@@ -77,7 +77,7 @@ public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
         using var chosen = await PostFormAsync(session.Client, "/portal/acting", "/portal/choose", ("grantId", grant));
         var home = await ReadAsync(chosen);
         Assert.Equal("/portal", PathOf(chosen));
-        Assert.Contains("Synthetic Cared&#x27;s record", home);
+        Assert.Contains("<dd>Synthetic Cared</dd>", home);
         Assert.Contains("Choose another record", home);
         Assert.Contains("href=\"/portal/results\"", home);
         Assert.Contains("Test results", await session.Client.GetStringAsync("/portal/results", Cancel));

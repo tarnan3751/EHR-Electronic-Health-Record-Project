@@ -20,8 +20,7 @@ busy the app is, as a web sign-in does (Tahseen's ruling 11b of 25 November 2026
 - **Every other refusal** (a session signed out here, a changed password, an account locked out or disabled, or the
   session's 30 days) carries no such header: that session is over.
 - **In the app** (`src/Ehr.Desktop/src-tauri/src/sync.rs`): the 12-hour answer keeps the session and the offline copy,
-  says "Sign in again. A sign-in lasts at most 12 hours. Until you do, nothing is sent or brought back. What you save
-  waits on this computer.", and locks the window once for a full sign-in (`docs/UC7.md`). Any other 401 ended the
+  says "Sign-in expired. Sign in again to sync.", and locks the window once for a full sign-in (`docs/UC7.md`). Any other 401 ended the
   session and forgot it, and now locks the window too, keeping the page for the same clinician, rather than clearing it.
   Since step 20's final review the session is ended but its token kept, not forgotten (below).
 - **What it costs.** The offline charts are refreshed only by **Download my charts**, and the drafts' pull brings back
@@ -94,7 +93,7 @@ before step 20 takes as a waiting recording refused for good.
   is shown in the server's words, for a round and a chart download, keeps the session, and asks for an update check
   once.
 - **TC-UC8-13** (`tests/Ehr.Web.Tests/TestCases/UC8/TC_UC8_13_RevokedAfterDisabled.cs`): disabled first from the staff
-  page, which says what stays on their computers until their desktop sign-ins are revoked, the token is refused
+  page, which says to revoke their desktop sign-ins now, the token is refused
   plainly on both sites; the revoke page says revoking works before or after; revoked, the same token is refused with
   `Ehr-Sign-In: revoked` on both sites. The app's side is TC-UC7-12's.
 - **TC-UC8-08** (`src/Ehr.Desktop/src-tauri/src/sync.rs`, `an_ended_sign_in_keeps_the_session_and_says_so`): a round

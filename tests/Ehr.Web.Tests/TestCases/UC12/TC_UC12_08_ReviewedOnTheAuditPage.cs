@@ -35,7 +35,7 @@ public class TC_UC12_08_ReviewedOnTheAuditPage(WebApps apps) : IClassFixture<Web
         // 1.
         var waiting = await admin.Client.GetStringAsync($"/admin/audit?Patient={access.Patient}&Flagged=true", Cancel);
         Assert.Contains("<tr class=\"sc-table__flagged\">", waiting);
-        Assert.Contains("Emergency access <span class=\"sc-tag sc-tag--danger\">Review</span>", waiting);
+        Assert.Contains("Break the glass <span class=\"sc-tag sc-tag--danger\">Review</span>", waiting);
         Assert.Contains(link, waiting);
         Assert.Contains("Synthetic: covering the ward tonight, asked by the charge nurse.", waiting);
 
@@ -47,7 +47,7 @@ public class TC_UC12_08_ReviewedOnTheAuditPage(WebApps apps) : IClassFixture<Web
 
         var done = await admin.Client.GetStringAsync($"/admin/audit?Patient={access.Patient}&Flagged=true", Cancel);
         Assert.DoesNotContain("sc-table__flagged", done);
-        Assert.Contains("Emergency access <span class=\"sc-tag\">Reviewed</span> <span class=\"sc-tag sc-tag--danger\">Not appropriate</span>", done);
+        Assert.Contains("Break the glass <span class=\"sc-tag\">Reviewed</span> <span class=\"sc-tag sc-tag--danger\">Not appropriate</span>", done);
         Assert.Contains(link, done);
         Assert.Contains("Synthetic: covering the ward tonight, asked by the charge nurse.", done);
     }

@@ -128,7 +128,7 @@ static class PasskeyFlows
         await page.Keyboard.PressAsync("Tab");
         await page.Keyboard.TypeAsync(Totp.Code(account.AuthenticatorKey));
         await page.Keyboard.PressAsync("Enter");
-        await page.WaitForSelectorAsync("text=Passkey added. Use it at your next sign-in");
+        await page.WaitForSelectorAsync("text=Passkey added.");
     }
 
     // The on-site app as Chromium reaches it through a ClinicalBrowserHost: passkeys tied to localhost, made and used only

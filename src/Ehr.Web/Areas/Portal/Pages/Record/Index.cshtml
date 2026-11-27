@@ -8,11 +8,10 @@
 <h1>@ViewData["Title"]</h1>
 @if (Model.Unavailable)
 {
-    <p class="sc-notice sc-notice--danger">@(own ? "Your record is" : "The record is") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(own ? "Your record is" : "The record is") not available right now.</p>
 }
-<p class="sc-prose">@(own ? "A copy of your" : $"A copy of {Model.ActingFor}'s") allergies, medications, diagnoses, test results, vital signs and appointments.</p>
 @* Said before anything is downloaded: the copy is the person's to look after once it leaves the portal. *@
-<p class="sc-notice sc-notice--warning" data-download-warning><span class="sc-notice__state">Keep it private.</span> Anyone with the file or the printout can read @(own ? "your" : "this person's") health information, and the clinic can't take it back. On a shared computer, delete the file when you're done.</p>
+<p class="sc-notice sc-notice--warning" data-download-warning><span class="sc-notice__state">Keep it private.</span> Anyone with the file or the printout can read @(own ? "your" : "this person's") health information.</p>
 @* A GET form, so the cloud app answers it too: the box asks for sensitive items, and each button names what it makes. A
    proxy the patient didn't allow sensitive items is offered no box: for them there are none. *@
 <form method="get" class="sc-stack sc-formcard">
@@ -20,7 +19,7 @@
     {
         <div class="sc-field">
             <label class="sc-check" for="record-sensitive"><input type="checkbox" id="record-sensitive" name="sensitive" value="true" checked="@Model.Sensitive" aria-describedby="record-sensitive-hint"> Include sensitive items</label>
-            <p class="sc-field__hint" id="record-sensitive-hint">Without this, diagnoses, medications and visit summaries marked sensitive are left out. Including them is logged.</p>
+            <p class="sc-field__hint" id="record-sensitive-hint">Including them is logged.</p>
         </div>
     }
     <div class="sc-actions">
@@ -31,9 +30,9 @@
 <details class="sc-prose">
     <summary>More about what's included</summary>
     <ul>
-        <li>The file uses FHIR, a standard format other clinics and health apps can read. It doesn't include visit summaries yet.</li>
-        <li>The printable page also has the @SummariesModel.Limit most recent visit summaries. You can print it or save it as a PDF.</li>
-        <li>Test results are included once the care team has shared them.</li>
+        <li>Both have the allergies, medications, diagnoses, test results, vital signs and appointments.</li>
+        <li>The file uses FHIR, a standard format other clinics and health apps can read. It has no visit summaries.</li>
+        <li>The printable page also has the @SummariesModel.Limit most recent visit summaries.</li>
         <li>Neither includes the care team's notes, messages, pre-visit forms, or who has looked at the record.</li>
     </ul>
 </details>

@@ -4,7 +4,7 @@
     // This page's address carries the patient and the search the clinician came from. Without htmx, nothing keeps it in
     // the browser's sessionStorage history, as on the chart.
     ViewData["UseHtmx"] = false;
-    ViewData["Title"] = Model.SwitchedOff ? "Listen to the visit" : $"Listen to the visit: {Model.Patient.FamilyName}, {Model.Patient.GivenName}";
+    ViewData["Title"] = "Listen to the visit";
     var chartRoute = Model.Search.RouteData();
     chartRoute["id"] = Model.PatientId.ToString();
 }
@@ -30,15 +30,15 @@
 {
     @* Listening switched off (Ehr:Ambient:Enabled), to a clinician whose patient this is: nothing about the patient read. *@
     <h1>Listen to the visit</h1>
-    <p data-ambient-switched-off>Listening to a visit is switched off at this clinic.</p>
+    <p data-ambient-switched-off>Listening is switched off at this clinic.</p>
     return;
 }
-<h1>Listen to the visit: @Model.Patient.FamilyName, @Model.Patient.GivenName</h1>
+<h1>Listen to the visit</h1>
 
 @if (!Model.AtTheClinic)
 {
     @* A visit is recorded only at the clinic: its conversation never crosses the WAN (Forwarding/CloudForwardingMiddleware). *@
-    <p class="sc-notice sc-notice--warning" data-ambient-offsite><span class="sc-notice__state">Unavailable here.</span> Listening works only on the clinic's network. You can dictate or type the note.</p>
+    <p class="sc-notice sc-notice--warning" data-ambient-offsite><span class="sc-notice__state">Unavailable here.</span> Listening works only on the clinic's network.</p>
 }
 else
 {
@@ -46,34 +46,35 @@ else
        consent, from what the app already holds. Nothing else changes. *@
     @if (HttpContext.RequestServices.GetService(typeof(Ehr.Web.Api.Dictation.DictationSidecar)) is Ehr.Web.Api.Dictation.DictationSidecar { IsConfigured: false })
     {
-        <p class="sc-notice sc-notice--warning" data-ambient-not-set-up><span class="sc-notice__state">Unavailable.</span> Listening isn't set up on this server. You can type the note.</p>
+        <p class="sc-notice sc-notice--warning" data-ambient-not-set-up><span class="sc-notice__state">Listening unavailable.</span></p>
     }
     <section data-ambient data-ambient-api="@Ehr.Web.Api.Dictation.DictationApi.AmbientPath" data-review-api="@Ehr.Web.Api.Dictation.DictationApi.Path" data-patient-id="@Model.Patient.Id" data-draft-id="@Model.DraftId" data-draft-version="@Model.DraftVersion">
         @Html.AntiForgeryToken()
-        <noscript><p class="sc-notice sc-notice--danger">Listening to a visit needs JavaScript. You can still type the note.</p></noscript>
+        <noscript><p class="sc-notice sc-notice--danger">Listening needs JavaScript.</p></noscript>
 
         <form class="sc-form sc-form--wide sc-formcard sc-formcard--wide" data-ambient-consent>
-            <h2 tabindex="-1" data-ambient-consent-heading>Before you start</h2>
-            <p>Ask the patient and anyone else who will speak if they agree to the visit being recorded. Read them this:</p>
+            <h2 tabindex="-1" data-ambient-consent-heading>Consent</h2>
+            <p>Read this to everyone who will speak:</p>
             <blockquote class="sc-notice sc-notice--info" data-ambient-statement>
                 <p>“I'd like SwiftChart to listen to our conversation to help me write today's note. The recording is deleted as soon as it's turned into text. I check everything before it goes in your record. The text is deleted once I've checked it, or after a week at the latest, except what it suggested for the note. You can say no, or ask me to stop at any time, and your care won't change either way. Is that all right with you?”</p>
             </blockquote>
-            <ul>
-                <li>For a child, ask a parent or guardian, and the child too if they're old enough to understand.</li>
-                <li>For anyone else who can't agree for themselves, ask the person who decides for them. Someone the patient shares their portal record with can't agree for them.</li>
-                <li>English only. Don't use it for a visit in another language or through an interpreter.</li>
-                <li>Nothing is recorded until you select Start listening. You can pause, stop or discard at any time.</li>
-                <li>The clinic's backups keep the text for up to 7 days.</li>
-            </ul>
+            <details>
+                <summary>More about consent</summary>
+                <ul>
+                    <li>For a child, ask a parent or guardian, and the child too if they're old enough to understand.</li>
+                    <li>For anyone else who can't agree, ask the person who decides for them. A portal proxy can't agree for them.</li>
+                    <li>English only. Not for a visit in another language or through an interpreter.</li>
+                </ul>
+            </details>
             <fieldset class="sc-stack">
                 <legend>Who will speak</legend>
                 <label class="sc-check" for="ambient-speakers-2"><input type="radio" id="ambient-speakers-2" name="Speakers" value="2" required> The patient and me</label>
-                <label class="sc-check" for="ambient-speakers-3"><input type="radio" id="ambient-speakers-3" name="Speakers" value="3"> The patient, me and one other person, such as a relative or carer</label>
+                <label class="sc-check" for="ambient-speakers-3"><input type="radio" id="ambient-speakers-3" name="Speakers" value="3"> The patient, me and one other person</label>
             </fieldset>
             <fieldset class="sc-stack">
                 <legend>Who agreed for the patient</legend>
                 <label class="sc-check" for="ambient-given-patient"><input type="radio" id="ambient-given-patient" name="GivenBy" value="patient" required> The patient</label>
-                <label class="sc-check" for="ambient-given-representative"><input type="radio" id="ambient-given-representative" name="GivenBy" value="representative"> Someone who decides for the patient, such as a parent, guardian or legal representative</label>
+                <label class="sc-check" for="ambient-given-representative"><input type="radio" id="ambient-given-representative" name="GivenBy" value="representative"> A parent, guardian or legal representative</label>
             </fieldset>
             <label class="sc-check" for="ambient-agreed"><input type="checkbox" id="ambient-agreed" name="Agreed" value="true" required> Everyone who will speak has agreed, aloud, to this visit being recorded to draft the note.</label>
             <div class="sc-actions">
@@ -101,18 +102,13 @@ else
                     <button type="button" class="sc-btn sc-btn--primary" data-ambient-stop>Stop and draft the note</button>
                     <button type="button" class="sc-btn sc-btn--danger" data-ambient-discard>Stop and discard</button>
                 </div>
-                <p class="sc-muted sc-prose" data-ambient-someone-else>If anyone else comes in, pause until they've agreed or left. If the patient changes their mind, select Stop and discard. Nothing recorded is kept.</p>
+                <p class="sc-muted sc-prose" data-ambient-someone-else>If someone else comes in, pause until they agree or leave. If the patient changes their mind, select Stop and discard.</p>
             </div>
         </section>
 
         <section class="sc-formcard sc-formcard--wide" data-ambient-speakers hidden aria-labelledby="ambient-speakers">
             <h2 id="ambient-speakers">Who is speaking</h2>
-            <p>Say who each voice is before the note is drafted.</p>
-            <ul>
-                <li>Subjective comes only from what the patient or someone with them said.</li>
-                <li>Objective, Assessment and Plan come only from what you said.</li>
-            </ul>
-            <p data-ambient-voices-two hidden>You said only the patient and you would speak, so any other voice can only be “I can't tell”.</p>
+            <p data-ambient-voices-two hidden>Any other voice can only be “I can't tell”: you said only the patient and you would speak.</p>
             <div class="sc-stack">
                 <div class="sc-stack" data-ambient-voices></div>
                 <div class="sc-actions" data-ambient-draft-actions>

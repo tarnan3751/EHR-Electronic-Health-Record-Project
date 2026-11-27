@@ -1,7 +1,7 @@
 @page "/portal"
 @model IndexModel
 @{
-    ViewData["Title"] = Model.ActingFor is { } name ? $"{name}'s record" : "My record";
+    ViewData["Title"] = Model.ActingFor is null ? "My record" : "Record";
 }
 @{
     // A proxy is reading about someone else (FR-19): the page doesn't call the record "yours".
@@ -10,7 +10,7 @@
 <h1>@ViewData["Title"]</h1>
 @if (Model.Ended)
 {
-    <p class="sc-notice sc-notice--warning" role="status"><span class="sc-notice__state">Access ended.</span> You can no longer see that record. This is your own.</p>
+    <p class="sc-notice sc-notice--warning" role="status"><span class="sc-notice__state">Access ended.</span> You can no longer see that record.</p>
 }
 @if (Model.Patient is { } patient)
 {
@@ -23,13 +23,12 @@
         </dl>
     </section>
     @* Results, appointments and messages as cards of one shape (docs/brand: the portal, one column), and the rest of
-       the record after them: what each holds on the left, its buttons in a column on the right (sc-home__card), so each
-       card's way in is in the same place. Each card's main way in is a button; the primary one is pre-visit forms, while
+       the record after them: each card's title, and what it lists, on the left, its buttons in a column on the right
+       (sc-home__card), so each card's way in is in the same place. Each card's main way in is a button; the primary one is pre-visit forms, while
        one waits to be filled in, the one thing on this page with something to do. Pages that only show the record are
        links. *@
     <section class="sc-panel sc-home__card" aria-labelledby="home-results">
         <h2 class="sc-panel__title" id="home-results">@(own ? "Your test results" : "Test results")</h2>
-        <p>Each result says what it means.</p>
         <p class="sc-home__actions"><a asp-page="/Results" class="sc-btn">@(own ? "See your test results" : "See test results")</a></p>
     </section>
     <section class="sc-panel sc-home__card sc-home__card--appointments" aria-labelledby="home-appointments">
@@ -40,7 +39,7 @@
         }
         else
         {
-            <p class="sc-muted">No upcoming appointments. To book one, contact the clinic.</p>
+            <p class="sc-muted">No upcoming appointments.</p>
         }
         <p class="sc-home__more"><a asp-page="/Appointments">@(own ? "All your appointments" : "All appointments")</a></p>
         @* Step 13e: always, but never to a proxy without sensitive items; how many can be filled in, while any can. *@
@@ -55,7 +54,7 @@
             <h2 class="sc-panel__title" id="home-messages">@(own ? "Messages with your care team" : "Messages with the care team")</h2>
             @if (Model.UnreadMessages > 0)
             {
-                <p><span class="sc-tag sc-tag--info">New</span> @Model.UnreadMessages @(Model.UnreadMessages == 1 ? "message" : "messages") from @(own ? "your" : "the") care team.</p>
+                <p><span class="sc-tag sc-tag--info">New</span> @Model.UnreadMessages @(Model.UnreadMessages == 1 ? "message" : "messages").</p>
             }
             else
             {
@@ -70,7 +69,6 @@
     }
     <section class="sc-panel sc-home__card sc-home__card--record" aria-labelledby="home-record">
         <h2 class="sc-panel__title" id="home-record">@(own ? "Visit summaries and your record" : "Visit summaries and this record")</h2>
-        <p>@(own ? "What your care team wrote for you after each visit." : "What the care team wrote after each visit.")</p>
         @* The button and the links under it, in the buttons' column. *@
         <div class="sc-home__side">
             @* Step 13a: what the care team wrote for the patient after a visit. *@
@@ -86,5 +84,5 @@
 }
 else
 {
-    <p class="sc-notice sc-notice--danger">@(own ? "Your record is" : "This record is") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(own ? "Your record is" : "This record is") not available right now.</p>
 }

@@ -6,10 +6,5 @@
 {
     var first = Model.Waiting[0];
     var one = Model.Waiting.Count == 1;
-    <p class="sc-notice sc-notice--warning" data-waiting-proposals="@Model.Waiting.Count"><span class="sc-notice__state">Awaiting review.</span> @(one ? "An order or allergy" : $"{Model.Waiting.Count} orders or allergies") proposed from dictation. <a asp-page="/Patients/Notes/Review" asp-area="Clinical" asp-route-patientId="@first.PatientId" asp-route-draftId="@Model.DraftId" asp-route-reviewId="@first.ReviewId">@(one ? "Review it" : "Review them")</a>. @if (Model.Signed)
-        {<text>You can still open or dismiss @(one ? "it" : "them").</text>}
-        else if (one)
-        {<text>Unlike the note's fields, it doesn't hold up signing.</text>}
-        else
-        {<text>Unlike the note's fields, they don't hold up signing.</text>}</p>
+    <p class="sc-notice sc-notice--warning" data-waiting-proposals="@Model.Waiting.Count"><span class="sc-notice__state">Awaiting review.</span> @(one ? "An order or allergy" : $"{Model.Waiting.Count} orders or allergies") proposed from dictation. <a asp-page="/Patients/Notes/Review" asp-area="Clinical" asp-route-patientId="@first.PatientId" asp-route-draftId="@Model.DraftId" asp-route-reviewId="@first.ReviewId">@(one ? "Review it" : "Review them")</a></p>
 }

@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 //   2. As the first clinician, mark the item done, then post the same again.
 //   3. Request the inbox as a signed-in patient, and with nobody signed in.
 // Expected result: Step 1: the second clinician's inbox doesn't show the item; both posts are answered with the inbox
-//   and "Nothing to mark. That item isn't waiting in your inbox. It may already be done."; the item still needs action. Step 2: the
+//   and "Nothing to mark. That item may already be done."; the item still needs action. Step 2: the
 //   first post marks it; the second is answered the same way and the done time doesn't change. Step 3: the patient
 //   and the anonymous request are each sent away (to staff sign-in or a "denied" page), and see no inbox.
 // Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
@@ -40,7 +40,7 @@ public class TC_UC15_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         foreach (var id in new[] { item, Guid.NewGuid() })
         {
             using var refused = await MarkDoneAsync(other.Client, id);
-            Assert.Contains("Nothing to mark. That item isn't waiting in your inbox. It may already be done.", Words(await ReadAsync(refused)));
+            Assert.Contains("Nothing to mark. That item may already be done.", Words(await ReadAsync(refused)));
         }
 
         Assert.False(await IsDoneAsync(apps, item));

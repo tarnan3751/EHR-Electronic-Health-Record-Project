@@ -18,7 +18,7 @@
     }
     <div class="sc-banner__meta">
         <span>MRN <span class="sc-banner__mrn">@Model.Patient.Mrn</span></span>
-        <span>Born @Model.Patient.BirthDate.ToString("yyyy-MM-dd")</span>
+        <span>Born @Model.Patient.BirthDate.ToString("MMM d, yyyy")</span>
         <span class="sc-banner__gender">@Model.Patient.Gender</span>
     </div>
     @if (Model.EmergencyUntil is not null || Model.Allergies is not null)
@@ -26,7 +26,7 @@
         <div class="sc-banner__end">
             @if (Model.EmergencyUntil is { } until)
             {
-                <span class="sc-tag sc-tag--danger">Emergency access until @Clinic.Format(until)</span>
+                <span class="sc-tag sc-tag--danger">Break-the-glass access until @Clinic.Format(until)</span>
             }
             @if (Model.Known.Count > 0)
             {

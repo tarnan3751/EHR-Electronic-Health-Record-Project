@@ -80,12 +80,12 @@ public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApp
 
         // A second standing summary of the same note.
         var form = await session.Client.GetStringAsync(SummaryPath(patient, note), Cancel);
-        Assert.Contains("Already released. A summary of this note was released by Dr. Test", Words(form));
+        Assert.Contains("Already released. Released by Dr. Test", Words(form));
         Assert.DoesNotContain("data-release-summary", form);
         using var second = await PostFormAsync(session.Client, SummaryPath(patient, note), NotePath(patient, note),
             ("TalkedAbout", "A second summary."), ("Found", "Found."), ("NextSteps", "Next."));
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
-        Assert.Contains("A summary of this note has already been released. Withdraw it first to write another.", Words(await second.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("A summary is already released. Withdraw it first to write another.", Words(await second.Content.ReadAsStringAsync(Cancel)));
 
         Assert.Equal([$"{clinician.Id} false standing {TalkedAbout}"], await SummariesAsync(apps, patient));
         Assert.Empty(await SummariesAsync(apps, other));

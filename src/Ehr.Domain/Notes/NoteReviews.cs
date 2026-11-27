@@ -131,7 +131,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         var proposal = proposals.SingleOrDefault(p => p.Id == proposalId);
         if (proposal is null) return ReviewResult.Missing;
         if (key == Guid.Empty || decision is not (AiProposalStates.Accepted or AiProposalStates.Edited or AiProposalStates.Rejected))
-            return ReviewResult.Invalid("Choose Accept, Edit and approve, or Reject.");
+            return ReviewResult.Invalid("Select Accept, Edit or Reject.");
         if (proposal.State != AiProposalStates.Pending)
             return proposal.DecisionKey == key && proposal.State == decision
                 && (decision != AiProposalStates.Edited || proposal.ApprovedValue == editedValue)
@@ -146,7 +146,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
             _ => null,
         };
         if (decision == AiProposalStates.Edited && string.IsNullOrWhiteSpace(approved))
-            return ReviewResult.Invalid("Enter the corrected value, or reject the proposal.");
+            return ReviewResult.Invalid("Corrected value is required.");
         // Step 16: with a recorded visit's transcript gone, nobody can check a proposal against what was said, so none goes
         // into the note as offered: not accepted, nor edited back to the same words (the database refuses the same,
         // db/policies/56-ambient-listening.sql).
@@ -184,7 +184,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         var approved = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         var current = NoteContent.From(draft);
         if (!append && approved.Keys.Any(field => current.Sections[Section(field)].Text.Length > 0))
-            return ReviewResult.Invalid("The draft already has text. Compare it below, then choose to add the approved values after it. The existing text stays.");
+            return ReviewResult.Invalid("The draft already has text. Select “Add approved values after existing text”.");
         var merged = Merge(current, approved);
         if (merged.Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors) return new(422, errors);
         merged.ApplyTo(draft);
@@ -223,7 +223,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
 
     // What a visit's review says once its transcript has gone while it was open: after the days the clinic keeps one.
     public static string TranscriptGone(AmbientTranscriptKeep keep) =>
-        $"This visit's transcript was deleted after {(keep.Days == 1 ? "a day" : $"{keep.Days} days")}, so its proposals can't be accepted as offered: reject each, or edit it into your own words.";
+        $"Transcript deleted after {(keep.Days == 1 ? "a day" : $"{keep.Days} days")}. Reject each proposal, or edit it into your own words.";
 
     // The review is complete at the draft's version; a recorded visit's transcript goes with it, in the same transaction
     // (the database refuses a finished review that still has one).
@@ -336,9 +336,9 @@ public sealed record ReviewResult(int Status, IReadOnlyList<string> Errors, AiNo
 {
     public static ReviewResult Missing => new(404, ["This review isn't available. Check that the patient is in My patients and the draft is yours."]);
     public static ReviewResult Offline => new(503, ["Saving review decisions needs the clinic's server. Your work is still here."]);
-    public static ReviewResult Signed => new(409, ["This note is signed, so it can't take new proposals."]);
-    public static ReviewResult Decided => new(409, ["Not saved. This proposal was already decided, in another tab or window. Nothing was changed."]);
+    public static ReviewResult Signed => new(409, ["This note is signed."]);
+    public static ReviewResult Decided => new(409, ["Not saved. This proposal was already decided."]);
     public static ReviewResult Invalid(string error) => new(422, [error]);
     public static ReviewResult Conflict(long version) => new(409,
-        ["The draft or review changed elsewhere. Your displayed work is still here. Compare the current draft and reload the saved review before retrying."], Version: version);
+        ["The draft or review changed elsewhere. Reload the review and try again."], Version: version);
 }

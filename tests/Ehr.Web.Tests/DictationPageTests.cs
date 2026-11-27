@@ -38,15 +38,15 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         var session = await SignInAsync(unset, clinician);
 
         var dictate = await session.Client.GetStringAsync($"/patients/{patient}/dictate", Cancel);
-        Assert.Contains("Unavailable. Dictation isn't set up on this server. You can type the note.", Words(dictate));
+        Assert.Contains("Dictation unavailable.", Words(dictate));
         Assert.True(dictate.IndexOf("data-dictation-not-set-up", StringComparison.Ordinal) < dictate.IndexOf("data-dictation-start", StringComparison.Ordinal));
         var listen = await session.Client.GetStringAsync($"/patients/{patient}/listen", Cancel);
-        Assert.Contains("Unavailable. Listening isn't set up on this server. You can type the note.", Words(listen));
+        Assert.Contains("Listening unavailable.", Words(listen));
         Assert.True(listen.IndexOf("data-ambient-not-set-up", StringComparison.Ordinal) < listen.IndexOf("data-ambient-statement", StringComparison.Ordinal));
 
         var setUp = await SignInAsync(apps.OnPrem, clinician);
-        Assert.DoesNotContain("isn't set up on this server", Words(await setUp.Client.GetStringAsync($"/patients/{patient}/dictate", Cancel)));
-        Assert.DoesNotContain("isn't set up on this server", Words(await setUp.Client.GetStringAsync($"/patients/{patient}/listen", Cancel)));
+        Assert.DoesNotContain("data-dictation-not-set-up", await setUp.Client.GetStringAsync($"/patients/{patient}/dictate", Cancel));
+        Assert.DoesNotContain("data-ambient-not-set-up", await setUp.Client.GetStringAsync($"/patients/{patient}/listen", Cancel));
     }
 
     [Fact]
@@ -60,15 +60,13 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await session.Client.GetStringAsync(DictatePath(patient), Cancel);
 
-        Assert.Contains("Dictate a note: Dictated, Dana", html);
+        Assert.Contains("<h1>Dictate a note</h1>", html);
+        Assert.Contains("Dictated, Dana", html);
         Assert.Contains("data-dictation-start", html);
         Assert.Contains($"data-dictation-api=\"{DictationApi.Path}\"", html);
         // The script, under its fingerprinted name (dictation.<hash>.js).
         Assert.Contains("/_content/Ehr.Design/js/dictation.", html);
-        Assert.Contains("Dictate in English or Spanish, with a microphone.", html);
-        Assert.Contains("Nothing goes into the note until you review it.", html);
-        Assert.Contains("The proposals and the transcript they came from are kept with your review.", html);
-        Assert.Contains("Orders and allergy changes are never filled in from dictation.", html);
+        Assert.Contains("Dictation never places orders or changes allergies.", html);
         foreach (var field in new[] { "subjective", "objective", "assessment", "plan" })
         {
             Assert.Contains($"data-dictation-field=\"{field}\"", html);
@@ -231,8 +229,9 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await Client(apps.CloudCutOff, session.Jar).GetStringAsync(DictatePath(patient), Cancel);
 
-        Assert.Contains("Dictate a note: Offsite, Pat", html);
-        Assert.Contains("Dictation needs the clinic's server, which can't be reached.", html);
+        Assert.Contains("<h1>Dictate a note</h1>", html);
+        Assert.Contains("Offsite, Pat", html);
+        Assert.Contains("Dictation unavailable.", html);
         Assert.DoesNotContain("data-dictation-start", html);
         Assert.DoesNotContain("/js/dictation.", html);
     }

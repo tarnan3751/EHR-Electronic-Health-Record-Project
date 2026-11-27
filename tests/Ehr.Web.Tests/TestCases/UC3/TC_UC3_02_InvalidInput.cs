@@ -18,7 +18,7 @@ namespace Ehr.Web.Tests.TestCases.UC3;
 // Steps:
 //   1. Sign in as a clinician.
 //   2. Search with the invalid date of birth.
-// Expected result: The page says "Enter the date of birth as a full date", shows no "Search results", and lists no
+// Expected result: The page says "Date of birth must be a full date", shows no "Search results", and lists no
 //   chart link.
 // Creator: Diego Valenzuela
 public class TC_UC3_02_InvalidInput(WebApps apps)
@@ -44,7 +44,7 @@ public class TC_UC3_02_InvalidInput(WebApps apps)
 
         // Assert: The system displays a validation message.
         Assert.Contains(
-            "Enter the date of birth as a full date",
+            "Date of birth must be a full date",
             html);
 
         // No patient search results should be displayed.

@@ -51,7 +51,7 @@ public partial class TC_UC12_05_Nfr06_Encryption(WebApps apps) : IClassFixture<W
         using var opened = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason",
             ("Reason", "Off-site consult for the on-call physician."));
 
-        Assert.Contains("Emergency access. This isn't one of your patients.", Words(await ReadAsync(opened)));
+        Assert.Contains("Break the glass. Not one of your patients. Access is audited until", Words(await ReadAsync(opened)));
         Assert.True(opened.Headers.CacheControl?.NoStore);
         Assert.Contains($"POST /patients/{patient}/reason", apps.Forwarded.Skip(forwarded));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.BreakGlass, clinician.Id, patient, AuditSources.OnPrem));
@@ -77,7 +77,7 @@ public partial class TC_UC12_05_Nfr06_Encryption(WebApps apps) : IClassFixture<W
 
         var html = await ReadAsync(chart);
         Assert.Contains("Readonly, Wren", html);
-        Assert.Contains("can't be changed until the clinic's server is back", html);
+        Assert.Contains("sc-notice--band", html);
         Assert.True(chart.Headers.CacheControl?.NoStore);
     }
 

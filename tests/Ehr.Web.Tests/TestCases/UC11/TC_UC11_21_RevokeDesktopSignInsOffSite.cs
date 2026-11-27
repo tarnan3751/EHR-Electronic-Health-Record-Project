@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   1. On the cut-off app, open Dr. Away's desktop sign-ins.
 //   2. On the cloud app, open them and revoke them; sync with Dr. Away's token on the on-site app.
 //   3. Open Dr. Never's desktop sign-ins.
-// Expected result: Step 1: "Revoking needs the clinic's server. Nothing has been revoked.", no button. Step 2: the post
+// Expected result: Step 1: "Revoking needs the clinic's server.", no button. Step 2: the post
 //   crosses the WAN link; the token is refused with "Ehr-Sign-In: revoked". Step 3: "None:", nothing to press.
 // Creator: Tahseen Arnan
 public class TC_UC11_21_RevokeDesktopSignInsOffSite(WebApps apps) : IClassFixture<WebApps>
@@ -37,7 +37,7 @@ public class TC_UC11_21_RevokeDesktopSignInsOffSite(WebApps apps) : IClassFixtur
 
         // 1.
         var cutOff = await Client(apps.CloudCutOff, admin.Jar).GetStringAsync(path, Cancel);
-        Assert.Contains("Revoking needs the clinic's server. Nothing has been revoked.", cutOff);
+        Assert.Contains("Revoking needs the clinic's server.", cutOff);
         Assert.DoesNotContain("Revoke and delete", cutOff);
 
         // 2.
@@ -56,7 +56,7 @@ public class TC_UC11_21_RevokeDesktopSignInsOffSite(WebApps apps) : IClassFixtur
         // 3.
         var never = await apps.CreateStaffAsync("Dr. Never", StaffRoles.Clinician);
         var none = await admin.Client.GetStringAsync($"/admin/staff/{never.Id}/desktop", Cancel);
-        Assert.Contains("No desktop sign-ins. Dr. Never has none to revoke.", Words(none));
+        Assert.Contains("No desktop sign-ins.", Words(none));
         Assert.DoesNotContain("Revoke and delete", none);
     }
 }

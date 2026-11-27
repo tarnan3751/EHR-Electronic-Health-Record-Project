@@ -63,7 +63,7 @@ public class SummaryModel(PhiReader phi, PatientAssignments assignments, BreakGl
         }
 
         var result = Standing is not null
-            ? new SummaryResult(StatusCodes.Status409Conflict, ["A summary of this note has already been released. Withdraw it first to write another."])
+            ? new SummaryResult(StatusCodes.Status409Conflict, ["A summary is already released. Withdraw it first to write another."])
             : await summaries.ReleaseAsync(patientId, noteId, TalkedAbout, Found, NextSteps, Sensitive, HttpContext.RequestAborted);
         if (result.Status == StatusCodes.Status200OK)
         {

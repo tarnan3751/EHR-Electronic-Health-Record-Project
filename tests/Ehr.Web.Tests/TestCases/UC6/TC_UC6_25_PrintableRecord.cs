@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Open Visit summaries.
 //   2. Open the printable page.
-// Expected result: Step 2: Cache-Control no-store; headed "Health record of Synthetic Fhirchart" and "as of" its time in
+// Expected result: Step 2: Cache-Control no-store; headed "Health record", the patient's name, and "as of" its time in
 //   UTC; the MRN in mono type and the date of birth as the portal's home shows it; each allergy (penicillin "High risk"),
 //   the medication and diagnosis that aren't sensitive with status and date, each result with its value, range, flag,
 //   date as the results page dates one, and the care team's note; the blood pressure as one reading "128/82 mmHg"; both
@@ -47,7 +47,8 @@ public class TC_UC6_25_PrintableRecord(WebApps apps) : IClassFixture<WebApps>
         var html = await response.Content.ReadAsStringAsync(Cancel);
         var words = Words(html);
 
-        Assert.Contains("<h1>Health record of Synthetic Fhirchart</h1>", html);
+        Assert.Contains("<h1>Health record</h1>", html);
+        Assert.Contains("<dd>Synthetic Fhirchart</dd>", html);
         Assert.Matches("A copy from the SwiftChart patient portal, as of [A-Z][a-z]{2} \\d{1,2}, \\d{4} \\d{2}:\\d{2} UTC\\.", words);
         Assert.Contains($"<dd class=\"mono-id\">{chart.Mrn}</dd>", html);
         Assert.Contains("<dd>1980-01-01</dd>", html);

@@ -44,7 +44,7 @@ public class TC_UC14_26_FourSectionsSuccessfulFlow(WebApps apps) : IClassFixture
         var (path, token) = (PathOf(created), Token(editor));
         Assert.Matches("(?s)<label[^>]*for=\"Subjective\"[^>]*>Subjective</label>.*<label[^>]*for=\"Objective\"[^>]*>Objective</label>.*<label[^>]*for=\"Assessment\"[^>]*>Assessment</label>.*<label[^>]*for=\"Plan\"[^>]*>Plan</label>", editor);
         Assert.Matches("<textarea[^>]*autofocus[^>]*id=\"Subjective\"|<textarea[^>]*id=\"Subjective\"[^>]*autofocus", editor);
-        Assert.Contains("Fill in all four sections to sign it.", Words(editor));
+        Assert.Contains("Sign note…", Words(editor));
         Assert.DoesNotContain("data-note-origin", editor);
 
         async Task<JsonElement> PostAsync(string target, long version, params (string Name, object Value)[] extra)

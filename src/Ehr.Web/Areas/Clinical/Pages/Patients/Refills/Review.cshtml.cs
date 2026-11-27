@@ -73,10 +73,10 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, RefillRe
             case RefillDeclined.NotAllowed:
                 return RedirectToPage("/Patients/Chart", new { id = patientId });
             case RefillDeclined.TooLong:
-                Error = $"Shorten the message to {RefillRequests.MaxDeclineLength:N0} characters or fewer.";
+                Error = $"Message to the patient must be {RefillRequests.MaxDeclineLength:N0} characters or fewer.";
                 break;
             default:
-                Error = "Write a message for the patient.";
+                Error = "Message to the patient is required.";
                 break;
         }
 

@@ -4,24 +4,23 @@
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
     ViewData["UseHtmx"] = false;
-    ViewData["Title"] = "Emergency access";
+    ViewData["Title"] = "Break the glass";
 }
-<h1>Emergency access</h1>
+<h1>Break the glass</h1>
 @if (!OnPrem.IsReachable)
 {
     @* Off-site with the clinic's server down, the grant couldn't be saved (UC 2). *@
-    <p class="sc-prose">Not one of your patients. Emergency access can't be granted until the clinic's server is back.</p>
+    <p class="sc-prose">Not one of your patients. Breaking the glass needs the clinic's server.</p>
 }
 else
 {
     @* The one thing to do first, then what follows from it as a short list, and the reason: one task, in one card. *@
     <div class="sc-formcard sc-formcard--wide">
     <div class="sc-prose">
-        <p>Not one of your patients. To open the chart, say why you need it, in @BreakGlass.MinimumReasonLength to @BreakGlass.MaximumReasonLength characters.</p>
+        <p>Not one of your patients.</p>
         <ul>
-            <li>Your access and your reason are logged and reviewed.</li>
-            <li>The chart stays open to you for @BreakGlass.Duration.TotalHours hours.</li>
-            <li>The patient, and anyone they share sensitive items with, can see in the portal that you used emergency access, and when. They never see your reason.</li>
+            <li>Access is audited and lasts @BreakGlass.Duration.TotalHours hours.</li>
+            <li>The patient can see this access in the portal.</li>
         </ul>
     </div>
     @* No action: the form posts to this page's own address, the search's criteria included. *@
@@ -31,7 +30,7 @@ else
             <textarea asp-for="Reason" class="sc-field__input" rows="3" required autofocus></textarea>
             <span asp-validation-for="Reason" class="sc-field__error"></span>
         </div>
-        <button class="sc-btn sc-btn--primary">Open the chart</button>
+        <button class="sc-btn sc-btn--primary">Break the glass</button>
     </form>
     </div>
 }

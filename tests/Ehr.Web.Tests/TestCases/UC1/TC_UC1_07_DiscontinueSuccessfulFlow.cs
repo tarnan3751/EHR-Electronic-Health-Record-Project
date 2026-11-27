@@ -29,7 +29,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   5. Read the order and its audit row from the database.
 // Expected result: The chart offers "Change" and "Discontinue…" for the order and a "Discontinued orders" link. The
 //   discontinue page shows the patient's banner with allergies and the order, with the cursor in a required reason
-//   field, and is one recorded read. After step 3 the chart says "Order discontinued.", naming the order, and "No
+//   field, and is one recorded read. After step 3 the chart says "Order discontinued." and "No
 //   active orders."; the discontinued orders list shows the order, "Dr. Test", and the reason. The order's row is revoked (FHIR's code for
 //   discontinued) with the reason, the clinician as discontinuer and the time of the change; no other column changed;
 //   one audit row for the update names the clinician.
@@ -49,7 +49,7 @@ public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<W
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(DiscontinuePath(patient, order), Cancel);
-        Assert.Contains("Discontinue order: Orderable, Synthetic", form);
+        Assert.Contains("<h1>Discontinue order</h1>", form);
         Assert.Contains("<strong>Penicillin</strong>: Hives", form);
         Assert.Contains("<strong>Complete blood count (CBC)</strong> Reason for the test: Synthetic fatigue", form);
         Assert.Matches("<textarea [^>]*name=\"Reason\"[^>]*required autofocus", form);
@@ -64,12 +64,12 @@ public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<W
         var url = System.Text.Json.JsonDocument.Parse(await discontinued.Content.ReadAsStringAsync(Cancel)).RootElement.GetProperty("url").GetString()!;
 
         var confirmed = await session.Client.GetStringAsync(url, Cancel);
-        Assert.Contains("Order discontinued. Complete blood count (CBC) is under discontinued orders.", Words(confirmed));
+        Assert.Contains("Order discontinued.", Words(confirmed));
         Assert.Contains("No active orders.", confirmed);
         Assert.DoesNotContain("data-discontinue-order", confirmed);
 
         var listed = await session.Client.GetStringAsync($"/patients/{patient}/orders/discontinued", Cancel);
-        Assert.Contains("Discontinued orders: Orderable, Synthetic", listed);
+        Assert.Contains("<h1>Discontinued orders</h1>", listed);
         Assert.Contains("<strong>Complete blood count (CBC)</strong> (Lab)", listed);
         Assert.Contains("Reason for the test: Synthetic fatigue", listed);
         Assert.Contains("<td>Dr. Test</td>", listed);

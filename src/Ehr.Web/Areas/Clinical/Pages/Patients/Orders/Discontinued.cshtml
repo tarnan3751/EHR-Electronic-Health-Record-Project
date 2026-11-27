@@ -5,7 +5,7 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.Orders.Patient;
-    ViewData["Title"] = $"Discontinued orders: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "Discontinued orders";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Orders.Allergies, Model.OnPanel, Model.EmergencyUntil)" />
@@ -13,7 +13,7 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
-<h1>Discontinued orders: @patient.FamilyName, @patient.GivenName</h1>
+<h1>Discontinued orders</h1>
 
 @if (Model.Orders.Orders.Count == 0)
 {
@@ -57,6 +57,6 @@ else
     </div>
     @if (Model.Orders.More)
     {
-        <p class="sc-muted">Showing the @DiscontinuedModel.Limit most recently discontinued orders.</p>
+        <p class="sc-muted">Latest @DiscontinuedModel.Limit discontinued orders.</p>
     }
 }

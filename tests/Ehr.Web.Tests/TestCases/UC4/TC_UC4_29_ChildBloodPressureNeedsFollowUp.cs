@@ -58,7 +58,7 @@ public class TC_UC4_29_ChildBloodPressureNeedsFollowUp(WebApps apps) : IClassFix
         Assert.Contains("98, needs follow-up", Words(trend));
         Assert.Matches("<td class=\"sc-table__mono\">97.9</td>", trend);
         Assert.Contains("Needs follow-up at or above 98 mmHg.", Words(trend));
-        Assert.Contains("Values at or above the shaded band need follow-up and are diamonds.", Words(trend));
+        Assert.Contains("<span class=\"sc-visually-hidden\"> Values at or above the shaded band need follow-up and are diamonds.</span>", trend);
 
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         var latest = Regex.Match(chart, "(?s)<li>\\s*<strong>Blood pressure</strong>.*?</li>").Value;

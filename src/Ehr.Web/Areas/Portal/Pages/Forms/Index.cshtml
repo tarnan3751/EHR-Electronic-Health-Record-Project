@@ -18,7 +18,7 @@
 <h1>Pre-visit forms</h1>
 @if (Model.Forms is null)
 {
-    <p class="sc-notice sc-notice--danger">@(own ? "Your forms are" : "Forms are") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(own ? "Your forms are" : "Forms are") not available right now.</p>
 }
 else
 {
@@ -39,12 +39,12 @@ else
                     <p>Before @(own ? "your" : "the") appointment on @When(form.AppointmentStartsAt) with @form.AppointmentClinician.</p>
                     @if (form.OpenAt(now))
                     {
-                        <p class="sc-rows__meta">Fill it in by @When(form.ClosesAt).</p>
+                        <p class="sc-rows__meta">Due @When(form.ClosesAt).</p>
                         <p class="sc-rows__end"><a asp-page="Form" asp-route-requestId="@form.Id" class="@(form == next ? "sc-btn sc-btn--primary" : "sc-btn")">Fill in the form</a></p>
                     }
                     else
                     {
-                        <p class="sc-rows__meta">You can fill it in from @When(form.OpensAt) until @When(form.ClosesAt).</p>
+                        <p class="sc-rows__meta">Opens @When(form.OpensAt). Due @When(form.ClosesAt).</p>
                     }
                 </li>
             }

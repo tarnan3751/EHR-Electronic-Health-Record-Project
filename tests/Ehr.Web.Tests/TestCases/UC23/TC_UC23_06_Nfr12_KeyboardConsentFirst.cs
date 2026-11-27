@@ -92,7 +92,7 @@ public class TC_UC23_06_Nfr12_KeyboardConsentFirst(WebApps apps) : IClassFixture
             """);
         await page.WaitForTimeoutAsync(200);
         Assert.Equal(hidden, await AmbientBrowserTests.ChunksAsync(page));
-        Assert.Contains("Paused while this page was out of sight", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Contains("Paused while this page was hidden", await page.TextContentAsync("[data-ambient-status]"));
         await page.FocusAsync("[data-ambient-pause]");
         await page.Keyboard.PressAsync("Enter");
 

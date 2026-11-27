@@ -19,7 +19,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   1. Open the signed note. Press Tab until "Mark this note sensitive" has the focus, and press Enter.
 //   2. Type the reason (the cursor starts in the field) and press Enter.
 // Expected result: Step 1 opens the page with the cursor in the reason. Step 2 marks it: the note's page says
-//   "Saved." and carries the "Sensitive" tag. Every focused control shows the focus ring, and the pages report no
+//   "Marked sensitive." and carries the "Sensitive" tag. Every focused control shows the focus ring, and the pages report no
 //   script errors.
 // Creator: Tahseen Arnan
 //
@@ -53,7 +53,7 @@ public class TC_UC14_16_Nfr12_SensitivityKeyboardFirst(WebApps apps) : IClassFix
         await page.Keyboard.TypeAsync("Patient asked for it.");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=marked", StringComparison.Ordinal));
-        Assert.Contains("Saved.", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Marked sensitive.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Equal(1, await page.Locator("[data-note-sensitive]").CountAsync());
 
         Assert.Equal([$"note true {clinician.Id} Patient asked for it."], await SensitivityAsync(apps, patient));

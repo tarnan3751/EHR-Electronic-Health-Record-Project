@@ -23,8 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   1. Off-site, record the two heart rates.
 //   2. On the app that is cut off, open the vital signs, and post a third set to it.
 // Expected result: Step 1: each post is forwarded and saved once; the read is in the audit log from the cloud. Step
-//   2: the flowsheet shows 64 and 72 and the heart rate's trend, and says "Vital signs can't be recorded until the
-//   clinic's server is back." with no form; the post is answered 503 and nothing is saved.
+//   2: the flowsheet shows 64 and 72 and the heart rate's trend, under the read-only band, with no form; the post is answered 503 and nothing is saved.
 // Creator: Tahseen Arnan
 public class TC_UC4_16_VitalSignsOffSite(WebApps apps) : IClassFixture<WebApps>
 {
@@ -47,7 +46,7 @@ public class TC_UC4_16_VitalSignsOffSite(WebApps apps) : IClassFixture<WebApps>
         var readOnly = await cutOff.GetStringAsync(Path(patient), Cancel);
         Assert.Contains($"data-trend=\"{HeartRate}\"", readOnly);
         Assert.Contains("Latest 64 per minute, down from 72.", Words(readOnly));
-        Assert.Contains("Vital signs can't be recorded until the clinic's server is back.", readOnly);
+        Assert.Contains("sc-notice--band", readOnly);
         Assert.DoesNotContain("data-record-vitals", readOnly);
         using var notSaved = await cutOff.PostAsync(Path(patient), Form(("__RequestVerificationToken", token), ($"Values[{HeartRate}]", "90"), ("TakenAt", "2026-11-01T08:00")), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);

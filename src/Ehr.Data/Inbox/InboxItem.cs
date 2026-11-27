@@ -78,7 +78,7 @@ public static class InboxItemKind
         [Message] = "Message",
         [Result] = "Result to acknowledge",
         [RefillRequest] = "Refill request",
-        [EmergencyAccessReview] = "Emergency access to review",
+        [EmergencyAccessReview] = "Break the glass to review",
         [Addendum] = "Addendum to your note",
         [SummaryWithdrawn] = "Visit summary withdrawn",
         [FormAlert] = "Pre-visit form to review",

@@ -31,7 +31,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   offered the box, and their file with sensitive items holds sertraline and the anxiety disorder, marked restricted,
 //   recorded as a download of sensitive items; the other two get no box, and the same file whether they ask or not, with
 //   neither. Every event is under the proxy's account and the patient. Step 2: sent to their own record, which says the
-//   access ended, with nothing of the patient's; from then on the copy is of their own record. Step 3: sent to "Whose record?" each time; nothing is recorded.
+//   access ended, with nothing of the patient's; from then on the copy is of their own record. Step 3: sent to "Records" each time; nothing is recorded.
 // Creator: Tahseen Arnan
 public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebApps>
 {
@@ -54,7 +54,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         {
             var page = await proxy.Client.GetStringAsync(PagePath, Cancel);
             Assert.Contains("<h1>Download this record</h1>", page);
-            Assert.Contains("A copy of Synthetic Fhirchart's allergies", Words(page));
+            Assert.Contains("You're viewing Synthetic Fhirchart's record", Words(page));
             Assert.Equal(sensitive, page.Contains("name=\"sensitive\"", StringComparison.Ordinal));
 
             var plain = await DownloadAsync(proxy.Client);
@@ -77,7 +77,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
             }
 
             Assert.Equal(sensitive ? 1 : 2, await apps.AuditEventsAsync(AuditActions.Download, proxy.Account, patient.Patient));
-            Assert.Contains("<h1>Health record of Synthetic Fhirchart</h1>", await PrintAsync(proxy.Client));
+            Assert.Contains("<dd>Synthetic Fhirchart</dd>", await PrintAsync(proxy.Client));
             // Nothing recorded against the proxy's own record: under either scope, the copy is the patient's.
             Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Download, proxy.Account, proxy.Patient));
         }
@@ -86,7 +86,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         var ended = proxies[1];
         using (var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", ended.Grant)))
         {
-            Assert.Contains("Sharing removed.", await ReadAsync(removed));
+            Assert.Contains("Sharing stopped.", await ReadAsync(removed));
         }
 
         var downloads = await apps.AuditEventsAsync(AuditActions.Download, ended.Proxy.Account, patient.Patient);
@@ -94,12 +94,13 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         {
             Assert.Equal("/portal", PathOf(after));
             var own = await ReadAsync(after);
-            Assert.Contains("Access ended. You can no longer see that record. This is your own.", Words(own));
+            Assert.Contains("Access ended. You can no longer see that record.", Words(own));
+            Assert.Contains("<h1>My record</h1>", own);
             Assert.DoesNotContain("Fhirchart", own);
         }
 
         // From then on the copy is of their own record.
-        Assert.Contains("<h1>Health record of Synthetic RecordWithout</h1>", await PrintAsync(ended.Proxy.Client));
+        Assert.Contains("<dd>Synthetic RecordWithout</dd>", await PrintAsync(ended.Proxy.Client));
         Assert.Equal("Recordwithout", Entries<R4.Patient>(Bundle(await DownloadAsync(ended.Proxy.Client))).Single().Name.Single().Family, ignoreCase: true);
 
         Assert.Equal(downloads, await apps.AuditEventsAsync(AuditActions.Download, ended.Proxy.Account, patient.Patient));
@@ -115,7 +116,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
             using var sent = await session.Client.GetAsync(path, Cancel);
             Assert.Equal("/portal/choose", PathOf(sent));
             var choose = await ReadAsync(sent);
-            Assert.Contains("<h1>Whose record?</h1>", choose);
+            Assert.Contains("<h1>Records</h1>", choose);
             Assert.DoesNotContain(chart.Mrn, choose);
         }
 

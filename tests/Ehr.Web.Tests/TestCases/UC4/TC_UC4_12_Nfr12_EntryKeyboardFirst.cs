@@ -24,11 +24,10 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   3. Clear the field, type "essen" and wait for the suggestions; type the rest of the suggested name.
 //   4. Press Tab until "Save diagnosis" has the focus, and press Enter.
 // Expected result: Step 1 opens the form with the cursor in the diagnosis field. In step 2 the search says "No
-//   matches.", and saving brings the form back with "Choose a diagnosis from the list." and the cursor in the
+//   matches.", and saving brings the form back with "Diagnosis must be selected from the list." and the cursor in the
 //   diagnosis field, marked invalid. In step 3 the field's
 //   list offers "Essential (primary) hypertension". Step 4 saves and returns to the
-//   chart, which lists the diagnosis with its code I10, with the focus on "Saved. Essential (primary) hypertension is
-//   listed under Diagnoses." Every focused control shows the focus ring, and the page reports no script errors.
+//   chart, which lists the diagnosis with its code I10, with the focus on "Diagnosis saved." Every focused control shows the focus ring, and the page reports no script errors.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -63,7 +62,7 @@ public class TC_UC4_12_Nfr12_EntryKeyboardFirst(WebApps apps) : IClassFixture<We
         await AiReviewBrowserTests.TabToAsync(page, "form.sc-form button[type=submit]");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForSelectorAsync("#entry-name-error");
-        Assert.Contains("Choose a diagnosis from the list.", await page.Locator("#entry-name-error").TextContentAsync());
+        Assert.Contains("Diagnosis must be selected from the list.", await page.Locator("#entry-name-error").TextContentAsync());
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('#entry-name[aria-invalid=true]')"));
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
 
@@ -92,7 +91,7 @@ public class TC_UC4_12_Nfr12_EntryKeyboardFirst(WebApps apps) : IClassFixture<We
         Assert.Contains("Essential (primary) hypertension", await page.Locator("#chart-diagnoses ~ ul").TextContentAsync());
         // The chart's notice has the focus, so the keyboard and a screen reader start from what was saved.
         await page.WaitForFunctionAsync("document.activeElement?.matches('[data-saved]') === true");
-        Assert.Contains("Saved. Essential (primary) hypertension is listed under Diagnoses.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Contains("Diagnosis saved.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
 
         Assert.Equal(["Essential (primary) hypertension I10"], await RowsAsync(apps, "conditions", patient, "concat_ws(' ', display, code)"));
         Assert.Empty(errors);

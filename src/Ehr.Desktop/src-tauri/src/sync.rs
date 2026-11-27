@@ -62,8 +62,7 @@ const BATCH: usize = 100;
 /// What an ended session's round asks for: changes since a watermark no transaction reaches, so nothing comes back.
 const PROBE: &str = "/api/sync/quick-texts?since=18446744073709551615";
 /// Said of an ended session: the window's lock asks for a full sign-in (main.rs).
-const ENDED: &str = "Signed out. The server ended this sign-in. Sign in again with your password and the code from \
-                     your authenticator app. Nothing on this computer opens until you do.";
+const ENDED: &str = "Signed out. Sign in again.";
 
 pub struct Sync {
     http: Client,
@@ -274,14 +273,15 @@ impl Sync {
         if current.ended {
             return Err(ENDED.to_owned());
         }
-        let access = current.offline_access.as_ref().ok_or_else(|| {
-            "Sign out and sign in on the updated server to use offline charts.".to_owned()
-        })?;
+        let access = current
+            .offline_access
+            .as_ref()
+            .ok_or_else(|| "Offline charts unavailable. Sign out and sign in again.".to_owned())?;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| "Check this computer's clock before using offline charts.".to_owned())?;
         if now.as_secs() >= access.expires_unix_seconds {
-            return Err("The offline session expired. Sign in again.".to_owned());
+            return Err("Offline access expired. Sign in again.".to_owned());
         }
         action(access.clinician_id)
     }
@@ -305,10 +305,7 @@ impl Sync {
             }
             if sign_in_ended(&response) {
                 self.ended(Ending::SignIn);
-                return Err(
-                    "Sign in again to download charts. A sign-in lasts at most 12 hours."
-                        .to_owned(),
-                );
+                return Err("Sign-in expired. Sign in again to download charts.".to_owned());
             }
             self.end(&token);
             return Err("The session ended. Sign in again to download charts.".to_owned());
@@ -450,9 +447,7 @@ impl Sync {
         let Some(token) = self.token() else {
             return Report {
                 server: None,
-                problem: Some(
-                    "Signed out. Nothing is sent or brought back until you sign in.".to_owned(),
-                ),
+                problem: Some("Signed out.".to_owned()),
             };
         };
         if self.session_ended() {
@@ -491,11 +486,7 @@ impl Sync {
                     self.ended(Ending::SignIn);
                     return Report {
                         server: Some(server.clone()),
-                        problem: Some(
-                            "Sign in again. A sign-in lasts at most 12 hours. Until you do, nothing is sent or \
-                             brought back. What you save waits on this computer."
-                                .to_owned(),
-                        ),
+                        problem: Some("Sign-in expired. Sign in again to sync.".to_owned()),
                     };
                 }
                 Err(Failure::Problem(problem)) => {
@@ -702,9 +693,15 @@ impl Sync {
                 .is_ok_and(|r| r.status() == StatusCode::FORBIDDEN)
             {
                 let db = store::lock(store);
-                self.with_clinician(Some(token), |_| db.reject_recording(owner, &recording,
-                    "This recording's patient is no longer one of your patients. The audio was kept on this device.").map_err(Into::into))
-                    .map_err(Failure::Problem)?;
+                self.with_clinician(Some(token), |_| {
+                    db.reject_recording(
+                        owner,
+                        &recording,
+                        "Not transcribed. The patient is no longer one of your patients.",
+                    )
+                    .map_err(Into::into)
+                })
+                .map_err(Failure::Problem)?;
                 return Ok(());
             }
             let session: Started = answer("start offline transcription", response).await?;
@@ -770,9 +767,15 @@ impl Sync {
                 )
             ) {
                 let db = store::lock(store);
-                self.with_clinician(Some(token), |_| db.reject_recording(owner, &recording,
-                    "The server couldn't accept this recording. The audio was kept on this device.").map_err(Into::into))
-                    .map_err(Failure::Problem)?;
+                self.with_clinician(Some(token), |_| {
+                    db.reject_recording(
+                        owner,
+                        &recording,
+                        "Not transcribed. The server refused this recording.",
+                    )
+                    .map_err(Into::into)
+                })
+                .map_err(Failure::Problem)?;
                 return Ok(());
             }
 
@@ -834,7 +837,7 @@ impl Sync {
                     db.reject_recording(
                         owner,
                         &recording,
-                        "No complete transcript was returned. The audio was kept on this device.",
+                        "Not transcribed. The transcript was incomplete.",
                     )
                 } else {
                     db.finish_recording(owner, &recording, text)
@@ -946,9 +949,7 @@ fn parse_servers(list: &str, https_only: bool) -> Result<Vec<String>, String> {
         .iter()
         .find(|server| https_only && !server.starts_with("https://"))
     {
-        Some(server) => Err(format!(
-            "{server} isn't an HTTPS server. SwiftChart connects only to HTTPS servers."
-        )),
+        Some(server) => Err(format!("{server} isn't an HTTPS server.")),
         None => Ok(servers),
     }
 }
@@ -1023,7 +1024,7 @@ fn revoked(response: &Response) -> bool {
 
 /// What a round or a download says when the server answers with the remote wipe's marker, until main.rs has deleted
 /// everything and the window says so.
-const REVOKED: &str = "Revoked. An administrator revoked this computer's sign-in.";
+const REVOKED: &str = "Sign-in revoked by an administrator.";
 
 /// The innermost cause, which names what actually went wrong: "Connection refused", an untrusted certificate.
 fn reason(error: &reqwest::Error) -> String {
@@ -1399,9 +1400,7 @@ mod tests {
             report,
             Report {
                 server: None,
-                problem: Some(
-                    "Signed out. Nothing is sent or brought back until you sign in.".to_owned()
-                )
+                problem: Some("Signed out.".to_owned())
             }
         );
         assert!(server.requests().is_empty());
@@ -1715,7 +1714,7 @@ mod tests {
             report
                 .problem
                 .unwrap()
-                .starts_with("Sign in again. A sign-in lasts at most 12 hours.")
+                .starts_with("Sign-in expired. Sign in again")
         );
         assert_eq!(client.take_ending(), Some(Ending::SignIn));
         assert_eq!(client.take_ending(), None, "once");
@@ -1725,7 +1724,7 @@ mod tests {
         let Err(problem) = client.download_panel().await else {
             panic!("a download with an ended sign-in");
         };
-        assert!(problem.starts_with("Sign in again to download charts"));
+        assert!(problem.starts_with("Sign-in expired. Sign in again to download charts"));
         assert_eq!(client.take_ending(), Some(Ending::SignIn));
         assert!(client.offline_available());
     }

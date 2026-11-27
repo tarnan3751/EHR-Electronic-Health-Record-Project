@@ -6,9 +6,9 @@ using static Ehr.Web.Tests.RecordViewTests;
 namespace Ehr.Web.Tests.TestCases.UC6;
 
 // Test Case ID: TC-UC6-43
-// Purpose / scenario: A lab order handed to the lab is listed as the lab's view, "The lab", "A lab order, sent to the
-//   lab", for the patient and for someone they share their record with, whatever that access includes; nothing of
-//   the order itself is on the page.
+// Purpose / scenario: A lab order handed to the lab is listed as the lab's view, "The lab", "Lab order", for the patient
+//   and for someone they share their record with, whatever that access includes; nothing of the order itself is on the
+//   page.
 // Type: Functional (alternative flow: the lab's hand-over)
 // Requirements: proposed FR-57, proposed FR-54
 // Use case: UC 6, View my results and appointments in the portal
@@ -21,8 +21,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test signs the order, and the lab is handed it.
 //   2. The patient, then the proxy, opens Who viewed the record.
-// Expected result: Step 1: the hand-over names the order. Step 2: each page has one line "The lab", "A lab order, sent
-//   to the lab", not marked; neither page names the order's item or its indication.
+// Expected result: Step 1: the hand-over names the order. Step 2: each page has one line "The lab", "Lab order", not
+//   marked; neither page names the order's item or its indication.
 // Creator: Tahseen Arnan
 public class TC_UC6_43_LabHandOverShown(WebApps apps) : IClassFixture<WebApps>
 {
@@ -47,7 +47,7 @@ public class TC_UC6_43_LabHandOverShown(WebApps apps) : IClassFixture<WebApps>
         foreach (var client in new[] { patient.Client, proxy.Client })
         {
             var html = await PageAsync(client);
-            Assert.Single(Lines(html), line => line.StartsWith("lab | The lab | A lab order, sent to the lab | ", StringComparison.Ordinal));
+            Assert.Single(Lines(html), line => line.StartsWith("lab | The lab | Lab order | ", StringComparison.Ordinal));
             Assert.DoesNotContain("Hemoglobin", html);
             Assert.DoesNotContain("fatigue", html);
         }

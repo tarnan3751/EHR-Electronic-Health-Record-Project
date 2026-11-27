@@ -31,9 +31,9 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 // Expected result: Step 1: before giving a reason, both requests are answered with a redirect to the chart; after,
 //   the appointment page shows the appointment and "To change this appointment, add this patient to My patients.",
 //   with no forms, and the post changes nothing. Step 2: the second post is answered 409 with "Not saved. This
-//   appointment changed while the page was open." Step 3: the chart says "Booking an appointment needs the clinic's
-//   server."; the day lists the appointment; its page says "Changing an appointment needs the clinic's server. The
-//   schedule remains readable."; the post is answered 503 and the appointment stays booked.
+//   appointment changed while the page was open." Step 3: the chart offers no "Book appointment", under the
+//   read-only band; the day lists the appointment; its page says "Changing an appointment needs the clinic's server.";
+//   the post is answered 503 and the appointment stays booked.
 // Creator: Tahseen Arnan
 public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -88,10 +88,12 @@ public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var token = Token(await session.Client.GetStringAsync($"/appointments/{second}", Cancel));
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Client(apps.CloudCutOff, session.Jar);
-        Assert.Contains("Booking an appointment needs the clinic's server.", await cutOff.GetStringAsync($"/patients/{patient}", Cancel));
+        var cutOffChart = await cutOff.GetStringAsync($"/patients/{patient}", Cancel);
+        Assert.DoesNotContain("data-book-appointment", cutOffChart);
+        Assert.Contains("sc-notice--band", cutOffChart);
         Assert.Contains("15:00 to 15:20 UTC", await cutOff.GetStringAsync($"/schedule?day={Day(4)}", Cancel));
         var page = await cutOff.GetStringAsync($"/appointments/{second}", Cancel);
-        Assert.Contains("Changing an appointment needs the clinic's server. The schedule remains readable.", page);
+        Assert.Contains("Changing an appointment needs the clinic's server.", page);
         Assert.DoesNotContain("Cancel appointment</button>", page);
         using var notSaved = await cutOff.PostAsync($"/appointments/{second}?handler=Cancel",
             Form(("__RequestVerificationToken", token), ("Version", "1"), ("CancelReason", "Synthetic: typed off-site")), Cancel);

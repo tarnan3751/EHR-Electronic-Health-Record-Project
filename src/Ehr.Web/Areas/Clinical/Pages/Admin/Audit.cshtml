@@ -3,16 +3,15 @@
 @using Ehr.Domain.Audit
 @model AuditModel
 @{
-    ViewData["Title"] = "Audit";
+    ViewData["Title"] = "Audit log";
 }
-<h1>Audit</h1>
-<p class="sc-lede">Every view and change of patient information, and every sign-in, newest first.</p>
+<h1>Audit log</h1>
 <details class="sc-prose">
-    <summary>More about what's shown</summary>
+    <summary>More about the audit log</summary>
     <ul>
-        <li>Patients appear by ID, and a portal account that acted by its email.</li>
-        <li>A change shows the names of the fields it changed, never their values.</li>
-        <li>Emergency access is flagged until an administrator reviews it.</li>
+        <li>Patients are shown by ID, portal accounts by email.</li>
+        <li>Changes list the fields changed, not their values.</li>
+        <li>Break-the-glass access is flagged until reviewed.</li>
     </ul>
 </details>
 <form method="get" class="sc-filters sc-audit__filters">
@@ -22,7 +21,7 @@
             <option value="">Any</option>
             @foreach (var action in AuditActions.All)
             {
-                <option value="@action">@(action == AuditActions.BreakGlass ? "Emergency access" : action)</option>
+                <option value="@action">@AuditModel.ActionName(action)</option>
             }
         </select>
     </div>
@@ -58,7 +57,7 @@
         <label asp-for="To" class="sc-field__label">To</label>
         <input asp-for="To" class="sc-field__input" type="date">
     </div>
-    <label class="sc-check"><input asp-for="Flagged" type="checkbox"> Emergency access only</label>
+    <label class="sc-check"><input asp-for="Flagged" type="checkbox"> Break the glass only</label>
     @* Step 18: emergency accesses by their review. *@
     <div class="sc-field">
         <label asp-for="Review" class="sc-field__label">Review</label>
@@ -83,7 +82,7 @@ else
     <div class="sc-table-wrap sc-audit">
         <table class="sc-table">
             <thead>
-                <tr><th>When (UTC)</th><th>Who</th><th>What</th><th>Patient</th><th>Row</th><th>Part</th><th>Reason and details</th></tr>
+                <tr><th>When (UTC)</th><th>User</th><th>Action</th><th>Patient</th><th>Record</th><th>Part</th><th>Details</th></tr>
             </thead>
             <tbody>
                 @foreach (var e in Model.Log.Events)
@@ -93,7 +92,7 @@ else
                         <td>@(e.ActorId is { } actor ? Model.Log.Actors.GetValueOrDefault(actor, actor.ToString()) : e.Source == AuditSources.Lab ? "Lab" : "System")</td>
                         @* An emergency access: "Review" until reviewed, then "Reviewed" and, when so, "Not appropriate"; either way the
                            way to its review (step 18). *@
-                        <td>@(e.Action == AuditActions.BreakGlass ? "Emergency access" : e.Action)@if (e.Action == AuditActions.BreakGlass && e.RowId is { } access)
+                        <td>@AuditModel.ActionName(e.Action)@if (e.Action == AuditActions.BreakGlass && e.RowId is { } access)
                             {
                                 if (Model.Reviews.TryGetValue(access, out var review))
                                 {

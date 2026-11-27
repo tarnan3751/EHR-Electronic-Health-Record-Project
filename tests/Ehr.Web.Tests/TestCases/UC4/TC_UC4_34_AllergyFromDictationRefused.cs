@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   3. Open another patient's allergy form, of the clinician's panel too, with a second dictation's allergy proposal;
 //      save from it, the proposal in the address and then in the form.
 // Expected result: Step 1: the first is saved and goes back to the review; the second is 409, "Not saved. This proposal
-//   was decided first, in another tab or window. Nothing was added.", which takes the focus, not a field; the patient
+//   was already decided.", which takes the focus, not a field; the patient
 //   has Penicillin G alone, which decides the proposal. Step 2: back to the review; to the chart, and 404 with nothing
 //   added; 400; 400. Step 3: to that patient's chart, then 404 twice; no allergy is added to either, the proposal still
 //   waits, and no read of it or its review is recorded against the other patient.
@@ -52,9 +52,9 @@ public class TC_UC4_34_AllergyFromDictationRefused(WebApps apps) : IClassFixture
         {
             Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
             var page = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Not saved. This proposal was decided first, in another tab or window. Nothing was added.", Said(page));
+            Assert.Contains("Not saved. This proposal was already decided.", Said(page));
             // The notice answers the save, so it takes the focus (NFR-12, as the form's other "Not saved." notices do).
-            Assert.Contains("role=\"alert\" tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Not saved.</span> This proposal was decided first", page);
+            Assert.Contains("role=\"alert\" tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Not saved.</span> This proposal was already decided.", page);
             Assert.DoesNotContain("autofocus", page);
         }
 

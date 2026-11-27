@@ -54,7 +54,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         {
             var page = await PortalAsync(proxy.Client);
             Assert.Contains(TalkedAbout, page);
-            Assert.Contains("From the care team after each visit", Words(page));
+            Assert.DoesNotContain("your care team", Words(page));
             before[proxy] = WithoutTokens(page);
         }
 
@@ -85,7 +85,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         // The first note marked: its summary is sensitive with it, and gone at once for the proxies without them.
         using (var marked = await ChangeSensitivityAsync(session.Client, patient.Patient, first, mark: true, "Discussed a private matter."))
         {
-            Assert.Contains("Saved.", Words(await ReadAsync(marked)));
+            Assert.Contains("Marked sensitive.", Words(await ReadAsync(marked)));
         }
 
         foreach (var proxy in new[] { without, messaging })

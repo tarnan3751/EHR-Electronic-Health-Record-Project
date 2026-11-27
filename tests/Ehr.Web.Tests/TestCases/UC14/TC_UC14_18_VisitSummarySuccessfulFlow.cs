@@ -30,9 +30,9 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   2. Type the three parts and select "Release visit summary", with a forged Host header.
 //   3. Release a summary of the second note.
 //   4. A day passes. Release a summary of the third note.
-// Expected result: Step 1: the note's page says "None yet." and offers the link; the form's three fields are
+// Expected result: Step 1: the note's page says "No visit summary released." and offers the link; the form's three fields are
 //   empty and the note's Subjective is under it; opening it is one recorded read of the note. Step 2: the note's page
-//   says "Released. The patient can now read the summary in the portal." and shows the three parts, line breaks kept,
+//   says "Released." and shows the three parts, line breaks kept,
 //   "Released to the patient by Dr. Test" and the time labeled UTC, and no link to write another; the chart tags the
 //   note "Summary released"; the database has it as released by the clinician, standing, not sensitive, with a write
 //   audit event; the patient gets one email, "Something new in your patient portal", whose text and button
@@ -51,7 +51,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         var third = await SignedNoteAsync(session.Client, patient, subjective: NoteSubjective);
 
         var notePage = await session.Client.GetStringAsync(NotePath(patient, note), Cancel);
-        Assert.Contains("None yet. The patient can't see anything of this note.", Words(notePage));
+        Assert.Contains("No visit summary released.", Words(notePage));
         Assert.Contains("data-write-summary", notePage);
         var readsBefore = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(SummaryPath(patient, note), Cancel);
@@ -62,7 +62,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         }
 
         Assert.Contains(NoteSubjective, form);
-        Assert.Contains("Not copied into the summary.", form);
+        Assert.Contains("<h2 id=\"signed-note\">Signed note</h2>", form);
         // The banner's read of the patient and the note's.
         Assert.Equal(readsBefore + 2, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
 
@@ -78,13 +78,13 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         var released1 = await ReadAsync(released);
 
         Assert.Equal(NotePath(patient, note), PathOf(released));
-        Assert.Contains("Released. The patient can now read the summary in the portal.", Words(released1));
+        Assert.Contains("Released.", Words(released1));
         Assert.Contains(TalkedAbout, released1);
         // Line breaks kept (written as entities in the markup).
         Assert.Contains("Your chest sounded clear.\nYour temperature was normal.", Words(released1));
         Assert.Contains(NextSteps, released1);
         Assert.Contains("Released to the patient by Dr. Test", Words(released1));
-        Assert.Matches(@"\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC</time>", released1);
+        Assert.Matches(@"[A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2} UTC</time>", released1);
         Assert.DoesNotContain("data-write-summary", released1);
         Assert.Contains("data-withdraw-summary", released1);
         Assert.Equal([$"{clinician.Id} false standing {TalkedAbout}"], await SummariesAsync(apps, patient));
@@ -94,7 +94,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
 
         var notice = Assert.Single(EmailsTo(apps, email));
         Assert.Equal("Something new in your patient portal", notice.Subject);
-        Assert.Equal("Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.", notice.Body);
+        Assert.Equal("Your clinic added something to your patient portal. Sign in to see it.", notice.Body);
         var action = apps.Emails.Actions[notice.Body];
         Assert.Equal(("See what's new", Base + "portal/summaries"), (action.Label, action.Link));
         foreach (var word in new[] { "cough", "chest", "fluids", "summary", "Dr. Test", "quartzwing", "attacker" })

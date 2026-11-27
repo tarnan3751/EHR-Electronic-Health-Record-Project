@@ -127,9 +127,9 @@ public sealed class ProxyAccess(EhrDbContext db, IEmailSender email)
     // once and expires. Someone who has an account signs in as usual.
     public Task NotifyAsync(string proxyEmail, string signInLink, string invitationLink, CancellationToken cancellationToken) =>
         email.SendAsync(proxyEmail.Trim(), "Someone shared their record with you",
-            "Someone shared their record with you in the patient portal, or their clinic did it for them. For their privacy, this email doesn't say who. "
-                + $"If you already have a portal account with this email address, sign in at {signInLink} to see it. "
-                + $"If you don't, create one at {invitationLink}. The link works once and expires in 7 days.",
+            "Someone shared their record with you in the patient portal. "
+                + $"If you have a portal account with this email address, sign in at {signInLink} to see it. "
+                + $"If you don't, create one at {invitationLink}. The link expires in 7 days.",
             new EmailAction("Create your portal account", invitationLink), cancellationToken);
 
     // A stand-in for the row, with its key: only revoked_at is sent, and the database sets its value and who.

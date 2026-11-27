@@ -28,7 +28,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   4. Open the chart, then "History of allergies, medications and diagnoses".
 // Expected result: The chart offers "Add allergy", "Add medication" and "Add diagnosis". The form opens with the
 //   cursor in a required name field that searches the codes, shows the patient's banner, and is one recorded read.
-//   After saving, the chart lists "Essential (primary) hypertension (I10) since 2024-05-01", the medication with how
+//   After saving, the chart lists "Essential (primary) hypertension (I10) since May 1, 2024", the medication with how
 //   it is taken, and the allergy with "High risk", each with a "Change" link; the banner, apart from the list, shows
 //   the allergy as "High risk: Penicillin G: Hives". Each row holds its code. The history's table has three rows, one
 //   per entry, each "Added" with "Dr. Test" as its author. The write audit has, by the clinician, one insert into
@@ -49,7 +49,7 @@ public class TC_UC4_07_AddEntrySuccessfulFlow(WebApps apps) : IClassFixture<WebA
 
         var reads = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses"), Cancel);
-        Assert.Contains("Add diagnosis: Listed, Synthetic", form);
+        Assert.Contains("<h1>Add diagnosis</h1>", form);
         Assert.Matches("<input [^>]*name=\"Name\"[^>]*required[^>]*autofocus[^>]*data-code-search=\"condition\"", form);
         Assert.Contains("/_content/Ehr.Design/js/code-search.", form);
         Assert.Contains(">Save diagnosis</button>", form);
@@ -66,7 +66,7 @@ public class TC_UC4_07_AddEntrySuccessfulFlow(WebApps apps) : IClassFixture<WebA
             ("Name", "Penicillin G"), ("Reaction", "Hives"), ("Criticality", "high"), ("Status", "active"));
 
         var saved = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Matches(@"<strong>Essential \(primary\) hypertension</strong>\s*\(I10\)\s*since 2024-05-01", saved);
+        Assert.Matches(@"<strong>Essential \(primary\) hypertension</strong>\s*\(I10\)\s*since May 1, 2024", saved);
         Assert.Contains("<strong>lisinopril 10 MG Oral Tablet</strong>: 1 tablet by mouth daily", saved);
         // The allergy in the chart's list, with its tag, and in the banner, apart.
         var allergies = Regex.Match(saved, "<section class=\"sc-panel\" aria-labelledby=\"chart-allergies\">[\\s\\S]*?</section>").Value;

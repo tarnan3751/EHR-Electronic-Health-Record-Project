@@ -137,7 +137,7 @@ public class QuickTextSyncTests(WebApps apps) : IClassFixture<WebApps>
         var result = await PushOneAsync(apps.OnPrem, NewPhrase("nad", "No period"));
 
         Assert.Equal(PushOutcome.Invalid, result.Outcome);
-        Assert.Contains("Start with a period", Assert.Single(result.Errors!["shortcut"]));
+        Assert.Contains("Shortcut must start with a period", Assert.Single(result.Errors!["shortcut"]));
     }
 
     [Fact]

@@ -44,7 +44,7 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
     public Task<IActionResult> OnPostResetAuthenticatorAsync(Guid id) => ActOnAsync(id, async member =>
     {
         var passkeys = await accounts.ResetAuthenticatorAsync(member, HttpContext.RequestAborted);
-        Message = $"{member.DisplayName} will set up an authenticator app again at their next sign-in."
+        Message = $"Authenticator reset for {member.DisplayName}."
             + (passkeys switch { 0 => "", 1 => " Their passkey was removed.", _ => $" Their {passkeys} passkeys were removed." });
         return null;
     });
@@ -54,10 +54,8 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
         await accounts.DisableAsync(member, HttpContext.RequestAborted);
         // Disabling ends a clinician's desktop sign-ins but deletes nothing on their computers: revoking them does,
         // before or after (DesktopSignIns, the expansion plan's step 20).
-        Message = $"{member.DisplayName} is disabled and can no longer sign in."
-            + (member.Roles.Contains(StaffRoles.Clinician)
-                ? " What SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked. Revoke them now: a sign-out on one of those computers first leaves it out of reach."
-                : "");
+        Message = $"{member.DisplayName} is disabled."
+            + (member.Roles.Contains(StaffRoles.Clinician) ? " Revoke their desktop sign-ins now." : "");
         return null;
     });
 
@@ -106,7 +104,7 @@ public class StaffModel(StaffAccounts accounts, IOptions<SiteAddresses> links) :
 
         if (roles.Count == 0)
         {
-            ModelState.AddModelError("", "Choose at least one role.");
+            ModelState.AddModelError("", "Select at least one role.");
         }
 
         if (ModelState.IsValid)

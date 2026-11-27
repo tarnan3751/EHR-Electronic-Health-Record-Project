@@ -25,9 +25,9 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   3. Submit the real reason.
 //   4. Read the emergency access events and their reasons.
 //   5. Open the chart again.
-// Expected result: Step 1 is a 302 to /patients/{id}/reason, with no recorded read. Step 2 says "Use at least 10
-//   characters." and records no emergency access. Step 3 lands on /patients/{id}, which shows "{family}, John" and
-//   "Emergency access". Step 4 finds exactly one emergency access event, with the real reason. Step 5 is a 200, and
+// Expected result: Step 1 is a 302 to /patients/{id}/reason, with no recorded read. Step 2 says "Reason must be 10
+//   to 500 characters." and records no emergency access. Step 3 lands on /patients/{id}, which shows "{family}, John"
+//   and "Break-the-glass access until". Step 4 finds exactly one emergency access event, with the real reason. Step 5 is a 200, and
 //   the clinician then has two recorded reads of the patient.
 // Creator: Diego Valenzuela
 public class TC_UC4_04_InvalidInput(WebApps apps)
@@ -91,7 +91,7 @@ public class TC_UC4_04_InvalidInput(WebApps apps)
             ("Reason", "ER"));
 
         Assert.Contains(
-            "Too short. Use 10 to 500 characters.",
+            "Reason must be 10 to 500 characters.",
             await ReadAsync(invalid));
 
         // No emergency access should be granted.
@@ -121,7 +121,7 @@ public class TC_UC4_04_InvalidInput(WebApps apps)
             chartHtml);
 
         Assert.Contains(
-            "Emergency access",
+            "Break-the-glass access until",
             chartHtml);
 
         // Step 4: Verify emergency access is audited.

@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Expected result: Step 2: the list has the two hemoglobin results and no vital sign; "Over time" has a chart for
 //   hemoglobin ("Latest 13.5 g/dL, up from 9.1"); "Vital signs" has a chart for heart rate ("Latest 64 per minute, down
 //   from 72") and none for blood pressure, taken once; each chart is an SVG with its values in a table, and the page
-//   has no script and no inline style. Step 3: "No test results yet. If you're expecting one, contact your care team." and no chart.
+//   has no script and no inline style. Step 3: "No test results yet." and no chart.
 // Creator: Tahseen Arnan
 public class TC_UC6_14_TrendsInPortal(WebApps apps) : IClassFixture<WebApps>
 {
@@ -58,7 +58,7 @@ public class TC_UC6_14_TrendsInPortal(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain(" style=", page);
 
         var theirs = await other.Client.GetStringAsync("/portal/results", Cancel);
-        Assert.Contains("No test results yet. If you're expecting one, contact your care team.", theirs);
+        Assert.Contains("No test results yet.", theirs);
         Assert.DoesNotContain("data-trend", theirs);
     }
 }

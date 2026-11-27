@@ -23,11 +23,11 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Choose "View this record".
 //   3. Open "Results".
 //   4. Choose "Back to my record", and open "Results".
-// Expected result: Step 1: "Records shared with you" lists "Synthetic Parent". Step 2: the home page is headed "Synthetic
-//   Parent's record", shows that patient's name and record number, and the band "Shared record. You're viewing Synthetic
-//   Parent's record, not your own." Step 3: the patient's result and not the proxy's; the band again; the read is
-//   recorded with the proxy's account as the actor and the patient as the subject. Step 4: the proxy's own record and
-//   result, no band, and nothing of the patient's.
+// Expected result: Step 1: "Records shared with you" lists "Synthetic Parent". Step 2: the home page is headed "Record",
+//   shows that patient's name and record number, and the band "Shared record. You're viewing Synthetic Parent's record,
+//   not your own." Step 3: the patient's result and not the proxy's; the band again; the read is recorded with the
+//   proxy's account as the actor and the patient as the subject. Step 4: the proxy's own record and result, no band, and
+//   nothing of the patient's.
 // Creator: Tahseen Arnan
 public class TC_UC6_10_ProxyChoosesRecord(WebApps apps) : IClassFixture<WebApps>
 {
@@ -48,7 +48,7 @@ public class TC_UC6_10_ProxyChoosesRecord(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("data-acting", access);
 
         var home = await ViewAsync(proxy, grant);
-        Assert.Contains("<h1>Synthetic Parent&#x27;s record</h1>", home);
+        Assert.Contains("<h1>Record</h1>", home);
         Assert.Contains("Shared record. You're viewing Synthetic Parent's record, not your own.", Words(home));
         Assert.Contains("<dd>Synthetic Parent</dd>", home);
         Assert.DoesNotContain("Synthetic Carer</dd>", home);

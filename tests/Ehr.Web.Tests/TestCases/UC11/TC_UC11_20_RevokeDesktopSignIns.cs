@@ -57,8 +57,8 @@ public class TC_UC11_20_RevokeDesktopSignIns(WebApps apps) : IClassFixture<WebAp
         Assert.Contains($"href=\"/admin/staff/{clinician.Id}/desktop\">Desktop sign-ins</a>", staff);
         Assert.DoesNotContain($"/admin/staff/{adminAccount.Id}/desktop", staff);
         var page = await admin.Client.GetStringAsync($"/admin/staff/{clinician.Id}/desktop", Cancel);
-        Assert.Contains("Dr. Lost Laptop has 2 desktop sign-ins that haven't ended.", Words(page));
-        Assert.Contains("and any drafts and recordings not yet sent, which are lost", Words(page));
+        Assert.Contains("Dr. Lost Laptop has 2 active desktop sign-ins.", Words(page));
+        Assert.Contains("Unsent drafts and recordings are lost.", Words(page));
         Assert.Contains("Revoke and delete", page);
 
         // 2.

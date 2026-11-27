@@ -20,8 +20,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //      between them. Press Tab until "Sign order" has the focus, and press Enter.
 //   2. Type the reason (the cursor is already in its field). Press Tab until "Sign order" has the focus, and press
 //      Enter.
-// Expected result: Step 1: the form stays, shows "Check before signing" with the allergy, and the cursor is in "Reason
-//   for ordering despite the warnings", which shows the focus ring. Step 2: the order is signed and the chart opens.
+// Expected result: Step 1: the form stays, shows "Check before signing" with the allergy, and the cursor is in "Override
+//   reason", which shows the focus ring. Step 2: the order is signed and the chart opens.
 //   The page reports no script errors.
 // Creator: Tahseen Arnan
 //

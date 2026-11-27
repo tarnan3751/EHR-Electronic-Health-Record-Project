@@ -64,7 +64,7 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
         var moment = taken.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
         Assert.True(page.Contains($"at={moment}", StringComparison.Ordinal) || page.Contains($"at={moment.Replace(":", "%3A", StringComparison.Ordinal)}", StringComparison.Ordinal));
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Contains($"· {clock.Day(taken)}</span>", chart);
+        Assert.Contains($"· {clock.Plain(taken, "MMM d, yyyy")}</span>", chart);
 
         // A second reading makes a trend: its sentence and its table are on the clinic's clock too.
         var earlier = taken.AddDays(-1);
@@ -85,7 +85,7 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
 
         // A clinic in UTC: the same reading, at the same moment, on its own clock.
         var utc = await utcSession.Client.GetStringAsync(Path(patient), Cancel);
-        Assert.Contains($"<th scope=\"col\" class=\"sc-table__mono\">{taken.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)} UTC</th>", utc);
+        Assert.Contains($"<th scope=\"col\" class=\"sc-table__mono\">{taken.UtcDateTime.ToString("MMM d, yyyy HH:mm", CultureInfo.InvariantCulture)} UTC</th>", utc);
         Assert.Contains("Taken (UTC) <span>(required)</span>", utc);
 
         // The audit log stays in UTC.

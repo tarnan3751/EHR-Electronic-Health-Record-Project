@@ -64,7 +64,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
                 return RedirectToPage(new { patientId, done = "recorded" });
             }
 
-            errors["Email"] = "Access couldn't be given. Check the address and try again.";
+            errors["Email"] = "Check the address and try again.";
         }
 
         Errors = errors;

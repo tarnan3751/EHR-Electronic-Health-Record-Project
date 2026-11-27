@@ -8,7 +8,7 @@
     // Off the panel nothing about the patient was read: the page says the post wasn't saved, and no more.
     var patient = Model.OffPanel ? null : Model.Form.Patient;
     var heading = $"{(Model.IsNew ? "Add" : "Change")} {Model.About.One}";
-    ViewData["Title"] = patient is null ? "Not saved" : $"{heading}: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = patient is null ? "Not saved" : heading;
 }
 @section Scripts {
     @if (patient is not null)
@@ -25,7 +25,7 @@
 @if (patient is null)
 {
     <h1>Not saved</h1>
-    <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> This isn't one of your patients.@(Model.Typed.Count > 0 ? " What you entered is below, to copy." : "")</p>
+    <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> This isn't one of your patients.</p>
     <div class="sc-form sc-kept">
         @foreach (var (field, value) in Model.Typed)
         {
@@ -40,7 +40,7 @@ else
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
-<h1>@heading: @patient.FamilyName, @patient.GivenName</h1>
+<h1>@heading</h1>
 @if (Model.Proposed is { } proposed)
 {
     <partial name="~/Areas/Clinical/Pages/Patients/Notes/_ProposedFromDictation.cshtml" model="proposed" />
@@ -55,7 +55,7 @@ else
     @if (Model.ProposalDecided)
     {
         @* Step 15: nothing was added, so nothing waits to be undone. *@
-        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Not saved.</span> This proposal was decided first, in another tab or window. Nothing was added. <a href="@Model.ReviewLink">Back to review</a></p>
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Not saved.</span> This proposal was already decided. <a href="@Model.ReviewLink">Back to review</a></p>
     }
     else if (Model.Errors.Count > 0)
     {
@@ -63,7 +63,7 @@ else
     }
     else if (Model.Refused)
     {
-        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> The entry may have changed, or this patient may no longer be one of your patients. What you entered is still below.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> The entry changed, or this isn't one of your patients.</p>
     }
     @{ var nameError = Model.Errors.GetValueOrDefault("Name"); }
     <div class="sc-field">
@@ -76,16 +76,9 @@ else
         {
             <p class="sc-field__error" id="entry-name-error">@nameError</p>
         }
-        @* Said before a save, not only after one is refused: only a name from the list (or, for a diagnosis, its code) is
-           saved. The search says, politely, when nothing matches or the session has ended (js/code-search.js). *@
-        <p class="sc-field__hint" id="entry-name-hint">@if (Model.List == "diagnoses")
-            {
-                <text>Type two or more letters, then pick a diagnosis from the list, or type an ICD-10-CM code. Other text can't be saved.</text>
-            }
-            else
-            {
-                <text>Type two or more letters, then pick a @Model.About.Label.ToLowerInvariant() from the list. Other text can't be saved.</text>
-            }<span aria-live="polite" data-code-search-status></span></p>
+        @* How to search, since only a name from the list (or, for a diagnosis, its code) is saved. The search says when
+           nothing matches or the session has ended (js/code-search.js). *@
+        <p class="sc-field__hint" id="entry-name-hint">@(Model.List == "diagnoses" ? "Search by name or ICD-10-CM code." : "Type at least two letters to search.")<span aria-live="polite" data-code-search-status></span></p>
     </div>
     @if (Model.List == "allergies")
     {
@@ -96,12 +89,12 @@ else
                 <option value="@reaction"></option>
             }
         </datalist>
-        Choice("Severity", "entry-severity", "Severity of the reaction", Model.Severity, optional: true, ChartListWords.Severities);
-        Choice("Criticality", "entry-criticality", "Risk from another exposure", Model.Criticality, optional: true, ChartListWords.Criticalities);
+        Choice("Severity", "entry-severity", "Severity", Model.Severity, optional: true, ChartListWords.Severities);
+        Choice("Criticality", "entry-criticality", "Criticality", Model.Criticality, optional: true, ChartListWords.Criticalities);
     }
     else if (Model.List == "medications")
     {
-        Text("Dosage", "entry-dosage", "How it is taken", Model.Dosage, list: null);
+        Text("Dosage", "entry-dosage", "Dosage", Model.Dosage, list: null);
         Day("Started", "entry-started", "Started", Model.Started);
         Day("Stopped", "entry-stopped", "Stopped", Model.Stopped);
     }
@@ -118,12 +111,12 @@ else
                 @* Marked by the rule, so it can't be cleared (docs/brand: Sensitive items). A disabled box isn't posted;
                    the page and the database keep the diagnosis sensitive either way. *@
                 <label class="sc-check" for="entry-sensitive"><input type="checkbox" id="entry-sensitive" checked disabled aria-describedby="entry-sensitive-hint"> Sensitive</label>
-                <p class="sc-field__hint" id="entry-sensitive-hint">Sensitive because of its code. Hidden from the chart unless someone chooses to show sensitive items. Views are logged.</p>
+                <p class="sc-field__hint" id="entry-sensitive-hint">Always sensitive for this code. Views are logged.</p>
             }
             else
             {
                 <label class="sc-check" for="entry-sensitive"><input type="checkbox" id="entry-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="entry-sensitive-hint"> Sensitive</label>
-                <p class="sc-field__hint" id="entry-sensitive-hint">Hidden from the chart unless someone chooses to show sensitive items. Views are logged.@(Model.List == "diagnoses" ? " Mental health, substance use and some other diagnoses are always sensitive." : "")</p>
+                <p class="sc-field__hint" id="entry-sensitive-hint">Views are logged.</p>
             }
         </div>
     }

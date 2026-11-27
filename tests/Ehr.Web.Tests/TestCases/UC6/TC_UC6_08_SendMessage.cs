@@ -43,7 +43,7 @@ public class TC_UC6_08_SendMessage(WebApps apps) : IClassFixture<WebApps>
 
         var thread = await StartAsync(portal.Client, "Synthetic: question about my inhaler", "Synthetic: how often should I use it?");
         var opened = await portal.Client.GetStringAsync($"/portal/messages/{thread}?sent=true", Cancel);
-        Assert.Contains("Sent. Replies from your care team appear here.", Words(opened));
+        Assert.Contains("<span class=\"sc-notice__state\">Sent.</span></p>", opened);
         Assert.Contains("<strong>You</strong>", opened);
         Assert.Contains("Synthetic: how often should I use it?", opened);
         Assert.Equal([clinician.Id.ToString()], await OpenInboxAsync(apps, patient));

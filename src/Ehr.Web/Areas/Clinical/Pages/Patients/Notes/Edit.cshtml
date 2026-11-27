@@ -32,8 +32,7 @@
 @if (!OnPrem.IsReachable)
 {
     @* UC 2 (Tahseen Arnan): off-site with the clinic's server unreachable, the draft as last saved, and no editor, since
-       nothing could be saved. *@
-    <p class="sc-muted">This draft can't be changed or signed until the clinic's server is back. It's shown as last saved.</p>
+       nothing could be saved; the layout's band says why. *@
     <partial name="_NoteContent" model="Model.Saved" />
 }
 else
@@ -41,7 +40,7 @@ else
     @* UC 13: go back to a review that was saved. Only while the draft can be changed. *@
     @if (Model.ActiveReviewId is { } reviewId)
     {
-        <p class="sc-notice sc-notice--warning"><a asp-page="Review" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])" asp-route-reviewId="@reviewId">Resume dictation review</a>. Review the dictated fields before signing.</p>
+        <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Dictation not reviewed.</span> <a asp-page="Review" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])" asp-route-reviewId="@reviewId">Resume dictation review</a></p>
     }
     var waiting = (Guid.Parse(RouteData.Values["draftId"]!.ToString()!), Model.WaitingProposals, false);
     <partial name="_WaitingProposals" model="waiting" />
@@ -49,11 +48,11 @@ else
        and saves it. Nothing has changed in the saved draft. *@
     @if (Model.Origin == NoteOrigin.History)
     {
-        <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="history"><span class="sc-notice__state">Check before signing.</span> This draft was written before notes had four sections, so its History is in Subjective. Move today's vital signs, examination findings and reviewed results to Objective.</p>
+        <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="history"><span class="sc-notice__state">Check before signing.</span> The History is in Subjective. Move today's vital signs, examination findings and reviewed results to Objective.</p>
     }
     else if (Model.Origin == NoteOrigin.Body)
     {
-        <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="body"><span class="sc-notice__state">Check before signing.</span> This draft was last saved on the desktop app, so all its text is in Subjective. Sort it into the four sections.</p>
+        <p class="sc-notice sc-notice--warning" id="note-origin" data-note-origin="body"><span class="sc-notice__state">Check before signing.</span> All the text from the desktop app is in Subjective. Sort it into the four sections.</p>
     }
     <div id="note-errors" class="sc-notice sc-notice--danger" role="alert" hidden="@(Model.Errors.Count == 0)">
         @foreach (var error in Model.Errors) { <p>@error</p> }
@@ -69,10 +68,9 @@ else
     </text>;
     <form method="post" asp-page-handler="Save" class="sc-form sc-form--wide sc-editor" data-note-editor>
         <input type="hidden" asp-for="Version" />
-        <p id="note-help" class="sc-field__hint">The draft saves as you type. Fill in all four sections to sign it.</p>
         <div class="sc-field">
             <label asp-for="NoteTemplateCode" class="sc-field__label">Visit type</label>
-            <select asp-for="NoteTemplateCode" class="sc-field__input" aria-describedby="note-template-help" data-note-template>
+            <select asp-for="NoteTemplateCode" class="sc-field__input" data-note-template>
                 <option value="">No visit type</option>
                 @foreach (var template in Model.Templates)
                 {
@@ -80,12 +78,11 @@ else
                             data-assessment="@($"{template.Title}: {template.AssessmentPrompt}")" data-plan="@($"{template.Title}: {template.PlanPrompt}")">@template.Title</option>
                 }
             </select>
-            <p id="note-template-help" class="sc-field__hint">Optional. Shows what to cover in each section, without adding any text to the note.</p>
         </div>
         <div class="sc-field sc-field--wide">
             <label asp-for="Subjective" class="sc-field__label">Subjective</label>
             @hints(NoteSections.Subjective)
-            <textarea asp-for="Subjective" class="sc-field__input" rows="7" autofocus aria-describedby="@(described(NoteSections.Subjective) + (Model.Origin == NoteOrigin.Sections ? " note-help" : " note-help note-origin"))"></textarea>
+            <textarea asp-for="Subjective" class="sc-field__input" rows="7" autofocus aria-describedby="@(described(NoteSections.Subjective) + (Model.Origin == NoteOrigin.Sections ? "" : " note-origin"))"></textarea>
         </div>
         <div class="sc-field sc-field--wide">
             <label asp-for="Objective" class="sc-field__label">Objective</label>

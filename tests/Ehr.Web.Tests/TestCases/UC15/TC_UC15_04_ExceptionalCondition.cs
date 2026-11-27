@@ -24,8 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 //   2. With the link down, open the inbox.
 //   3. Post "Mark done" for the second item.
 // Expected result: Step 1: the post is forwarded and the first item is done on the clinic's server. Step 2: the inbox
-//   lists the second item with no "Mark done" button and says "Marking an item done needs the clinic's server. Your
-//   inbox remains readable."; the app bar shows the count. Step 3: the post is answered 503 and the item still
+//   lists the second item with no "Mark done" button and says "Marking an item done needs the clinic's server."; the app bar shows the count. Step 3: the post is answered 503 and the item still
 //   needs action.
 // Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
@@ -48,7 +47,7 @@ public class TC_UC15_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var inbox = await cutOff.GetStringAsync("/inbox", Cancel);
         Assert.Contains("Synthetic: second off-site item", inbox);
         Assert.DoesNotContain("Mark done</button>", inbox);
-        Assert.Contains("Marking an item done needs the clinic's server. Your inbox remains readable.", inbox);
+        Assert.Contains("Marking an item done needs the clinic's server.", inbox);
         Assert.Contains("data-inbox-count", inbox);
 
         using var refused = await MarkDoneAsync(cutOff, second, token);

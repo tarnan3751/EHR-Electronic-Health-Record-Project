@@ -8,7 +8,7 @@
     var patient = Model.Form.Patient;
     var replaced = Model.Form.Replaced;
     var heading = replaced is null ? "New order" : "Change order";
-    ViewData["Title"] = $"{heading}: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = heading;
 }
 @* UC 1 Place an order (Tahseen Arnan). js/orders.js posts the form with fetch, and keeps it filled when the clinic's
    server can't be reached; without JavaScript it posts as a normal form. *@
@@ -23,7 +23,7 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
-<h1>@heading: @patient.FamilyName, @patient.GivenName</h1>
+<h1>@heading</h1>
 @if (Model.Proposed is { } proposed)
 {
     <partial name="~/Areas/Clinical/Pages/Patients/Notes/_ProposedFromDictation.cshtml" model="proposed" />
@@ -52,27 +52,27 @@
 
 @if (Model.KnownType is not { } selected)
 {
-    <p class="sc-muted">Choose the type of order.</p>
+    <p class="sc-muted">Select an order type.</p>
 }
 else
 {
     <form method="post" class="sc-form sc-formgrid" data-order-form>
         @if (Model.Gone)
         {
-            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active. Someone discontinued or changed it first.</p>
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active.</p>
         }
         else if (Model.RefillRefused is { } refused)
         {
             @* Step 13d: nothing was ordered, so nothing waits to be undone. *@
             <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> @if (refused == SignRefusal.Answered)
-                {<text>Someone answered this refill request first, so nothing was ordered.</text>}
+                {<text>This refill request was already answered.</text>}
                 else
-                {<text>This refill request can't be approved. Its medication is no longer active, or this isn't the same medication.</text>} <a asp-page="/Patients/Refills/Review" asp-route-patientId="@patient.Id" asp-route-requestId="@Model.Refill">Back to request</a></p>
+                {<text>This refill request can't be approved. The medication is no longer active or doesn't match.</text>} <a asp-page="/Patients/Refills/Review" asp-route-patientId="@patient.Id" asp-route-requestId="@Model.Refill">Back to request</a></p>
         }
         else if (Model.ProposalDecided)
         {
             @* Step 15: nothing was ordered, so nothing waits to be undone. *@
-            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This proposal was decided first, in another tab or window. Nothing was ordered. <a href="@Model.ReviewLink">Back to review</a></p>
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This proposal was already decided. <a href="@Model.ReviewLink">Back to review</a></p>
         }
         else
         {
@@ -83,9 +83,8 @@ else
         {
             @* Step 13d: what the order approves. Signing it answers the request, and the patient sees what was ordered. *@
             <div class="sc-notice sc-notice--info" data-order-refill>
-                <p><span class="sc-notice__state">Refill request.</span> Signing approves the request for <strong>@refill.MedicationDisplay</strong>@if (refill.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }, asked by @refill.AskedBy, @Clinic.Format(refill.RequestedAt).</p>
-                <p>On the chart: @refill.Medication.Display@(refill.Medication.Dosage is { } dosage ? $", {dosage}" : "").@if (refill.Note is { } note) { <br><text>The patient's note: </text><span class="sc-note__text">@note</span> }</p>
-                <p>This order renews the same medication, @refill.CatalogItem. The patient sees what was ordered.</p>
+                <p><span class="sc-notice__state">Refill request.</span> <strong>@refill.MedicationDisplay</strong>@if (refill.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }, requested by @refill.AskedBy, @Clinic.Format(refill.RequestedAt). Signing approves it.</p>
+                <p>On the chart: @refill.Medication.Display@(refill.Medication.Dosage is { } dosage ? $", {dosage}" : "").@if (refill.Note is { } note) { <br><text>Patient's note: </text><span class="sc-note__text">@note</span> }</p>
             </div>
         }
         @if (replaced is not null)
@@ -93,7 +92,6 @@ else
             @* A signed order is never edited: the change is a new order, and signing it discontinues this one. *@
             <div class="sc-notice sc-notice--info" data-order-replaces>
                 <p><span class="sc-notice__state">Order being changed.</span> <strong>@replaced.Display</strong> @OrderForms.Summary(replaced.Type, replaced.Details) · signed @Clinic.Format(replaced.SignedAt)</p>
-                <p>Signing the change discontinues it, and it moves to discontinued orders.</p>
             </div>
         }
         @{ Field("Item", "order-item", "Item", required: true, Model.Item, Model.Form.Refill is null ? "order-items" : null); }
@@ -115,9 +113,8 @@ else
                 {
                     <p>An active order for <strong>@duplicate.Display</strong> was signed @Clinic.Format(duplicate.SignedAt).</p>
                 }
-                <p>Cancel, or give a reason and sign to order it again.</p>
                 <div class="sc-field">
-                    <label for="order-reason">Reason for ordering it again <span>(required)</span></label>
+                    <label for="order-reason">Reason for duplicate order <span>(required)</span></label>
                     <textarea id="order-reason" class="sc-field__input" name="DuplicateReason" rows="2" maxlength="@OrderForms.MaximumReasonLength" required
                               aria-invalid="@(Model.Errors.ContainsKey("DuplicateReason") ? "true" : null)">@Model.DuplicateReason</textarea>
                 </div>
@@ -144,7 +141,7 @@ else
                             <br><span class="sc-muted">Source: @OrderSafetyText.SourceName(warning.Source)@(warning.Citation is null ? "." : $". {warning.Citation}")
                                 @if (warning.Source == Ehr.Data.Reference.DrugInteractionSource.DdInter)
                                 {
-                                    <a href="@OrderSafetyText.DdInterChecker" rel="noreferrer noopener" target="_blank">Look the pair up in DDInter (needs internet)</a>
+                                    <a href="@OrderSafetyText.DdInterChecker" rel="noreferrer noopener" target="_blank">Look up in DDInter</a>
                                 }
                             </span>
                         </li>
@@ -153,13 +150,12 @@ else
                 @if (!stops)
                 {
                     <input type="hidden" name="SafetySeen" value="true">
-                    <p>These don't stop the order. They are kept on it. @(Model.ShowingNotes ? "Sign again to go ahead, or cancel." : null)</p>
+                    <p>These don't stop the order.@(Model.ShowingNotes ? " Sign again to continue." : null)</p>
                 }
                 else
                 {
-                <p>Cancel, or give a reason and sign to order it all the same.</p>
                 <div class="sc-field">
-                    <label for="order-safety-reason">Reason for ordering despite the warnings <span>(required)</span></label>
+                    <label for="order-safety-reason">Override reason <span>(required)</span></label>
                     <textarea id="order-safety-reason" class="sc-field__input" name="SafetyReason" rows="2" maxlength="@OrderForms.MaximumReasonLength" required
                               autofocus="@(safetyError is not null && Model.Errors.Count == 1)"
                               aria-invalid="@(safetyError is null ? null : "true")" aria-describedby="@(safetyError is null ? null : "order-safety-reason-error")">@Model.SafetyReason</textarea>
@@ -173,15 +169,15 @@ else
         }
         @if (Model.KnownType == Ehr.Data.Orders.OrderType.Medication)
         {
-            @* What the checks are, that no warning doesn't mean safe, and the one limit a clinician must know (uncoded
-               allergies and medications), before the order is signed. *@
+            @* That the checks are not a complete reference, beside the form; what they cover and miss, under the disclosure. *@
             <div class="sc-muted" data-safety-disclaimer>
-                <p>Decision support for this demonstration system, not a complete clinical reference. No warning doesn't mean a combination is safe. Allergies and medications without a code aren't checked.</p>
+                <p>Demonstration decision support, not a complete clinical reference.</p>
                 <details>
                     <summary>More about what is checked</summary>
                     <ul>
                         <li>A medication order is checked against the patient's allergies and medications.</li>
-                        <li>Only items with a drug code are checked.</li>
+                        <li>Allergies and medications without a code aren't checked.</li>
+                        <li>No warning doesn't mean a combination is safe.</li>
                     </ul>
                 </details>
             </div>

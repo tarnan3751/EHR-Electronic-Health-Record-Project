@@ -256,7 +256,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForTimeoutAsync(400);
         Assert.False(await page.EvaluateAsync<bool>("window.__ambient.track.enabled"));
         Assert.Equal(0, await ChunksAsync(page));
-        Assert.StartsWith("Paused while this page was out of sight", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.StartsWith("Paused while this page was hidden", await page.TextContentAsync("[data-ambient-status]"));
         Assert.StartsWith("Paused", await page.TitleAsync(), StringComparison.Ordinal);
     }
 
@@ -324,8 +324,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForSelectorAsync("[data-ambient-voice='2']");
         var said = await page.EvaluateAsync<string[]>("window.__said");
         Assert.Single(said, s => s.StartsWith("Listening stops in a minute", StringComparison.Ordinal));
-        Assert.Single(said, s => s == "Listening stopped at its 20-minute limit. Transcribing the visit and telling its voices apart. "
-            + "Then say who each voice is to draft the note.");
+        Assert.Single(said, s => s == "Listening stopped at its 20-minute limit. Transcribing the visit.");
         Assert.DoesNotContain("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
     }
 
@@ -436,7 +435,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     // goes on to the voices.
     [Theory]
     [InlineData(502, """{"error":"bad_answer","message":"Dictation isn't working right now."}""", 1, "Dictation isn't working right now.")]
-    [InlineData(503, """{"error":"unavailable","message":"Listening isn't available right now. You can type the note."}""", 4, "The visit couldn't be fetched because the listening service isn't answering")]
+    [InlineData(503, """{"error":"unavailable","message":"Listening unavailable."}""", 4, "The listening service isn't answering. Try again in a moment, or discard the recording.")]
     public async Task TC_UC23_04_fetching_the_draft_is_asked_a_few_times_at_most(int status, string answer, int asked, string said)
     {
         var (patient, session) = await AccountAsync(apps);
@@ -456,7 +455,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("draft", words, StringComparison.OrdinalIgnoreCase);
         if (status == 503)
         {
-            Assert.Contains("Try again in a moment, or discard the recording. The service keeps nothing for more than 10 minutes.", words);
+            Assert.Contains("The listening service isn't answering. Try again in a moment, or discard the recording.", words);
         }
 
         Assert.True(await page.IsVisibleAsync("[data-ambient-retry]"));
@@ -475,9 +474,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     // the recording, which discards the review and the service's session as Stop and discard does.
     [Theory]
     [InlineData("""{"transcript":{"text":"","final":true,"segments":[]},"sorting":"unavailable","reason":"transcription_failed","fields":null,"notCarriedOver":[],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null,"llamaServer":null,"prompt":"p","schema":"s","structuring":"t","code":"c"}}""",
-        "This visit couldn't be transcribed and its voices told apart, so it can't be drafted.")]
+        "This visit couldn't be transcribed, so it can't be drafted.")]
     [InlineData("""{"transcript":{"text":"","final":true,"segments":[]},"sorting":"awaiting_speakers","fields":null,"notCarriedOver":[],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null,"llamaServer":null,"prompt":"p","schema":"s","structuring":"t","code":"c"},"speakers":[{"group":1,"seconds":1},{"group":2,"seconds":1},{"group":3,"seconds":1},{"group":4,"seconds":1},{"group":5,"seconds":1},{"group":6,"seconds":1},{"group":7,"seconds":1},{"group":8,"seconds":1},{"group":9,"seconds":1},{"group":10,"seconds":1}]}""",
-        "More voices were told apart than can be named (9 at most), so this visit can't be drafted.")]
+        "More voices than can be named (9 at most), so this visit can't be drafted.")]
     public async Task TC_UC23_04_a_visit_that_cant_be_drafted_offers_only_discarding_it(string answer, string said)
     {
         var (patient, session) = await AccountAsync(apps);
@@ -516,7 +515,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         {
             Status = 503,
             ContentType = "application/json",
-            Body = """{"error":"unavailable","message":"Listening isn't available right now. You can type the note."}"""
+            Body = """{"error":"unavailable","message":"Listening unavailable."}"""
         }));
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
@@ -527,7 +526,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.TypeAsync("T");
         await AiReviewBrowserTests.TabToAsync(page, "[data-ambient-draft]");
         await page.Keyboard.PressAsync("Enter");
-        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-status]').textContent.startsWith('The draft couldn\\'t be fetched')",
+        await page.WaitForFunctionAsync("document.querySelector('[data-ambient-status]').textContent.startsWith('The listening service isn\\'t answering')",
             null, new() { Timeout = 30_000 });
         Assert.Contains("open the draft in a few minutes to retrieve or discard it", await page.TextContentAsync("[data-ambient-status]"));
         Assert.True(await page.IsVisibleAsync("[data-ambient-retry]"));
@@ -547,9 +546,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
             "SELECT id::text FROM ehr.ai_note_reviews WHERE patient_id = @id AND mode = 'ambient'", patient)).Single();
         await page.UnrouteAsync("**/ambient/*/result");
         await page.GotoAsync($"{server.Url}/patients/{patient}/notes/drafts/{draft}/review/{review}");
-        Assert.Contains("Not drafted yet. A visit was recorded at",
+        Assert.Contains("Not drafted yet. Visit recorded",
             await page.TextContentAsync("[data-ambient-not-drafted]"));
-        Assert.Contains("If you named its voices a moment ago, wait a minute, then retrieve its draft.",
+        Assert.Contains("If you just named its voices, wait a minute before retrieving its draft.",
             await page.TextContentAsync("[data-ambient-not-drafted]"));
         await AiReviewBrowserTests.TabToAsync(page, "[data-review-retrieve]");
         await page.Keyboard.PressAsync("Tab");

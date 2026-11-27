@@ -18,14 +18,14 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   ?showErrors=true; POST /patients/{id}/vitals.
 // Test data: Reason "Synthetic: cuff too small."; then 140/90 for the same time.
 // Steps:
-//   1. Follow "Mark in error" under the set.
+//   1. Follow "Mark as entered in error" under the set.
 //   2. Send the form with only the diastolic value's ID, as no page offers it.
 //   3. Tick the blood pressure, give the reason, and mark it.
 //   4. Choose "Show entries in error".
 //   5. Record 140/90 for the same time.
-// Expected result: Step 1: the page lists two items, "Blood pressure 150/95 mmHg" and the heart rate, and says marking
-//   the blood pressure marks both of its numbers. Step 2: 422, "Choose at least one reading."; nothing is marked.
-//   Step 3: "Marked in error. 1 reading"; the page counts 1 reading marked; both numbers are entered in error with the reason
+// Expected result: Step 1: the page lists two items, "Blood pressure 150/95 mmHg", both its numbers in one item, and
+//   the heart rate. Step 2: 422, "Select at least one reading."; nothing is marked.
+//   Step 3: "Entered in error."; the page counts 1 reading marked; both numbers are entered in error with the reason
 //   and the clinician; the heart rate stands. Step 4: 150/95 is struck through once, with the reason. Step 5: saved;
 //   the flowsheet shows 140/90, a reading of its own. And a systolic marked in error alone before readings existed, as
 //   the VitalReadings migration leaves one beside the reading that corrected it, is struck through with a dash for its
@@ -44,18 +44,18 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
         var form = await session.Client.GetStringAsync(ErrorPath(patient, taken + ":00"), Cancel);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(form, "name=\"Chosen\"").Count);
         Assert.Contains("Blood pressure 150/95 mmHg", Words(form));
-        Assert.Contains("A blood pressure is one reading. Marking it marks both numbers.", Words(form));
+        Assert.DoesNotContain("Diastolic blood pressure", Words(form));
         Assert.DoesNotContain("Systolic blood pressure", Words(form));
 
         using var diastolicOnly = await MarkAsync(apps, session.Client, patient, taken + ":00", "Synthetic: cuff too small.", Diastolic);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, diastolicOnly.StatusCode);
-        Assert.Contains("Choose at least one reading.", Words(await diastolicOnly.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Select at least one reading.", Words(await diastolicOnly.Content.ReadAsStringAsync(Cancel)));
         Assert.DoesNotContain("entered-in-error", await StatesAsync(apps, patient));
 
         using var marked = await MarkAsync(apps, session.Client, patient, taken + ":00", "Synthetic: cuff too small.", Systolic);
         var page = await ReadAsync(marked);
-        Assert.Contains("Marked in error. 1 reading is now left out", Words(page));
-        Assert.Contains("1 reading entered in error isn't shown.", Words(page));
+        Assert.Contains("Entered in error.", Words(page));
+        Assert.Contains("1 reading entered in error is not shown.", Words(page));
         Assert.Equal([$"Diastolic 95 Synthetic: cuff too small. {clinician.Id}", $"Systolic 150 Synthetic: cuff too small. {clinician.Id}"], await ProxyTests.QueryAsync(apps,
             """
             SELECT CASE code WHEN '8480-6' THEN 'Systolic' ELSE 'Diastolic' END || ' ' || trim_scale(value) || ' ' || entered_in_error_reason || ' ' || entered_in_error_by
@@ -97,6 +97,6 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
         var row = Words(System.Text.RegularExpressions.Regex.Match(shown, "(?s)<th scope=\"row\">Blood pressure.*?</tr>").Value);
         Assert.Contains("140/90", row);
         Assert.Contains("150/— entered in error: Synthetic: typed 150 for 140.", row);
-        Assert.Contains("1 reading entered in error is shown struck through.", Words(shown));
+        Assert.Contains("1 reading entered in error is shown.", Words(shown));
     }
 }

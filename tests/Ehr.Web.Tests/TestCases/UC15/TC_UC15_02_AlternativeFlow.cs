@@ -44,7 +44,7 @@ public class TC_UC15_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Matches(@"Inbox\s*,\s*1\s*to do", Words(await admin.Client.GetStringAsync("/admin/staff", Cancel)));
 
         var inbox = await admin.Client.GetStringAsync("/inbox", Cancel);
-        Assert.Contains("<span class=\"sc-tag\">Emergency access to review</span> Synthetic: emergency access to review", inbox);
+        Assert.Contains("<span class=\"sc-tag\">Break the glass to review</span> Synthetic: emergency access to review", inbox);
         Assert.Contains($"<td class=\"sc-table__id\">{patient}</td>", inbox);
         Assert.DoesNotContain("Inboxed", inbox);
         Assert.DoesNotContain($"/patients/{patient}", inbox);

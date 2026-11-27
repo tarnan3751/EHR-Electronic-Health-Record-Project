@@ -69,14 +69,14 @@ public class TC_UC21_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"href=\"{ApprovePath(patient.Patient, request).Replace("&", "&amp;", StringComparison.Ordinal)}\"", review);
 
         var form = await session.Client.GetStringAsync(ApprovePath(patient.Patient, request), Cancel);
-        Assert.Contains("Refill request. Signing approves the request for", Said(form));
+        Assert.Contains("Refill request. lisinopril 10 MG Oral Tablet, requested by", Said(form));
+        Assert.Contains("Signing approves it.", Said(form));
         Assert.Contains("name=\"Item\" value=\"lisinopril 10 MG Oral Tablet\"", form);
-        Assert.Contains("This order renews the same medication, lisinopril 10 MG Oral Tablet.", Said(form));
         Assert.Matches("id=\"order-item\"[^>]*readonly", form);
         using var approved = await ApproveAsync(session.Client, patient.Patient, request);
         var answered = Said(await ReadAsync(approved));
         Assert.Equal(ReviewPath(patient.Patient, request), PathOf(approved));
-        Assert.Contains("Approved. The order is signed, and the patient can see what was ordered.", answered);
+        Assert.Contains("Approved.", answered);
         Assert.Contains("Approved by Dr. Test", answered);
         Assert.Contains("Ordered lisinopril 10 MG Oral Tablet.", answered);
 

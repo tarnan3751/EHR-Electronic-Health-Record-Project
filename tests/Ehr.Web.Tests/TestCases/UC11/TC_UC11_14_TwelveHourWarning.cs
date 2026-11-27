@@ -23,9 +23,9 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   2. Press Escape in the first page and Enter in the second.
 //   3. Let 90 seconds pass, 10 at a time, typing in the first page.
 //   4. Let the 12-hour end pass.
-// Expected result: Step 1: each page warns that a sign-in lasts at most 12 hours, with the focus on "Keep working".
-//   Step 2: both close. Step 3: neither opens again, and the text is in the message. Step 4: both pages end, saying a
-//   sign-in lasts at most 12 hours; the first says what was typed is kept.
+// Expected result: Step 1: each page warns that the 12-hour sign-in is ending, with the focus on "Keep working".
+//   Step 2: both close. Step 3: neither opens again, and the text is in the message. Step 4: both pages end, saying the
+//   12-hour sign-in limit was reached; the first says what was typed comes back.
 // Creator: Tahseen Arnan
 [Collection(BrowserTests.Collection)]
 public class TC_UC11_14_TwelveHourWarning(WebApps apps) : IClassFixture<WebApps>
@@ -95,7 +95,7 @@ public class TC_UC11_14_TwelveHourWarning(WebApps apps) : IClassFixture<WebApps>
         foreach (var page in new[] { message, other })
         {
             await page.WaitForSelectorAsync("[data-session-why='longest']");
-            Assert.Contains("Signed out. A sign-in lasts at most 12 hours", await SeenAsync(page));
+            Assert.Contains("Signed out. The 12-hour sign-in limit was reached.", await SeenAsync(page));
         }
 
         Assert.True(await message.IsVisibleAsync("[data-session-kept]"));

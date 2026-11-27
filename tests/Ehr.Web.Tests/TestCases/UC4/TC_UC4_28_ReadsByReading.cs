@@ -23,8 +23,8 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Open the chart, and the desktop app's offline copy.
 // Expected result: Step 1: the flowsheet has one "Blood pressure" row, 118/92 "High" and 130/95 "High", and no row
 //   for either number alone; the trends chart systolic and diastolic over the same two readings. Step 2: the chart's
-//   newest blood pressure is "118/92 mmHg" "High" with a mark and the words "down from 130/95"; its visit says
-//   "blood pressure 118/92 mmHg"; the offline copy's visit has 118 and 92.
+//   newest blood pressure is "118/92 mmHg" "High" with a mark and the words "down from 130/95"; its visit's row
+//   says "118/92 mmHg"; the offline copy's visit has 118 and 92.
 // Creator: Tahseen Arnan
 public class TC_UC4_28_ReadsByReading(WebApps apps) : IClassFixture<WebApps>
 {
@@ -50,7 +50,7 @@ public class TC_UC4_28_ReadsByReading(WebApps apps) : IClassFixture<WebApps>
             "(?s)data-latest-vitals.*?<strong>Blood pressure</strong>\\s*118/92 mmHg\\s*<span class=\"sc-tag sc-tag--warning\">High</span>\\s*<span class=\"sc-trendmark\" data-direction=\"down\">.*?down from 130/95</span>",
             chart);
         Assert.DoesNotContain("<strong>Systolic blood pressure</strong>", chart);
-        Assert.Contains("blood pressure 118/92 mmHg, heart rate 70/min", Words(chart));
+        Assert.Matches("<tbody>\\s*<tr>\\s*<td class=\"sc-table__mono\">[^<]*</td>\\s*<td>[^<]*</td>\\s*<td>118/92 mmHg</td>\\s*<td>70/min</td>", chart);
 
         var token = await apps.DesktopSignInAsync(apps.OnPrem, clinician);
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", token);

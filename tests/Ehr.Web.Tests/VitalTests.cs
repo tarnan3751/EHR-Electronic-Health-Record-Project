@@ -26,7 +26,7 @@ static class VitalTests
 
     public static string ErrorPath(Guid patient, string at) => $"/patients/{patient}/vitals/error?at={at}";
 
-    // "Mark entered in error" for the set taken at `at` ("yyyy-MM-ddTHH:mm:ss", UTC): the readings of these codes, as
+    // "Mark as entered in error" for the set taken at `at` ("yyyy-MM-ddTHH:mm:ss", UTC): the readings of these codes, as
     // the page posts them, by observation ID.
     public static async Task<HttpResponseMessage> MarkAsync(WebApps apps, HttpClient client, Guid patient, string at, string? reason, params string[] codes)
     {

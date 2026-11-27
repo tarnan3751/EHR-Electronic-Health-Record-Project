@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   3. Ask for the PHQ-9 again, then the GAD-7.
 //   4. Open the page off-site with the clinic's server down, and as another clinician.
 // Expected result: Step 1: the appointment list starts with the cursor in it, offers the booked appointment and both
-//   questionnaires, and says forms aren't watched as they arrive; no form is listed and no count shown. Step 2: the
+//   questionnaires, and the "Ask for form" button; no form is listed and no count shown. Step 2: the
 //   page says "Form asked for."; the request names the patient, the appointment's clinician, the clinician who asked
 //   and a copy of the PHQ-9's definition. Step 3: the second PHQ-9 is answered 422 "Not asked. That questionnaire is
 //   already asked for at that appointment." and nothing more is saved; the GAD-7 is saved. Step 4: off-site the page
@@ -46,12 +46,12 @@ public class TC_UC22_07_AskForAForm(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("with Dr. Forms Seven</option>", page);
         Assert.Contains($"<option value=\"{Phq9}\">Patient Health Questionnaire-9 (PHQ-9)</option>", page);
         Assert.Contains($"<option value=\"{Gad7}\">GAD-7</option>", page);
-        Assert.Contains("Forms aren't watched as they arrive", Words(page));
+        Assert.Contains(">Ask for form</button>", page);
         Assert.DoesNotContain("data-sensitive", page);
 
         using var asked = await AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, Phq9);
         Assert.Equal(HttpStatusCode.OK, asked.StatusCode);
-        Assert.Contains("Form asked for. The patient can fill it in from 7 days before the appointment until it ends.", Words(await ReadAsync(asked)));
+        Assert.Contains("Form asked for.", Words(await ReadAsync(asked)));
         Assert.Equal([$"{visit.Patient} {visit.Clinician.Id} {visit.Clinician.Id} true"], await QueryAsync(apps,
             """
             SELECT r.patient_id || ' ' || r.clinician_id || ' ' || r.requested_by || ' ' || (r.definition = q.definition)

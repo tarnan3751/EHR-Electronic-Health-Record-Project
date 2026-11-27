@@ -7,10 +7,10 @@ namespace Ehr.Web.Accounts;
 public class NewPassword
 {
     [Required(ErrorMessage = "Enter a new password.")]
-    [MinLength(12, ErrorMessage = "Use at least 12 characters.")]
+    [MinLength(12, ErrorMessage = "Password must be at least 12 characters.")]
     public string? Password { get; set; }
 
     [Required(ErrorMessage = "Enter the password again.")]
-    [Compare(nameof(Password), ErrorMessage = "The passwords don't match.")]
+    [Compare(nameof(Password), ErrorMessage = "Passwords don't match.")]
     public string? Confirm { get; set; }
 }
