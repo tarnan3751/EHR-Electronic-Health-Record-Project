@@ -333,8 +333,8 @@ jobs:
       fail-fast: false
       matrix:
         # The team's machines: Apple Silicon Macs and x64 Windows PCs. Running the desktop sync tests on both is
-        # TC-UC8-06, NFR-10.
-        os: [macos-latest, windows-latest]
+        # TC-UC8-06, NFR-10. And x64 Linux, the third platform the app is packaged for.
+        os: [macos-latest, windows-latest, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     defaults:
@@ -357,6 +357,15 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: src/Ehr.Desktop/src-tauri -> ../../../target
+
+      # Tauri's libraries on Linux (WebKitGTK 4.1 and GTK 3), libdbus for the Secret Service that keeps the app's key
+      # (key.rs), and what the .deb and AppImage bundlers run. OpenSSL is built from source here too.
+      - name: Install the Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends build-essential pkg-config file xdg-utils \
+            libwebkit2gtk-4.1-dev libdbus-1-dev librsvg2-dev
 
       # The vendored OpenSSL build rejects Git's Perl, which can come first on PATH.
       - name: Use Strawberry Perl for OpenSSL
@@ -384,8 +393,9 @@ jobs:
         run: cargo test --locked --release -- --show-output
 
       # The installers, unsigned (the expansion plan's step 20, docs/desktop-install.md): the .dmg on macOS, sealed ad
-      # hoc, and the NSIS setup on Windows. Built on every run, so both platforms are known to bundle; nothing signs an
-      # update here, and no key is ever given to CI. The CLI is cached with the toolchain after its first install.
+      # hoc, the NSIS setup on Windows, and the .deb and AppImage on Linux. Built on every run, so every platform is
+      # known to bundle; nothing signs an update here, and no key is ever given to CI. The CLI is cached with the
+      # toolchain after its first install.
       - name: Install the Tauri CLI
         run: cargo install tauri-cli --version 2.12.0 --locked
 
@@ -410,6 +420,8 @@ jobs:
           path: |
             ${{ github.workspace }}/target/release/bundle/dmg/*.dmg
             ${{ github.workspace }}/target/release/bundle/nsis/*-setup.exe
+            ${{ github.workspace }}/target/release/bundle/deb/*.deb
+            ${{ github.workspace }}/target/release/bundle/appimage/*.AppImage
           if-no-files-found: error
           retention-days: 7
 

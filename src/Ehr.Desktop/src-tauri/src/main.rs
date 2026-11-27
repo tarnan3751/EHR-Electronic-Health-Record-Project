@@ -57,7 +57,7 @@ struct App {
     lock: Mutex<Lock>,
     /// Why the kept sign-in was forgotten at start, for the sign-in form; none once someone signs in.
     notice: Mutex<Option<&'static str>>,
-    /// The local database's file; none on Linux, which keeps it in memory.
+    /// The local database's file; none if the app's data folder couldn't be made, when there is no store either.
     database: Option<PathBuf>,
     /// Once an administrator revoked the sign-in: whether everything here was deleted, or what couldn't be. From then
     /// on the app refuses everything, and says so.
@@ -980,28 +980,21 @@ async fn sync_in_background(handle: AppHandle) {
 /// Opens the encrypted database at `path` without replacing it if the key is missing or invalid.
 fn open_store(path: &Result<PathBuf, String>) -> Result<Store, String> {
     let path = path.as_ref().map_err(Clone::clone)?;
-    let exists = path != std::path::Path::new(":memory:")
-        && path
-            .try_exists()
-            .map_err(|error| format!("{}: {error}", path.display()))?;
+    let exists = path
+        .try_exists()
+        .map_err(|error| format!("{}: {error}", path.display()))?;
     let key = key::load(exists)?;
     Store::open(path, &key).map_err(Into::into)
 }
 
-/// In the app's data folder on macOS and Windows. Linux is for development only, and keeps its key in memory
-/// (key.rs), so it keeps the database in memory too.
+/// In the app's data folder.
 fn database_path(app: &tauri::App) -> Result<PathBuf, String> {
-    if cfg!(any(target_os = "macos", windows)) {
-        let folder = app
-            .path()
-            .app_data_dir()
-            .map_err(|error| error.to_string())?;
-        std::fs::create_dir_all(&folder)
-            .map_err(|error| format!("{}: {error}", folder.display()))?;
-        Ok(folder.join("ehr.db"))
-    } else {
-        Ok(PathBuf::from(":memory:"))
-    }
+    let folder = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    std::fs::create_dir_all(&folder).map_err(|error| format!("{}: {error}", folder.display()))?;
+    Ok(folder.join("ehr.db"))
 }
 
 fn main() {
@@ -1022,9 +1015,7 @@ fn main() {
                 wake: Notify::new(),
                 lock: Mutex::new(lock),
                 notice: Mutex::new(notice),
-                database: database
-                    .ok()
-                    .filter(|path| path != std::path::Path::new(":memory:")),
+                database: database.ok(),
                 deleted: Mutex::new(None),
                 version,
                 updates: updates::Updates::default(),

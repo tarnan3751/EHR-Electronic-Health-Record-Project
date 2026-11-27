@@ -37,6 +37,11 @@ apple-native-keyring-store = { version = "1", features = ["keychain"] }
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = "1"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# The Secret Service over D-Bus (GNOME Keyring, KDE Wallet), through the system's libdbus, which tao links already. It
+# always encrypts what it sends over the bus, here with pure-Rust crypto.
+dbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rust"] }
+
 # The hash takes about 1.6 s unoptimized: optimized, development builds and `cargo test` unlock as quickly as a release.
 [profile.dev.package.argon2]
 opt-level = 3
