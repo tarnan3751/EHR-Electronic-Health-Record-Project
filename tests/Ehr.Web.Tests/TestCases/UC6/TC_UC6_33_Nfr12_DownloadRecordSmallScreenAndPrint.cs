@@ -44,8 +44,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   Without sensitive items, "Sensitive items hidden." is displayed on screen and not printed, and the paper says
 //   nothing of sensitive items. Step 5: each printout keeps the band "Shared record. You're viewing Synthetic Fhirchart's
 //   record, not your own.", without its button. Step 6: no app bar, the patient banner not stuck, the flowsheet's
-//   wrapper not clipping it; off-site, the band "Read-only. The clinic's server can't be reached, so nothing can be
-//   saved until it's back." prints. No script errors.
+//   wrapper not clipping it; off-site, the band "Read-only. The clinic's server can't be reached." prints. No script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -164,7 +163,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         await chartOffSite.EmulateMediaAsync(new() { Media = Media.Print });
         Assert.Equal("none", await DisplayAsync(chartOffSite, ".sc-appbar"));
         Assert.NotEqual("none", await DisplayAsync(chartOffSite, "p.sc-notice--band"));
-        Assert.StartsWith("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back.", await chartOffSite.Locator("p.sc-notice--band").InnerTextAsync());
+        Assert.StartsWith("Read-only. The clinic's server can't be reached.", await chartOffSite.Locator("p.sc-notice--band").InnerTextAsync());
     }
 
     static Task<string> DisplayAsync(IPage page, string selector) =>

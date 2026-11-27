@@ -42,7 +42,7 @@ public class AmbientSwitchTests(WebApps apps) : IClassFixture<WebApps>
             var html = await page.Content.ReadAsStringAsync(Cancel);
             Assert.Contains("Listening to a visit is switched off at this clinic.", html);
             Assert.Contains($"href=\"/patients/{patient}\"", html);
-            Assert.DoesNotContain("No patient, or nothing in their chart, matches this address", html);
+            Assert.DoesNotContain("No patient or chart item matches this address", html);
             Assert.DoesNotContain("Synthetic", html);
         }
 

@@ -35,7 +35,7 @@ public static class ErrorPages
                 return context.HttpContext.Response.StatusCode switch
                 {
                     StatusCodes.Status404NotFound when IsChart(request.Path) =>
-                        WritePageAsync(context.HttpContext, "Not found", "No patient, or nothing in their chart, matches this address.", "/patients", "Back to patients"),
+                        WritePageAsync(context.HttpContext, "Not found", "No patient or chart item matches this address.", "/patients", "Back to patients"),
                     StatusCodes.Status404NotFound => ShowNotFoundAsync(context),
                     // A form refused before its handler ran, most often because its token was made for whoever was signed
                     // in when the page was opened, and someone else has signed in or out in this browser since.
@@ -88,7 +88,7 @@ public static class ErrorPages
     static Task WriteNotSentAsync(HttpContext context)
     {
         var (home, homeText) = Home(context.Request.Path);
-        return WritePageAsync(context, "Not sent", "This form couldn't be sent, so nothing was changed. Open its page again and try once more.", home, homeText);
+        return WritePageAsync(context, "Not sent", "Nothing was changed. Open the page again and try again.", home, homeText);
     }
 
     static Task WriteFailureAsync(HttpContext context)
@@ -99,14 +99,14 @@ public static class ErrorPages
         // such as the on-prem app reading its WAL position for the cloud app (DatabaseTransactionFilter).
         if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
         {
-            return WritePageAsync(context, "Maybe not saved", "Something went wrong, and your change may not have been saved. Check before you try again.", home, homeText);
+            return WritePageAsync(context, "Maybe not saved", "Your change may not have been saved. Check before trying again.", home, homeText);
         }
 
         return IsChart(path)
-            ? WritePageAsync(context, "Chart not loaded", "The chart couldn't be loaded. Try again in a moment.", "/patients", "Back to patients")
+            ? WritePageAsync(context, "Chart not loaded", "Try again in a moment.", "/patients", "Back to patients")
             : path.StartsWithSegments("/patients")
-                ? WritePageAsync(context, "Search not completed", "The search couldn't be completed. Try again in a moment.", "/patients", "Back to patients")
-                : WritePageAsync(context, "Page not loaded", "Something went wrong, and this page couldn't be loaded. Try again in a moment.", home, homeText);
+                ? WritePageAsync(context, "Search not completed", "Try again in a moment.", "/patients", "Back to patients")
+                : WritePageAsync(context, "Page not loaded", "Try again in a moment.", home, homeText);
     }
 
     // No inline script, like every page, so a strict CSP can be added later.

@@ -29,7 +29,8 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
 
             var html = await response.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-            Assert.Contains("The search couldn't be completed. Try again in a moment.", html);
+            Assert.Contains("<h1>Search not completed</h1>", html);
+            Assert.Contains("Try again in a moment.", html);
             Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
             AssertNothingAbout(html, "Ada", "1980-01-01");
         });
@@ -51,7 +52,8 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
 
             var html = await response.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-            Assert.Contains("The chart couldn't be loaded. Try again in a moment.", html);
+            Assert.Contains("<h1>Chart not loaded</h1>", html);
+            Assert.Contains("Try again in a moment.", html);
             Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
             AssertNothingAbout(html, "Failing", patient.ToString());
         });
@@ -76,7 +78,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
 
             var html = await response.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-            Assert.Contains("Something went wrong, and your change may not have been saved. Check before you try again.", html);
+            Assert.Contains("Your change may not have been saved. Check before trying again.", html);
             Assert.DoesNotContain("loaded", html);
             Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
             AssertNothingAbout(html, "Unsaved", patient.ToString());
@@ -95,7 +97,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await response.Content.ReadAsStringAsync(Cancel);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Contains("No patient, or nothing in their chart, matches this address.", html);
+        Assert.Contains("No patient or chart item matches this address.", html);
         Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
     }
 
@@ -113,7 +115,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await response.Content.ReadAsStringAsync(Cancel);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Contains("No patient, or nothing in their chart, matches this address.", html);
+        Assert.Contains("No patient or chart item matches this address.", html);
         Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
     }
 
@@ -133,7 +135,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
         var html = await refused.Content.ReadAsStringAsync(Cancel);
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Contains("<title>Not sent</title>", html);
-        Assert.Contains("This form couldn't be sent, so nothing was changed. Open its page again and try once more.", html);
+        Assert.Contains("Nothing was changed. Open the page again and try again.", html);
         Assert.Contains("<a href=\"/\">Back to home</a>", html);
         Assert.Empty(await apps.RowsAsync(shortcut));
 
@@ -157,7 +159,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
             using var response = await session.Client.GetAsync("/patients?name=Ada", Cancel);
 
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-            Assert.DoesNotContain("The search couldn't be completed", await response.Content.ReadAsStringAsync(Cancel));
+            Assert.DoesNotContain("Search not completed", await response.Content.ReadAsStringAsync(Cancel));
         });
     }
 

@@ -62,7 +62,7 @@ public class LayoutTests(WebApps apps) : IClassFixture<WebApps>
         var (portal, _) = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, patient);
         var portalPage = await portal.GetStringAsync("/portal", Cancel);
         Assert.Contains("data-session-url=\"/portal/session\"", portalPage);
-        Assert.Contains("To keep your health information safe", portalPage);
+        Assert.Contains("data-session-kind=\"portal\"", portalPage);
 
         foreach (var path in new[] { "/sign-in", "/portal/sign-in" })
         {

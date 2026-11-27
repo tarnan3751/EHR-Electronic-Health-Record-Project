@@ -52,7 +52,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await NotSavedAsync(response);
         Assert.DoesNotContain("Text another site chose", html);
-        Assert.Contains("What you entered may still be there", html);
+        Assert.Contains("Go back and try again later.", html);
     }
 
     // What is shown again was kept in memory, never on the cloud server's disk, so a form too large for that isn't kept.
@@ -68,7 +68,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await NotSavedAsync(response);
         Assert.DoesNotContain("Too long to keep.", html);
-        Assert.Contains("What you entered may still be there", html);
+        Assert.Contains("Go back and try again later.", html);
     }
 
     // UC 1's order form during an outage: the order is refused, and what was entered is kept. With JavaScript,
@@ -189,7 +189,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         var panel = await Client(apps.CloudCutOff, session.Jar).GetStringAsync("/patients", Cancel);
 
         Assert.Contains("Panelread, Lior", panel);
-        Assert.Contains("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back.", Words(panel));
+        Assert.Contains("Read-only. The clinic's server can't be reached.", Words(panel));
         Assert.Single(QueuedReads(apps.CloudCutOff), e => e.PatientId == patient && e.ActorId == clinician.Id);
     }
 
@@ -293,7 +293,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         using var signIn = await PlainPostAsync(anonymous, "/sign-in", Token(signInPage), ("Input.Email", clinician.Email), ("Input.Password", clinician.Password));
 
         Assert.Equal("/sign-in", PathOf(home));
-        Assert.Contains("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back.", Words(signInPage));
+        Assert.Contains("Read-only. The clinic's server can't be reached.", Words(signInPage));
         var html = await NotSavedAsync(signIn);
         Assert.DoesNotContain(clinician.Password, html);
         Assert.DoesNotContain(clinician.Email, html);

@@ -172,7 +172,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
             using (var during = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, $"/patients/{patient}", signedIn))
             {
                 var html = await ReadAsync(during);
-                Assert.Contains("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back. The newest changes may not show yet", Words(html));
+                Assert.Contains("Read-only. The clinic's server can't be reached", Words(html));
                 Assert.DoesNotContain("handler=Unassign", html);
             }
 

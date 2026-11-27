@@ -161,8 +161,8 @@ public sealed class CloudForwardingMiddleware(
     static string NotSavedPage(PathString formPage, List<(string Field, string Value)> entered)
     {
         var next = entered.Count > 0
-            ? "Copy what you entered below, then go back and try again once the server is back."
-            : "Go back and try again once it's back. What you entered may still be there.";
+            ? "Copy what you entered below, then try again later."
+            : "Go back and try again later.";
         // A newline first in each box, which the browser drops, so one that starts the text is kept.
         var fields = string.Concat(entered.Select(entry =>
             $"<label>{HtmlEncoder.Default.Encode(entry.Field)} <textarea readonly rows=\"4\">\n"
