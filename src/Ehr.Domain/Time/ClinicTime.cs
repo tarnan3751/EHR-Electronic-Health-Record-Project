@@ -90,14 +90,14 @@ public sealed class ClinicTime
         return offset.Minutes == 0 ? $"UTC{sign}{hours}" : $"UTC{sign}{hours}:{Math.Abs(offset.Minutes):00}";
     }
 
-    // "2026-11-15 14:05 CST": the clinic's clock, with the label. The brand guide's form for clinician pages.
-    public string Format(DateTimeOffset moment, string format = "yyyy-MM-dd HH:mm") =>
+    // "Nov 15, 2026 14:05 CST": the clinic's clock, with the label. The brand guide's form for clinician pages.
+    public string Format(DateTimeOffset moment, string format = "MMM d, yyyy HH:mm") =>
         $"{At(moment).ToString(format, CultureInfo.InvariantCulture)} {Label(moment)}";
 
-    public string? Format(DateTimeOffset? moment, string format = "yyyy-MM-dd HH:mm") => moment is { } at ? Format(at, format) : null;
+    public string? Format(DateTimeOffset? moment, string format = "MMM d, yyyy HH:mm") => moment is { } at ? Format(at, format) : null;
 
     // The clinic's clock with no label, where a label is already beside it (a table's heading, a field's label).
-    public string Plain(DateTimeOffset moment, string format = "yyyy-MM-dd HH:mm") => At(moment).ToString(format, CultureInfo.InvariantCulture);
+    public string Plain(DateTimeOffset moment, string format = "MMM d, yyyy HH:mm") => At(moment).ToString(format, CultureInfo.InvariantCulture);
 
     // The clinic's calendar day a moment falls on: "2026-11-15".
     public string Day(DateTimeOffset moment) => At(moment).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

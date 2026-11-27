@@ -40,7 +40,7 @@ else
 <div class="sc-notedoc">
     <dl class="record">
         <dt>Signed by</dt><dd>@Model.SignerName</dd>
-        <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Clinic.Format(Model.Note.SignedAt, "yyyy-MM-dd HH:mm:ss")</time></dd>
+        <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Clinic.Format(Model.Note.SignedAt, "MMM d, yyyy HH:mm:ss")</time></dd>
     </dl>
     <partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
     @* Step 10b: the note's sensitivity can change after signing, with a reason; its text never does. *@

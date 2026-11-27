@@ -258,7 +258,7 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var editor = await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/notes/drafts/{draft}", Cancel);
         Assert.Contains("Resume dictation review", editor);
         var html = await l.Session.Client.GetStringAsync(url, Cancel);
-        Assert.Matches(@"Not drafted yet\.</span> A visit was recorded at \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\. If you named its voices a moment ago, wait a minute, then retrieve its draft\. Otherwise, discard it and dictate or listen again\.", WebUtility.HtmlDecode(html));
+        Assert.Matches(@"Not drafted yet\.</span> A visit was recorded at [A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2} UTC\. If you named its voices a moment ago, wait a minute, then retrieve its draft\. Otherwise, discard it and dictate or listen again\.", WebUtility.HtmlDecode(html));
 
         using (var retrieved = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version }))
         {

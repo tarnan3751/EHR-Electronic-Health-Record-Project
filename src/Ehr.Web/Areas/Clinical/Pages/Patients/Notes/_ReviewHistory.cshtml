@@ -7,7 +7,7 @@
         <ul class="sc-list">
             @foreach (var review in Model)
             {
-                <li><a asp-page="/Patients/Notes/Review" asp-area="Clinical" asp-route-patientId="@review.PatientId" asp-route-draftId="@review.DraftId" asp-route-reviewId="@review.Id">Dictation@(DictationResult.SpokenLanguageOf(review.ResultJson) == SpokenLanguage.Spanish ? " in Spanish" : "") and review saved @Clinic.Format(review.CompletedAt, "yyyy-MM-dd HH:mm:ss"), with its proposals and decisions</a></li>
+                <li><a asp-page="/Patients/Notes/Review" asp-area="Clinical" asp-route-patientId="@review.PatientId" asp-route-draftId="@review.DraftId" asp-route-reviewId="@review.Id">Dictation@(DictationResult.SpokenLanguageOf(review.ResultJson) == SpokenLanguage.Spanish ? " in Spanish" : "") and review saved @Clinic.Format(review.CompletedAt, "MMM d, yyyy HH:mm:ss"), with its proposals and decisions</a></li>
             }
         </ul>
     </details>

@@ -63,7 +63,7 @@ public class TC_UC4_13_AllergyStatus(WebApps apps) : IClassFixture<WebApps>
         using var recorded = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", $"/patients/{patient}");
         var none = await ReadAsync(recorded);
         Assert.Contains("Saved. This patient has no known allergies.", Words(none));
-        Assert.Matches(@"<p>No known allergies \(recorded \d{4}-\d{2}-\d{2} by Dr\. Allergy Status\)\.</p>", AllergyList(none));
+        Assert.Matches(@"<p>No known allergies \(recorded [A-Z][a-z]{2} \d{1,2}, \d{4} by Dr\. Allergy Status\)\.</p>", AllergyList(none));
         Assert.Contains("<span class=\"sc-allergy\">No known allergies</span>", Banner(none));
         Assert.DoesNotContain("No allergy information recorded", none);
         Assert.DoesNotContain("data-no-known-allergies", none);

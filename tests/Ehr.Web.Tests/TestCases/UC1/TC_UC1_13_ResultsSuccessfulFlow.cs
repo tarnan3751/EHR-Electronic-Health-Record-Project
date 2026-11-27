@@ -66,7 +66,7 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
         using var acknowledged = await AcknowledgeAsync(session.Client, patient, order);
         var after = await ReadAsync(acknowledged);
         Assert.Contains("Results acknowledged.", after);
-        Assert.Matches($"data-acknowledged>Acknowledged by Dr. Test, \\d{{4}}-\\d{{2}}-\\d{{2}} \\d{{2}}:\\d{{2}} UTC\\.", after);
+        Assert.Matches($"data-acknowledged>Acknowledged by Dr. Test, [A-Z][a-z]{{2}} \\d{{1,2}}, \\d{{4}} \\d{{2}}:\\d{{2}} UTC\\.", after);
         Assert.DoesNotContain("data-acknowledge>", after);
         Assert.Equal([$"{clinician.Id}"], await ProxyTests.QueryAsync(apps,
             "SELECT actor_id::text FROM ehr.audit_events WHERE table_name = 'result_acknowledgments' AND action = 'insert' AND patient_id = @patient", patient));

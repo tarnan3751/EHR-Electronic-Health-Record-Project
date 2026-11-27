@@ -69,7 +69,7 @@ public class TC_UC14_21_VisitSummaryWithdrawn(WebApps apps) : IClassFixture<WebA
         Assert.Contains("Withdrawn. The patient no longer sees the summary in the portal.", Words(page));
         Assert.Contains("data-summary=\"withdrawn\"", page);
         Assert.Contains($"<s>{TalkedAbout}</s>", page);
-        Assert.Matches(@"Withdrawn by Dr. Colleague · \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC: Written for the wrong visit\.", Words(page));
+        Assert.Matches(@"Withdrawn by Dr. Colleague · [A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2} UTC: Written for the wrong visit\.", Words(page));
         Assert.Contains("data-write-summary", page);
         Assert.DoesNotContain("data-withdraw-summary", page);
 

@@ -49,7 +49,7 @@ public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("Time, clinic time <span>(required)</span>", form);
         using var booked = await BookAsync(session.Client, patient, clinician.Id, Day(7), "23:30", "Synthetic: late clinic");
         Assert.Equal(HttpStatusCode.OK, booked.StatusCode);
-        Assert.Contains($"<strong>{Day(7)} 23:30 {label}</strong> · 20 minutes · Dr. Schedule Central", await ReadAsync(booked));
+        Assert.Contains($"<strong>{day:MMM d, yyyy} 23:30 {label}</strong> · 20 minutes · Dr. Schedule Central", await ReadAsync(booked));
         // The same moment, stored in UTC: early the next day.
         Assert.Equal([start.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)],
             await RowsAsync(apps, patient, "to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')"));

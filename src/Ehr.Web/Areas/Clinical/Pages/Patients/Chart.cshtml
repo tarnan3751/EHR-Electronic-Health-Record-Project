@@ -137,7 +137,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
         else if (Model.NoKnownAllergies is { } none)
         {
-            <p>No known allergies (recorded @Clinic.Day(none.RecordedAt)@(Model.Chart.NoKnownAllergiesRecordedBy is { } recorder ? $" by {recorder}" : "")).</p>
+            <p>No known allergies (recorded @Clinic.Plain(none.RecordedAt, "MMM d, yyyy")@(Model.Chart.NoKnownAllergiesRecordedBy is { } recorder ? $" by {recorder}" : "")).</p>
         }
         else
         {
@@ -191,7 +191,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         <span class="sc-list__main">
                             <strong>@condition.Display</strong>
                             @if (condition.Code is { } diagnosisCode) { <text>(@diagnosisCode)</text> }
-                            @if (condition.OnsetDate is { } onset) { <text> since @onset.ToString("yyyy-MM-dd")</text> }
+                            @if (condition.OnsetDate is { } onset) { <text> since @onset.ToString("MMM d, yyyy")</text> }
                             @if (condition.Sensitive)
                             {
                                 <span class="sc-tag sc-tag--warning">Sensitive</span>
@@ -235,7 +235,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         {
                             <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
                         }
-                        <span class="sc-muted">· @Clinic.Day(vital.TakenAt)</span>
+                        <span class="sc-muted">· @Clinic.Plain(vital.TakenAt, "MMM d, yyyy")</span>
                     </li>
                 }
             </ul>
@@ -396,7 +396,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         }
                         @if (resulted.ResultedAt is { } at)
                         {
-                            <span class="sc-muted">· @Clinic.Day(at)</span>
+                            <span class="sc-muted">· @Clinic.Plain(at, "MMM d, yyyy")</span>
                         }
                     </li>
                 }
@@ -466,7 +466,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         {
                             <span class="sc-tag sc-tag--info">New</span>
                         }
-                        <span class="sc-muted">· @Clinic.Day(thread.LastMessageAt)</span>
+                        <span class="sc-muted">· @Clinic.Plain(thread.LastMessageAt, "MMM d, yyyy")</span>
                     </li>
                 }
             </ul>
@@ -510,7 +510,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             var latest = Model.Chart.Visits[0];
             <p class="latest-visit">
-                Latest visit, @Clinic.Day(latest.PeriodStart):
+                Latest visit, @Clinic.Plain(latest.PeriodStart, "MMM d, yyyy"):
                 blood pressure @(Model.BloodPressure(latest) ?? "not taken"), heart rate @(Model.HeartRate(latest) ?? "not taken").
             </p>
             <div class="sc-table-wrap">
@@ -522,7 +522,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                         @foreach (var visit in Model.Chart.Visits)
                         {
                             <tr>
-                                <td class="sc-table__mono">@Clinic.Day(visit.PeriodStart)</td>
+                                <td class="sc-table__mono">@Clinic.Plain(visit.PeriodStart, "MMM d, yyyy")</td>
                                 <td>@visit.Reason</td>
                                 <td>@Model.BloodPressure(visit)</td>
                                 <td>@Model.HeartRate(visit)</td>

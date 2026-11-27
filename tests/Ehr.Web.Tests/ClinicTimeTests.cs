@@ -23,8 +23,8 @@ public class ClinicTimeTests
     [Fact]
     public void A_time_is_shown_on_the_clinics_clock_with_the_zones_abbreviation_for_that_moment()
     {
-        Assert.Equal("2026-11-15 14:05 CST", ChicagoClock.Format(Utc(2026, 11, 15, 20, 5)));
-        Assert.Equal("2026-07-04 18:30 CDT", ChicagoClock.Format(Utc(2026, 7, 4, 23, 30)));
+        Assert.Equal("Nov 15, 2026 14:05 CST", ChicagoClock.Format(Utc(2026, 11, 15, 20, 5)));
+        Assert.Equal("Jul 4, 2026 18:30 CDT", ChicagoClock.Format(Utc(2026, 7, 4, 23, 30)));
         // The day is the clinic's: early on the 16th in UTC is still the 15th there.
         Assert.Equal("2026-11-15", ChicagoClock.Day(Utc(2026, 11, 16, 3)));
         Assert.Equal("clinic time", ChicagoClock.ClockName);
@@ -43,14 +43,14 @@ public class ClinicTimeTests
     public void Without_abbreviations_the_label_is_the_offset_and_a_clinic_in_UTC_reads_as_before()
     {
         var plain = new ClinicTime(ChicagoId);
-        Assert.Equal("2026-11-15 14:05 UTC-6", plain.Format(Utc(2026, 11, 15, 20, 5)));
-        Assert.Equal("2026-07-04 18:30 UTC-5", plain.Format(Utc(2026, 7, 4, 23, 30)));
-        Assert.Equal("2026-11-15 20:05 UTC+5:30", new ClinicTime("Asia/Kolkata").Format(Utc(2026, 11, 15, 14, 35)));
+        Assert.Equal("Nov 15, 2026 14:05 UTC-6", plain.Format(Utc(2026, 11, 15, 20, 5)));
+        Assert.Equal("Jul 4, 2026 18:30 UTC-5", plain.Format(Utc(2026, 7, 4, 23, 30)));
+        Assert.Equal("Nov 15, 2026 20:05 UTC+5:30", new ClinicTime("Asia/Kolkata").Format(Utc(2026, 11, 15, 14, 35)));
 
         foreach (var utc in new[] { new ClinicTime(null), new ClinicTime("  "), new ClinicTime("UTC") })
         {
             Assert.True(utc.IsUtc);
-            Assert.Equal("2026-11-15 20:05 UTC", utc.Format(Utc(2026, 11, 15, 20, 5)));
+            Assert.Equal("Nov 15, 2026 20:05 UTC", utc.Format(Utc(2026, 11, 15, 20, 5)));
             Assert.Equal("UTC", utc.ClockName);
             Assert.Equal(Utc(2026, 11, 15, 9, 30), utc.From(new DateTime(2026, 11, 15, 9, 30, 0)));
         }

@@ -48,7 +48,7 @@ public class TC_UC14_07_AddendumSuccessfulFlow(WebApps apps) : IClassFixture<Web
         using var first = await AddAsync(session.Client, patient, note, "Synthetic addendum: culture negative.");
         page = await ReadAsync(first);
         Assert.Contains("Addendum signed. It's shown after the note.", Words(page));
-        Assert.Matches("(?s)<ol class=\"sc-list\" data-addenda>.*?<strong>Dr. Test</strong>.*?signed <time[^>]*>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC</time>.*?Synthetic addendum: culture negative\\.", page);
+        Assert.Matches("(?s)<ol class=\"sc-list\" data-addenda>.*?<strong>Dr. Test</strong>.*?signed <time[^>]*>[A-Z][a-z]{2} \\d{1,2}, \\d{4} \\d{2}:\\d{2} UTC</time>.*?Synthetic addendum: culture negative\\.", page);
         Assert.Contains(Subjective, page);
         Assert.DoesNotContain("textarea", page);
 

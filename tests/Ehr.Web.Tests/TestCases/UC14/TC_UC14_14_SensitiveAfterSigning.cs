@@ -78,7 +78,7 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         page = await ReadAsync(marked);
         Assert.Contains("Saved. Marked sensitive, with your reason.", Words(page));
         Assert.Contains("Sensitive note. Your view of it is logged.", Words(page));
-        Assert.Matches("data-sensitivity-reason>Marked sensitive by Dr. First \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC: Patient asked for it\\.", page);
+        Assert.Matches("data-sensitivity-reason>Marked sensitive by Dr. First [A-Z][a-z]{2} \\d{1,2}, \\d{4} \\d{2}:\\d{2} UTC: Patient asked for it\\.", page);
 
         // The same form sent again (a double click, or Back and send): it asked to mark, the note is marked, and it
         // is not undone.

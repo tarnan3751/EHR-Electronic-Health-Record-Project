@@ -39,8 +39,8 @@ public class ObjectiveVitalsTests
             Sign(VitalSign.Weight, 80, "kg", "2026-11-01T04:30:00Z"),
         ], Chicago);
 
-        Assert.Equal("2026-11-01", offer.Day);
-        Assert.Equal("Vital signs, 2026-11-01: heart rate 75 per minute at 01:30 CST; temperature 37.1 °C at 01:30 CDT.", offer.Text);
+        Assert.Equal("Nov 1, 2026", offer.Day);
+        Assert.Equal("Vital signs, Nov 1, 2026: heart rate 75 per minute at 01:30 CST; temperature 37.1 °C at 01:30 CDT.", offer.Text);
     }
 
     // A blood pressure is one reading's two numbers (step 9c), and a set taken at one moment gives its time once.
@@ -55,7 +55,7 @@ public class ObjectiveVitalsTests
             Sign(VitalSign.OxygenSaturation, 98, "%", "2026-11-20T16:05:00Z"),
         ], Chicago);
 
-        Assert.Equal("Vital signs, 2026-11-20 10:05 CST: blood pressure 126/80 mmHg, oxygen saturation 98 %.", offer.Text);
+        Assert.Equal("Vital signs, Nov 20, 2026 10:05 CST: blood pressure 126/80 mmHg, oxygen saturation 98 %.", offer.Text);
         Assert.False(offer.Today);
         Assert.Equal(new ObjectiveVitals(null, false, ""), ObjectiveVitals.Of([], Chicago));
     }

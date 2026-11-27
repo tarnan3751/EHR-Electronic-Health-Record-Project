@@ -147,7 +147,7 @@ public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebA
         }
 
         Assert.Equal(["false false none"], await MarkAsync(ownNote));
-        Assert.Matches(new Regex("data-summary-sensitivity-reason>Unmarked as sensitive \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC: Reviewed with the patient\\."),
+        Assert.Matches(new Regex("data-summary-sensitivity-reason>Unmarked as sensitive [A-Z][a-z]{2} \\d{1,2}, \\d{4} \\d{2}:\\d{2} UTC: Reviewed with the patient\\."),
             await session.Client.GetStringAsync(NotePath(patient, ownNote), Cancel));
     }
 

@@ -108,7 +108,7 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
         await InsertHeartRatesAsync(patient, day, 125);
 
         Assert.Equal(
-            $"Vital signs, {day:yyyy-MM-dd}: heart rate 65 per minute at {At(day, 9, 5)}; temperature 39.1 °C at {At(day, 6, 0)}.",
+            $"Vital signs, {day:MMM d, yyyy}: heart rate 65 per minute at {At(day, 9, 5)}; temperature 39.1 °C at {At(day, 6, 0)}.",
             await OfferAsync(session.Client, await DraftAsync(session.Client, patient)));
     }
 
@@ -122,7 +122,7 @@ public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
         await InsertHeartRatesAsync(patient, day, 119);
 
         Assert.Equal(
-            $"Vital signs, {day:yyyy-MM-dd}: blood pressure 128/82 mmHg at {At(day, 6, 30)}; heart rate 99 per minute at {At(day, 8, 59)}.",
+            $"Vital signs, {day:MMM d, yyyy}: blood pressure 128/82 mmHg at {At(day, 6, 30)}; heart rate 99 per minute at {At(day, 8, 59)}.",
             await OfferAsync(session.Client, await DraftAsync(session.Client, patient)));
     }
 

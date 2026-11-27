@@ -36,8 +36,8 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<strong>Lisinopril 10 mg tablet</strong>: 1 tablet by mouth daily", html);
         Assert.Contains("Essential (primary) hypertension", html);
         Assert.Contains("(I10)", html);
-        Assert.Contains("since 2019-04-01", html);
-        Assert.Contains($"Latest visit, {Today.AddDays(-3):yyyy-MM-dd}:", html);
+        Assert.Contains("since Apr 1, 2019", html);
+        Assert.Contains($"Latest visit, {Today.AddDays(-3):MMM d, yyyy}:", html);
         Assert.Contains("blood pressure 128/82 mmHg, heart rate 72/min.", html);
         Assert.Contains("Annual physical", html);
         Assert.Contains("Blood pressure check", html);
@@ -73,7 +73,7 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Cancelled appointment", html);
         Assert.DoesNotContain("Planned appointment", html);
         // The latest visit that happened, without vital signs.
-        Assert.Contains($"Latest visit, {Today.AddDays(-10):yyyy-MM-dd}:", html);
+        Assert.Contains($"Latest visit, {Today.AddDays(-10):MMM d, yyyy}:", html);
         Assert.Contains("blood pressure not taken, heart rate not taken.", html);
     }
 
@@ -138,7 +138,7 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
         var unknownHtml = await session.Client.GetStringAsync($"/patients/{unknown}", Cancel);
         var allergicHtml = await session.Client.GetStringAsync($"/patients/{allergic}", Cancel);
 
-        Assert.Contains("No known allergies (recorded 2025-03-04).", noneHtml);
+        Assert.Contains("No known allergies (recorded Mar 4, 2025).", noneHtml);
         Assert.DoesNotContain("No allergy information recorded.", noneHtml);
         Assert.Contains("No allergy information recorded.", unknownHtml);
         Assert.DoesNotContain("No known allergies", unknownHtml);

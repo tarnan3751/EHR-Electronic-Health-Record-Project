@@ -43,7 +43,7 @@
                     @foreach (var point in Model.Points.Reverse())
                     {
                         <tr>
-                            <td class="sc-table__mono">@(zoned ? Clinic.Format(point.At) : point.At.UtcDateTime.ToString("yyyy-MM-dd HH:mm"))</td>
+                            <td class="sc-table__mono">@(zoned ? Clinic.Format(point.At) : point.At.UtcDateTime.ToString("MMM d, yyyy HH:mm"))</td>
                             <td class="sc-table__mono">@point.Value.ToString("0.####")@(point.Flag is null ? "" : point.Flag == VitalFlag.FollowUp ? ", needs follow-up" : ", outside the range")</td>
                         </tr>
                     }

@@ -82,7 +82,7 @@ public class TC_UC14_30_VitalSignsForObjective(WebApps apps) : IClassFixture<Web
         var latest = new DateTimeOffset(DateTime.SpecifyKind(DateTime.ParseExact(At(2), "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture), DateTimeKind.Utc));
         var text = $"Vital signs, {clinic.Format(latest)}: blood pressure 126/80 mmHg, heart rate 72 per minute, temperature 37.9 °C.";
         Assert.Equal(text, offer.GetProperty("text").GetString());
-        Assert.Equal(clinic.Day(latest), offer.GetProperty("day").GetString());
+        Assert.Equal(clinic.Plain(latest, "MMM d, yyyy"), offer.GetProperty("day").GetString());
         Assert.Equal(clinic.Day(latest) == clinic.Day(DateTimeOffset.UtcNow), offer.GetProperty("today").GetBoolean());
         Assert.Equal(["1"], await ProxyTests.QueryAsync(apps,
             $"SELECT count(*)::text FROM ehr.audit_events WHERE patient_id = @patient AND actor_id = '{clinician.Id}' AND action = 'read' AND table_name = 'patients' AND part = 'vitals' AND occurred_at >= '{since:O}'", first));
@@ -99,7 +99,7 @@ public class TC_UC14_30_VitalSignsForObjective(WebApps apps) : IClassFixture<Web
         var earlier = new DateTimeOffset(DateTime.SpecifyKind(DateTime.ParseExact(At(3 * 24 * 60), "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture), DateTimeKind.Utc));
         var older = await OfferAsync(session.Client, (await DraftAsync(session.Client, second)).Path);
         Assert.Matches($"^Vital signs, {System.Text.RegularExpressions.Regex.Escape(clinic.Format(earlier))}: weight 70 kg, height 170 cm, body mass index [0-9.]+ kg/m²\\.$", older.GetProperty("text").GetString());
-        Assert.Equal(clinic.Day(earlier), older.GetProperty("day").GetString());
+        Assert.Equal(clinic.Plain(earlier, "MMM d, yyyy"), older.GetProperty("day").GetString());
         Assert.False(older.GetProperty("today").GetBoolean());
 
         var third = await apps.InsertPatientAsync("Synthetic", "Unmeasured");

@@ -152,7 +152,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
             Assert.Contains("<span class=\"sc-notice__state\">Sent.</span>", await ReadAsync(sent));
         }
 
-        Assert.Contains($"until {closes} UTC, while the visit is in progress.",
+        Assert.Contains($"until {DateTime.ParseExact(closes, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture):MMM d, yyyy HH:mm} UTC, while the visit is in progress.",
             Text(await visit.Session.Client.GetStringAsync(FormsPath(visit.Patient) + "?sensitive=true", Cancel)));
 
         // The visit ends: the form left closes.

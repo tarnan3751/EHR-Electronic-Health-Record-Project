@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Expected result: The change form is titled "Change medication" and opens filled in. After step 2 the chart says "No
 //   active medications recorded." and the row still exists, stopped. After step 3 the allergy is still "Sulfonamides"
 //   with no code, and shows "Rash". No row was deleted. The history shows, in the form's words, "Status: Active →
-//   Stopped", "Stopped: not recorded → 2026-10-01", "Reaction: not recorded → Rash", "Risk: not recorded → High
+//   Stopped", "Stopped: not recorded → Oct 1, 2026", "Reaction: not recorded → Rash", "Risk: not recorded → High
 //   risk" and "Severity: not recorded → Moderate".
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_08_ChangeEntryAlternativeFlow(WebApps apps) : IClassFixture<WebApps>
@@ -61,7 +61,7 @@ public class TC_UC4_08_ChangeEntryAlternativeFlow(WebApps apps) : IClassFixture<
 
         var history = Words(await session.Client.GetStringAsync($"/patients/{patient}/chart-history", Cancel));
         Assert.Contains("Status: Active → Stopped", history);
-        Assert.Contains("Stopped: not recorded → 2026-10-01", history);
+        Assert.Contains("Stopped: not recorded → Oct 1, 2026", history);
         Assert.Contains("Reaction: not recorded → Rash", history);
         Assert.Contains("Risk: not recorded → High risk", history);
         Assert.Contains("Severity: not recorded → Moderate", history);

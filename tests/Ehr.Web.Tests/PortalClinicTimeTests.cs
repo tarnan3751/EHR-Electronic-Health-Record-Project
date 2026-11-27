@@ -131,7 +131,7 @@ public class PortalClinicTimeTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Contains($"<h2>{Clock.Format(signed, "MMM d, yyyy")}</h2>", await GetAsync(chicago, patient.Jar, "/portal/summaries"));
         var clinical = await (await SignInAsync(chicago, clinician)).Client.GetStringAsync(NoteAddendumTests.NotePath(patient.Patient, note), Cancel);
-        Assert.Contains(Clock.Format(signed, "yyyy-MM-dd HH:mm:ss"), clinical);
+        Assert.Contains(Clock.Format(signed, "MMM d, yyyy HH:mm:ss"), clinical);
     }
 
     [Fact]

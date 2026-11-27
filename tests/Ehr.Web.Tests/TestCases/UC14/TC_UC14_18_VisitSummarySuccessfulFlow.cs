@@ -84,7 +84,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         Assert.Contains("Your chest sounded clear.\nYour temperature was normal.", Words(released1));
         Assert.Contains(NextSteps, released1);
         Assert.Contains("Released to the patient by Dr. Test", Words(released1));
-        Assert.Matches(@"\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC</time>", released1);
+        Assert.Matches(@"[A-Z][a-z]{2} \d{1,2}, \d{4} \d{2}:\d{2} UTC</time>", released1);
         Assert.DoesNotContain("data-write-summary", released1);
         Assert.Contains("data-withdraw-summary", released1);
         Assert.Equal([$"{clinician.Id} false standing {TalkedAbout}"], await SummariesAsync(apps, patient));

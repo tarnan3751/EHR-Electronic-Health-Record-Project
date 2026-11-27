@@ -50,7 +50,7 @@ public class TC_UC16_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         using var booked = await BookAsync(session.Client, patient, clinician.Id, Day(1), "09:30", "Synthetic: blood pressure check");
         Assert.Equal(HttpStatusCode.OK, booked.StatusCode);
         var listed = await ReadAsync(booked);
-        Assert.Contains($"<strong>{Day(1)} 09:30 UTC</strong> · 20 minutes · Dr. Schedule One", listed);
+        Assert.Contains($"<strong>{DateOnly.ParseExact(Day(1), "yyyy-MM-dd", null):MMM d, yyyy} 09:30 UTC</strong> · 20 minutes · Dr. Schedule One", listed);
         Assert.Contains("Synthetic: blood pressure check", listed);
         Assert.Equal([$"booked {clinician.Id}"], await RowsAsync(apps, patient, "status || ' ' || booked_by_id"));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Insert, clinician.Id, patient));
