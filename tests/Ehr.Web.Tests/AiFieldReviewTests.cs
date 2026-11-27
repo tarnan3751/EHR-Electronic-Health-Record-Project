@@ -246,6 +246,8 @@ public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
     {
         var f = await StageAsync(objective: true);
         var review = await f.Session.Client.GetStringAsync(f.ReviewUrl, Cancel);
+        // Opening the review saves nothing, so its status says nothing until a decision is saved (note-review.js).
+        Assert.Contains("<p id=\"note-save-status\" class=\"sc-status\" role=\"status\" aria-live=\"polite\"></p>", review);
         Assert.Equal(["subjective", "objective", "assessment", "plan"],
             System.Text.RegularExpressions.Regex.Matches(review, "data-dictation-field=\"([a-z]+)\"").Select(m => m.Groups[1].Value));
         var snapshot = JsonDocument.Parse(System.Net.WebUtility.HtmlDecode(
