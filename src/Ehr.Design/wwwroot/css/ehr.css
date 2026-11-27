@@ -2926,6 +2926,177 @@
         border-radius: var(--radius-lg);
     }
 
+    /* The home: whose record it is as one line of facts, then a card each for results, appointments, messages and the
+       rest of the record. Where the column has room, a card holds what it says on the left and its buttons in a
+       column of one width on the right, so every card's way in is in the same place; the appointments run across their
+       card, the way to all of them on the right of its title. On a phone, one column, the buttons as wide as their
+       card and the links as tall as a control. */
+    .sc-home__about {
+        padding: var(--space-4) var(--space-6);
+    }
+
+    .sc-home__about dl.record {
+        grid-auto-flow: column;
+        grid-template-rows: auto auto;
+        grid-template-columns: none;
+        grid-auto-columns: max-content;
+        gap: 0 var(--space-8);
+        margin: 0;
+    }
+
+    .sc-home__about dl.record dt {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-home__about dl.record dd {
+        margin: 0;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sc-home__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+    }
+
+    /* The way to a card's fuller page ("All your appointments"). */
+    .sc-home__more a {
+        font-size: 16px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-home__more a:hover,
+    .sc-home__more a:focus-visible {
+        text-decoration: underline;
+    }
+
+    /* The next appointments, set into their card on the recessed surface. */
+    .sc-home__card .sc-rows {
+        background: var(--surface-subtle);
+        border: 0;
+        border-radius: var(--radius-md);
+    }
+
+    .sc-home__card .sc-rows > li {
+        padding: var(--space-3) var(--space-4);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-home__card .sc-rows > li > h3 {
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-home__card .sc-rows > li > .sc-rows__meta {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-home__card .sc-list {
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-home__side > :last-child {
+        margin-bottom: 0;
+    }
+
+    @media (min-width: 40rem) {
+        .sc-home__card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 16rem;
+            grid-template-rows: auto 1fr;
+            align-items: start;
+            gap: var(--space-1) var(--space-6);
+        }
+
+        .sc-home__card > * {
+            grid-column: 1;
+            margin: 0;
+        }
+
+        /* As specific as the rule that sets a panel's lone button inline, so the column's buttons are one width. */
+        .sc-app--portal .sc-panel.sc-home__card > p.sc-home__actions,
+        .sc-home__card > .sc-home__side {
+            grid-column: 2;
+            grid-row: 1 / -1;
+            margin: 0;
+        }
+
+        .sc-app--portal .sc-panel.sc-home__card > p.sc-home__actions,
+        .sc-home__side > .sc-home__actions {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sc-home__actions > .sc-btn {
+            padding-inline: var(--space-4);
+        }
+
+        /* The record's card: under its button, the links to the download and to who viewed the record. */
+        .sc-home__side > .sc-list {
+            margin: var(--space-2) 0 0;
+        }
+
+        /* The appointments' card: its title and the way to all of them on one line, the appointments across the card,
+           and pre-visit forms in the buttons' column under them. */
+        .sc-home__card--appointments > .sc-home__more {
+            grid-column: 2;
+            grid-row: 1;
+            justify-self: end;
+        }
+
+        .sc-home__card--appointments > :is(.sc-rows, .sc-muted) {
+            grid-column: 1 / -1;
+            margin-top: var(--space-3);
+        }
+
+        .sc-app--portal .sc-panel.sc-home__card--appointments > p.sc-home__actions {
+            grid-row: auto;
+            margin-top: var(--space-4);
+        }
+    }
+
+    @media (max-width: 40rem) {
+        .sc-home__about {
+            padding: var(--space-4);
+        }
+
+        .sc-home__about dl.record {
+            grid-auto-flow: row;
+            grid-template-rows: none;
+            grid-template-columns: max-content minmax(0, 1fr);
+            gap: var(--space-1) var(--space-4);
+        }
+
+        .sc-home__about dl.record dt,
+        .sc-home__about dl.record dd {
+            margin: 0;
+            font-size: 16px;
+            line-height: 24px;
+        }
+
+        .sc-home__actions > .sc-btn {
+            flex: 1 1 100%;
+        }
+
+        /* On a phone a link standing alone is a target as tall as a control. */
+        .sc-home__more a,
+        .sc-home__card .sc-list a {
+            display: inline-flex;
+            align-items: center;
+            min-height: var(--control-height-portal);
+        }
+
+        .sc-home__card .sc-list > li {
+            padding: 0;
+        }
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */

@@ -14,22 +14,25 @@
 }
 @if (Model.Patient is { } patient)
 {
-    <section class="sc-panel" aria-label="@(own ? "About you" : "About the patient")">
+    @* Whose record it is, as one line of facts over the cards. *@
+    <section class="sc-panel sc-home__about" aria-label="@(own ? "About you" : "About the patient")">
         <dl class="record">
             <dt>Name</dt><dd>@patient.GivenName @patient.FamilyName</dd>
             <dt>Medical record number</dt><dd>@patient.Mrn</dd>
             <dt>Date of birth</dt><dd>@patient.BirthDate.ToString("yyyy-MM-dd")</dd>
         </dl>
     </section>
-    @* Results, appointments and messages as three panels of one shape (docs/brand: the portal, one column), and the
-       rest of the record after them. Each panel's main way in is a button; the primary one is pre-visit forms, while one
-       waits to be filled in, the one thing on this page with something to do. Pages that only show the record are links. *@
-    <section class="sc-panel" aria-labelledby="home-results">
+    @* Results, appointments and messages as cards of one shape (docs/brand: the portal, one column), and the rest of
+       the record after them: what each holds on the left, its buttons in a column on the right (sc-home__card), so each
+       card's way in is in the same place. Each card's main way in is a button; the primary one is pre-visit forms, while
+       one waits to be filled in, the one thing on this page with something to do. Pages that only show the record are
+       links. *@
+    <section class="sc-panel sc-home__card" aria-labelledby="home-results">
         <h2 class="sc-panel__title" id="home-results">@(own ? "Your test results" : "Test results")</h2>
         <p>Each result says what it means.</p>
-        <p><a asp-page="/Results" class="sc-btn">@(own ? "See your test results" : "See test results")</a></p>
+        <p class="sc-home__actions"><a asp-page="/Results" class="sc-btn">@(own ? "See your test results" : "See test results")</a></p>
     </section>
-    <section class="sc-panel" aria-labelledby="home-appointments">
+    <section class="sc-panel sc-home__card sc-home__card--appointments" aria-labelledby="home-appointments">
         <h2 class="sc-panel__title" id="home-appointments">@(own ? "Your next appointments" : "Next appointments")</h2>
         @if (Model.Upcoming.Count > 0)
         {
@@ -39,16 +42,16 @@
         {
             <p class="sc-muted">No upcoming appointments. To book one, contact the clinic.</p>
         }
-        <p><a asp-page="/Appointments">@(own ? "All your appointments" : "All appointments")</a></p>
+        <p class="sc-home__more"><a asp-page="/Appointments">@(own ? "All your appointments" : "All appointments")</a></p>
         @* Step 13e: always, but never to a proxy without sensitive items; how many can be filled in, while any can. *@
         @if (Model.MaySeeForms)
         {
-            <p><a asp-page="/Forms/Index" class="@(Model.OpenForms > 0 ? "sc-btn sc-btn--primary" : "sc-btn")" data-forms>Pre-visit forms@(Model.OpenForms > 0 ? $" ({Model.OpenForms} to fill in)" : "")</a></p>
+            <p class="sc-home__actions"><a asp-page="/Forms/Index" class="@(Model.OpenForms > 0 ? "sc-btn sc-btn--primary" : "sc-btn")" data-forms>Pre-visit forms@(Model.OpenForms > 0 ? $" ({Model.OpenForms} to fill in)" : "")</a></p>
         }
     </section>
     @if (Model.MayMessage)
     {
-        <section class="sc-panel" aria-labelledby="home-messages">
+        <section class="sc-panel sc-home__card" aria-labelledby="home-messages">
             <h2 class="sc-panel__title" id="home-messages">@(own ? "Messages with your care team" : "Messages with the care team")</h2>
             @if (Model.UnreadMessages > 0)
             {
@@ -58,22 +61,27 @@
             {
                 <p class="sc-muted">No new messages.</p>
             }
-            <p><a asp-page="/Messages/Index" class="sc-btn">@(own ? "Open your messages" : "Open messages")</a></p>
-            @* Step 13d: asking the care team to renew a medication, which is writing to them, as a message is. *@
-            <p><a asp-page="/Refills" class="sc-btn">Ask for a refill</a></p>
+            <p class="sc-home__actions">
+                <a asp-page="/Messages/Index" class="sc-btn">@(own ? "Open your messages" : "Open messages")</a>
+                @* Step 13d: asking the care team to renew a medication, which is writing to them, as a message is. *@
+                <a asp-page="/Refills" class="sc-btn">Ask for a refill</a>
+            </p>
         </section>
     }
-    <section class="sc-panel" aria-labelledby="home-record">
+    <section class="sc-panel sc-home__card sc-home__card--record" aria-labelledby="home-record">
         <h2 class="sc-panel__title" id="home-record">@(own ? "Visit summaries and your record" : "Visit summaries and this record")</h2>
         <p>@(own ? "What your care team wrote for you after each visit." : "What the care team wrote after each visit.")</p>
-        @* Step 13a: what the care team wrote for the patient after a visit. *@
-        <p><a asp-page="/Summaries" class="sc-btn">@(own ? "See your visit summaries" : "See visit summaries")</a></p>
-        <ul class="sc-list">
-            @* Step 13b: a copy of the record, as a file or a page to print. *@
-            <li><a asp-page="/Record/Index">@(own ? "Download my record" : "Download this record")</a></li>
-            @* Step 13c: who has looked at the record, from the audit log. *@
-            <li><a asp-page="/Views">@(own ? "Who viewed my record" : "Who viewed this record")</a></li>
-        </ul>
+        @* The button and the links under it, in the buttons' column. *@
+        <div class="sc-home__side">
+            @* Step 13a: what the care team wrote for the patient after a visit. *@
+            <p class="sc-home__actions"><a asp-page="/Summaries" class="sc-btn">@(own ? "See your visit summaries" : "See visit summaries")</a></p>
+            <ul class="sc-list">
+                @* Step 13b: a copy of the record, as a file or a page to print. *@
+                <li><a asp-page="/Record/Index">@(own ? "Download my record" : "Download this record")</a></li>
+                @* Step 13c: who has looked at the record, from the audit log. *@
+                <li><a asp-page="/Views">@(own ? "Who viewed my record" : "Who viewed this record")</a></li>
+            </ul>
+        </div>
     </section>
 }
 else
