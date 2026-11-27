@@ -229,8 +229,8 @@ public static partial class DictationApi
         var minutes = (left.UntilLongest + 59) / 60;
         var ends = minutes <= 1 ? "in a minute" : $"in {minutes} minutes";
         return Refuse(StatusCodes.Status409Conflict, "sign_in_ending", ambient
-            ? $"Sign in again first: a sign-in lasts at most 12 hours, and this one ends {ends}, too soon for a visit, which can record for 20 minutes. Sign out, sign in again, then start listening."
-            : $"Sign in again first: a sign-in lasts at most 12 hours, and this one ends {ends}, too soon for a dictation, which can record for 3 minutes. Sign out, sign in again, then dictate.");
+            ? $"Sign in again first. Your sign-in ends {ends}, too soon for a visit of up to 20 minutes. Sign out, sign in again, then start listening."
+            : $"Sign in again first. Your sign-in ends {ends}, too soon for a dictation of up to 3 minutes. Sign out, sign in again, then dictate.");
     }
 
     static Task<IResult> SendAudioAsync(string id, string? seq, HttpContext context, DictationSidecar sidecar) =>

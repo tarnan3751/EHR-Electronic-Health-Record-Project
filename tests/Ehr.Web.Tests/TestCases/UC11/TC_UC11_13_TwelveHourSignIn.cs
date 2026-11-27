@@ -28,8 +28,8 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   2. At 11 h 41 min, start a visit; read the session page.
 //   3. At 11 h 51 min, read the session page and start a dictation; at 11 h 58 min, start another.
 //   4. At 12 hours, open a page as each.
-// Expected result: Step 1: the visit starts (201). Step 2: 409 sign_in_ending, "Sign in again first: a sign-in lasts at
-//   most 12 hours, and this one ends in 19 minutes, too soon for a visit, which can record for 20 minutes. …"; the
+// Expected result: Step 1: the visit starts (201). Step 2: 409 sign_in_ending, "Sign in again first. Your sign-in ends
+//   in 19 minutes, too soon for a visit of up to 20 minutes. …"; the
 //   session page doesn't call the end final yet, since the idle end comes first. Step 3: at 11 h 51 min the session page
 //   says the end is final, 9 minutes away; the first dictation starts (201), the second, 2 minutes before the end, is
 //   refused the same way, for a dictation. Step 4: each is sent to its sign-in.
@@ -87,8 +87,8 @@ public class TC_UC11_13_TwelveHourSignIn(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
             var refusal = JsonNode.Parse(await late.Content.ReadAsStringAsync(Cancel))!;
             Assert.Equal("sign_in_ending", (string)refusal["error"]!);
-            Assert.Equal("Sign in again first: a sign-in lasts at most 12 hours, and this one ends in 19 minutes, too soon for a visit, which can "
-                + "record for 20 minutes. Sign out, sign in again, then start listening.", (string)refusal["message"]!);
+            Assert.Equal("Sign in again first. Your sign-in ends in 19 minutes, too soon for a visit of up to 20 minutes. "
+                + "Sign out, sign in again, then start listening.", (string)refusal["message"]!);
         }
 
         var (before, _) = await SessionTimeTests.AskAsync(session.Client, check: true);
@@ -111,8 +111,8 @@ public class TC_UC11_13_TwelveHourSignIn(WebApps apps) : IClassFixture<WebApps>
         using (var tooLate = await PostJsonAsync("/api/dictation/sessions", null))
         {
             Assert.Equal(HttpStatusCode.Conflict, tooLate.StatusCode);
-            Assert.Equal("Sign in again first: a sign-in lasts at most 12 hours, and this one ends in 2 minutes, too soon for a dictation, which can "
-                + "record for 3 minutes. Sign out, sign in again, then dictate.", (string)JsonNode.Parse(await tooLate.Content.ReadAsStringAsync(Cancel))!["message"]!);
+            Assert.Equal("Sign in again first. Your sign-in ends in 2 minutes, too soon for a dictation of up to 3 minutes. "
+                + "Sign out, sign in again, then dictate.", (string)JsonNode.Parse(await tooLate.Content.ReadAsStringAsync(Cancel))!["message"]!);
         }
 
         // 4.
