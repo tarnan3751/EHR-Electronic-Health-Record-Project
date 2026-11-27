@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Tahseen Arnan
 public class TC_UC11_13_TwelveHourSignIn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_sign_in_ends_at_12_hours_and_no_recording_starts_that_it_would_cut_off()
     {

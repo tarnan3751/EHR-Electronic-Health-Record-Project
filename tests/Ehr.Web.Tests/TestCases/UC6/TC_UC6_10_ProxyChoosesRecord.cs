@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_10_ProxyChoosesRecord(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_proxy_chooses_a_record_sees_only_it_and_goes_back_to_their_own()
     {

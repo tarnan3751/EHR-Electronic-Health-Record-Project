@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_08_SendMessage(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_patient_writes_to_their_care_team_and_reads_the_reply()
     {

@@ -30,8 +30,6 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_marking_done_is_forwarded_and_with_the_server_down_the_inbox_is_read_only()
     {

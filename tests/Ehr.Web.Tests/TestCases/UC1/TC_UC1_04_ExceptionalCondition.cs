@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_with_the_clinics_server_down_the_order_is_not_saved()
     {

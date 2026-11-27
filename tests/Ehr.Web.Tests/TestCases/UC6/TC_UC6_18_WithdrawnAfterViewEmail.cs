@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_18_WithdrawnAfterViewEmail(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_withdrawal_emails_the_patient_only_when_the_summary_had_been_viewed()
     {

@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_11_ProxyLimits(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_proxy_is_held_to_the_grant_and_loses_the_record_when_it_is_removed()
     {

@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public partial class TC_UC6_48_Nfr06_WhoViewedSecurity(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly string[] LogWords =
     [
         "audit_events", "patients", "clinical_notes", "clinical_drafts", "ai_note_reviews", "ai_field_proposals", "message_threads",

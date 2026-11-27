@@ -37,8 +37,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_13_AllergyStatus(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_allergy_list_is_not_recorded_none_known_or_listed_everywhere_it_is_shown()
     {

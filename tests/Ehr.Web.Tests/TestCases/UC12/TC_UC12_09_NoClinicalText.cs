@@ -35,8 +35,6 @@ public class TC_UC12_09_NoClinicalText(WebApps apps) : IClassFixture<WebApps>
 {
     const string Reason = "Synthetic: called in to cover the ward overnight.";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_audit_page_names_the_fields_a_change_to_patient_data_changed_and_never_a_value()
     {

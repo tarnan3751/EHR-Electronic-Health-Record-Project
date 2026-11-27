@@ -52,8 +52,6 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 // Creator: Tahseen Arnan
 public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_listening_is_not_offered_and_nothing_about_it_crosses_the_WAN()
     {

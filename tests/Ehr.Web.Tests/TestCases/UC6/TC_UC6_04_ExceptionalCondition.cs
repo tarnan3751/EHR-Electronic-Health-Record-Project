@@ -30,8 +30,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Simar Rekhi
 public class TC_UC6_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_with_the_clinic_server_down_results_are_read_only_and_the_read_is_queued()
     {

@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_20_VitalSignErrorRefusedAndOffSite(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Marking_in_error_needs_a_reading_a_reason_and_the_panel_and_follows_the_off_site_rules()
     {

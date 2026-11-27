@@ -24,8 +24,6 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 // Creator: Tahseen Arnan
 public class TC_UC12_08_ReviewedOnTheAuditPage(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_audit_page_says_whether_each_emergency_access_was_reviewed()
     {

@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Each_proxy_gets_the_copy_their_grant_allows_and_an_ended_one_gets_nothing()
     {

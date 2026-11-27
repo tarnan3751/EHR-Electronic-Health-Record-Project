@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 // Creator: Tahseen Arnan
 public class TC_UC24_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Refused_reviews_save_nothing_and_say_why()
     {

@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_24_OrderFromDictationRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // "Sign order" for a lab test on a form already open in a tab, with its own token.
     static Task<HttpResponseMessage> SignOnAsync(Dictated dictated, string path, string token, string item) =>
         dictated.Session.Client.PostAsync(path, Form([("__RequestVerificationToken", token), ("Item", item), ("SafetySeen", "true"),

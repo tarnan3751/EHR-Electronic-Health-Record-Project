@@ -37,8 +37,6 @@ public class TC_UC11_20_RevokeDesktopSignIns(WebApps apps) : IClassFixture<WebAp
 {
     const string Sync = "/api/sync/quick-texts?since=0";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_administrator_revokes_a_clinicians_desktop_sign_ins_and_their_own()
     {

@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_07_AddEntrySuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_clinician_adds_coded_entries_and_the_chart_history_and_audit_show_them()
     {

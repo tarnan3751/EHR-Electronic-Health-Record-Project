@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_25_ReadingAcrossCheckIn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // Records 120/80 taken `minutesBefore` ago and checks the patient in, in either order; marks the reading and records
     // 120/78; then records a heart rate taken just after the check-in.
     async Task<Guid> CorrectAsync(bool typedFirst, int minutesBefore, string at)

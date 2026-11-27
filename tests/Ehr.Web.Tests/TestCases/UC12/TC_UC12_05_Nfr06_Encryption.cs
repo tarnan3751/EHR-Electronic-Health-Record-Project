@@ -40,8 +40,6 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 // Creator: Luke Garcia
 public partial class TC_UC12_05_Nfr06_Encryption(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_the_reason_is_saved_on_prem_the_read_reaches_the_log_and_the_chart_is_not_cached()
     {

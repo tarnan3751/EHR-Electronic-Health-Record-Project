@@ -39,8 +39,6 @@ public class TC_UC8_10_MinimumDesktopVersion(WebApps apps) : IClassFixture<WebAp
 {
     const string Sync = "/api/sync/quick-texts?since=0";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_build_older_than_the_minimum_is_refused_its_data_and_never_its_lock()
     {

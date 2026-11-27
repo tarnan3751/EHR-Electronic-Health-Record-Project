@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_the_panel_another_patients_note_and_a_second_standing_summary_are_refused()
     {

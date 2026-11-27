@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_22_OrderFromRefill(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_order_form_approves_a_refill_with_an_ordinary_order_for_the_same_medication()
     {

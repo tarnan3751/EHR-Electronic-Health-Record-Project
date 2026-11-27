@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC17;
 // Creator: Tahseen Arnan
 public class TC_UC17_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_clinician_starts_a_thread_and_emergency_access_reads_without_replying()
     {

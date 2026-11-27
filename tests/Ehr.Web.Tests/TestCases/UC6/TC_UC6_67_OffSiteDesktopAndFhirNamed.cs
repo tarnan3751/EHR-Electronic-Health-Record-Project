@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_67_OffSiteDesktopAndFhirNamed(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Views_off_site_through_the_api_and_into_the_offline_copy_are_named()
     {

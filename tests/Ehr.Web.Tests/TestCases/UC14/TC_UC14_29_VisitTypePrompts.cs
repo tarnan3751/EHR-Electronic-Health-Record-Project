@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_29_VisitTypePrompts(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Prompt = "How each problem has been since the last visit";
 
     [Fact]

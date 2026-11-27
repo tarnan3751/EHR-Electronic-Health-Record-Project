@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 // Creator: Tahseen Arnan
 public class TC_UC24_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_access_in_force_waits_a_not_appropriate_one_is_found_again_and_an_older_one_reaches_the_inbox()
     {

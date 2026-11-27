@@ -29,8 +29,6 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 // Creator: Luke Garcia
 public class TC_UC12_03_OnlyClinicians(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_admin_is_refused_the_patient_pages_and_emergency_access_and_a_visitor_is_sent_to_sign_in()
     {

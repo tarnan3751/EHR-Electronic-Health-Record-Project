@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Creator: Tahseen Arnan
 public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_invitation_works_once_until_it_expires_and_its_account_shares_nothing()
     {

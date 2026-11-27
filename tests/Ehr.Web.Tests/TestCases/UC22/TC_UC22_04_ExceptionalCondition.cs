@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Creator: Tahseen Arnan
 public class TC_UC22_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_a_form_is_sent_through_the_clinics_server_and_not_offered_while_it_cant_be_reached()
     {

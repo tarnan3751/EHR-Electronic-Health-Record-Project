@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Tahseen Arnan
 public class TC_UC11_21_RevokeDesktopSignInsOffSite(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_the_revocation_is_forwarded_and_cut_off_it_waits()
     {

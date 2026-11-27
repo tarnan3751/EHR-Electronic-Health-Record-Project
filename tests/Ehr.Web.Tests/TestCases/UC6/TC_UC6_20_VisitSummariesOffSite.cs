@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_20_VisitSummariesOffSite(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_summaries_are_read_from_the_cloud_copy_and_a_shipped_view_counts()
     {

@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_18_SafetyWarningsOverride(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_allergy_or_a_serious_interaction_stops_the_order_until_a_reason_is_given()
     {

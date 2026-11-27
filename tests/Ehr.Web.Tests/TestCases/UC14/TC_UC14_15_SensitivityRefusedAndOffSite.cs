@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_15_SensitivityRefusedAndOffSite(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Sensitivity_changes_need_the_panel_and_follow_the_off_site_rules()
     {

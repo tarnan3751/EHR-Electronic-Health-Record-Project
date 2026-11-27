@@ -29,8 +29,6 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Marking_someone_elses_item_or_a_done_one_changes_nothing()
     {

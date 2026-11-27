@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_15_ResultsExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_results_are_forwarded_and_with_the_server_down_they_are_read_only()
     {

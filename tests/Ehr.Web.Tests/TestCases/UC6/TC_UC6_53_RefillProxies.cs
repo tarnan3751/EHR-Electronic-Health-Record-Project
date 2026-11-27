@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_53_RefillProxies(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_proxy_asks_under_access_with_messages_and_sensitive_items_follow_their_rules()
     {

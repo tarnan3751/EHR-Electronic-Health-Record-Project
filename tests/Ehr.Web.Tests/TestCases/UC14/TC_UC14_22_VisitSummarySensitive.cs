@@ -40,8 +40,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_summary_is_sensitive_with_its_note_and_addenda_or_on_its_own_under_the_addenda_rules()
     {

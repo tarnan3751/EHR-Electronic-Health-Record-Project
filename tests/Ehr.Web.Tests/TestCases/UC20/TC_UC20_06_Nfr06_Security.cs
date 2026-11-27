@@ -44,8 +44,6 @@ namespace Ehr.Web.Tests.TestCases.UC20;
 // Creator: Tahseen Arnan
 public class TC_UC20_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string WrongKey = "not-the-lab-key-but-long-enough-to-look-real";
 
     [Fact]

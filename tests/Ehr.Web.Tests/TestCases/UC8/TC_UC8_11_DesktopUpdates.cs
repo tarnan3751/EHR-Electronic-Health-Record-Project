@@ -36,8 +36,6 @@ public sealed class TC_UC8_11_DesktopUpdates(WebApps apps) : IClassFixture<WebAp
 
     readonly string outside = Directory.CreateTempSubdirectory("ehr-desktop-outside-").FullName;
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public void Dispose()
     {
         Directory.Delete(folder, recursive: true);

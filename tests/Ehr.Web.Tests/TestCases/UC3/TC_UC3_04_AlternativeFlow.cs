@@ -23,9 +23,6 @@ namespace Ehr.Web.Tests.TestCases.UC3;
 public class TC_UC3_04_AlternativeFlow(WebApps apps)
     : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel =>
-        TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task No_matching_patients_displays_message()
     {

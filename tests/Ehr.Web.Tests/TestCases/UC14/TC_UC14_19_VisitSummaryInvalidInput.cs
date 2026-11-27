@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_19_VisitSummaryInvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_summary_with_a_code_an_identifier_or_the_notes_own_words_is_not_released()
     {

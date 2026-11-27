@@ -30,8 +30,6 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 // Creator: Luke Garcia
 public class TC_UC12_02_InvalidReason(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public static TheoryData<string, string> Refused => new()
     {
         { "", "Say why you need this chart, in 10 to 500 characters." },

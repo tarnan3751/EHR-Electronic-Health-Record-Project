@@ -30,8 +30,6 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 // Creator: Tahseen Arnan
 public class TC_UC16_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_booking_that_is_incomplete_or_double_booked_is_refused_and_nothing_is_saved()
     {

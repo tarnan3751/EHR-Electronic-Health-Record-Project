@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Creator: Tahseen Arnan
 public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_clinic_records_a_proxy_who_writes_for_the_patient_and_only_the_care_team_changes_it()
     {

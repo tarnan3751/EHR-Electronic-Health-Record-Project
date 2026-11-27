@@ -38,8 +38,6 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Creator: Tahseen Arnan
 public class TC_UC22_08_FormsForEachVisit(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_clinician_reads_each_visits_forms_scored_banded_and_trended_once_asked()
     {

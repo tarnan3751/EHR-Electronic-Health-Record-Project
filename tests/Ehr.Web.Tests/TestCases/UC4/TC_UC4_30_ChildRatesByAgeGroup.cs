@@ -26,8 +26,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_30_ChildRatesByAgeGroup(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static string Row(string page, string name) => Regex.Match(page, $"(?s)<th scope=\"row\">{name}.*?</tr>").Value;
 
     [Fact]

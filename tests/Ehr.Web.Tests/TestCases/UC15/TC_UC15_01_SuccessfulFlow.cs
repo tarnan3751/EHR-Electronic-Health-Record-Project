@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_clinician_sees_the_count_works_through_the_inbox_and_marks_an_item_done()
     {

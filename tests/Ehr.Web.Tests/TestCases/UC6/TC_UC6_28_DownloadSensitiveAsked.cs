@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_28_DownloadSensitiveAsked(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Sensitive_items_come_only_when_asked_and_a_proxy_without_them_sees_no_sign_of_them()
     {

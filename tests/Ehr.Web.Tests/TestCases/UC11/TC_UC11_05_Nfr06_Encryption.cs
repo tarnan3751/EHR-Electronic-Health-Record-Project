@@ -39,8 +39,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Luke Garcia
 public class TC_UC11_05_Nfr06_Encryption(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_staff_session_cookie_is_secure_http_only_and_same_site_strict()
     {

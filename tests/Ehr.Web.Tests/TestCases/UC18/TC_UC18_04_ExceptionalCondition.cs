@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Creator: Tahseen Arnan
 public class TC_UC18_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_access_is_forwarded_is_read_only_during_an_outage_and_expires_by_itself()
     {

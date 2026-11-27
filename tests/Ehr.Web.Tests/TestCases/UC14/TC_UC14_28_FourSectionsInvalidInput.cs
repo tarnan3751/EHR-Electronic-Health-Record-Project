@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_28_FourSectionsInvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_empty_section_is_not_signed_and_an_overlong_or_null_one_is_not_saved()
     {

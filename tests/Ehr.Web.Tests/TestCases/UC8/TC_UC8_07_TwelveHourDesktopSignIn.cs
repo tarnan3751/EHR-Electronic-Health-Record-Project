@@ -34,8 +34,6 @@ public class TC_UC8_07_TwelveHourDesktopSignIn(WebApps apps) : IClassFixture<Web
 {
     const string Sync = "/api/sync/quick-texts?since=0";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_desktop_token_is_refused_12_hours_after_its_sign_in_saying_so()
     {

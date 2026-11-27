@@ -37,8 +37,6 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 // Creator: Tahseen Arnan
 public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_the_panel_already_changed_or_off_site_with_the_server_down_an_appointment_is_not_changed()
     {

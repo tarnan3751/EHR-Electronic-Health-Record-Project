@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_51_AskToRenew(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_patient_asks_to_renew_an_active_coded_medication_and_the_care_team_is_told()
     {

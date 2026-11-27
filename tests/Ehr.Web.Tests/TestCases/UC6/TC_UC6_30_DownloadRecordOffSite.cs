@@ -30,8 +30,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_30_DownloadRecordOffSite(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_the_copy_comes_from_the_cloud_copy_and_its_record_is_queued_first()
     {

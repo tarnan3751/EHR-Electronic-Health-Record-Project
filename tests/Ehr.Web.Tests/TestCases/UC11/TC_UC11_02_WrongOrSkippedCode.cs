@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Luke Garcia
 public class TC_UC11_02_WrongOrSkippedCode(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_a_wrong_or_skipped_code_signs_nobody_in()
     {

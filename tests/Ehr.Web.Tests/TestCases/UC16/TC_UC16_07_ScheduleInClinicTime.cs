@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 // Creator: Tahseen Arnan
 public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_appointment_is_booked_listed_and_shown_on_the_clinics_clock()
     {

@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_clinician_discontinues_an_order_with_a_reason_and_the_chart_keeps_it_as_discontinued()
     {

@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Creator: Tahseen Arnan
 public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_invited_carer_creates_an_account_that_sees_only_the_record_shared_with_it()
     {

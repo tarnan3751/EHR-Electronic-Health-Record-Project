@@ -29,8 +29,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_15_VisitSummaries(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_patient_reads_their_visit_summaries_newest_first_and_nothing_of_the_notes()
     {

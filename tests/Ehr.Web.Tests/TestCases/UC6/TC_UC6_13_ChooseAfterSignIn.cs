@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_13_ChooseAfterSignIn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task After_sign_in_an_account_with_shared_records_chooses_whose_to_view()
     {

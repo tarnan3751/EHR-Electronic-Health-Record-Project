@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Creator: Tahseen Arnan
 public class TC_UC22_07_AskForAForm(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_clinician_asks_for_a_form_before_a_booked_appointment_once_for_each_questionnaire()
     {

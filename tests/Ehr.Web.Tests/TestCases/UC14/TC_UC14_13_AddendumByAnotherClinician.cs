@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_13_AddendumByAnotherClinician(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_addendum_by_another_clinician_is_labeled_and_reaches_the_signers_inbox()
     {

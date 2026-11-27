@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_33_AllergyFromDictation(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_allergy_form_opened_from_a_proposal_fills_in_nothing_and_adds_a_coded_allergy()
     {

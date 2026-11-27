@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_31_FourSectionsOffSite(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_the_editor_reads_the_replica_and_with_the_server_down_shows_the_draft_as_saved()
     {

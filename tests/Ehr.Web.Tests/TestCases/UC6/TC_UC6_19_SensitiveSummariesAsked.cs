@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_19_SensitiveSummariesAsked(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_patients_sensitive_summaries_wait_until_asked_for_and_asking_is_a_recorded_read()
     {

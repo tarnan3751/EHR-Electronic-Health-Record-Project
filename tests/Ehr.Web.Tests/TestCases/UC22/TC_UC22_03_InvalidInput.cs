@@ -34,8 +34,6 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Creator: Tahseen Arnan
 public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Missing_or_made_up_answers_a_second_send_and_forms_that_arent_open_or_arent_theirs_are_refused()
     {

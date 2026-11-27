@@ -29,8 +29,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_31_ChildBloodPressureBySexAndAge(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static string Row(string page) => Regex.Match(page, "(?s)<th scope=\"row\">Blood pressure.*?</tr>").Value;
 
     [Fact]

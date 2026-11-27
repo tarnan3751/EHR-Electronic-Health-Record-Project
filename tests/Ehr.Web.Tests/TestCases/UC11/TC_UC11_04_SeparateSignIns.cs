@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Luke Garcia
 public class TC_UC11_04_SeparateSignIns(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Staff_and_patient_sign_ins_are_kept_apart()
     {

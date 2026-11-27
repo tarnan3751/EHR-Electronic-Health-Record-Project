@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_21_VisitSummaryWithdrawn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_wrong_summary_is_withdrawn_with_a_reason_by_a_colleague_and_a_new_one_written()
     {

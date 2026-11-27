@@ -41,8 +41,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Luke Garcia
 public partial class TC_UC11_03_NewStaffFirstSignIn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // StaffSignIn.RecoveryCodes: how many the enrollment page shows, once.
     const int RecoveryCodes = 8;
 

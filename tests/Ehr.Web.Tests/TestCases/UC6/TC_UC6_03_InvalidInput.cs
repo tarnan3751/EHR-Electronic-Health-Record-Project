@@ -25,8 +25,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Simar Rekhi
 public class TC_UC6_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Nobody_signed_out_and_no_clinician_reaches_the_results_page()
     {

@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Creator: Tahseen Arnan
 public class TC_UC15_08_RefillDoneByAnswering(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_refill_request_is_done_by_answering_it_not_from_the_list()
     {

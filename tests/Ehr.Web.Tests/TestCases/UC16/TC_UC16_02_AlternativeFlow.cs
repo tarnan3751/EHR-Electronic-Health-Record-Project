@@ -30,8 +30,6 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 // Creator: Tahseen Arnan
 public class TC_UC16_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_appointment_is_rescheduled_cancelled_or_marked_a_no_show_and_none_is_deleted()
     {

@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 // Creator: Tahseen Arnan
 public class TC_UC12_07_SensitiveValuesHidden(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_audit_page_shows_that_a_sensitive_item_changed_and_never_its_values()
     {

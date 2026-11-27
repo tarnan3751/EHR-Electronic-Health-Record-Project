@@ -29,8 +29,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_26_FourSectionsSuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly (string Name, object Value)[] Sections =
     [
         ("Subjective", "Synthetic subjective: cough for two days."), ("Objective", "Synthetic objective: temperature 37.9, chest clear."),

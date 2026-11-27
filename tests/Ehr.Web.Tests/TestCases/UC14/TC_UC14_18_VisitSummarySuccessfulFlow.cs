@@ -41,8 +41,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_summary_written_from_a_signed_note_is_released_and_the_patient_is_told_with_no_health_details()
     {

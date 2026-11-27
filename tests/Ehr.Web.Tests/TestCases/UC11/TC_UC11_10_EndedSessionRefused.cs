@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Tahseen Arnan
 public class TC_UC11_10_EndedSessionRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_session_that_has_ended_stays_ended()
     {

@@ -34,8 +34,6 @@ public class TC_UC12_04_EverythingAudited(WebApps apps) : IClassFixture<WebApps>
 {
     const string Reason = "Paged by the ward; the patient's own doctor is away.";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_grant_every_view_and_every_change_under_emergency_access_are_logged()
     {

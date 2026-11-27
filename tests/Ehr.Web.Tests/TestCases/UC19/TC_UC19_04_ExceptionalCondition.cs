@@ -37,8 +37,6 @@ namespace Ehr.Web.Tests.TestCases.UC19;
 // Creator: Tahseen Arnan
 public class TC_UC19_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     sealed class Watched(IDurableAuditQueue? queue) : IDurableAuditQueue
     {
         public List<string[]> Writes { get; } = [];

@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_09_AddendumInvalidAndRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_empty_or_overlong_addendum_is_not_signed_and_a_clinician_off_the_panel_signs_none()
     {

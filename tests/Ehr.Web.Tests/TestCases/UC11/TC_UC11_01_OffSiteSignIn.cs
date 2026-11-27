@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Luke Garcia
 public class TC_UC11_01_OffSiteSignIn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_the_password_reaches_the_code_page_and_the_code_signs_the_clinician_in()
     {
