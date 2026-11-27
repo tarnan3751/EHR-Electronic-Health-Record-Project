@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. As the covering clinician, open the flowsheet, open the page, and post to it.
 //   3. Off-site, mark the heart rate with the reason.
 //   4. On the app that is cut off, open the flowsheet and the page, and post to it.
-// Expected result: Step 1: each is answered 422 with "Not marked:" and "Choose at least one reading." or "Say why, so
+// Expected result: Step 1: each is answered 422 with "Not saved." and "Choose at least one reading." or "Say why, so
 //   the record shows it."; nothing changes. Step 2: the flowsheet has no "Mark in error" link; the page and the post
 //   send them back to the chart; nothing changes. Step 3: forwarded, and the heart rate is entered in error. Step 4:
 //   the flowsheet has no link, the page says "Readings can't be marked until the clinic's server is back." with no
@@ -44,7 +44,7 @@ public class TC_UC4_20_VitalSignErrorRefusedAndOffSite(WebApps apps) : IClassFix
 
         using var none = await MarkAsync(apps, session.Client, patient, set, "Wrong patient.");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, none.StatusCode);
-        Assert.Contains("Not marked: Choose at least one reading.", Words(await none.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. Choose at least one reading.", Words(await none.Content.ReadAsStringAsync(Cancel)));
         using var unexplained = await MarkAsync(apps, session.Client, patient, set, null, HeartRate);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unexplained.StatusCode);
         Assert.Contains("Say why, so the record shows it.", Words(await unexplained.Content.ReadAsStringAsync(Cancel)));

@@ -57,7 +57,7 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
         Assert.NotEqual(taken.UtcDateTime.ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture), typed);
         using var recorded = await RecordAtAsync(session.Client, patient, typed, (HeartRate, "72"));
         var page = await ReadAsync(recorded);
-        Assert.Contains("Saved:", page);
+        Assert.Contains("Saved.", page);
         Assert.Contains($"<th scope=\"col\" class=\"sc-table__mono\">{clock.Format(taken)}</th>", page);
         Assert.Contains("Times are clinic time.", page);
         Assert.Equal([taken.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)], await ProxyTests.QueryAsync(apps,

@@ -19,7 +19,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Steps:
 //   1. As the first clinician, record each of the five in turn.
 //   2. As the second clinician, open the patient's vital signs, and post a set to it.
-// Expected result: Step 1: each is answered 422 with "Not saved:" and, in turn, "Enter both numbers of the blood
+// Expected result: Step 1: each is answered 422 with "Not saved." and, in turn, "Enter both numbers of the blood
 //   pressure.", "Enter a number, like 36.8.", "Enter a value from 20 to 45 °C.", "Enter at least one
 //   vital sign." and "The time can't be in the future."; what was typed is still in the form; nothing is saved. Step
 //   2: both are sent back to the chart, and nothing is saved.
@@ -49,7 +49,7 @@ public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture
             using var refused = await RecordAtAsync(session.Client, patient, at, values);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var page = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Not saved:", page);
+            Assert.Contains("Not saved.", page);
             Assert.Contains(message, Words(page));
             foreach (var (_, typed) in values)
             {
@@ -74,7 +74,7 @@ public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture
         // sent twice is recorded once, and the second answer says so.
         using var absurd = await RecordAtAsync(session.Client, patient, now, (Weight, "700"), (Height, "20"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, absurd.StatusCode);
-        Assert.Contains("The vital signs couldn't be saved.", Words(await absurd.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. Reload the page and try again.", Words(await absurd.Content.ReadAsStringAsync(Cancel)));
         Assert.Empty(await RecordedAsync(apps, patient));
         using var once = await RecordAtAsync(session.Client, patient, now, (HeartRate, "72"));
         using var twice = await RecordAtAsync(session.Client, patient, now, (HeartRate, "72"));

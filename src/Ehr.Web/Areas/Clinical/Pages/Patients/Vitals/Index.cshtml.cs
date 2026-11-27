@@ -143,7 +143,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
                         : "A value already stands for one of these signs at that time. Mark it entered in error first, then record the correct one.";
                     break;
                 default:
-                    errors[""] = "The vital signs couldn't be saved. Reload the page and try again.";
+                    errors[""] = "Reload the page and try again.";
                     break;
             }
         }

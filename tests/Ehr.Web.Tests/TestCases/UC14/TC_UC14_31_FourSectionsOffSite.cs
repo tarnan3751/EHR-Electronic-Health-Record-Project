@@ -39,7 +39,7 @@ public class TC_UC14_31_FourSectionsOffSite(WebApps apps) : IClassFixture<WebApp
         var (clinician, patient, session) = await OnPanelAsync(apps);
         using (var recorded = await RecordAsync(apps, session.Client, patient, 1, (HeartRate, "72")))
         {
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         using var created = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NewNote", $"/patients/{patient}");

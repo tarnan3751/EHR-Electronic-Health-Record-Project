@@ -41,7 +41,7 @@ public class TC_UC4_30_ChildRatesByAgeGroup(WebApps apps) : IClassFixture<WebApp
         foreach (var day in new[] { birthday.AddDays(-1), birthday })
         {
             using var recorded = await RecordAtAsync(session.Client, child, $"{day:yyyy-MM-dd}T12:00", ("9279-1", "40"));
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         Assert.Equal(["9279-1 19-46", "9279-1 18-38"], await ProxyTests.QueryAsync(apps,

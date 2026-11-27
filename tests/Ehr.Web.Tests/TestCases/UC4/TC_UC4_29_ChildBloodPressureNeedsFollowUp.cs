@@ -45,7 +45,7 @@ public class TC_UC4_29_ChildBloodPressureNeedsFollowUp(WebApps apps) : IClassFix
         foreach (var (daysAgo, systolic) in new[] { (3, "97.9"), (2, "98"), (1, "98.1") })
         {
             using var recorded = await RecordAsync(apps, session.Client, patient, daysAgo * 24 * 60, (VitalTests.Systolic, systolic), (Diastolic, "50"));
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         var flowsheet = await session.Client.GetStringAsync(Path(patient), Cancel);

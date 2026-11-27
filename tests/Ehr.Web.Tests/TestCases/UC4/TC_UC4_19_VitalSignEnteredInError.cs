@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Choose "Show entries in error".
 //   3. Record 108/92 for yesterday's time; then 108/95; then weight 79 with height 180.
 //   4. Open the chart, the offline copy, and the patient's portal results.
-// Expected result: Step 1: "Marked: 2 readings"; the page says 3 readings are marked (a blood pressure is one
+// Expected result: Step 1: "Marked in error. 2 readings"; the page says 3 readings are marked (a blood pressure is one
 //   reading, both its numbers marked, step 9c; and the body mass index worked out from the weight is marked with
 //   it); yesterday's column no longer has 180/92, 81 or the body mass index; there is no blood pressure trend (one of
 //   each value stands). The four values are in the database as entered-in-error with the reason, the clinician and
@@ -51,14 +51,14 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         Assert.Contains($"/patients/{patient}/vitals/error?at={Uri.EscapeDataString(yesterday + ":00")}", flowsheet);
         var form = await session.Client.GetStringAsync(ErrorPath(patient, yesterday + ":00"), Cancel);
         Assert.Contains("Which readings are wrong?", form);
-        Assert.Contains("marking the weight or the height also marks the body mass index", form);
+        Assert.Contains("Body mass index isn't listed. Marking the weight or height marks it too.", form);
         // The body mass index is not a reading to tick: it follows its weight and height. A blood pressure is one.
         Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(form, "name=\"Chosen\"").Count);
 
         using var marked = await MarkAsync(apps, session.Client, patient, yesterday + ":00", "Typed 180 for 108.", Systolic, Weight);
         var page = await ReadAsync(marked);
-        Assert.Contains("Marked: 2 readings are marked entered in error", Words(page));
-        Assert.Contains("3 readings are marked entered in error and left out.", Words(page));
+        Assert.Contains("Marked in error. 2 readings are now left out of the flowsheet and trends.", Words(page));
+        Assert.Contains("3 readings entered in error aren't shown.", Words(page));
         Assert.DoesNotContain("180", System.Text.RegularExpressions.Regex.Match(page, "(?s)<tbody>.*?Blood pressure.*?</tr>").Value);
         Assert.DoesNotContain($"data-trend=\"{Systolic}\"", page);
         Assert.DoesNotContain($"data-trend=\"{Diastolic}\"", page);
@@ -78,7 +78,7 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         // The blood pressure typed again, both numbers: a new reading.
         using var corrected = await RecordAtAsync(session.Client, patient, yesterday, (Systolic, "108"), (Diastolic, "92"));
         page = await ReadAsync(corrected);
-        Assert.Contains("Saved:", page);
+        Assert.Contains("Saved.", page);
         Assert.Contains("Latest 126 mmHg, up from 108.", Words(page));
         Assert.Equal(1, (await StatesAsync(apps, patient)).Count(state => state == $"{Diastolic} 92 final"));
         Assert.Contains($"{Systolic} 108 final", await StatesAsync(apps, patient));
@@ -88,7 +88,7 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
             Words(await clash.Content.ReadAsStringAsync(Cancel)));
         // The weight corrected beside the height that stands: a new body mass index is worked out.
         using var weighed = await RecordAtAsync(session.Client, patient, yesterday, (Weight, "79"), (Height, "180"));
-        Assert.Contains("Saved:", await ReadAsync(weighed));
+        Assert.Contains("Saved.", await ReadAsync(weighed));
         Assert.Contains($"{BodyMassIndex} 24.4 final", await StatesAsync(apps, patient));
 
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
@@ -124,14 +124,14 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
 
         // The blood pressure is one reading, ticked by its systolic: the diastolic isn't offered, and the database marks it.
         using var whole = await MarkAsync(apps, session.Client, patient, times[0] + ":00", "Wrong patient.", Systolic, Diastolic, HeartRate, Weight, Height);
-        Assert.Contains("Marked: 4 readings", Words(await ReadAsync(whole)));
+        Assert.Contains("Marked in error. 4 readings", Words(await ReadAsync(whole)));
         Assert.Equal(6, (await StatesAsync(apps, patient)).Count(state => state.EndsWith("entered-in-error", StringComparison.Ordinal)));
 
         // The weight alone, in the second set: marked, then typed again by itself. The height stands.
         using var weight = await MarkAsync(apps, session.Client, patient, times[1] + ":00", "Weighed with a coat on.", Weight);
-        Assert.Contains("Marked:", Words(await ReadAsync(weight)));
+        Assert.Contains("Marked in error.", Words(await ReadAsync(weight)));
         using var corrected = await RecordAtAsync(session.Client, patient, times[1], (Weight, "79"));
-        Assert.Contains("Saved:", await ReadAsync(corrected));
+        Assert.Contains("Saved.", await ReadAsync(corrected));
         Assert.Contains($"{BodyMassIndex} 24.4 final", await StatesAsync(apps, patient));
 
         // The eighth set is beyond the six listed: "Show earlier sets" lists it, with its "Mark in error" link.
@@ -142,7 +142,7 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         var earlier = await session.Client.GetStringAsync(Path(patient) + "?earlier=true", Cancel);
         Assert.Contains($"/patients/{patient}/vitals/error?at={oldest}", earlier);
         using var old = await MarkAsync(apps, session.Client, patient, times[7] + ":00", "Cuff too small.", Systolic);
-        Assert.Contains("Marked:", Words(await ReadAsync(old)));
+        Assert.Contains("Marked in error.", Words(await ReadAsync(old)));
         // And with entries in error shown, that old one is among them.
         Assert.Contains("entered in error: Cuff too small.", await session.Client.GetStringAsync(Path(patient) + "?showErrors=true", Cancel));
     }

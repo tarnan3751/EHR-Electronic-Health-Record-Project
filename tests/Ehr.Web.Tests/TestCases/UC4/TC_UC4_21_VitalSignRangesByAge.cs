@@ -59,7 +59,7 @@ public class TC_UC4_21_VitalSignRangesByAge(WebApps apps) : IClassFixture<WebApp
         Assert.DoesNotContain("High", Row(young, "Respiratory rate"));
         Assert.Contains("Needs follow-up", Row(young, "Blood pressure"));
         Assert.DoesNotContain("High", Row(young, "Blood pressure"));
-        Assert.Contains("High", Row(young, "Body temperature"));
+        Assert.Contains("High", Row(young, "Temperature"));
     }
 
     // A trend marks each point against the range it was recorded with: a child who has since grown into the next age

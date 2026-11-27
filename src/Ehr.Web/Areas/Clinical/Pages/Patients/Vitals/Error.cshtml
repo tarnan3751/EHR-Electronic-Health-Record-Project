@@ -16,7 +16,8 @@
     <p><a asp-page="Index" asp-route-patientId="@patient.Id">Back to vital signs</a></p>
 </div>
 <h1>Mark vital signs entered in error</h1>
-<p class="sc-prose">The set taken <strong>@Clinic.Format(Model.Taken)</strong>. A reading marked entered in error stays in the record, marked with your name, the time and the reason, and is left out of the flowsheet, trends and chart. It can't be unmarked: record the correct values as a new set.</p>
+<p class="sc-prose">The set taken <strong>@Clinic.Format(Model.Taken)</strong>. Marked readings are left out of the flowsheet, trends and chart.</p>
+<p class="sc-prose">This can't be undone. Record the correct values as a new set.</p>
 @if (!OnPrem.IsReachable)
 {
     <p class="sc-muted">Readings can't be marked until the clinic's server is back.</p>
@@ -26,7 +27,7 @@ else
     <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@patient.Id" asp-route-at="@Model.At">
         @if (Model.Errors.Count > 0)
         {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not marked:</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : string.Join(" ", Model.Errors.Values))</p>
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : string.Join(" ", Model.Errors.Values))</p>
         }
         <fieldset class="sc-stack" aria-describedby="@(Model.Errors.ContainsKey("Chosen") ? "chosen-error" : null)">
             <legend>Which readings are wrong?</legend>
@@ -50,11 +51,11 @@ else
             }
             @if (Model.Diastolic.Count > 0)
             {
-                <p class="sc-field__hint">A blood pressure is one reading: marking it marks both of its numbers.</p>
+                <p class="sc-field__hint">A blood pressure is one reading. Marking it marks both numbers.</p>
             }
             @if (Model.HasBodyMassIndex)
             {
-                <p class="sc-field__hint">The body mass index isn't listed: marking the weight or the height also marks the body mass index worked out from them.</p>
+                <p class="sc-field__hint">Body mass index isn't listed. Marking the weight or height marks it too.</p>
             }
             @if (Model.Errors.TryGetValue("Chosen", out var chosenError))
             {
@@ -74,7 +75,7 @@ else
         </div>
         <div class="sc-actions">
             <button type="submit" class="sc-btn sc-btn--primary" data-mark-entered-in-error>Mark entered in error</button>
-            <a class="sc-btn" asp-page="Index" asp-route-patientId="@patient.Id">Cancel</a>
+            <a asp-page="Index" asp-route-patientId="@patient.Id">Cancel</a>
         </div>
     </form>
 }

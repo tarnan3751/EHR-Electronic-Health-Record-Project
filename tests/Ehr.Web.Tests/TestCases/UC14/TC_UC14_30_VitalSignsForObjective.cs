@@ -68,12 +68,12 @@ public class TC_UC14_30_VitalSignsForObjective(WebApps apps) : IClassFixture<Web
         })
         {
             using var recorded = await RecordAtAsync(session.Client, first, taken, values);
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         using (var marked = await MarkAsync(apps, session.Client, first, At(1) + ":00", "Synthetic: cuff too small.", Systolic, HeartRate))
         {
-            Assert.Contains("Marked:", Words(await ReadAsync(marked)));
+            Assert.Contains("Marked in error.", Words(await ReadAsync(marked)));
         }
 
         var (path, token) = await DraftAsync(session.Client, first);
@@ -95,7 +95,7 @@ public class TC_UC14_30_VitalSignsForObjective(WebApps apps) : IClassFixture<Web
         await apps.AssignAsync(clinician, second);
         using (var recorded = await RecordAtAsync(session.Client, second, At(3 * 24 * 60), (Weight, "70"), (Height, "170")))
         {
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         var earlier = new DateTimeOffset(DateTime.SpecifyKind(DateTime.ParseExact(At(3 * 24 * 60), "yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture), DateTimeKind.Utc));

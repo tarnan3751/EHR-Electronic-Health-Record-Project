@@ -43,7 +43,7 @@ public class TC_UC14_33_Nfr12_FourSectionsKeyboardFirst(WebApps apps) : IClassFi
         var (_, patient, session) = await OnPanelAsync(apps);
         using (var recorded = await RecordAsync(apps, session.Client, patient, 1, (HeartRate, "72")))
         {
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         await using var server = await ClinicalBrowserHost.StartAsync(apps);

@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. For the other: check them in, then record 120/80 taken before the check-in.
 //   3. For each: on the set's "Mark in error" page tick the blood pressure, give the reason and mark it; record 120/78
 //      for the same time; record a heart rate of 70 taken just after the check-in.
-// Expected result: For every patient: "Marked: 1 reading"; both numbers of the first reading are entered in error; the
+// Expected result: For every patient: "Marked in error. 1 reading"; both numbers of the first reading are entered in error; the
 //   new systolic and diastolic share one reading, not the first's. Taken ten minutes before the check-in, all four
 //   values have the visit, in whichever order they were typed; taken twenty minutes before, none of them has it, in
 //   whichever order. The heart rate taken after the check-in has the visit.
@@ -44,7 +44,7 @@ public class TC_UC4_25_ReadingAcrossCheckIn(WebApps apps) : IClassFixture<WebApp
         async Task RecordFirstAsync()
         {
             using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "120"), (Diastolic, "80"));
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         if (typedFirst)
@@ -62,12 +62,12 @@ public class TC_UC4_25_ReadingAcrossCheckIn(WebApps apps) : IClassFixture<WebApp
 
         // The diastolic was misread: the blood pressure is ticked, one reading, by its systolic.
         using var marked = await MarkAsync(apps, session.Client, patient, taken + ":00", "Synthetic: diastolic misread.", Systolic);
-        Assert.Contains("Marked: 1 reading is marked entered in error", Words(await ReadAsync(marked)));
+        Assert.Contains("Marked in error. 1 reading is now left out", Words(await ReadAsync(marked)));
         using var corrected = await RecordAtAsync(session.Client, patient, taken, (Systolic, "120"), (Diastolic, "78"));
-        Assert.Contains("Saved:", await ReadAsync(corrected));
+        Assert.Contains("Saved.", await ReadAsync(corrected));
         // To the second, just after the check-in.
         using var rate = await RecordAtAsync(session.Client, patient, (await apps.Database.NowAsync()).AddSeconds(2).ToString("yyyy-MM-ddTHH:mm:ss"), (HeartRate, "70"));
-        Assert.Contains("Saved:", await ReadAsync(rate));
+        Assert.Contains("Saved.", await ReadAsync(rate));
         return patient;
     }
 

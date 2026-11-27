@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   5. Record 140/90 for the same time.
 // Expected result: Step 1: the page lists two items, "Blood pressure 150/95 mmHg" and the heart rate, and says marking
 //   the blood pressure marks both of its numbers. Step 2: 422, "Choose at least one reading."; nothing is marked.
-//   Step 3: "Marked: 1 reading"; the page counts 1 reading marked; both numbers are entered in error with the reason
+//   Step 3: "Marked in error. 1 reading"; the page counts 1 reading marked; both numbers are entered in error with the reason
 //   and the clinician; the heart rate stands. Step 4: 150/95 is struck through once, with the reason. Step 5: saved;
 //   the flowsheet shows 140/90, a reading of its own. And a systolic marked in error alone before readings existed, as
 //   the VitalReadings migration leaves one beside the reading that corrected it, is struck through with a dash for its
@@ -41,12 +41,12 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
         var (clinician, patient, session) = await OnPanelAsync(apps);
         var taken = (await apps.Database.NowAsync()).AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm");
         using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "150"), (Diastolic, "95"), (HeartRate, "70"));
-        Assert.Contains("Saved:", await ReadAsync(recorded));
+        Assert.Contains("Saved.", await ReadAsync(recorded));
 
         var form = await session.Client.GetStringAsync(ErrorPath(patient, taken + ":00"), Cancel);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(form, "name=\"Chosen\"").Count);
         Assert.Contains("Blood pressure 150/95 mmHg", Words(form));
-        Assert.Contains("A blood pressure is one reading: marking it marks both of its numbers.", Words(form));
+        Assert.Contains("A blood pressure is one reading. Marking it marks both numbers.", Words(form));
         Assert.DoesNotContain("Systolic blood pressure", Words(form));
 
         using var diastolicOnly = await MarkAsync(apps, session.Client, patient, taken + ":00", "Synthetic: cuff too small.", Diastolic);
@@ -56,8 +56,8 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
 
         using var marked = await MarkAsync(apps, session.Client, patient, taken + ":00", "Synthetic: cuff too small.", Systolic);
         var page = await ReadAsync(marked);
-        Assert.Contains("Marked: 1 reading is marked entered in error", Words(page));
-        Assert.Contains("1 reading is marked entered in error and left out.", Words(page));
+        Assert.Contains("Marked in error. 1 reading is now left out", Words(page));
+        Assert.Contains("1 reading entered in error isn't shown.", Words(page));
         Assert.Equal([$"Diastolic 95 Synthetic: cuff too small. {clinician.Id}", $"Systolic 150 Synthetic: cuff too small. {clinician.Id}"], await ProxyTests.QueryAsync(apps,
             """
             SELECT CASE code WHEN '8480-6' THEN 'Systolic' ELSE 'Diastolic' END || ' ' || trim_scale(value) || ' ' || entered_in_error_reason || ' ' || entered_in_error_by
@@ -84,7 +84,7 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
         var (_, patient, session) = await OnPanelAsync(apps);
         var taken = (await apps.Database.NowAsync()).AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm");
         using var recorded = await RecordAtAsync(session.Client, patient, taken, (Systolic, "140"), (Diastolic, "90"));
-        Assert.Contains("Saved:", await ReadAsync(recorded));
+        Assert.Contains("Saved.", await ReadAsync(recorded));
         await ProxyTests.QueryAsync(apps,
             """
             INSERT INTO ehr.observations (id, patient_id, reading_id, category, code, display, status, value, unit, reference_low, reference_high, effective_at, issued_at,
@@ -99,6 +99,6 @@ public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
         var row = Words(System.Text.RegularExpressions.Regex.Match(shown, "(?s)<th scope=\"row\">Blood pressure.*?</tr>").Value);
         Assert.Contains("140/90", row);
         Assert.Contains("150/— entered in error: Synthetic: typed 150 for 140.", row);
-        Assert.Contains("1 reading is marked entered in error and left out.", Words(shown));
+        Assert.Contains("1 reading entered in error is shown struck through.", Words(shown));
     }
 }
