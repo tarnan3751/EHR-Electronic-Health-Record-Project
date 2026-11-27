@@ -2571,6 +2571,34 @@
         margin: 0 0 var(--space-4);
     }
 
+    /* A card in a list with nothing to open (an appointment, a record to choose): the card padding on the card itself,
+       where the results page puts it on a card's summary line and body. */
+    .sc-results > li.sc-result {
+        padding: var(--space-4) var(--space-6);
+    }
+
+    .sc-results > li.sc-result > :first-child {
+        margin-top: 0;
+    }
+
+    .sc-results > li.sc-result > :last-child {
+        margin-bottom: 0;
+    }
+
+    /* A panel's buttons, each in a paragraph of its own, share a line where the column has room. */
+    @media (min-width: 40rem) {
+        .sc-app--portal .sc-panel > p:has(> .sc-btn:only-child) {
+            display: inline-block;
+            margin-right: var(--space-3);
+        }
+    }
+
+    /* A card inside a panel is set in on the recessed surface, not drawn as a second border. */
+    .sc-panel .sc-result {
+        background: var(--surface-subtle);
+        border-color: transparent;
+    }
+
     .sc-result {
         background: var(--surface-raised);
         border: 1px solid var(--line);
@@ -2637,7 +2665,8 @@
             padding: 0 var(--space-4) var(--space-4);
         }
 
-        .sc-result--plain {
+        .sc-result--plain,
+        .sc-results > li.sc-result {
             padding: var(--space-4);
         }
 
