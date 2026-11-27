@@ -106,11 +106,8 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_02_stop_and_discard_switches_the_microphone_off_and_keeps_nothing()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
         await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio'))");
@@ -137,10 +134,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_02_an_answer_that_arrives_after_stop_and_discard_belongs_to_the_listening_discarded()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
 
@@ -178,26 +174,15 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal("Listening. The visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
     }
 
-    // Opens the Listen page in its own browser, with the fake microphone.
-    static async Task<(IPage Page, IAsyncDisposable Browser)> ListenAsync(Guid patient, Session session, ClinicalBrowserHost server, IPlaywright playwright)
-    {
-        var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
-        var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
-        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
-        return (page, browser);
-    }
-
     // TC-UC23-02 in the browser: a recorder's last chunk, handed over after its listening was discarded, is dropped. Held
     // here until the clinician has started listening again, it would otherwise be sent as the new listening's audio.
     [Fact]
     public async Task TC_UC23_02_a_discarded_recorders_last_chunk_never_reaches_the_next_listening()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
         var first = apps.Dictation.Received.First(r => r.PathAndQuery.Contains("/audio", StringComparison.Ordinal)).PathAndQuery.Split('/')[3];
@@ -225,10 +210,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_02_leaving_the_page_ends_listening_for_good()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio'))");
 
@@ -253,10 +237,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_06_out_of_sight_while_listening_starts_it_is_paused_at_once()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await page.EvaluateAsync("""
             const send = window.fetch;
             window.fetch = async (url, options) => {
@@ -283,10 +266,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_06_the_clock_isnt_announced_and_a_warning_stays_until_the_next_message()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("document.querySelector('[data-ambient-clock]').textContent.startsWith('Recording the visit')");
         Assert.Equal("Listening. The visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
@@ -357,10 +339,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_01_stop_with_a_chunk_on_its_way_sends_the_last_chunk_before_the_visit_is_stopped()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         var holdNext = 0;
         var held = new TaskCompletionSource();
         var answer = new TaskCompletionSource();
@@ -410,10 +391,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         var (patient, session) = await AccountAsync(apps);
         apps.Dictation.ExtraVoice = true;
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-ambient-stop]')"));
@@ -460,10 +440,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_04_fetching_the_draft_is_asked_a_few_times_at_most(int status, string answer, int asked, string said)
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await page.RouteAsync("**/ambient/*/stop", route => route.FulfillAsync(new() { Status = status, ContentType = "application/json", Body = answer }));
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
@@ -502,10 +481,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_04_a_visit_that_cant_be_drafted_offers_only_discarding_it(string answer, string said)
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await page.RouteAsync("**/ambient/*/stop", route => route.FulfillAsync(new() { Status = 200, ContentType = "application/json", Body = answer }));
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
@@ -531,10 +509,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_04_after_the_voices_are_handed_over_leaving_keeps_the_visit()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         await page.RouteAsync("**/ambient/*/result", route => route.FulfillAsync(new()
         {
             Status = 503,
@@ -641,11 +618,8 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         apps.Dictation.ExtraVoice = true;
         var d = await AmbientFlows.DraftAsync(apps, names: new() { ["1"] = "clinician", ["2"] = "patient", ["3"] = "unsure" });
         var offSite = await SignInAsync(apps.Cloud, await apps.ClinicianAsync(), via: apps.OnPrem);
-        await using var cloud = await ClinicalBrowserHost.StartAsync(apps, apps.Cloud);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await AiReviewBrowserTests.LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, offSite);
-        var page = await context.NewPageAsync();
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, offSite), apps.Cloud);
+        var (cloud, page, _) = opened;
         await page.GotoAsync($"{cloud.Url}{d.ReviewUrl}");
         await page.WaitForSelectorAsync("[data-dictation-not-carried-list] li");
 
@@ -660,10 +634,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC23_06_the_listen_pages_actions_are_spaced_and_its_sentence_keeps_to_the_column()
     {
         var (patient, session) = await AccountAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        var (page, browser) = await ListenAsync(patient, session, server, playwright);
-        await using var _ = browser;
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
+        await page.GotoAsync($"{server.Url}/patients/{patient}/listen");
         const string Gap = "([above, below]) => document.querySelector(below).getBoundingClientRect().top - document.querySelector(above).getBoundingClientRect().bottom";
         var column = await page.EvaluateAsync<double>("() => document.querySelector('[data-ambient-consent]').getBoundingClientRect().width");
         await ConsentAsync(page);
