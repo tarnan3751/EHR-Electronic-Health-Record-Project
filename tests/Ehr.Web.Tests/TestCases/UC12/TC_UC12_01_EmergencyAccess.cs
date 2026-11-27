@@ -30,7 +30,7 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 //      the chart again.
 // Expected result: Step 1 shows the chart with no reason asked and no break_glass event. Step 2 is sent to
 //   /patients/{id}/reason, which doesn't show the patient's name, and nothing is read. Step 3 shows the chart with the
-//   "Emergency access" notice, and the grant ends four hours after it was given. Step 4 shows the chart without asking.
+//   "Break the glass." notice, and the grant ends four hours after it was given. Step 4 shows the chart without asking.
 //   Step 5 lists one break_glass event, shown as "Break the glass", marked Review, with the clinician's name, the
 //   patient's ID and the reason. Step 6 is sent to the reason page again.
 // Creator: Luke Garcia
@@ -56,6 +56,7 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
             var ownChart = await own.Content.ReadAsStringAsync(Cancel);
             Assert.DoesNotContain("Emergency access", ownChart);
             Assert.DoesNotContain("Break-the-glass access", ownChart);
+            Assert.DoesNotContain("Break the glass.", ownChart);
         }
 
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, clinician.Id, paneled));
@@ -79,7 +80,7 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
             var html = await ReadAsync(opened);
             Assert.Equal($"/patients/{patient}", PathOf(opened));
             Assert.Contains("Offpanel, Ezra", html);
-            Assert.Contains("Emergency access. This isn't one of your patients.", Words(html));
+            Assert.Contains("Break the glass. Not one of your patients. Access is audited until", Words(html));
         }
 
         Assert.Equal(TimeSpan.FromHours(4), await AccessLengthAsync(clinician.Id, patient));

@@ -37,8 +37,8 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Essential (primary) hypertension", html);
         Assert.Contains("(I10)", html);
         Assert.Contains("since Apr 1, 2019", html);
-        Assert.Contains($"Latest visit, {Today.AddDays(-3):MMM d, yyyy}:", html);
-        Assert.Contains("blood pressure 128/82 mmHg, heart rate 72/min.", html);
+        // The latest visit first in the visits table, with its vital signs.
+        Assert.Matches($@"<tbody>\s*<tr>\s*<td class=""sc-table__mono"">{Today.AddDays(-3):MMM d, yyyy}</td>\s*<td>Annual physical</td>\s*<td>128/82 mmHg</td>\s*<td>72/min</td>", html);
         Assert.Contains("Annual physical", html);
         Assert.Contains("Blood pressure check", html);
         Assert.Contains("141/90 mmHg", html);
@@ -73,8 +73,7 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Cancelled appointment", html);
         Assert.DoesNotContain("Planned appointment", html);
         // The latest visit that happened, without vital signs.
-        Assert.Contains($"Latest visit, {Today.AddDays(-10):MMM d, yyyy}:", html);
-        Assert.Contains("blood pressure not taken, heart rate not taken.", html);
+        Assert.Matches($@"<tbody>\s*<tr>\s*<td class=""sc-table__mono"">{Today.AddDays(-10):MMM d, yyyy}</td>\s*<td>Follow-up</td>\s*<td></td>\s*<td></td>", html);
     }
 
     [Fact]
@@ -113,7 +112,7 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("No active medications.", html);
         Assert.Contains("No active diagnoses.", html);
         Assert.Contains("No visits.", html);
-        Assert.DoesNotContain("Latest visit", html);
+        Assert.DoesNotContain("<th>Blood pressure</th>", html);
     }
 
     [Fact]

@@ -32,7 +32,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Expected result: In step 2 the first clinician's discontinuation and change are each answered 409 with "Not saved.
 //   This order is no longer active."; the order keeps the second clinician's reason and name, there is one audit row
 //   for its update, and no new order exists. In step 3 the chart lists the Urinalysis order with no "Change" or
-//   "Discontinue…" and says "Changing or discontinuing an order needs the clinic's server." In step 4 both posts are
+//   "Discontinue…", under the read-only band. In step 4 both posts are
 //   answered 503, the plain one with the "Not saved" page showing the typed reason again, and the order stays active.
 // Creator: Tahseen Arnan
 public class TC_UC1_10_ChangeExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
@@ -81,7 +81,7 @@ public class TC_UC1_10_ChangeExceptionalCondition(WebApps apps) : IClassFixture<
         Assert.Contains("<strong>Urinalysis</strong> (Lab)", chart);
         Assert.DoesNotContain("data-change-order", chart);
         Assert.DoesNotContain("data-discontinue-order", chart);
-        Assert.Contains("Changing or discontinuing an order needs the clinic's server.", chart);
+        Assert.Contains("sc-notice--band", chart);
         // The discontinued orders are read from the cloud copy.
         Assert.Contains("No discontinued orders.", await cutOff.GetStringAsync($"/patients/{patient}/orders/discontinued", Cancel));
 

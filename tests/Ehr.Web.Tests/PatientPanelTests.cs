@@ -147,8 +147,8 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
             Assert.DoesNotContain("handler=Assign", chart);
             Assert.DoesNotContain("handler=Unassign", chart);
             Assert.DoesNotContain("handler=Enroll", chart);
-            Assert.Contains("Your patients can't be changed until the clinic's server is back.", chart);
-            Assert.Contains("Enrollment codes can be issued once the clinic's server is back.", chart);
+            // The layout's read-only band says why nothing is offered.
+            Assert.Contains("sc-notice--band", chart);
         });
     }
 

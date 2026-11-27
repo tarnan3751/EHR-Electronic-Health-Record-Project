@@ -129,8 +129,8 @@ public class TC_UC4_01_SuccessfulFlow(WebApps apps)
         // Verify recent visit information.
         Assert.Contains("Annual physical", chartHtml);
 
-        Assert.Contains(
-            "blood pressure 128/82 mmHg, heart rate 72/min.",
+        Assert.Matches(
+            @"<td>Annual physical</td>\s*<td>128/82 mmHg</td>\s*<td>72/min</td>",
             chartHtml);
 
         // Verify chart access generates exactly one audit event.

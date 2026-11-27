@@ -27,8 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   matches.", and saving brings the form back with "Choose a diagnosis from the list." and the cursor in the
 //   diagnosis field, marked invalid. In step 3 the field's
 //   list offers "Essential (primary) hypertension". Step 4 saves and returns to the
-//   chart, which lists the diagnosis with its code I10, with the focus on "Saved. Essential (primary) hypertension is
-//   listed under Diagnoses." Every focused control shows the focus ring, and the page reports no script errors.
+//   chart, which lists the diagnosis with its code I10, with the focus on "Diagnosis saved." Every focused control shows the focus ring, and the page reports no script errors.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -92,7 +91,7 @@ public class TC_UC4_12_Nfr12_EntryKeyboardFirst(WebApps apps) : IClassFixture<We
         Assert.Contains("Essential (primary) hypertension", await page.Locator("#chart-diagnoses ~ ul").TextContentAsync());
         // The chart's notice has the focus, so the keyboard and a screen reader start from what was saved.
         await page.WaitForFunctionAsync("document.activeElement?.matches('[data-saved]') === true");
-        Assert.Contains("Saved. Essential (primary) hypertension is listed under Diagnoses.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Contains("Diagnosis saved.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
 
         Assert.Equal(["Essential (primary) hypertension I10"], await RowsAsync(apps, "conditions", patient, "concat_ws(' ', display, code)"));
         Assert.Empty(errors);

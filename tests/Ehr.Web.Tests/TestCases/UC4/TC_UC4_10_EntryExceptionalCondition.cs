@@ -30,7 +30,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Expected result: In step 1 the chart lists the diagnosis with no "Add" or "Change"; each form request is answered
 //   with a redirect to the chart, and each post with 409 and "Not saved. This isn't one of your patients.", the
 //   typed name to copy and nothing about the patient; no new read is recorded and nothing changes. In step 2 the chart lists the
-//   diagnosis, offers no "Add" or "Change", and says "Changes to diagnoses need the clinic's server." In step 3 the
+//   diagnosis, offers no "Add" or "Change", under the read-only band. In step 3 the
 //   post is answered 503 with "Not saved. The clinic's server can't be reached." and the typed name
 //   shown again. The patient still has exactly one diagnosis.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
@@ -74,7 +74,7 @@ public class TC_UC4_10_EntryExceptionalCondition(WebApps apps) : IClassFixture<W
         Assert.Contains("<strong>Essential (primary) hypertension</strong>", readOnly);
         Assert.DoesNotContain("data-add-entry", readOnly);
         Assert.DoesNotContain("data-change-entry", readOnly);
-        Assert.Contains("Changes to diagnoses need the clinic's server.", readOnly);
+        Assert.Contains("sc-notice--band", readOnly);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, EntryPath(patient, "diagnoses"));
         request.Headers.Add("Sec-Fetch-Site", "same-origin");

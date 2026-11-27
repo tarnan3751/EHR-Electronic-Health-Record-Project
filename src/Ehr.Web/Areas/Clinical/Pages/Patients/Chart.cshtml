@@ -20,19 +20,15 @@
 }
 <div class="sc-pagehead">
     <p><partial name="_BackToSearch" model="Model.Search" /></p>
-    @* Off-site with the clinic's server down nothing can be saved, so no change is offered (UC 2). *@
+    @* Off-site with the clinic's server down nothing can be saved, so no change is offered (UC 2); the layout's band says so. *@
     <div class="sc-actions">
-        @if (!OnPrem.IsReachable)
-        {
-            <p class="sc-muted">Your patients can't be changed until the clinic's server is back.</p>
-        }
-        else if (Model.OnPanel)
+        @if (OnPrem.IsReachable && Model.OnPanel)
         {
             <form method="post" asp-page-handler="Unassign" asp-all-route-data="Model.Search.RouteData()">
                 <button class="sc-btn">Remove from my patients</button>
             </form>
         }
-        else
+        else if (OnPrem.IsReachable)
         {
             <form method="post" asp-page-handler="Assign" asp-all-route-data="Model.Search.RouteData()">
                 <button class="sc-btn">Add to my patients</button>
@@ -42,43 +38,43 @@
 </div>
 @if (Model.EmergencyUntil is { } until)
 {
-    <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Emergency access.</span> This isn't one of your patients. Your access and your reason are logged and reviewed. It lasts until @Clinic.Format(until).</p>
+    <p class="sc-notice sc-notice--danger"><span class="sc-notice__state">Break the glass.</span> Not one of your patients. Access is audited until @Clinic.Format(until).</p>
 }
 @if (Model.Chart.FormToReview)
 {
     @* Step 13e: a pre-visit form in this clinician's inbox has an answer to review. No questionnaire, answer or score. *@
-    <p class="sc-notice sc-notice--danger" data-form-review><span class="sc-notice__state">Needs review.</span> A pre-visit form has an answer for you to review. <a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" asp-route-sensitive="true">Open pre-visit forms</a></p>
+    <p class="sc-notice sc-notice--danger" data-form-review><span class="sc-notice__state">Pre-visit form to review.</span> <a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" asp-route-sensitive="true">Open pre-visit forms</a></p>
 }
 @* The notices after an action take the focus (data-focus-on-load, js/patient-search.js), so the keyboard and a
    screen reader start from what just happened. *@
 @if (Model.Chart.ConfirmsDiscontinued)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order discontinued.</span> <strong>@Model.Chart.DiscontinuedName</strong> is under discontinued orders.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order discontinued.</span></p>
 }
-@if (Model.SignedOrder is { } signed && Model.Chart.ReplacedName is { } replaced)
+@if (Model.SignedOrder is not null && Model.Chart.ReplacedName is not null)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order changed.</span> <strong>@signed.Display</strong> replaces <strong>@replaced</strong>, signed @Clinic.Format(signed.SignedAt). The old order is under discontinued orders.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order changed.</span></p>
 }
-else if (Model.SignedOrder is { } newOrder)
+else if (Model.SignedOrder is not null)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order signed.</span> <strong>@newOrder.Display</strong> is under active orders, signed @Clinic.Format(newOrder.SignedAt).</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Order signed.</span></p>
 }
 @* After the entry form saved an entry. A sensitive one the chart leaves out isn't named: the notice says where it is. *@
 @if (Model.Chart.Saved is { Hidden: true } hiddenSave)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved.</span> The @Ehr.Domain.Patients.ChartListWords.Lists[hiddenSave.Table].One is sensitive, so it's hidden with the other sensitive items.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">@ChartModel.SavedState(hiddenSave.Table)</span> Hidden as sensitive.</p>
 }
 else if (Model.Chart.Saved is { } saved)
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved.</span> <strong>@saved.Display</strong>@ChartModel.SavedWhere(saved)</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">@ChartModel.SavedState(saved.Table)</span>@if (!saved.Listed) { <text> <strong>@saved.Display</strong>@ChartModel.SavedWhere(saved)</text> }</p>
 }
 @switch (Model.NoKnownAllergiesNotice)
 {
     case "saved":
-        <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved.</span> This patient has no known allergies.</p>
+        <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load data-saved><span class="sc-notice__state">Saved.</span> No known allergies.</p>
         break;
     case "allergy-recorded":
-        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> This patient has an allergy on record, listed below.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> An allergy is already recorded.</p>
         break;
     case "refused":
         <p class="sc-notice sc-notice--danger" role="alert" tabindex="-1" data-focus-on-load data-not-saved><span class="sc-notice__state">Not saved.</span> You can't change this patient's allergies now.</p>
@@ -272,10 +268,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             <p class="sc-muted">To write a note, add this patient to My patients.</p>
         }
-        else
-        {
-            <p class="sc-muted">New notes and signing need the clinic's server. Saved notes remain readable.</p>
-        }
         @if (Model.Drafts.Count > 0)
         {
             <h3>Your drafts</h3>
@@ -318,10 +310,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             <p class="sc-muted">To place an order, add this patient to My patients.</p>
         }
-        else
-        {
-            <p class="sc-muted">New orders need the clinic's server. Active orders remain readable.</p>
-        }
         <h3>Active orders</h3>
         @if (Model.Chart.Orders.Count > 0)
         {
@@ -357,10 +345,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                     </li>
                 }
             </ul>
-            @if (Model.OnPanel && !OnPrem.IsReachable)
-            {
-                <p class="sc-muted">Changing or discontinuing an order needs the clinic's server.</p>
-            }
         }
         else
         {
@@ -418,10 +402,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             bookRoute["id"] = Model.Patient.Id.ToString();
             <p class="sc-actions"><a asp-page="/Schedule/New" asp-all-route-data="bookRoute" class="sc-btn sc-btn--compact" data-book-appointment>Book appointment</a></p>
         }
-        else if (Model.OnPanel)
-        {
-            <p class="sc-muted">Booking an appointment needs the clinic's server.</p>
-        }
         @if (Model.Chart.Upcoming.Count > 0)
         {
             <ul class="sc-list">
@@ -451,10 +431,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         {
             <p class="sc-actions"><a asp-page="Messages/New" asp-route-patientId="@Model.Patient.Id" class="sc-btn sc-btn--compact" data-new-message>New message</a></p>
         }
-        else if (Model.OnPanel)
-        {
-            <p class="sc-muted">Messages can't be sent until the clinic's server is back.</p>
-        }
         @if (Model.Threads.Count > 0)
         {
             <ul class="sc-list">
@@ -483,15 +459,11 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         @if (Model.EnrollmentCode is { } code)
         {
             <section class="sc-notice sc-notice--info">
-                <p>Give the patient this code to register for the portal. It works once, for 14 days, and isn't shown again.</p>
+                <p><span class="sc-notice__state">Enrollment code.</span> Shown only once. Single use, valid for 14 days.</p>
                 <p class="mono-code">@code</p>
             </section>
         }
-        else if (!OnPrem.IsReachable)
-        {
-            <p class="sc-muted">Enrollment codes can be issued once the clinic's server is back.</p>
-        }
-        else
+        else if (OnPrem.IsReachable)
         {
             <form method="post" asp-page-handler="Enroll" asp-all-route-data="Model.Search.RouteData()">
                 <button class="sc-btn sc-btn--compact">Issue an enrollment code</button>
@@ -508,11 +480,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         <h2 class="sc-panel__title" id="chart-visits">Recent visits</h2>
         @if (Model.Chart.Visits.Count > 0)
         {
-            var latest = Model.Chart.Visits[0];
-            <p class="latest-visit">
-                Latest visit, @Clinic.Plain(latest.PeriodStart, "MMM d, yyyy"):
-                blood pressure @(Model.BloodPressure(latest) ?? "not taken"), heart rate @(Model.HeartRate(latest) ?? "not taken").
-            </p>
             <div class="sc-table-wrap">
                 <table class="sc-table">
                     <thead>
@@ -540,8 +507,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
 </div>
 
 @functions {
-    // "Add ..." beside a list's title, for a patient on the clinician's panel; off-site with the clinic's server down,
-    // a sentence in its place, under the title.
+    // "Add ..." beside a list's title, for a patient on the clinician's panel while the clinic's server can be reached.
     void AddLink(string list, string label)
     {
         if (Model.OnPanel && OnPrem.IsReachable)
@@ -551,10 +517,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             route["list"] = list;
             KeepSensitiveShown(route);
             <p class="sc-actions"><a href="@Url.Page("Lists/Entry", route)" class="sc-btn sc-btn--compact" data-add-entry="@list">@label</a></p>
-        }
-        else if (Model.OnPanel)
-        {
-            <p class="sc-muted">Changes to @list need the clinic's server.</p>
         }
     }
 

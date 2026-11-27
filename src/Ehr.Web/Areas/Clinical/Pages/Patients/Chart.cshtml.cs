@@ -49,7 +49,7 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     public bool Sensitive { get; set; }
 
     // Set by the entry form's redirect after a save: the entry and its list (Lists/Entry's name for it), for the
-    // chart's "Saved." notice, which is shown only when that entry is this patient's (PatientChart.Saved).
+    // chart's saved notice, which is shown only when that entry is this patient's (PatientChart.Saved).
     [BindProperty(SupportsGet = true)]
     public Guid? Saved { get; set; }
 
@@ -89,10 +89,15 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         return route;
     }
 
-    // The "Saved." notice's sentence after the name, for an entry that is shown: where it is, or why it isn't listed.
-    public static string SavedWhere(SavedEntry saved) => saved.Listed
-        ? $" is listed under {ChartListWords.Lists[saved.Table].Heading}."
-        : $" is now {ChartListWords.Status(saved.Table, saved.Status).ToLowerInvariant()}, so it is no longer listed.";
+    // The saved notice's state, named by the list: "Diagnosis saved."
+    public static string SavedState(string table)
+    {
+        var one = ChartListWords.Lists[table].One;
+        return $"{char.ToUpperInvariant(one[0])}{one[1..]} saved.";
+    }
+
+    // The saved notice's words after the name, for an entry that is shown but no longer listed: its status now.
+    public static string SavedWhere(SavedEntry saved) => $" is now {ChartListWords.Status(saved.Table, saved.Status).ToLowerInvariant()}.";
 
     public IReadOnlyList<ClinicalDraft> Drafts { get; private set; } = [];
     public IReadOnlyList<SignedNoteEntry> Notes { get; private set; } = [];
