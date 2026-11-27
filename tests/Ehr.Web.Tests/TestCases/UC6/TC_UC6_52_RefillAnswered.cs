@@ -65,7 +65,7 @@ public class TC_UC6_52_RefillAnswered(WebApps apps) : IClassFixture<WebApps>
 
         var words = Words(await patient.Client.GetStringAsync(PortalPath, Cancel));
         Assert.Contains("Approved", words);
-        Assert.Contains("your care team ordered lisinopril 10 MG Oral Tablet.", words);
+        Assert.Contains(". Your care team ordered lisinopril 10 MG Oral Tablet.", words);
         Assert.Contains("Declined", words);
         Assert.Contains("Your care team says:", words);
         Assert.Contains("Synthetic: we need to check your blood pressure first.\nPlease book a visit.", words);

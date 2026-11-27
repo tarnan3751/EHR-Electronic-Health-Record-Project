@@ -26,9 +26,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   5. Post amlodipine (active again) with a note of 501 characters.
 //   6. Open the page, then end Dr. Test's assignment, then post.
 //   7. As the third patient, open the page.
-// Expected result: Steps 1, 3, 4, 5 and 6 answer 422 with "Not sent:" and the sentence that applies; step 3 says the
+// Expected result: Steps 1, 3, 4, 5 and 6 answer 422 with "Not sent." and the sentence that applies; step 3 says the
 //   request is waiting already. Step 2 saves the request for the signed-in patient alone. Step 7 says "No care team
-//   yet:" and offers no form. The other patient has no request, and nothing else was saved.
+//   yet." and offers no form. The other patient has no request, and nothing else was saved.
 // Creator: Tahseen Arnan
 public class TC_UC6_54_RefillRefused(WebApps apps) : IClassFixture<WebApps>
 {
@@ -52,7 +52,7 @@ public class TC_UC6_54_RefillRefused(WebApps apps) : IClassFixture<WebApps>
                 Form([("Medication", reference ?? ReferenceOf(html, Lisinopril)), ("Note", note), ("__RequestVerificationToken", Token(html)), .. more]), Cancel);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, posted.StatusCode);
             var words = Words(await posted.Content.ReadAsStringAsync(Cancel));
-            Assert.Contains("Not sent:", words);
+            Assert.Contains("Not sent.", words);
             return words;
         }
 
@@ -72,11 +72,11 @@ public class TC_UC6_54_RefillRefused(WebApps apps) : IClassFixture<WebApps>
 
         // A reference from a page opened before the first request: the medication is waiting already.
         var reference = ReferenceOf(html, Lisinopril);
-        Assert.Contains("You've already asked to renew this medication. Your care team hasn't answered yet.", await PostAsync(reference));
+        Assert.Contains("You've already asked for a refill of this medication. Your care team hasn't answered yet.", await PostAsync(reference));
 
         var stale = ReferenceOf(await patient.Client.GetStringAsync(PortalPath, Cancel), "amlodipine 5 MG Oral Tablet");
         await SetStatusAsync(amlodipine, "stopped");
-        Assert.Contains("That medication can't be renewed here any more. Choose one from the list.", await PostAsync(stale));
+        Assert.Contains("That medication can't be refilled here any more. Choose one from the list.", await PostAsync(stale));
         await SetStatusAsync(amlodipine, "active");
 
         Assert.Contains("Shorten the note to 500 characters or fewer.",
@@ -85,14 +85,14 @@ public class TC_UC6_54_RefillRefused(WebApps apps) : IClassFixture<WebApps>
         var beforeLeaving = ReferenceOf(await patient.Client.GetStringAsync(PortalPath, Cancel), "amlodipine 5 MG Oral Tablet");
         await ProxyTests.QueryAsync(apps,
             "WITH ended AS (UPDATE ehr.patient_assignments SET ended_at = now() WHERE patient_id = @patient AND ended_at IS NULL RETURNING id::text) SELECT id FROM ended", patient.Patient);
-        Assert.Contains("This record has no care team at the clinic yet, so nobody would see the request.", await PostAsync(beforeLeaving));
-        Assert.Contains("No care team yet:", Words(await patient.Client.GetStringAsync(PortalPath, Cancel)));
+        Assert.Contains("This record has no care team yet. To ask for a refill, call the clinic.", await PostAsync(beforeLeaving));
+        Assert.Contains("No care team yet.", Words(await patient.Client.GetStringAsync(PortalPath, Cancel)));
         Assert.Single(await RequestsAsync(apps, patient.Patient));
 
         var alone = await ProxyTests.PersonAsync(apps, "Synthetic", "RefusedAlone");
         await MedicationAsync(apps, alone.Patient);
         var page = await alone.Client.GetStringAsync(PortalPath, Cancel);
-        Assert.Contains("No care team yet: nobody at the clinic would see a request. Call the clinic to renew a medication.", Words(page));
+        Assert.Contains("No care team yet. To ask for a refill, call the clinic.", Words(page));
         Assert.DoesNotContain("name=\"Medication\"", page);
     }
 

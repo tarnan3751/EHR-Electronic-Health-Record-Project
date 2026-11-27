@@ -92,7 +92,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("href=\"/portal/refills", html);
         Assert.DoesNotContain("new message", home);
         Assert.DoesNotContain("No new messages.", home);
-        Assert.DoesNotContain("Renew a medication", home);
+        Assert.DoesNotContain("Ask for a refill", home);
         // The rest of the home is there, worded for someone else's record.
         Assert.Contains(">Test results</h2>", html);
         Assert.Contains("id=\"home-record\"", html);

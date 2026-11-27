@@ -106,7 +106,7 @@ public class TC_UC6_58_Nfr06_RefillSecurity(WebApps apps) : IClassFixture<WebApp
         var words = Words(await ReadAsync(landed));
         Assert.Equal(PortalPath, PathOf(landed));
         Assert.Equal("", landed.RequestMessage!.RequestUri!.Query);
-        Assert.Contains("Sensitive items hidden:", words);
+        Assert.Contains("Sensitive items hidden.", words);
         Assert.DoesNotContain("sertraline", words);
         Assert.Equal(sensitiveViews, await apps.AuditEventsAsync(AuditActions.ReadSensitive, patient.Account));
     }

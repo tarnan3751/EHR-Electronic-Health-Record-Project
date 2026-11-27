@@ -74,7 +74,7 @@ public class RefillCareTeamTests(WebApps apps) : IClassFixture<WebApps>
         await LockAsync(clinician.Id, "now() + interval '15 minutes'");
 
         var page = Said(await patient.Client.GetStringAsync(PortalPath, Cancel));
-        Assert.DoesNotContain("No care team yet:", page);
+        Assert.DoesNotContain("No care team yet.", page);
         using (var asked = await AskAsync(patient.Client, Lisinopril))
         {
             Assert.Equal(PortalPath, PathOf(asked));
@@ -83,7 +83,7 @@ public class RefillCareTeamTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([$"{clinician.Id} false"], await ItemsAsync(apps, patient.Patient, await RequestIdAsync(apps, patient.Patient)));
 
         await LockAsync(clinician.Id, "now() + interval '100 years'");
-        Assert.Contains("No care team yet:", Said(await patient.Client.GetStringAsync(PortalPath, Cancel)));
+        Assert.Contains("No care team yet.", Said(await patient.Client.GetStringAsync(PortalPath, Cancel)));
         await LockAsync(clinician.Id, "NULL");
     }
 
