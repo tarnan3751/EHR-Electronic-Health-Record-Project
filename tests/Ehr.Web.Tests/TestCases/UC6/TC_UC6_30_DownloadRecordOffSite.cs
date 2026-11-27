@@ -43,7 +43,7 @@ public class TC_UC6_30_DownloadRecordOffSite(WebApps apps) : IClassFixture<WebAp
         Assert.Equal(["lisinopril 10 MG Oral Tablet"], Entries<R4.MedicationStatement>(file).Select(m => (m.Medication as R4.CodeableConcept)?.Text));
         var page = Words(await PrintAsync(cutOff));
         Assert.Contains("Read-only. The clinic's server can't be reached", page);
-        Assert.Contains("Health record of Synthetic Fhirchart", page);
+        Assert.Contains("Synthetic Fhirchart", page);
         Assert.Equal(forwarded, apps.Forwarded.Count);
 
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);

@@ -38,7 +38,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   6. As the clinician, open the patient's vital signs and emulate print; then the chart off-site, printed.
 // Expected result: Step 1: no sideways scroll. Step 2: the focus ring on each; a download named health-record-<date>.json
 //   whose file holds sertraline. Step 3: /portal/record/print?sensitive=true, with "Sensitive items shown.", no sideways
-//   scroll. Step 4: printed, the app bar, the sign-out button and "use your browser's Print command" aren't displayed;
+//   scroll. Step 4: printed, the app bar, the sign-out button and "Back to download" aren't displayed;
 //   the body's text is rgb(14, 27, 44) on a transparent ground, in the light scheme, in both themes; a table row avoids a break; nothing
 //   overflows. On screen, the light theme's text is rgb(14, 27, 44) on white and the dark theme's rgb(232, 238, 243).
 //   Without sensitive items, "Sensitive items hidden." is displayed on screen and not printed, and the paper says

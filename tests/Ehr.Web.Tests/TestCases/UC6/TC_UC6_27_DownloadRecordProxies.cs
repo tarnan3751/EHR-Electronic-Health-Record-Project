@@ -54,7 +54,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         {
             var page = await proxy.Client.GetStringAsync(PagePath, Cancel);
             Assert.Contains("<h1>Download this record</h1>", page);
-            Assert.Contains("A copy of Synthetic Fhirchart's allergies", Words(page));
+            Assert.Contains("You're viewing Synthetic Fhirchart's record", Words(page));
             Assert.Equal(sensitive, page.Contains("name=\"sensitive\"", StringComparison.Ordinal));
 
             var plain = await DownloadAsync(proxy.Client);
@@ -77,7 +77,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
             }
 
             Assert.Equal(sensitive ? 1 : 2, await apps.AuditEventsAsync(AuditActions.Download, proxy.Account, patient.Patient));
-            Assert.Contains("<h1>Health record of Synthetic Fhirchart</h1>", await PrintAsync(proxy.Client));
+            Assert.Contains("<dd>Synthetic Fhirchart</dd>", await PrintAsync(proxy.Client));
             // Nothing recorded against the proxy's own record: under either scope, the copy is the patient's.
             Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Download, proxy.Account, proxy.Patient));
         }
@@ -100,7 +100,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         }
 
         // From then on the copy is of their own record.
-        Assert.Contains("<h1>Health record of Synthetic RecordWithout</h1>", await PrintAsync(ended.Proxy.Client));
+        Assert.Contains("<dd>Synthetic RecordWithout</dd>", await PrintAsync(ended.Proxy.Client));
         Assert.Equal("Recordwithout", Entries<R4.Patient>(Bundle(await DownloadAsync(ended.Proxy.Client))).Single().Name.Single().Family, ignoreCase: true);
 
         Assert.Equal(downloads, await apps.AuditEventsAsync(AuditActions.Download, ended.Proxy.Account, patient.Patient));

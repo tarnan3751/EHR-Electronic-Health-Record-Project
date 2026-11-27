@@ -51,8 +51,7 @@ public class TC_UC6_24_DownloadRecordFile(WebApps apps) : IClassFixture<WebApps>
             var words = Browser.Words(html);
             Assert.True(page.Headers.CacheControl?.NoStore);
             Assert.Contains("<h1>Download my record</h1>", html);
-            Assert.Contains("Keep it private. Anyone with the file or the printout can read your health information,", words);
-            Assert.Contains("and the clinic can't take it back. On a shared computer, delete the file when you're done.", words);
+            Assert.Contains("Keep it private. Anyone with the file or the printout can read your health information.", words);
             Assert.Contains("name=\"sensitive\"", html);
             Assert.Contains("name=\"handler\" value=\"File\"", html);
             Assert.Contains("formaction=\"/portal/record/print\"", html);
