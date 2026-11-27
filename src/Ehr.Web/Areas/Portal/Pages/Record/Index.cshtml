@@ -4,6 +4,7 @@
     var own = Model.ActingFor is null;
     ViewData["Title"] = own ? "Download my record" : "Download this record";
 }
+<div class="sc-pagehead"><a asp-page="/Index" class="sc-back">Back to home</a></div>
 <h1>@ViewData["Title"]</h1>
 @if (Model.Unavailable)
 {
@@ -14,7 +15,7 @@
 <p class="sc-notice sc-notice--warning" data-download-warning><span class="sc-notice__state">Keep it private.</span> Anyone with the file or the printout can read @(own ? "your" : "this person's") health information, and the clinic can't take it back. On a shared computer, delete the file when you're done.</p>
 @* A GET form, so the cloud app answers it too: the box asks for sensitive items, and each button names what it makes. A
    proxy the patient didn't allow sensitive items is offered no box: for them there are none. *@
-<form method="get" class="sc-stack">
+<form method="get" class="sc-stack sc-formcard">
     @if (Model.MaySeeSensitive)
     {
         <div class="sc-field">
@@ -36,4 +37,3 @@
         <li>Neither includes the care team's notes, messages, pre-visit forms, or who has looked at the record.</li>
     </ul>
 </details>
-<p><a asp-page="/Index">Back to home</a></p>

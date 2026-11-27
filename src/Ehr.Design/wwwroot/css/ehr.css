@@ -3642,6 +3642,71 @@
         border-radius: var(--radius-lg);
     }
 
+    /* Visit summaries (step 13a): each a card read top to bottom, its date and who wrote it over a hairline, then its
+       three parts, each under a small muted heading; a withdrawn one on the same surface, with a dashed edge. */
+    .sc-result--plain[data-summary] > h2 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 28px;
+    }
+
+    .sc-result--plain[data-summary="standing"] > h2 + p {
+        margin: var(--space-1) calc(-1 * var(--space-6)) var(--space-2);
+        padding: 0 var(--space-6) var(--space-4);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-result--plain[data-summary] > h3 {
+        margin: var(--space-4) 0 var(--space-1);
+        font-family: var(--font-sans);
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+    }
+
+    .sc-result--plain[data-summary] > h3 + p {
+        margin-bottom: 0;
+    }
+
+    .sc-result--plain[data-summary="withdrawn"] {
+        border-style: dashed;
+        border-color: var(--line-strong);
+    }
+
+    @media (max-width: 40rem) {
+        .sc-result--plain[data-summary="standing"] > h2 + p {
+            margin-inline: calc(-1 * var(--space-4));
+            padding-inline: var(--space-4);
+        }
+    }
+
+    /* A portal form on a card (downloading the record, asking for a refill, a pre-visit form, sharing the record): as
+       wide as the column, its fields the card's width, its buttons at their own width, as wide as the card on a phone. */
+    .sc-formcard {
+        max-width: none;
+        margin: 0 0 var(--space-6);
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-formcard .sc-field {
+        max-width: none;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-formcard {
+            padding: var(--space-4);
+        }
+
+        .sc-formcard .sc-actions > .sc-btn {
+            flex: 1 1 100%;
+        }
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */

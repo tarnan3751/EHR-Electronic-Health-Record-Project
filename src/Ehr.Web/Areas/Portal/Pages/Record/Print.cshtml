@@ -8,6 +8,8 @@
     var own = Model.Own;
     string[] parts = Ehr.Domain.Notes.VisitSummaries.Parts;
 }
+@* The way back is for the screen only: paper doesn't need it. *@
+<div class="sc-pagehead sc-screen-only"><a asp-page="/Record/Index" class="sc-back">Back to download</a></div>
 @if (Model.Record is not { } record || record.Summaries is not { } summaries)
 {
     <h1>Health record</h1>
@@ -290,4 +292,3 @@ else
         }
     </section>
 }
-<p class="sc-screen-only"><a asp-page="/Record/Index">Back to download</a></p>
