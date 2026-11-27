@@ -482,7 +482,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             </form>
         }
         @* Who can use the portal for this patient (FR-19): on its own page, read when it is opened. *@
-        <p><a asp-page="Proxies/Index" asp-route-patientId="@Model.Patient.Id" data-proxies>Who can use the portal for this patient</a></p>
+        <p><a asp-page="Proxies/Index" asp-route-patientId="@Model.Patient.Id" data-proxies>People who can see this record</a></p>
         @* Step 13e: the forms asked for before visits, each a sensitive item, on their own page; only how many here. *@
         <p><a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" data-forms>Pre-visit forms@(Model.Chart.Forms > 0 ? $" ({Model.Chart.Forms})" : "")</a></p>
     </section>

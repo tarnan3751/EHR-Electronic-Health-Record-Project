@@ -17,12 +17,12 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Inputs and system conditions: Key presses only: Tab, Enter and typing.
 // Test data: The proxy's email, typed. The scope and length of time as the form offers them first.
 // Steps:
-//   1. Open the chart. Press Tab until "Who can use the portal for this patient" has the focus, and press Enter.
-//   2. Type the proxy's email (the cursor is already in its field), press Tab until "Record proxy" has the focus, and
+//   1. Open the chart. Press Tab until "People who can see this record" has the focus, and press Enter.
+//   2. Type the proxy's email (the cursor is already in its field), press Tab until "Give access" has the focus, and
 //      press Enter.
-//   3. Press Tab until "Remove" has the focus, and press Enter.
+//   3. Press Tab until "Remove access" has the focus, and press Enter.
 // Expected result: Step 1 opens the proxies page with the cursor in the email field. Step 2 saves: the page says
-//   "Saved:" and lists the proxy as in force. Step 3 removes it: the page says "Removed:". Every focused control shows
+//   "Access given." and lists the proxy as in force. Step 3 removes it: the page says "Access removed.". Every focused control shows
 //   the focus ring, and the page reports no script errors.
 // Creator: Tahseen Arnan
 //
@@ -60,14 +60,14 @@ public class TC_UC18_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=recorded", StringComparison.Ordinal));
-        Assert.Contains("Saved:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Access given.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Equal(1, await page.Locator("tr[data-grant='in-force']").CountAsync());
 
         await AiReviewBrowserTests.TabToAsync(page, "tr[data-grant='in-force'] button");
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=removed", StringComparison.Ordinal));
-        Assert.Contains("Removed:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Access removed.", await page.Locator(".sc-notice--success").TextContentAsync());
 
         Assert.Equal([$"{proxy.Email} record false staff revoked"], await GrantsAsync(apps, patient.Patient));
         Assert.Empty(errors);

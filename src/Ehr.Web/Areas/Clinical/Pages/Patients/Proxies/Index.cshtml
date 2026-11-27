@@ -7,34 +7,34 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.Patient;
-    ViewData["Title"] = $"Proxy access: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = $"People who can see this record: {patient.FamilyName}, {patient.GivenName}";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
 </div>
-<h1>Proxy access: @patient.FamilyName, @patient.GivenName</h1>
+<h1>People who can see this record: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Done is "recorded")
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Saved:</span> the proxy can open this record in the portal. Their email doesn't say whose record it is, and has a link to create a portal account if they don't have one.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Access given.</span> They can now open this record in the portal. Their email has a link to sign in or create an account, and doesn't say whose record it is.</p>
 }
 else if (Model.Done is "removed")
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Removed:</span> that proxy can no longer open this record.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Access removed.</span> They can no longer open this record.</p>
 }
-<p class="sc-muted">A proxy signs in to the portal with their own account and sees this patient's record until the access expires or is removed. Only the patient can let a proxy see items marked sensitive.</p>
+<p class="sc-muted">Each person signs in to the portal with their own account. Only the patient can let them see sensitive items.</p>
 @if (Model.Grants.Count == 0)
 {
-    <p class="sc-muted">No proxies.</p>
+    <p class="sc-muted">No one else has access.</p>
 }
 else
 {
     <div class="sc-table-wrap">
         <table class="sc-table">
             <thead>
-                <tr><th scope="col">Proxy</th><th scope="col">Can see</th><th scope="col">Sensitive items</th><th scope="col">Given</th><th scope="col">Status</th><th scope="col"><span class="sc-visually-hidden">Action</span></th></tr>
+                <tr><th scope="col">Person</th><th scope="col">Can see</th><th scope="col">Sensitive items</th><th scope="col">Given</th><th scope="col">Status</th><th scope="col"><span class="sc-visually-hidden">Action</span></th></tr>
             </thead>
             <tbody>
                 @foreach (var grant in Model.Grants)
@@ -63,7 +63,7 @@ else
                             {
                                 <form method="post" asp-page-handler="Revoke" asp-route-patientId="@patient.Id">
                                     <input type="hidden" name="grantId" value="@grant.Id">
-                                    <button type="submit" class="sc-btn sc-btn--compact sc-btn--danger" aria-label="Remove access for @grant.Email">Remove</button>
+                                    <button type="submit" class="sc-btn sc-btn--compact sc-btn--danger" aria-label="Remove access for @grant.Email">Remove access</button>
                                 </form>
                             }
                         </td>
@@ -73,24 +73,24 @@ else
         </table>
     </div>
 }
-<h2>Record a proxy</h2>
+<h2>Give access</h2>
 @if (!Model.OnPanel)
 {
-    <p class="sc-muted">Add this patient to your panel to record or remove a proxy.</p>
+    <p class="sc-muted">To give or remove access, add this patient to My patients.</p>
 }
 else if (!OnPrem.IsReachable)
 {
-    <p class="sc-muted">A proxy can't be recorded or removed until the clinic's server is back.</p>
+    <p class="sc-muted">Access can't be given or removed until the clinic's server is back.</p>
 }
 else
 {
     <form method="post" class="sc-form" asp-route-patientId="@patient.Id">
         @if (Model.Errors.Count > 0)
         {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> fix the highlighted fields and save again.</p>
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> Fix the highlighted fields and try again.</p>
         }
         <div class="sc-field">
-            <label for="proxy-email">The proxy's email <span>(required)</span></label>
+            <label for="proxy-email">Their email <span>(required)</span></label>
             <input id="proxy-email" class="sc-field__input" type="email" name="Email" value="@Model.Email" maxlength="@ProxyGrantConfiguration.MaximumEmail" autocomplete="off" required autofocus="@(Model.Done is null)"
                    aria-invalid="@(Model.Errors.ContainsKey("Email") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "proxy-email-error" : null)">
             @if (Model.Errors.TryGetValue("Email", out var emailError))
@@ -127,7 +127,7 @@ else
             }
         </div>
         <div class="sc-actions">
-            <button type="submit" class="sc-btn sc-btn--primary">Record proxy</button>
+            <button type="submit" class="sc-btn sc-btn--primary">Give access</button>
         </div>
     </form>
 }

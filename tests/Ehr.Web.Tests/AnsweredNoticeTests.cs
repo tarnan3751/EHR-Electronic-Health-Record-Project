@@ -42,7 +42,7 @@ public class AnsweredNoticeTests(WebApps apps) : IClassFixture<WebApps>
         using var recorded = await PostFormAsync(session.Client, page, page, ("Email", $"synthetic-{Guid.NewGuid():N}@example.com"), ("Scope", "record"), ("Days", 90));
         var html = await ReadAsync(recorded);
         Assert.Contains("done=recorded", recorded.RequestMessage!.RequestUri!.Query);
-        Assert.Matches("tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Saved:</span>", html);
+        Assert.Matches("tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Access given.</span>", html);
         Assert.DoesNotMatch("<input id=\"proxy-email\"[^>]*autofocus", html);
     }
 
