@@ -456,7 +456,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     // goes on to the voices.
     [Theory]
     [InlineData(502, """{"error":"bad_answer","message":"Dictation isn't working right now."}""", 1, "Dictation isn't working right now.")]
-    [InlineData(503, """{"error":"unavailable","message":"Dictation isn't available right now."}""", 4, "The visit couldn't be fetched because the listening service isn't answering")]
+    [InlineData(503, """{"error":"unavailable","message":"Listening isn't available right now. You can type the note."}""", 4, "The visit couldn't be fetched because the listening service isn't answering")]
     public async Task TC_UC23_04_fetching_the_draft_is_asked_a_few_times_at_most(int status, string answer, int asked, string said)
     {
         var (patient, session) = await AccountAsync(apps);
@@ -539,7 +539,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         {
             Status = 503,
             ContentType = "application/json",
-            Body = """{"error":"unavailable","message":"Dictation isn't available right now."}"""
+            Body = """{"error":"unavailable","message":"Listening isn't available right now. You can type the note."}"""
         }));
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
