@@ -160,8 +160,9 @@ function actions(...buttons) {
   return el('div', { className: 'sc-actions' }, ...buttons);
 }
 
-function notice(text, tone = 'warning') {
-  return el('p', { className: `sc-notice sc-notice--${tone}`, textContent: text });
+// Its state, then a sentence (docs/brand: Notice).
+function notice(state, text, tone = 'warning') {
+  return el('p', { className: `sc-notice sc-notice--${tone}` }, el('span', { className: 'sc-notice__state', textContent: state }), ` ${text}`);
 }
 
 // Changes the server refused, for the person to choose. Redrawn only when they change.
@@ -184,13 +185,13 @@ function conflictItem(conflict) {
 
   const content = conflict.canKeepMine
     ? [
-        notice('Someone else saved this phrase before your change reached the server. Choose which version to keep.'),
+        notice('Not saved.', 'Someone else saved this phrase before your change reached the server. Choose which version to keep.'),
         bothVersions(theirs, conflict),
         actions(button('Keep mine', resolve(true)), button('Keep theirs', resolve(false))),
       ]
     : [
-        notice(theirs
-          ? `${theirs.shortcut} is already in use by another phrase, so your change wasn't saved.`
+        notice('Not saved.', theirs
+          ? `${theirs.shortcut} is already in use by another phrase.`
           : `The server didn't accept your change. ${conflict.message ?? ''}`),
         el('dl', { className: 'sc-versions' }, version('Mine (not saved)', ...phraseText(conflict))),
         actions(button('Discard mine', resolve(false), 'sc-btn sc-btn--danger')),
@@ -272,7 +273,7 @@ function showProblems(form, problems) {
 
 // `version` is the phrase as the person saw it when they began; the save is refused if it has changed since.
 function showEditForm(li, id, version, values) {
-  const form = phraseForm(values, 'Save');
+  const form = phraseForm(values, 'Save phrase');
   form.lastElementChild.append(button('Cancel', () => closeEdit(li), 'sc-btn sc-btn--quiet'));
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -298,7 +299,7 @@ async function saveEdit(li, id, version, mine) {
         el(
           'div',
           { className: 'sc-conflict' },
-          notice('Someone else saved this phrase while you were editing it. Choose which version to keep.'),
+          notice('Not saved.', 'Someone else saved this phrase while you were editing it. Choose which version to keep.'),
           bothVersions(answer.current, mine),
           actions(button('Keep mine', () => saveEdit(li, id, answer.current.version, mine)), button('Keep theirs', () => closeEdit(li))),
         ),

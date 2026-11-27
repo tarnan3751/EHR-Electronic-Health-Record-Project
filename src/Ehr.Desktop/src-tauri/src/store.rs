@@ -489,7 +489,7 @@ impl Store {
             .ok_or(Error::NotFound)?;
         if keep_mine && !conflict.can_keep_mine {
             return Err(Error::Refused(
-                "This change can't be kept: change the shortcut and add it again.",
+                "This change can't be kept. Change the shortcut and add it again.",
             ));
         }
 
