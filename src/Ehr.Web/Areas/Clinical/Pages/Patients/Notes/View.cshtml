@@ -12,7 +12,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id" class="sc-back">Back to chart</a></p>
 </div>
 <h1 class="sc-title">Clinical note <span class="sc-tag sc-tag--success">Signed · read-only</span>@if (Model.Note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning" data-note-sensitive>Sensitive</span> }</h1>
 @if (Model.Done == "addendum")
@@ -36,22 +36,26 @@ else
 {
     <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive note.</span> Your view of it is logged.</p>
 }
-<dl class="record">
-    <dt>Signed by</dt><dd>@Model.SignerName</dd>
-    <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Clinic.Format(Model.Note.SignedAt, "yyyy-MM-dd HH:mm:ss")</time></dd>
-</dl>
-<partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
-@* Step 10b: the note's sensitivity can change after signing, with a reason; its text never does. *@
-@if (Model.Note.SensitiveReason is not null)
-{
-    <p class="sc-muted" data-sensitivity-reason>@Model.Change(Model.Note.Sensitive, Model.Note.SensitiveMarkedBy) @Clinic.Format(Model.Note.SensitiveChangedAt): @Model.Note.SensitiveReason</p>
-}
-@if (Model.OnPanel && OnPrem.IsReachable)
-{
-    <p><a asp-page="Sensitivity" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-note-sensitivity>@(Model.Note.Sensitive ? "Unmark this note as sensitive" : "Mark this note sensitive")</a></p>
-}
+@* The note as one document: who signed it and when, its sections, then what can change about it. *@
+<div class="sc-notedoc">
+    <dl class="record">
+        <dt>Signed by</dt><dd>@Model.SignerName</dd>
+        <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Clinic.Format(Model.Note.SignedAt, "yyyy-MM-dd HH:mm:ss")</time></dd>
+    </dl>
+    <partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
+    @* Step 10b: the note's sensitivity can change after signing, with a reason; its text never does. *@
+    @if (Model.Note.SensitiveReason is not null)
+    {
+        <p class="sc-muted" data-sensitivity-reason>@Model.Change(Model.Note.Sensitive, Model.Note.SensitiveMarkedBy) @Clinic.Format(Model.Note.SensitiveChangedAt): @Model.Note.SensitiveReason</p>
+    }
+    @if (Model.OnPanel && OnPrem.IsReachable)
+    {
+        <p><a asp-page="Sensitivity" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-note-sensitivity>@(Model.Note.Sensitive ? "Unmark this note as sensitive" : "Mark this note sensitive")</a></p>
+    }
+</div>
 
 @* Addenda (step 10): the note above never changes; each addendum is a signed text after it, oldest first. *@
+<section class="sc-sheet" aria-labelledby="addenda">
 <h2 id="addenda">Addenda</h2>
 @if (Model.Addenda.SensitiveHidden > 0)
 {
@@ -108,8 +112,10 @@ else
 {
     <p><a class="sc-btn" asp-page="Addendum" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-add-addendum>Add addendum</a></p>
 }
+</section>
 
 @* Step 13a: what the patient reads of this note, written for them. The note itself never reaches the portal. *@
+<section class="sc-sheet" aria-labelledby="summary">
 <h2 id="summary">Visit summary for the patient</h2>
 @if (Model.Summaries.SensitiveHidden > 0)
 {
@@ -134,7 +140,9 @@ else if (Model.Summaries.SensitiveShown && !Model.Note.Sensitive && Model.Summar
         {
             <p class="sc-muted">Released by @summary.ReleasedBy, @Clinic.Format(summary.ReleasedAt). <strong>Withdrawn by @summary.WithdrawnBy</strong> · @Clinic.Format(summary.WithdrawnAt): @summary.WithdrawnReason@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning" data-summary-sensitive="@(summary.SensitiveInherited ? "inherited" : "own")">@(summary.SensitiveInherited ? "Sensitive with the note" : "Sensitive")</span> }</p>
         }
-        <partial name="_SummaryContent" model="summary" />
+        <div class="sc-notedoc">
+            <partial name="_SummaryContent" model="summary" />
+        </div>
         @* Its sensitivity can change after it is released, with a reason, as an addendum's (Tahseen's decision of 21 November 2026). *@
         @if (summary.SensitiveReason is not null)
         {
@@ -167,5 +175,6 @@ else if (!Model.Summaries.HasStanding)
 {
     <p><a class="sc-btn" asp-page="Summary" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-write-summary>Write visit summary</a></p>
 }
+</section>
 
 <partial name="_ReviewHistory" model="Model.CompletedReviews" />

@@ -22,10 +22,10 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Detail.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
-    <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@Clinic.Day(appointment.StartsAt)">Back to schedule</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
+    <p><a asp-page="Index" asp-route-clinician="@appointment.ClinicianId" asp-route-day="@Clinic.Day(appointment.StartsAt)" class="sc-back">Back to schedule</a></p>
     @* Step 13e: the forms asked for before this visit, and asking for one, on the patient's pre-visit forms page. *@
-    <p><a asp-page="/Patients/Forms/Index" asp-route-patientId="@patient.Id" asp-fragment="appointment-@appointment.Id" data-forms>Pre-visit forms</a></p>
+    <p><a asp-page="/Patients/Forms/Index" asp-route-patientId="@patient.Id" asp-fragment="appointment-@appointment.Id" class="sc-btn" data-forms>Pre-visit forms</a></p>
 </div>
 <h1>Appointment: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Gone)
@@ -36,7 +36,9 @@ else if (saved is not null && Model.Errors.Count == 0)
 {
     <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">@saved</span> @(Model.Saved == "checked-in" ? "The visit has started and is on the chart." : "The patient sees the change in the portal.")</p>
 }
-<section class="sc-panel" aria-label="Appointment">
+@* The appointment and what can be done with it, as panels two to a row. *@
+<div class="sc-split sc-split--even">
+<section class="sc-panel sc-sheet" aria-label="Appointment">
     <dl class="record">
         <dt>When</dt><dd>@Clinic.Plain(appointment.StartsAt, "dddd, MMMM d, yyyy"), @AppointmentForm.Time(Clinic, appointment)</dd>
         <dt>With</dt><dd>@appointment.Clinician</dd>
@@ -50,7 +52,7 @@ else if (saved is not null && Model.Errors.Count == 0)
 </section>
 @if (Model.CanChange && OnPrem.IsReachable)
 {
-    <section class="sc-panel" aria-labelledby="appointment-arrival">
+    <section class="sc-panel sc-sheet" aria-labelledby="appointment-arrival">
         <h2 class="sc-panel__title" id="appointment-arrival">Arrival</h2>
         <div class="sc-actions">
             <form method="post" asp-page-handler="CheckIn"><input type="hidden" name="Version" value="@Model.Version"><button class="sc-btn sc-btn--primary" aria-describedby="appointment-arrival-note">Check in</button></form>
@@ -58,7 +60,7 @@ else if (saved is not null && Model.Errors.Count == 0)
         </div>
         <p class="sc-muted" id="appointment-arrival-note">Checking in starts the patient's visit. Neither can be undone.</p>
     </section>
-    <section class="sc-panel" aria-labelledby="appointment-reschedule">
+    <section class="sc-panel sc-sheet" aria-labelledby="appointment-reschedule">
         <h2 class="sc-panel__title" id="appointment-reschedule">Reschedule</h2>
         <form method="post" asp-page-handler="Reschedule" class="sc-form">
             <input type="hidden" name="Version" value="@Model.Version">
@@ -66,7 +68,7 @@ else if (saved is not null && Model.Errors.Count == 0)
             <button type="submit" class="sc-btn">Save new time</button>
         </form>
     </section>
-    <section class="sc-panel" aria-labelledby="appointment-cancel">
+    <section class="sc-panel sc-sheet" aria-labelledby="appointment-cancel">
         <h2 class="sc-panel__title" id="appointment-cancel">Cancel appointment</h2>
         <form method="post" asp-page-handler="Cancel" class="sc-form">
             <input type="hidden" name="Version" value="@Model.Version">
@@ -93,3 +95,4 @@ else if (appointment.Status == AppointmentStatus.Booked)
 {
     <p class="sc-muted">To change this appointment, add this patient to My patients.</p>
 }
+</div>

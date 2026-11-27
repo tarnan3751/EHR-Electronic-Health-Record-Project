@@ -14,9 +14,12 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to note</a></p>
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" class="sc-back">Back to note</a></p>
 </div>
 <h1>Write visit summary</h1>
+@* The form beside the note it is written from. *@
+<div class="sc-split">
+<div class="sc-formcard sc-formcard--wide">
 @* What the patient should be told first, then the rest as a short list. *@
 <div class="sc-prose">
     <p>For the note signed @Clinic.Format(Model.Note.SignedAt). Write what the patient should know, in plain words.</p>
@@ -76,8 +79,12 @@ else
     </div>
 </form>
 }
+</div>
 
 @* For reference only: nothing of it is copied into the summary, which the clinician writes for the patient. *@
-<h2>The signed note, for reference</h2>
+<section class="sc-sheet" aria-labelledby="signed-note">
+<h2 id="signed-note">The signed note, for reference</h2>
 <p class="sc-muted">Not copied into the summary.</p>
 <partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
+</section>
+</div>

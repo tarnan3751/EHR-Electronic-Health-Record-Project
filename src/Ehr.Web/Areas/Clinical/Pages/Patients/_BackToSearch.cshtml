@@ -3,9 +3,9 @@
 @model SearchQuery
 @if (Model.IsEmpty)
 {
-    <a asp-page="Index" data-search-back aria-keyshortcuts="/">Back to patients</a>
+    <a asp-page="Index" class="sc-back" data-search-back aria-keyshortcuts="/">Back to patients</a>
 }
 else
 {
-    <a asp-page="Index" asp-all-route-data="Model.RouteData()" data-search-back aria-keyshortcuts="/">Back to search</a>
+    <a asp-page="Index" asp-all-route-data="Model.RouteData()" class="sc-back" data-search-back aria-keyshortcuts="/">Back to search</a>
 }

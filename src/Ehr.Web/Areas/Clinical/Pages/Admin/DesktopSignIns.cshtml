@@ -6,32 +6,34 @@
     var name = Model.Member.DisplayName;
 }
 <h1>Desktop sign-ins: @name</h1>
-
-@if (Model.Unended == 0)
-{
-    <p class="sc-notice sc-notice--info" data-desktop-none><span class="sc-notice__state">No desktop sign-ins.</span> @name has none to revoke.</p>
-}
-else
-{
-    <p data-desktop-count>@name has @Model.Unended desktop @(Model.Unended == 1 ? "sign-in that hasn't" : "sign-ins that haven't") ended. A computer in daily use makes one or two a day and keeps only its latest.</p>
-    <section class="sc-notice sc-notice--warning" data-desktop-confirm>
-        <p><strong>Revoke @name's desktop sign-ins?</strong> Each computer they've signed in to with SwiftChart stops syncing now.</p>
-        <ul>
-            <li>The next time it reaches either server, it deletes everything SwiftChart keeps on it: offline charts, and any drafts and recordings not yet sent, which are lost.</li>
-            <li>A computer that never connects again keeps its data locked, and closes it 30 days after its last sign-in.</li>
-            <li>They can sign in again afterwards, unless the account is disabled.</li>
-        </ul>
-        <p data-desktop-order>Revoking is what deletes it. Disabling the account or resetting its password or authenticator ends these sign-ins but deletes nothing. Revoke at once: if someone signs out of SwiftChart on one of those computers first, it's out of reach.</p>
-    </section>
-    @if (!OnPrem.IsReachable)
+@* What revoking does, and the choice, at a reading width: the warning's lines are long sentences. *@
+<div class="sc-desktop">
+    @if (Model.Unended == 0)
     {
-        <p class="sc-muted" data-desktop-offline>Revoking needs the clinic's server. Nothing has been revoked.</p>
+        <p class="sc-notice sc-notice--info" data-desktop-none><span class="sc-notice__state">No desktop sign-ins.</span> @name has none to revoke.</p>
     }
     else
     {
-        <form method="post" class="sc-actions">
-            <button class="sc-btn sc-btn--danger">Revoke and delete</button>
-            <a class="sc-btn" asp-page="/Admin/Staff">Cancel</a>
-        </form>
+        <p data-desktop-count>@name has @Model.Unended desktop @(Model.Unended == 1 ? "sign-in that hasn't" : "sign-ins that haven't") ended. A computer in daily use makes one or two a day and keeps only its latest.</p>
+        <section class="sc-notice sc-notice--warning" data-desktop-confirm>
+            <p><strong>Revoke @name's desktop sign-ins?</strong> Each computer they've signed in to with SwiftChart stops syncing now.</p>
+            <ul>
+                <li>The next time it reaches either server, it deletes everything SwiftChart keeps on it: offline charts, and any drafts and recordings not yet sent, which are lost.</li>
+                <li>A computer that never connects again keeps its data locked, and closes it 30 days after its last sign-in.</li>
+                <li>They can sign in again afterwards, unless the account is disabled.</li>
+            </ul>
+            <p data-desktop-order>Revoking is what deletes it. Disabling the account or resetting its password or authenticator ends these sign-ins but deletes nothing. Revoke at once: if someone signs out of SwiftChart on one of those computers first, it's out of reach.</p>
+        </section>
+        @if (!OnPrem.IsReachable)
+        {
+            <p class="sc-muted" data-desktop-offline>Revoking needs the clinic's server. Nothing has been revoked.</p>
+        }
+        else
+        {
+            <form method="post" class="sc-actions">
+                <button class="sc-btn sc-btn--danger">Revoke and delete</button>
+                <a class="sc-btn" asp-page="/Admin/Staff">Cancel</a>
+            </form>
+        }
     }
-}
+</div>

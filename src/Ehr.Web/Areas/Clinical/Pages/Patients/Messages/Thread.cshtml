@@ -14,8 +14,8 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Thread.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
-    <p><a asp-page="/Inbox/Index">Back to inbox</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
+    <p><a asp-page="/Inbox/Index" class="sc-back">Back to inbox</a></p>
 </div>
 <h1>@Model.Thread.Subject</h1>
 @if (Model.Sent && Model.Error is null)
@@ -33,7 +33,7 @@ else if (!OnPrem.IsReachable)
 }
 else
 {
-    <form method="post" class="sc-form">
+    <form method="post" class="sc-form sc-formcard sc-formcard--wide">
         @if (Model.Error is not null)
         {
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted field and try again.</p>

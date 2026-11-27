@@ -5,7 +5,7 @@
 @{
     ViewData["Title"] = "New message";
 }
-<p><a asp-page="Index">Back to messages</a></p>
+<div class="sc-pagehead"><a asp-page="Index" class="sc-back">Back to messages</a></div>
 <h1>@ViewData["Title"]</h1>
 @if (!OnPrem.IsReachable)
 {
@@ -14,32 +14,34 @@
 else
 {
     <p class="sc-muted">For an emergency, call your local emergency number. Messages are read during clinic hours.</p>
-    <form method="post" asp-page="New" class="sc-form">
-        @if (Model.Errors.Count > 0)
-        {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted fields and try again.</p>
-        }
-        <div class="sc-field">
-            <label for="message-subject">Subject</label>
-            <input id="message-subject" class="sc-field__input" name="Subject" value="@Model.Subject" maxlength="@SecureMessages.MaximumSubject" autocomplete="off" required autofocus="@(!Model.About)"
-                   aria-invalid="@(Model.Errors.ContainsKey("Subject") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Subject") ? "message-subject-error" : null)">
-            @if (Model.Errors.TryGetValue("Subject", out var subjectError))
+    <div class="sc-formcard">
+        <form method="post" asp-page="New" class="sc-form">
+            @if (Model.Errors.Count > 0)
             {
-                <p class="sc-field__error" id="message-subject-error">@subjectError</p>
+                <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted fields and try again.</p>
             }
-        </div>
-        <div class="sc-field">
-            <label for="message-body">Message</label>
-            <textarea id="message-body" class="sc-field__input" name="Body" rows="8" maxlength="@SecureMessages.MaximumBody" required autofocus="@Model.About"
-                      aria-invalid="@(Model.Errors.ContainsKey("Body") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Body") ? "message-body-error" : null)">@Model.Body</textarea>
-            @if (Model.Errors.TryGetValue("Body", out var bodyError))
-            {
-                <p class="sc-field__error" id="message-body-error">@bodyError</p>
-            }
-        </div>
-        <div class="sc-actions">
-            <button type="submit" class="sc-btn sc-btn--primary">Send message</button>
-            <a asp-page="Index">Cancel</a>
-        </div>
-    </form>
+            <div class="sc-field">
+                <label for="message-subject">Subject</label>
+                <input id="message-subject" class="sc-field__input" name="Subject" value="@Model.Subject" maxlength="@SecureMessages.MaximumSubject" autocomplete="off" required autofocus="@(!Model.About)"
+                       aria-invalid="@(Model.Errors.ContainsKey("Subject") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Subject") ? "message-subject-error" : null)">
+                @if (Model.Errors.TryGetValue("Subject", out var subjectError))
+                {
+                    <p class="sc-field__error" id="message-subject-error">@subjectError</p>
+                }
+            </div>
+            <div class="sc-field">
+                <label for="message-body">Message</label>
+                <textarea id="message-body" class="sc-field__input" name="Body" rows="8" maxlength="@SecureMessages.MaximumBody" required autofocus="@Model.About"
+                          aria-invalid="@(Model.Errors.ContainsKey("Body") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Body") ? "message-body-error" : null)">@Model.Body</textarea>
+                @if (Model.Errors.TryGetValue("Body", out var bodyError))
+                {
+                    <p class="sc-field__error" id="message-body-error">@bodyError</p>
+                }
+            </div>
+            <div class="sc-actions">
+                <button type="submit" class="sc-btn sc-btn--primary">Send message</button>
+                <a asp-page="Index">Cancel</a>
+            </div>
+        </form>
+    </div>
 }

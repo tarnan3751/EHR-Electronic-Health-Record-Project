@@ -16,7 +16,7 @@ else if (Model.Searched)
     <h2>Search results</h2>
     @if (Model.Results.Count == 0)
     {
-        <p class="sc-muted">No patients match.</p>
+        <p class="sc-empty">No patients match.</p>
     }
     else
     {
@@ -44,7 +44,7 @@ else
     <h2>My patients</h2>
     @if (Model.PanelPatients.Count == 0)
     {
-        <p class="sc-muted">No patients yet. Search for a patient, then add them from their chart.</p>
+        <p class="sc-empty">No patients yet. Search for a patient, then add them from their chart.</p>
     }
     else
     {

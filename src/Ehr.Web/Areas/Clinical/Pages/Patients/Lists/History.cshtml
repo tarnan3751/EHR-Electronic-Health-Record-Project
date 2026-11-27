@@ -10,7 +10,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.History.Allergies, Model.OnPanel, Model.EmergencyUntil)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.Route(sensitive: Model.History.SensitiveShown)">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.Route(sensitive: Model.History.SensitiveShown)" class="sc-back">Back to chart</a></p>
 </div>
 <h1>History of allergies, medications and diagnoses: @patient.FamilyName, @patient.GivenName</h1>
 
@@ -25,7 +25,7 @@ else if (Model.History.SensitiveHidden > 0)
 
 @if (Model.History.Changes.Count == 0)
 {
-    <p class="sc-muted">No changes.</p>
+    <p class="sc-empty">No changes.</p>
 }
 else
 {
@@ -33,9 +33,9 @@ else
         <table class="sc-table">
             <thead>
                 <tr>
-                    <th scope="col">When</th>
-                    <th scope="col">By</th>
-                    <th scope="col">List</th>
+                    <th scope="col" class="sc-table__fit">When</th>
+                    <th scope="col" class="sc-table__fit">By</th>
+                    <th scope="col" class="sc-table__fit">List</th>
                     <th scope="col">Entry</th>
                     <th scope="col">Change</th>
                 </tr>

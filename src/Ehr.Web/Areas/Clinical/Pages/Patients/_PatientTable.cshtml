@@ -1,16 +1,16 @@
 @model PatientTable
 @* The arrow keys move through these links (patient-search.js); the row the keyboard is on is tinted, beside its focus
-   ring. *@
+   ring. The name and MRN columns are as wide as their values, and the last column takes the rest. *@
 <div class="sc-table-wrap">
     <table class="sc-table sc-table--pick">
         <thead>
-            <tr><th>Name</th><th>MRN</th><th>Born</th></tr>
+            <tr><th class="sc-table__fit">Name</th><th class="sc-table__fit">MRN</th><th>Born</th></tr>
         </thead>
         <tbody>
             @foreach (var patient in Model.Patients)
             {
                 <tr>
-                    <td>
+                    <td class="sc-table__fit">
                         @* The criteria first: asp-all-route-data replaces the route values, and asp-route-id then adds to them. *@
                         <a asp-page="Chart" asp-all-route-data="Model.Search.RouteData()" asp-route-id="@patient.Id">@patient.FamilyName, @patient.GivenName</a>
                         @if (Model.MarkPanel && Model.Panel.Contains(patient.Id))

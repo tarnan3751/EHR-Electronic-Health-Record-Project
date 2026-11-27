@@ -6,7 +6,7 @@
 @{
     ViewData["Title"] = Model.Thread.Subject;
 }
-<p><a asp-page="Index">Back to messages</a></p>
+<div class="sc-pagehead"><a asp-page="Index" class="sc-back">Back to messages</a></div>
 <h1>@Model.Thread.Subject</h1>
 @if (Model.Sent && Model.Error is null)
 {
@@ -19,20 +19,22 @@
 }
 else
 {
-    <form method="post" class="sc-form">
-        @if (Model.Error is not null)
-        {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted fields and try again.</p>
-        }
-        <div class="sc-field">
-            <label for="message-body">Your reply</label>
-            <textarea id="message-body" class="sc-field__input" name="Body" rows="6" maxlength="@SecureMessages.MaximumBody" required
-                      aria-invalid="@(Model.Error is null ? null : "true")" aria-describedby="@(Model.Error is null ? null : "message-body-error")">@(Model.Error is null ? null : Model.Body)</textarea>
+    <div class="sc-formcard">
+        <form method="post" class="sc-form">
             @if (Model.Error is not null)
             {
-                <p class="sc-field__error" id="message-body-error">@Model.Error</p>
+                <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Fix the highlighted fields and try again.</p>
             }
-        </div>
-        <button type="submit" class="sc-btn sc-btn--primary">Send reply</button>
-    </form>
+            <div class="sc-field">
+                <label for="message-body">Your reply</label>
+                <textarea id="message-body" class="sc-field__input" name="Body" rows="6" maxlength="@SecureMessages.MaximumBody" required
+                          aria-invalid="@(Model.Error is null ? null : "true")" aria-describedby="@(Model.Error is null ? null : "message-body-error")">@(Model.Error is null ? null : Model.Body)</textarea>
+                @if (Model.Error is not null)
+                {
+                    <p class="sc-field__error" id="message-body-error">@Model.Error</p>
+                }
+            </div>
+            <button type="submit" class="sc-btn sc-btn--primary">Send reply</button>
+        </form>
+    </div>
 }

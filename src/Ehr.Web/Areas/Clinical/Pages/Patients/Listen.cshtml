@@ -24,7 +24,7 @@
     }
 }
 <div class="sc-pagehead">
-    <p><a asp-page="Chart" asp-all-route-data="chartRoute">Back to chart</a></p>
+    <p><a asp-page="Chart" asp-all-route-data="chartRoute" class="sc-back">Back to chart</a></p>
 </div>
 @if (Model.SwitchedOff)
 {
@@ -52,7 +52,7 @@ else
         @Html.AntiForgeryToken()
         <noscript><p class="sc-notice sc-notice--danger">Listening to a visit needs JavaScript. You can still type the note.</p></noscript>
 
-        <form class="sc-form sc-form--wide" data-ambient-consent>
+        <form class="sc-form sc-form--wide sc-formcard sc-formcard--wide" data-ambient-consent>
             <h2 tabindex="-1" data-ambient-consent-heading>Before you start</h2>
             <p>Ask the patient and anyone else who will speak if they agree to the visit being recorded. Read them this:</p>
             <blockquote class="sc-notice sc-notice--info" data-ambient-statement>
@@ -92,7 +92,7 @@ else
             <a class="sc-btn" data-ambient-open-draft hidden>Open the draft</a>
         </div>
 
-        <section data-ambient-capture hidden aria-labelledby="ambient-capture">
+        <section class="sc-formcard sc-formcard--wide" data-ambient-capture hidden aria-labelledby="ambient-capture">
             <h2 id="ambient-capture">Listening to the visit</h2>
             <p class="sc-status" data-ambient-clock></p>
             <div class="sc-stack">
@@ -105,7 +105,7 @@ else
             </div>
         </section>
 
-        <section data-ambient-speakers hidden aria-labelledby="ambient-speakers">
+        <section class="sc-formcard sc-formcard--wide" data-ambient-speakers hidden aria-labelledby="ambient-speakers">
             <h2 id="ambient-speakers">Who is speaking</h2>
             <p>Say who each voice is before the note is drafted.</p>
             <ul>

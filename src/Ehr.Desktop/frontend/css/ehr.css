@@ -23,9 +23,11 @@
         text-size-adjust: 100%;
     }
 
+    /* The page's ground is surface-page; what is on it (cards, tables, toolbars) sits on surface-raised, so it has an
+       edge in both themes. */
     body {
         margin: 0;
-        background: var(--surface);
+        background: var(--surface-page);
         color: var(--ink);
         font-family: var(--font-sans);
         font-size: 16px;
@@ -152,8 +154,10 @@
         cursor: pointer;
     }
 
+    /* Dates and times never break mid-value, and their figures line up from row to row. */
     time {
         white-space: nowrap;
+        font-variant-numeric: tabular-nums;
     }
 
     /* The keyboard focus ring, the same on everything that takes focus. Never removed. */
@@ -184,6 +188,7 @@
         border-collapse: collapse;
         font-size: 14px;
         line-height: 20px;
+        font-variant-numeric: tabular-nums;
     }
 
     th {
@@ -191,14 +196,28 @@
         font-weight: 600;
         background: var(--surface-subtle);
         color: var(--ink);
-        padding: var(--space-2) var(--space-3);
+        padding: var(--space-3) var(--space-4);
         border-bottom: 1px solid var(--line);
+        vertical-align: baseline;
+    }
+
+    /* A column's header is a caption over its values; a row's header (th scope="row") stays ink, as its row's name. */
+    thead th {
+        padding-block: var(--space-2);
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--ink-muted);
+    }
+
+    tbody th,
+    tfoot th {
+        background: transparent;
     }
 
     td {
-        padding: var(--space-2) var(--space-3);
+        padding: var(--space-3) var(--space-4);
         border-bottom: 1px solid var(--line);
-        vertical-align: top;
+        vertical-align: baseline;
     }
 
     /* Motion is short and functional, and off for anyone who asks. */
@@ -260,10 +279,13 @@
         color: var(--on-appbar);
     }
 
+    /* The portal's bar holds its contents to the reading column the page is on, so the lockup starts where the page
+       does and the sign-out ends where it ends; the links take a row of their own under them, at every width. */
     .sc-appbar--portal {
         background: var(--surface-raised);
         color: var(--ink);
         border-bottom: 1px solid var(--line);
+        padding-inline: max(var(--space-5), (100% - var(--width-reading)) / 2);
     }
 
     .sc-appbar__brand {
@@ -287,6 +309,40 @@
         min-height: var(--appbar-height);
     }
 
+    /* The clinic's links: the work on the left, then the staff member's own pages (sc-appbar__account) on the right,
+       beside their name, a step quieter and set off from it by a hairline. */
+    .sc-appbar--clinician .sc-appbar__nav {
+        flex-grow: 1;
+    }
+
+    .sc-appbar__account {
+        display: flex;
+        align-items: stretch;
+        gap: var(--space-5);
+        margin-left: auto;
+    }
+
+    .sc-appbar__account .sc-appbar__link {
+        font-weight: 500;
+        color: var(--appbar-muted);
+    }
+
+    .sc-appbar__account .sc-appbar__link:hover,
+    .sc-appbar__account .sc-appbar__link[aria-current="page"] {
+        color: var(--on-appbar);
+    }
+
+    .sc-appbar__account::after {
+        content: "";
+        align-self: center;
+        width: 1px;
+        height: 20px;
+        margin-left: calc(var(--space-6) - var(--space-5));
+        background: color-mix(in srgb, var(--on-appbar) 28%, transparent);
+    }
+
+    /* A link's place is marked by a bar on the bar's bottom edge: mint where the page is, a faint one under the
+       pointer, so the two are never confused. */
     .sc-appbar__link {
         display: flex;
         align-items: center;
@@ -297,26 +353,49 @@
         line-height: 20px;
         font-weight: 600;
         white-space: nowrap;
-        border-bottom: 2px solid transparent;
-        border-top: 2px solid transparent;
+        border-bottom: 3px solid transparent;
+        border-top: 3px solid transparent;
     }
 
     .sc-appbar__link:hover {
-        border-bottom-color: currentColor;
+        border-bottom-color: color-mix(in srgb, currentColor 35%, transparent);
     }
 
     .sc-appbar__link[aria-current="page"] {
         border-bottom-color: var(--accent);
     }
 
-    /* A count beside an app bar link, such as the inbox's items that need action. */
+    /* The portal's links are muted until one is the page's, so the place shows in the words too, not only in the
+       mint, which is faint on the light bar. */
+    .sc-appbar--portal .sc-appbar__link {
+        color: var(--ink-muted);
+    }
+
+    .sc-appbar--portal .sc-appbar__link:hover,
+    .sc-appbar--portal .sc-appbar__link[aria-current="page"] {
+        color: var(--ink);
+    }
+
+    /* A shortcut's key on an app bar link ("/" on Patients): a keycap in the bar's muted ink, so it reads as a hint
+       beside the word, not a second word. */
+    .sc-appbar .sc-kbd {
+        display: inline-block;
+        min-width: 18px;
+        text-align: center;
+        color: var(--appbar-muted);
+        border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+    }
+
+    /* A count beside an app bar link, such as the inbox's items that need action: a pill. */
     .sc-appbar__count {
+        min-width: 20px;
+        text-align: center;
         font-family: var(--font-mono);
         font-size: 12px;
-        line-height: 16px;
+        line-height: 18px;
         font-weight: 600;
         padding: 0 var(--space-1);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-full);
         /* Navy on mint, 9.6:1, in both themes: the app bar is dark in both. */
         background: var(--accent);
         color: var(--brand-navy);
@@ -342,6 +421,28 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* The portal's first row: the lockup, then the account and its sign-out on the column's right edge. The account
+       is shown whole when the row has room, and in the muted ink, since the page's own heading says whose record it
+       is. */
+    .sc-appbar--portal .sc-appbar__end {
+        flex: 1 1 0;
+        min-width: 0;
+        justify-content: flex-end;
+    }
+
+    .sc-appbar--portal .sc-appbar__user {
+        max-width: none;
+        min-width: 0;
+        color: var(--ink-muted);
+    }
+
+    .sc-appbar--portal .sc-appbar__nav {
+        order: 3;
+        flex-basis: 100%;
+        gap: var(--space-6);
+        min-height: 44px;
     }
 
     .sc-appbar__site {
@@ -371,6 +472,10 @@
         padding: 0 var(--space-3);
         cursor: pointer;
         white-space: nowrap;
+    }
+
+    .sc-appbar__signout:hover {
+        background: color-mix(in srgb, currentColor 12%, transparent);
     }
 
     .sc-appbar .sc-conn {
@@ -411,6 +516,11 @@
             min-width: 0;
         }
 
+        /* The staff member's own pages follow the work in the row that scrolls, without the hairline. */
+        .sc-appbar__account::after {
+            display: none;
+        }
+
         /* The portal's links share one row on a phone, spread across it, and wrap only on a narrower screen, so none is
            hidden off the edge. */
         .sc-appbar--portal .sc-appbar__nav {
@@ -418,6 +528,7 @@
             justify-content: space-between;
             overflow-x: visible;
             gap: 0 var(--space-2);
+            min-height: 40px;
         }
 
         .sc-appbar--portal .sc-appbar__link {
@@ -436,20 +547,32 @@
         }
     }
 
+    /* A band's words under the app bar (read-only off-site, a proxy's shared record), on the column the app bar's
+       contents are on: the bar's own edges in the clinic, the reading column in the portal, where a little more room
+       above and below keeps the proxy's button off the band's edges. */
+    .sc-app--portal .sc-band__line {
+        display: block;
+        max-width: var(--width-reading);
+        margin-inline: auto;
+        padding-block: var(--space-1);
+    }
+
     /* The page: clinician pages at width-content, reading at width-reading, account forms at width-form. */
     .sc-page {
         max-width: calc(var(--width-content) + 2 * var(--space-5));
         margin: 0 auto;
-        padding: var(--space-6) var(--space-5) var(--space-16);
+        padding: var(--space-8) var(--space-5) var(--space-16);
     }
 
     .sc-page--reading {
         max-width: calc(var(--width-reading) + 2 * var(--space-5));
     }
 
+    /* One narrow column, as a card (sc-card) a little above the middle of the window: sign-in and the other account
+       pages of both sites. */
     .sc-page--form {
-        max-width: calc(var(--width-form) + 2 * var(--space-5));
-        padding-top: var(--space-12);
+        max-width: calc(var(--width-form) + 2 * var(--space-8) + 2 * var(--space-5));
+        padding-top: max(var(--space-12), 12vh);
     }
 
     @media (max-width: 40rem) {
@@ -457,9 +580,55 @@
             padding-left: var(--space-4);
             padding-right: var(--space-4);
         }
+
+        .sc-page--form {
+            padding-top: var(--space-8);
+        }
     }
 
-    /* The mark alone, above a signed-out account form: one of the brand's few moments. */
+    /* The account pages' card: the lockup, then the page, all on one left edge; its buttons take the card's width. On
+       a phone the page itself is the card. */
+    .sc-card {
+        padding: var(--space-8);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-card h1 {
+        margin-bottom: var(--space-6);
+    }
+
+    /* A page that stands on its own (StandalonePage) has the mark alone at the card's top, on the same edge. */
+    .sc-card > .sc-brandmark {
+        justify-content: flex-start;
+        margin-bottom: var(--space-6);
+    }
+
+    .sc-card > .sc-brandmark img {
+        height: 32px;
+    }
+
+    .sc-card__brand {
+        display: flex;
+        margin: 0 0 var(--space-8);
+    }
+
+    .sc-card__brand img {
+        height: 28px;
+        width: auto;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-card {
+            padding: 0;
+            background: none;
+            border: 0;
+        }
+    }
+
+    /* The mark alone, above a page that stands on its own (StandalonePage) or the desktop app's sign-in: one of the
+       brand's few moments. */
     .sc-brandmark {
         display: flex;
         justify-content: center;
@@ -501,13 +670,116 @@
         align-items: center;
         justify-content: space-between;
         gap: var(--space-2) var(--space-4);
-        margin: 0 0 var(--space-4);
+        min-height: 28px;
+        margin: calc(-1 * var(--space-2)) 0 var(--space-5);
         font-size: 14px;
         line-height: 20px;
     }
 
     .sc-pagehead > * {
         margin: 0;
+    }
+
+    .sc-pagehead .sc-muted {
+        font-size: 14px;
+    }
+
+    /* The way back, as a small breadcrumb: muted, with a chevron drawn before it, underlined only on hover and focus. */
+    .sc-back {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        color: var(--ink-muted);
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-back::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-left: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+    }
+
+    .sc-back:hover,
+    .sc-back:focus-visible {
+        color: var(--accent-ink);
+        text-decoration: underline;
+    }
+
+    /* Two ways back on the line: both breadcrumbs on its left, the page's own action on its right. A way on beside a
+       breadcrumb ("Open the chart") has a list link's weight. */
+    .sc-pagehead > p:has(> .sc-back) + p:has(> .sc-back) {
+        margin-right: auto;
+    }
+
+    .sc-pagehead p > .sc-back ~ a {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-pagehead p > .sc-back ~ a:hover,
+    .sc-pagehead p > .sc-back ~ a:focus-visible {
+        text-decoration: underline;
+    }
+
+    /* The way back above a portal page's title, at the portal's size: as tall as its controls, so a finger finds it. */
+    .sc-app--portal .sc-pagehead {
+        margin: calc(-1 * var(--space-4)) 0 var(--space-2);
+    }
+
+    .sc-app--portal .sc-back {
+        min-height: var(--control-height-portal);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    /* A section's heading with what belongs to it on the right, such as a day's heading and the way to the next. */
+    .sc-sectionhead {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2) var(--space-4);
+        margin: var(--space-8) 0 var(--space-3);
+    }
+
+    .sc-sectionhead > * {
+        margin: 0;
+    }
+
+    /* The page's title with its one action on the right ("New message"), under it where the line is too short. */
+    .sc-titlebar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3) var(--space-4);
+        margin: 0 0 var(--space-4);
+    }
+
+    .sc-titlebar > h1 {
+        margin: 0;
+    }
+
+    /* A list or table with nothing in it: one quiet line, framed, so the empty space reads as meant. */
+    .sc-empty {
+        margin: 0 0 var(--space-4);
+        padding: var(--space-8) var(--space-4);
+        text-align: center;
+        color: var(--ink-muted);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    /* An empty list has the corners of the portal's cards. */
+    .sc-app--portal .sc-empty {
+        border-radius: var(--radius-lg);
     }
 
     /* A title with its status beside it. */
@@ -583,8 +855,16 @@
         color: var(--danger);
     }
 
-    /* For a row of actions inside a table or a list. */
-    .sc-btn--compact {
+    /* A destructive action among quiet ones, such as a table row's "Disable account": the quiet button in the danger
+       ink. */
+    .sc-btn--quiet.sc-btn--danger {
+        background: transparent;
+        border-color: transparent;
+    }
+
+    /* For a row of actions inside a table or a list, and the page's own actions on the line above its title. */
+    .sc-btn--compact,
+    .sc-pagehead .sc-btn {
         height: 28px;
         padding: 0 var(--space-3);
     }
@@ -610,6 +890,12 @@
         filter: brightness(0.96);
     }
 
+    /* A secondary button darkens its ground on hover rather than its border, in both themes. */
+    .sc-btn:not(.sc-btn--primary, .sc-btn--quiet, .sc-btn--danger):hover:not(:disabled) {
+        filter: none;
+        background: var(--surface-subtle);
+    }
+
     .sc-btn--quiet:hover:not(:disabled) {
         filter: none;
         text-decoration: underline;
@@ -622,15 +908,16 @@
         color: var(--ink-muted);
     }
 
+    /* A keyboard shortcut on its control: a quiet chip tinted from the control's own text, so it reads as part of the
+       control rather than a box beside it. */
     .sc-kbd {
         font-family: var(--font-mono);
-        font-size: 12px;
+        font-size: 11px;
         line-height: 16px;
         font-weight: 600;
-        padding: 0 var(--space-1);
+        padding: 0 5px;
         border-radius: var(--radius-xs);
-        border: 1px solid currentColor;
-        opacity: 0.85;
+        background: color-mix(in srgb, currentColor 14%, transparent);
         white-space: nowrap;
     }
 
@@ -649,12 +936,28 @@
         margin: 0;
     }
 
-    /* A plain link beside the buttons, such as "Cancel": the quiet button's weight. */
+    /* A plain link beside the buttons, such as "Cancel": a quiet control as tall as the buttons, underlined on hover
+       and focus. In the portal, at the portal's size and height. */
     .sc-actions > a:not(.sc-btn) {
-        padding: 0 var(--space-2);
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--control-height);
+        padding: 0 var(--space-3);
         font-size: 14px;
         line-height: 20px;
         font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-actions > a:not(.sc-btn):hover,
+    .sc-actions > a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    .sc-app--portal .sc-actions > a:not(.sc-btn) {
+        min-height: var(--control-height-portal);
+        font-size: 16px;
+        line-height: 24px;
     }
 
     /* Form: one column of fields at width-form. */
@@ -687,6 +990,90 @@
 
     .sc-app--portal .sc-form > .sc-btn {
         align-self: stretch;
+    }
+
+    /* In the account pages' card (sc-card), the form's button takes the card's width, and what follows the form (the
+       ways to register or reset a password) sits under a hairline. */
+    .sc-card .sc-form > .sc-btn {
+        align-self: stretch;
+    }
+
+    .sc-card > :last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-card > .sc-form + p {
+        padding-top: var(--space-6);
+        border-top: 1px solid var(--line);
+    }
+
+    /* Form card: a form, or one task's words and its form, on the raised surface, on the page's left edge. The card is
+       the form itself or wraps it; its fields take the card's width, and a heading in it is a panel's. In the clinic
+       at the form's width (--wide: a form of notes and messages, at reading width); in the portal a portal card as
+       wide as the column, its buttons as wide as the card on a phone. */
+    .sc-formcard {
+        max-width: calc(var(--width-form) + 2 * var(--space-6));
+        margin: 0 0 var(--space-6);
+        padding: var(--space-5) var(--space-6) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-formcard--wide {
+        max-width: calc(var(--width-reading) + 2 * var(--space-6));
+    }
+
+    .sc-formcard > :first-child {
+        margin-top: 0;
+    }
+
+    .sc-formcard > :last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-formcard .sc-form {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-formcard .sc-field {
+        max-width: none;
+    }
+
+    .sc-formcard h2 {
+        margin: 0 0 var(--space-3);
+        font-size: 18px;
+        line-height: 24px;
+    }
+
+    .sc-formcard .sc-form > h2 {
+        margin: 0;
+    }
+
+    .sc-app--portal .sc-formcard {
+        max-width: none;
+        padding: var(--space-6);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-app--portal .sc-formcard .sc-form > .sc-btn {
+        align-self: flex-start;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-app--portal .sc-formcard {
+            padding: var(--space-4);
+        }
+
+        .sc-app--portal .sc-formcard .sc-form > .sc-btn,
+        .sc-app--portal .sc-formcard .sc-actions {
+            align-self: stretch;
+        }
+
+        .sc-app--portal .sc-formcard .sc-actions > .sc-btn {
+            flex: 1 1 100%;
+        }
     }
 
     /* Text field: the label above, then the input, its hint and its error. */
@@ -962,7 +1349,15 @@
         max-width: none;
     }
 
-    /* The band that says a portal session is looking at someone else's record (FR-19), with the way back beside it. */
+    /* On a phone a band's words start where the app bar's and the page's do. */
+    @media (max-width: 40rem) {
+        .sc-notice--band {
+            padding-inline: var(--space-4);
+        }
+    }
+
+    /* The band that says a portal session is looking at someone else's record (FR-19), with the way back beside it,
+       a control-height button that keeps the band a band. */
     .sc-acting {
         display: flex;
         flex-wrap: wrap;
@@ -973,6 +1368,12 @@
 
     .sc-acting p {
         margin: 0;
+    }
+
+    .sc-app--portal .sc-acting .sc-btn {
+        height: var(--control-height);
+        padding: 0 var(--space-4);
+        font-size: 14px;
     }
 
     /* A trend chart (step 9): one test or vital sign over time, drawn by the server as SVG. The reference range is a
@@ -1137,7 +1538,7 @@
         align-items: center;
         gap: var(--space-2) var(--space-6);
         padding: var(--space-3) var(--space-5);
-        background: var(--surface-subtle);
+        background: var(--surface-raised);
         border-bottom: 1px solid var(--line);
     }
 
@@ -1165,10 +1566,8 @@
     }
 
     .sc-banner__mrn {
-        font-family: var(--font-mono);
-        font-size: 13px;
-        line-height: 20px;
-        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
         color: var(--ink);
     }
 
@@ -1375,6 +1774,159 @@
         font-weight: 600;
     }
 
+    /* A line whose text is wrapped in sc-list__main is a row: the text on the left, its actions on the right, on the
+       first line's baseline. */
+    .sc-list > li:has(> .sc-list__main) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--space-1) var(--space-4);
+    }
+
+    /* The text keeps at least 16rem beside its actions; where several actions would squeeze it more, they go under it. */
+    .sc-list__main {
+        flex: 1 1 16rem;
+        min-width: 0;
+    }
+
+    .sc-list > li > .sc-list__actions {
+        flex: none;
+    }
+
+    .sc-list > li:has(> .sc-list__main) > .sc-list__actions {
+        margin: 0 0 0 auto;
+        flex-wrap: nowrap;
+    }
+
+    /* In a list of record lines, a link is plainly one by its place and weight: underlined on hover and focus. */
+    .sc-list a:not(.sc-btn) {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-list a:not(.sc-btn):hover,
+    .sc-list a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    /* Rows: a list as rows on one card (the portal's appointments, conversations, requests, forms, sharing, views):
+       what a row is about on the left, semibold, its date or state on the right (sc-rows__end), and a muted line under
+       it (sc-rows__meta). A row that opens something is a
+       target as big as the row, its link keeping the focus ring. One column on a phone, the right-hand part under the
+       rest. */
+    .sc-rows {
+        list-style: none;
+        margin: 0 0 var(--space-6);
+        padding: 0;
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-rows > li {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: var(--space-6);
+        align-items: baseline;
+        margin: 0;
+        padding: var(--space-4) var(--space-6);
+        border-top: 1px solid var(--line);
+        overflow-wrap: anywhere;
+    }
+
+    .sc-rows > li:first-child {
+        border-top: 0;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .sc-rows > li:last-child {
+        border-bottom-left-radius: var(--radius-lg);
+        border-bottom-right-radius: var(--radius-lg);
+    }
+
+    .sc-rows > li > * {
+        grid-column: 1;
+        margin: 0;
+    }
+
+    .sc-rows > li > :is(h2, h3) {
+        font-family: var(--font-sans);
+        font-size: 18px;
+        line-height: 28px;
+        font-weight: 600;
+        letter-spacing: normal;
+    }
+
+    .sc-rows__meta {
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+    }
+
+    .sc-rows > li > .sc-rows__end {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: var(--space-2);
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sc-rows a:not(.sc-btn) {
+        text-decoration: none;
+    }
+
+    .sc-rows a:not(.sc-btn):hover,
+    .sc-rows a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    .sc-rows__link::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+    }
+
+    .sc-rows > li:has(.sc-rows__link):hover {
+        background: var(--surface-subtle);
+    }
+
+    @media (max-width: 40rem) {
+        .sc-rows > li {
+            grid-template-columns: minmax(0, 1fr);
+            padding: var(--space-4);
+        }
+
+        .sc-rows > li > .sc-rows__end {
+            grid-column: 1;
+            grid-row: auto;
+            justify-content: flex-start;
+            white-space: normal;
+        }
+    }
+
+    /* A link on a row's right ("See your answers") has a list's link weight; a row's buttons go under its words. */
+    .sc-rows__end > a:not(.sc-btn) {
+        font-weight: 600;
+    }
+
+    .sc-rows > li > .sc-actions {
+        margin-top: var(--space-3);
+    }
+
+    /* On a phone a row's button (fill in a form, look at a record) is as wide as the row. */
+    @media (max-width: 40rem) {
+        .sc-rows__end > .sc-btn {
+            flex: 1 1 100%;
+        }
+    }
+
     /* A conversation: messages oldest first, each in its own block. The reader's own are set in from the left, and
        marked with the accent bar, so who wrote what is clear without color alone (each also says who). */
     .sc-thread {
@@ -1421,7 +1973,7 @@
            container and can't widen the page. */
         position: relative;
         border: 1px solid var(--line);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-md);
         overflow: clip;
         margin: 0 0 var(--space-4);
         background: var(--surface-raised);
@@ -1434,21 +1986,92 @@
     }
 
     .sc-table th {
+        white-space: nowrap;
+    }
+
+    /* Only the columns' headers stay in view: a row's header, on its row's ground, scrolls with its row. */
+    .sc-table thead th {
         position: sticky;
         top: 0;
         z-index: 1;
-        white-space: nowrap;
     }
 
-    .sc-table tr:last-child td {
+    .sc-table tr:last-child > td,
+    .sc-table :is(tbody, tfoot) tr:last-child > th {
         border-bottom: 0;
     }
 
+    /* Dates, times, MRNs and readings in a table: the text font with tabular figures, so they line up from row to row,
+       and never broken mid-value. (Mono stays for what is compared character by character: sc-table__id.) */
     .sc-table__mono {
-        font-family: var(--font-mono);
-        font-size: 13px;
-        font-weight: 500;
+        font-variant-numeric: tabular-nums;
         white-space: nowrap;
+    }
+
+    /* A row is one thing, its header with it: it lights up under the pointer. */
+    .sc-table tbody tr:hover > :is(td, th) {
+        background: var(--surface-subtle);
+    }
+
+    /* A link in a table is plainly one by its place and weight: underlined on hover and focus, not always. */
+    .sc-table a:not(.sc-btn) {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-table a:not(.sc-btn):hover,
+    .sc-table a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    /* A column only as wide as what is in it, such as a date or an MRN; the column left without it takes the rest. */
+    .sc-table__fit {
+        width: 1%;
+        white-space: nowrap;
+    }
+
+    /* A row's actions: in the last column, on the right, on one line and one baseline, links drawn like the compact
+       quiet button beside the buttons. A note under them wraps. */
+    .sc-table__actions {
+        width: 1%;
+        white-space: nowrap;
+        text-align: right;
+    }
+
+    .sc-table__actions .sc-actions {
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+    }
+
+    .sc-table__actions .sc-actions > a:not(.sc-btn),
+    .sc-table__actions > a:not(.sc-btn) {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 var(--space-2);
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+    }
+
+    .sc-table__actions .sc-actions > a:not(.sc-btn):last-child,
+    .sc-table__actions > a:not(.sc-btn):last-child {
+        padding-right: 0;
+    }
+
+    /* A quiet button among them (a form of one button each) keeps a button's edge, so it is never taken for the link
+       beside it, which opens a page where the button acts at once; a quiet danger one keeps its danger ink. */
+    .sc-table__actions .sc-btn--quiet {
+        border-color: var(--line-strong);
+    }
+
+    .sc-table__actions p,
+    .sc-table__actions > .sc-muted {
+        display: block;
+        min-width: 16rem;
+        margin: var(--space-2) 0 0;
+        white-space: normal;
+        text-align: left;
     }
 
     .sc-table__id {
@@ -1467,7 +2090,7 @@
         margin-top: var(--space-1);
     }
 
-    .sc-table tr.sc-table__flagged td {
+    .sc-table tr.sc-table__flagged > :is(td, th) {
         background: var(--row-flagged);
     }
 
@@ -1476,11 +2099,11 @@
     }
 
     /* A row the keyboard is on, such as a search result: the accent bar and a soft tint beside the focus ring. */
-    .sc-table--pick tbody tr:focus-within td {
+    .sc-table--pick tbody tr:focus-within > :is(td, th) {
         background: var(--accent-soft);
     }
 
-    .sc-table--pick tbody tr:focus-within td:first-child {
+    .sc-table--pick tbody tr:focus-within > :first-child {
         box-shadow: inset 2px 0 0 var(--accent);
     }
 
@@ -2029,6 +2652,7 @@
 
         .sc-app {
             --surface: transparent;
+            --surface-page: transparent;
             --surface-subtle: transparent;
             --surface-raised: transparent;
             --line: color-mix(in srgb, var(--brand-navy) 25%, transparent);
@@ -2115,29 +2739,146 @@
         border-radius: var(--radius-sm);
     }
 
-    /* Patient search: the three criteria in a row, then the results. */
+    /* Patient search: the three criteria in a row on a toolbar, the name widest, then the results. */
     .sc-search {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--space-3);
+        gap: var(--space-3) var(--space-4);
         align-items: flex-end;
         margin: 0 0 var(--space-6);
+        padding: var(--space-4);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
     }
 
     .sc-search .sc-field {
         flex: 1 1 12rem;
     }
 
-    /* Chart: panels side by side where there is room. */
+    .sc-search .sc-field:first-child {
+        flex-grow: 2;
+    }
+
+    .sc-search .sc-field__input {
+        min-height: var(--control-height);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    /* Chart (docs/brand: the chart): three columns, each a stack of panels, so no panel leaves a hole beside a taller
+       one. The standing facts first (allergies, medications, diagnoses, vital signs), then the notes and orders, then
+       results, appointments, messages and the portal; recent visits across the foot. One column on a narrow screen. */
     .sc-chart {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-        gap: var(--space-6);
+        gap: var(--space-4);
         align-items: start;
     }
 
     .sc-chart > .sc-panel--wide {
         grid-column: 1 / -1;
+    }
+
+    .sc-chart__col {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        min-width: 0;
+    }
+
+    .sc-chart__col > * {
+        margin: 0;
+    }
+
+    /* A chart panel: a grid whose first row is its head, the title on the left and the panel's one action ("Add
+       allergy", "New order") on the right, over a hairline; everything after it spans the panel. A sentence in the
+       action's place (off-site) is the first line under the head. The markup stays a title followed by its action. */
+    .sc-chart .sc-panel {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-content: start;
+        row-gap: var(--space-2);
+        padding-top: 0;
+    }
+
+    .sc-chart .sc-panel > * {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
+
+    .sc-chart .sc-panel > .sc-panel__title {
+        display: flex;
+        align-items: center;
+        min-height: calc(28px + 2 * var(--space-3));
+        margin: 0 calc(-1 * var(--space-4)) var(--space-1);
+        padding: 0 var(--space-4);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-chart .sc-panel > .sc-panel__title:has(+ p.sc-actions) {
+        grid-column: 1;
+        margin-right: 0;
+        padding-right: 0;
+    }
+
+    .sc-chart .sc-panel > .sc-panel__title + p.sc-actions {
+        grid-column: 2;
+        grid-row: 1;
+        margin: 0 calc(-1 * var(--space-4)) var(--space-1) 0;
+        padding: 0 var(--space-4) 0 var(--space-3);
+        border-bottom: 1px solid var(--line);
+    }
+
+    /* Dense: the record lines and their dates in body-sm, a date after a line never broken. */
+    .sc-chart .sc-list {
+        margin: 0;
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-chart .sc-list span.sc-muted {
+        white-space: nowrap;
+    }
+
+    .sc-chart .sc-panel > p,
+    .sc-chart .sc-panel > form {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-chart .sc-panel > h3 {
+        margin-top: var(--space-2);
+    }
+
+    /* The history of the standing facts, under their column. */
+    .sc-chart__more {
+        padding: 0 var(--space-1);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-chart__more a {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-chart__more a:hover,
+    .sc-chart__more a:focus-visible {
+        text-decoration: underline;
+    }
+
+    /* The quiet way to a panel's fuller page ("Discontinued orders", "Flowsheet, trends and recording"), at its foot. */
+    .sc-chart .sc-panel > p > a:only-child {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-chart .sc-panel > p > a:only-child:hover,
+    .sc-chart .sc-panel > p > a:only-child:focus-visible {
+        text-decoration: underline;
     }
 
     /* A clinical note: the three fields at reading width, their text kept as it was typed. */
@@ -2170,13 +2911,28 @@
         margin-top: 0;
     }
 
-    /* Audit: the filters in a row above the table. */
+    /* The columns' tops level: the first frame in each starts on the same line. */
+    .sc-review > * > :first-child {
+        margin-top: 0;
+    }
+
+    /* Filters (the schedule, the audit log): a toolbar above the table, its fields as wide as they need and the
+       button on their line. */
     .sc-filters {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 16rem));
         gap: var(--space-3) var(--space-4);
         align-items: end;
         margin: 0 0 var(--space-6);
+        padding: var(--space-4);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-filters .sc-field__input {
+        font-size: 14px;
+        line-height: 20px;
     }
 
     .sc-filters .sc-btn {
@@ -2206,6 +2962,26 @@
 
     .sc-results > li {
         margin: 0 0 var(--space-4);
+    }
+
+    /* A card in a list with nothing to open (an appointment, a record to choose): the card padding on the card itself,
+       where the results page puts it on a card's summary line and body. */
+    .sc-results > li.sc-result {
+        padding: var(--space-4) var(--space-6);
+    }
+
+    .sc-results > li.sc-result > :first-child {
+        margin-top: 0;
+    }
+
+    .sc-results > li.sc-result > :last-child {
+        margin-bottom: 0;
+    }
+
+    /* A card inside a panel is set in on the recessed surface, not drawn as a second border. */
+    .sc-panel .sc-result {
+        background: var(--surface-subtle);
+        border-color: transparent;
     }
 
     .sc-result {
@@ -2274,12 +3050,1032 @@
             padding: 0 var(--space-4) var(--space-4);
         }
 
-        .sc-result--plain {
+        .sc-result--plain,
+        .sc-results > li.sc-result {
             padding: var(--space-4);
         }
 
         .sc-app--portal .sc-panel {
             padding: var(--space-4);
         }
+    }
+
+    /* Chart pages and clinic forms: the pages opened from a chart (lists, orders, vital signs, notes, dictation,
+       appointments, sharing, forms), quick text and passkeys. Rules for those pages only go under this comment;
+       anything two areas share belongs in the components layer.
+       ---- */
+
+    /* A form of short fields (an order, an allergy): the item or name across the card, the details two to a row
+       where they fit; notices, reasons, checkboxes and the buttons across. */
+    .sc-formgrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+        gap: var(--space-4);
+        align-items: end;
+    }
+
+    .sc-formgrid > * {
+        grid-column: 1 / -1;
+    }
+
+    .sc-formgrid > .sc-field:not(:has(#order-item, #entry-name, textarea, .sc-check)) {
+        grid-column: auto;
+    }
+
+    .sc-formgrid > .sc-actions {
+        margin-top: var(--space-1);
+    }
+
+    /* A form in a panel (results to enter, vital signs to record): its fields side by side as many as fit, each box
+       on one line with the others; the sentences before them, a time and the button across. */
+    .sc-sheet > .sc-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+        gap: var(--space-4) var(--space-5);
+        align-items: end;
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-sheet > .sc-form > :not(.sc-field) {
+        grid-column: 1 / -1;
+    }
+
+    .sc-sheet > .sc-form > .sc-field:has(input[type="datetime-local"]) {
+        grid-column: 1;
+    }
+
+    .sc-sheet > .sc-form > .sc-actions {
+        margin-top: 0;
+    }
+
+    .sc-sheet > h2:first-child + .sc-notice {
+        margin-bottom: var(--space-4);
+    }
+
+    /* Two columns that both earn their place: a form beside what it adds to (an addendum beside the note it follows),
+       or a record beside what belongs to it. One column on a narrow window, the form first. */
+    .sc-split {
+        display: grid;
+        grid-template-columns: minmax(0, calc(var(--width-reading) + 2 * var(--space-6))) minmax(0, 1fr);
+        gap: var(--space-6);
+        align-items: start;
+        margin: 0 0 var(--space-6);
+    }
+
+    .sc-split > * {
+        margin: 0;
+    }
+
+    @media (max-width: 64rem) {
+        .sc-split {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    /* A panel on a chart page: its title over a hairline, as the chart's panels. */
+    .sc-sheet {
+        margin: 0 0 var(--space-6);
+        padding: 0 var(--space-6) var(--space-5);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-sheet > :last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-sheet > h2:first-child {
+        display: flex;
+        align-items: center;
+        min-height: calc(28px + 2 * var(--space-3));
+        margin: 0 calc(-1 * var(--space-6)) var(--space-4);
+        padding: 0 var(--space-6);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    /* In a panel, a list of signed texts (addenda): who and when, then the text, then its own link. */
+    .sc-sheet .sc-list {
+        margin: 0 0 var(--space-4);
+    }
+
+    .sc-sheet .sc-list > li {
+        padding: var(--space-3) 0;
+    }
+
+    .sc-sheet .sc-list > li:first-child {
+        padding-top: 0;
+    }
+
+    .sc-sheet .sc-list > li > p {
+        margin: 0;
+    }
+
+    .sc-sheet .sc-list > li > p + p {
+        margin-top: var(--space-1);
+    }
+
+    .sc-sheet .sc-list > li > p:has(> a:only-child),
+    .sc-sheet [data-summary] > p:last-child {
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+    }
+
+    .sc-sheet [data-summary] > p:last-child a {
+        text-decoration: none;
+    }
+
+    .sc-sheet [data-summary] > p:last-child a:hover,
+    .sc-sheet [data-summary] > p:last-child a:focus-visible {
+        text-decoration: underline;
+    }
+
+    .sc-sheet [data-summary] {
+        margin: 0 0 var(--space-4);
+    }
+
+    .sc-sheet [data-summary] > p {
+        margin: 0;
+    }
+
+    .sc-sheet [data-summary] > p:first-child {
+        padding-bottom: var(--space-1);
+    }
+
+    .sc-sheet [data-summary]:last-child {
+        margin-bottom: 0;
+    }
+
+    /* A note's sections as one document: on a wide window each section's title on the left of its text, between
+       hairlines; the signer and the time first, the same way. In a panel (a visit summary's parts), no frame of its
+       own. */
+    .sc-notedoc {
+        margin: 0 0 var(--space-6);
+        padding: var(--space-1) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-sheet .sc-notedoc {
+        margin: 0 0 var(--space-3);
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .sc-notedoc .sc-note {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-notedoc .sc-note > :is(h2, h3) {
+        margin: 0;
+        padding-top: var(--space-4);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-notedoc .sc-note > .sc-note__text {
+        margin: 0;
+        padding: var(--space-1) 0 var(--space-4);
+    }
+
+    .sc-notedoc .sc-note > [data-note-format] {
+        margin: var(--space-4) 0 0;
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-notedoc > dl.record {
+        margin: 0;
+        padding: var(--space-3) 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-notedoc > p {
+        margin: 0;
+        padding: var(--space-3) 0;
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-notedoc > p > a:only-child {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-notedoc > p > a:only-child:hover,
+    .sc-notedoc > p > a:only-child:focus-visible {
+        text-decoration: underline;
+    }
+
+    @media (min-width: 48rem) {
+        .sc-notedoc .sc-note,
+        .sc-notedoc > dl.record {
+            display: grid;
+            grid-template-columns: 12rem minmax(0, 1fr);
+            column-gap: 0;
+        }
+
+        .sc-notedoc > dl.record > dd {
+            padding-left: var(--space-6);
+        }
+
+        .sc-notedoc .sc-note > * {
+            grid-column: 1 / -1;
+        }
+
+        .sc-notedoc .sc-note > :is(h2, h3) {
+            grid-column: 1;
+            padding-bottom: var(--space-4);
+        }
+
+        .sc-notedoc .sc-note > .sc-note__text {
+            grid-column: 2;
+            padding-top: var(--space-4);
+            padding-left: var(--space-6);
+        }
+
+        .sc-notedoc .sc-note > :is(h2, h3) ~ :is(h2, h3),
+        .sc-notedoc .sc-note > :is(h2, h3) ~ :is(h2, h3) + .sc-note__text {
+            border-top: 1px solid var(--line);
+        }
+    }
+
+    /* A note or a summary for reference beside a form: each part's title above its text, small. */
+    .sc-sheet > .sc-note {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-sheet > .sc-note > :is(h2, h3) {
+        margin: var(--space-3) 0 var(--space-1);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
+    }
+
+    .sc-sheet > .sc-note > :is(h2, h3):first-child {
+        margin-top: 0;
+    }
+
+    .sc-sheet > .sc-note > .sc-note__text {
+        margin: 0;
+    }
+
+    /* The note editor: a card the page's width, each section a row: its name and what to cover in it on the left,
+       its box on the right; the buttons under the boxes. One column on a narrow window. */
+    .sc-editor {
+        max-width: none;
+        padding: var(--space-5) var(--space-6) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-editor > #note-help {
+        margin: 0;
+    }
+
+    @media (min-width: 56rem) {
+        .sc-editor {
+            gap: 0;
+        }
+
+        .sc-editor > .sc-field {
+            display: grid;
+            grid-template-columns: 15rem minmax(0, 1fr);
+            grid-template-rows: auto auto 1fr;
+            column-gap: var(--space-6);
+            row-gap: var(--space-1);
+            align-items: start;
+            max-width: none;
+            padding: var(--space-4) 0;
+            border-top: 1px solid var(--line);
+        }
+
+        .sc-editor > .sc-field > label,
+        .sc-editor > .sc-field > .sc-field__hint {
+            grid-column: 1;
+        }
+
+        .sc-editor > .sc-field > .sc-field__input {
+            grid-column: 2;
+            grid-row: 1 / span 3;
+        }
+
+        .sc-editor > .sc-field > :not(label, .sc-field__hint, .sc-field__input) {
+            grid-column: 2;
+        }
+
+        .sc-editor > .sc-field > select.sc-field__input {
+            max-width: var(--width-form);
+        }
+
+        .sc-editor > #note-help {
+            padding-bottom: var(--space-4);
+        }
+
+        .sc-editor > .sc-actions {
+            align-self: stretch;
+            margin: 0;
+            padding: var(--space-4) 0 0 calc(15rem + var(--space-6));
+            border-top: 1px solid var(--line);
+        }
+    }
+
+    .sc-editor .sc-actions .sc-status {
+        margin: 0 0 0 var(--space-2);
+    }
+
+    /* A form whose kinds are tabs (a new order: lab, imaging, medication, referral): the tabs across the card's top,
+       their rule from edge to edge. */
+    .sc-tabcard > nav > .sc-tabs {
+        margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-6)) var(--space-5);
+        padding: 0 var(--space-6);
+    }
+
+    /* The order form's note on what the safety checks cover, in the hints' size. */
+    .sc-formgrid > [data-safety-disclaimer] {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    /* Two columns of the same width: panels two to a row (an appointment and what can be done with it), or a request
+       beside its answer. One column on a narrow window. */
+    .sc-split--even {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 64rem) {
+        .sc-split--even {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    /* A panel with no title (a record's facts): its first line clear of the frame's top. A panel titled a level down
+       (a visit's forms) has the same head as one titled with an h2. */
+    .sc-sheet > :first-child:not(h2, h3) {
+        margin-top: var(--space-5);
+    }
+
+    .sc-sheet > h3:first-child {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1) var(--space-2);
+        min-height: calc(28px + 2 * var(--space-3));
+        margin: 0 calc(-1 * var(--space-6)) var(--space-4);
+        padding: var(--space-2) var(--space-6);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    /* In a panel's form, a box of several lines takes the form's width, and a button keeps its own. In a form of short
+       fields, the reason for a visit, with its hint, takes the card's width. */
+    .sc-sheet > .sc-form > .sc-field:has(textarea) {
+        grid-column: 1 / -1;
+    }
+
+    .sc-sheet > .sc-form > .sc-btn {
+        justify-self: start;
+    }
+
+    .sc-formgrid > .sc-field:has(#appointment-reason) {
+        grid-column: 1 / -1;
+    }
+
+    /* Panels and cards side by side keep only the columns' gap; a panel's fields take their cell's width, three to a
+       row at most on a wide page and two in half of one; a list ends at the panel's padding. */
+    .sc-split > :is(.sc-sheet, .sc-formcard) {
+        margin: 0;
+    }
+
+    .sc-sheet > .sc-form {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    }
+
+    .sc-split--even .sc-sheet > .sc-form {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    }
+
+    .sc-sheet > .sc-form > .sc-field {
+        max-width: none;
+    }
+
+    /* Fields with a hint under one of them line up by their tops, not their bottoms. */
+    .sc-sheet > .sc-form:has(> .sc-field > .sc-field__hint) {
+        align-items: start;
+    }
+
+    .sc-sheet > .sc-form > .sc-field:has(#appointment-reason) {
+        grid-column: 1 / -1;
+    }
+
+    .sc-sheet > .sc-list:last-child {
+        margin-bottom: 0;
+    }
+
+    /* A field standing in a card that isn't a form itself (the language of a dictation): at the form's width, the
+       buttons a step under it. */
+    .sc-formcard:not(form) > .sc-field {
+        max-width: var(--width-form);
+    }
+
+    .sc-formcard:not(form) > .sc-field + .sc-actions {
+        margin-top: var(--space-3);
+    }
+
+    /* Dictating: the proposed fields in their panel, their rows from edge to edge. */
+    .sc-sheet > .sc-proposals {
+        max-width: none;
+        margin: 0 calc(-1 * var(--space-6));
+    }
+
+    .sc-sheet > .sc-proposals > .sc-proposal {
+        max-width: none;
+        padding-inline: var(--space-6);
+    }
+
+    .sc-sheet > .sc-proposals > .sc-proposal:last-child {
+        border-bottom: 0;
+    }
+
+    /* Reviewing them: the rows straight under the panel's head, its hairline their first. */
+    .sc-sheet > h2:first-child + .sc-proposals {
+        margin-top: calc(-1 * var(--space-4));
+        border-top: 0;
+    }
+
+    /* Quick text: adding a phrase is a panel, and the phrases a framed list under it, shown once there is one. Not
+       where they are already in a panel (the desktop app's phrases). */
+    #add-quick-text:not(.sc-panel *) {
+        padding: var(--space-5) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    #quick-texts:not(.sc-panel *) {
+        padding: 0 var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    #quick-texts:not(.sc-panel *) > li:last-child {
+        border-bottom: 0;
+    }
+
+    #quick-texts:not(.sc-panel *):not(:has(li)) {
+        display: none;
+    }
+
+    /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
+       comment; anything two areas share belongs in the components layer.
+       ---- */
+
+    /* The home: whose record it is as one line of facts, then a card each for results, appointments, messages and the
+       rest of the record. Where the column has room, a card holds what it says on the left and its buttons in a
+       column of one width on the right, so every card's way in is in the same place; the appointments run across their
+       card, the way to all of them on the right of its title. On a phone, one column, the buttons as wide as their
+       card and the links as tall as a control. */
+    .sc-home__about {
+        padding: var(--space-4) var(--space-6);
+    }
+
+    .sc-home__about dl.record {
+        grid-auto-flow: column;
+        grid-template-rows: auto auto;
+        grid-template-columns: none;
+        grid-auto-columns: max-content;
+        gap: 0 var(--space-8);
+        margin: 0;
+    }
+
+    .sc-home__about dl.record dt {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-home__about dl.record dd {
+        margin: 0;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sc-home__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+    }
+
+    /* The way to a card's fuller page ("All your appointments"). */
+    .sc-home__more a {
+        font-size: 16px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-home__more a:hover,
+    .sc-home__more a:focus-visible {
+        text-decoration: underline;
+    }
+
+    /* The next appointments, set into their card on the recessed surface. */
+    .sc-home__card .sc-rows {
+        background: var(--surface-subtle);
+        border: 0;
+        border-radius: var(--radius-md);
+    }
+
+    .sc-home__card .sc-rows > li {
+        padding: var(--space-3) var(--space-4);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-home__card .sc-rows > li > h3 {
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-home__card .sc-rows > li > .sc-rows__meta {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-home__card .sc-list {
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-home__side > :last-child {
+        margin-bottom: 0;
+    }
+
+    @media (min-width: 40rem) {
+        .sc-home__card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 16rem;
+            grid-template-rows: auto 1fr;
+            align-items: start;
+            gap: var(--space-1) var(--space-6);
+        }
+
+        .sc-home__card > * {
+            grid-column: 1;
+            margin: 0;
+        }
+
+        .sc-home__card > .sc-home__actions,
+        .sc-home__card > .sc-home__side {
+            grid-column: 2;
+            grid-row: 1 / -1;
+            margin: 0;
+        }
+
+        .sc-home__card > .sc-home__actions,
+        .sc-home__side > .sc-home__actions {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sc-home__actions > .sc-btn {
+            padding-inline: var(--space-4);
+        }
+
+        /* The record's card: under its button, the links to the download and to who viewed the record. */
+        .sc-home__side > .sc-list {
+            margin: var(--space-2) 0 0;
+        }
+
+        /* The appointments' card: its title and the way to all of them on one line, the appointments across the card,
+           and pre-visit forms in the buttons' column under them. */
+        .sc-home__card--appointments > .sc-home__more {
+            grid-column: 2;
+            grid-row: 1;
+            justify-self: end;
+        }
+
+        .sc-home__card--appointments > :is(.sc-rows, .sc-muted) {
+            grid-column: 1 / -1;
+            margin-top: var(--space-3);
+        }
+
+        .sc-home__card--appointments > .sc-home__actions {
+            grid-row: auto;
+            margin-top: var(--space-4);
+        }
+    }
+
+    @media (max-width: 40rem) {
+        .sc-home__about {
+            padding: var(--space-4);
+        }
+
+        .sc-home__about dl.record {
+            grid-auto-flow: row;
+            grid-template-rows: none;
+            grid-template-columns: max-content minmax(0, 1fr);
+            gap: var(--space-1) var(--space-4);
+        }
+
+        .sc-home__about dl.record dt,
+        .sc-home__about dl.record dd {
+            margin: 0;
+            font-size: 16px;
+            line-height: 24px;
+        }
+
+        .sc-home__actions > .sc-btn {
+            flex: 1 1 100%;
+        }
+
+        /* On a phone a link standing alone is a target as tall as a control. */
+        .sc-home__more a,
+        .sc-home__card .sc-list a {
+            display: inline-flex;
+            align-items: center;
+            min-height: var(--control-height-portal);
+        }
+
+        .sc-home__card .sc-list > li {
+            padding: 0;
+        }
+    }
+
+    /* Test results (step 6) as rows of one card, each opening in place: the name and its flag on the left, the date
+       on the right; opened, under a hairline, the plain sentence, then the value beside its normal range on the
+       recessed surface, figures lined up. */
+    .sc-results:has(> li > details.sc-result) {
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-results > li:has(> details.sc-result) {
+        margin: 0;
+        border-top: 1px solid var(--line);
+    }
+
+    .sc-results > li:has(> details.sc-result):first-child {
+        border-top: 0;
+    }
+
+    .sc-results details.sc-result {
+        margin: 0;
+        background: none;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .sc-results details.sc-result > summary::marker {
+        color: var(--ink-muted);
+    }
+
+    .sc-results details.sc-result .sc-result__line {
+        width: calc(100% - var(--space-6));
+        max-width: none;
+    }
+
+    .sc-results details.sc-result .sc-result__date {
+        order: 1;
+        margin-left: auto;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sc-results details.sc-result[open] > summary {
+        border-bottom: 1px solid var(--line);
+    }
+
+    .sc-results details.sc-result > .sc-result__body {
+        padding-top: var(--space-4);
+    }
+
+    .sc-result__body dl.record {
+        grid-auto-flow: column;
+        grid-template-rows: auto auto;
+        grid-template-columns: none;
+        grid-auto-columns: max-content;
+        gap: 0 var(--space-12);
+        padding: var(--space-4) var(--space-6);
+        background: var(--surface-subtle);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-result__body dl.record dt {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-result__body dl.record dd {
+        margin: 0;
+        font-size: 22px;
+        line-height: 28px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-results details.sc-result .sc-result__date {
+            flex-basis: 100%;
+            margin-left: 0;
+        }
+
+        .sc-result__body dl.record {
+            gap: 0 var(--space-6);
+            padding: var(--space-3) var(--space-4);
+        }
+    }
+
+    /* A conversation in the portal: the messages on the portal's cards, the reply under them. */
+    .sc-app--portal .sc-thread {
+        gap: var(--space-4);
+        margin-bottom: var(--space-6);
+    }
+
+    .sc-app--portal .sc-message {
+        padding: var(--space-4) var(--space-6);
+        border-radius: var(--radius-lg);
+    }
+
+    /* Visit summaries (step 13a): each a card read top to bottom, its date and who wrote it over a hairline, then its
+       three parts, each under a small muted heading; a withdrawn one on the same surface, with a dashed edge. */
+    .sc-result--plain[data-summary] > h2 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 28px;
+    }
+
+    .sc-result--plain[data-summary="standing"] > h2 + p {
+        margin: var(--space-1) calc(-1 * var(--space-6)) var(--space-2);
+        padding: 0 var(--space-6) var(--space-4);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-result--plain[data-summary] > h3 {
+        margin: var(--space-4) 0 var(--space-1);
+        font-family: var(--font-sans);
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+    }
+
+    .sc-result--plain[data-summary] > h3 + p {
+        margin-bottom: 0;
+    }
+
+    .sc-result--plain[data-summary="withdrawn"] {
+        border-style: dashed;
+        border-color: var(--line-strong);
+    }
+
+    @media (max-width: 40rem) {
+        .sc-result--plain[data-summary="standing"] > h2 + p {
+            margin-inline: calc(-1 * var(--space-4));
+            padding-inline: var(--space-4);
+        }
+    }
+
+    /* Asking for a refill (step 13d): each medication a choice as tall as a portal control, drawn as a pre-visit form's
+       answers are; the requests as rows, each one's state on the right and its note and answer under it. */
+    [data-refill-form="ask"] > fieldset {
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    [data-refill-form="ask"] > fieldset > legend {
+        margin-bottom: var(--space-2);
+        padding: 0;
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    [data-refill-form="ask"] .sc-check {
+        max-width: none;
+        min-height: var(--control-height-portal);
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        cursor: pointer;
+    }
+
+    [data-refill-form="ask"] .sc-check:has(input:checked) {
+        border-color: var(--primary);
+        background: var(--surface-subtle);
+    }
+
+    li[data-refill] > p:not(.sc-rows__end, .sc-rows__meta) {
+        margin-top: var(--space-2);
+    }
+
+    /* Pre-visit forms (step 13e): the questions on a card, and the answers sent on one too. */
+    .sc-app--portal .sc-answers {
+        max-width: none;
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-app--portal .sc-answers > dd:last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-formcard .sc-choice:last-of-type {
+        margin-bottom: 0;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-app--portal .sc-answers {
+            padding: var(--space-4);
+        }
+    }
+
+    /* Sharing (step 6): sharing that has ended as a quiet list on a card. */
+    .sc-ended {
+        padding: var(--space-2) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-ended > li {
+        padding: var(--space-3) 0;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-ended {
+            padding-inline: var(--space-4);
+        }
+    }
+
+    /* Who viewed the record (step 13c): its views as rows, and the way to newer and older ones on the list's left
+       edge. */
+    .sc-app--portal nav.sc-actions > a:not(.sc-btn):first-child {
+        padding-left: 0;
+    }
+
+    /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
+       under this comment; anything two areas share belongs in the components layer.
+       ---- */
+
+    /* Staff. A status on one line, as its column's head is fitted to it (the cell itself is plain: tests read it). */
+    .sc-staff td:nth-child(4) {
+        white-space: nowrap;
+    }
+
+    /* An email breaks where it must, so the row's actions always have their room; on a narrow window, where the
+       table scrolls sideways, it stays whole. */
+    @media (min-width: 48rem) {
+        .sc-staff td:nth-child(2) {
+            overflow-wrap: anywhere;
+        }
+    }
+
+    /* The audit log's filters: as many to a row as fit, the patient's ID two wide so the whole of one shows, and the
+       checkbox on the fields' line. */
+    .sc-audit__filters {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+    }
+
+    .sc-audit__filters .sc-check {
+        align-self: end;
+        align-items: center;
+        min-height: var(--control-height);
+    }
+
+    .sc-audit__filters .sc-check input {
+        margin: 0;
+    }
+
+    @media (min-width: 48rem) {
+        .sc-audit__patient {
+            grid-column: span 2;
+        }
+    }
+
+    /* The audit log. The fields a write changed: a muted line in the caption's size that wraps between names, never
+       inside one. */
+    .sc-audit [data-audit-fields] {
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--ink-muted);
+        overflow-wrap: normal;
+    }
+
+    /* IDs at the text's weight, so a column of them reads quieter than the words beside it; the way to a review on a
+       line of its own words. */
+    .sc-audit .sc-table__id {
+        font-weight: 400;
+    }
+
+    .sc-audit [data-review-link] {
+        white-space: nowrap;
+    }
+
+    /* Wide enough for set columns: the time and who did it first, the IDs whole, wrapping where they must, and the
+       reason and the fields changed taking what is left. Narrower, the columns fit their values as any table's do. */
+    @media (min-width: 80rem) {
+        .sc-audit .sc-table {
+            table-layout: fixed;
+        }
+
+        .sc-audit th:nth-child(1) {
+            width: 11rem;
+        }
+
+        .sc-audit th:nth-child(2) {
+            width: 12.5rem;
+        }
+
+        .sc-audit th:nth-child(3) {
+            width: 9.5rem;
+        }
+
+        .sc-audit th:nth-child(4) {
+            width: 10.5rem;
+        }
+
+        .sc-audit th:nth-child(5) {
+            width: 13rem;
+        }
+
+        .sc-audit th:nth-child(6) {
+            width: 5rem;
+        }
+
+        .sc-audit td:nth-child(2) {
+            overflow-wrap: anywhere;
+        }
+    }
+
+    /* The administrator's inbox: a patient, shown by ID, on one line. */
+    .sc-table tr[data-inbox-item] > td.sc-table__id {
+        white-space: nowrap;
+    }
+
+    /* The emergency-access review: the access and what was done under it, and the review beside them in a panel. */
+    .sc-access {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 24rem;
+        gap: var(--space-6);
+        align-items: start;
+    }
+
+    .sc-access__done > dl.record {
+        margin: 0;
+    }
+
+    .sc-access__done > h2 {
+        margin-top: var(--space-6);
+    }
+
+    /* What was done: each value on one line, the row's table and ID taking the rest. */
+    .sc-access [data-access-events] td:not(.sc-table__id) {
+        white-space: nowrap;
+    }
+
+    .sc-access__review {
+        overflow-wrap: anywhere;
+    }
+
+    .sc-access__review fieldset {
+        padding: 0;
+        border: 0;
+    }
+
+    .sc-access__review legend {
+        padding: 0;
+        margin-bottom: var(--space-2);
+    }
+
+    @media (max-width: 64rem) {
+        .sc-access {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    /* A clinician's desktop sign-ins: what revoking does and the choice, at a reading width. */
+    .sc-desktop {
+        max-width: var(--width-reading);
     }
 }

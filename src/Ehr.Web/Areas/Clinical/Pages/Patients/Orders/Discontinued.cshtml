@@ -11,13 +11,13 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Orders.Allergies, Model.OnPanel, Model.EmergencyUntil)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
 <h1>Discontinued orders: @patient.FamilyName, @patient.GivenName</h1>
 
 @if (Model.Orders.Orders.Count == 0)
 {
-    <p class="sc-muted">No discontinued orders.</p>
+    <p class="sc-empty">No discontinued orders.</p>
 }
 else
 {
@@ -26,8 +26,8 @@ else
             <thead>
                 <tr>
                     <th scope="col">Order</th>
-                    <th scope="col">Signed</th>
-                    <th scope="col">Discontinued</th>
+                    <th scope="col" class="sc-table__fit">Signed</th>
+                    <th scope="col" class="sc-table__fit">Discontinued</th>
                     <th scope="col">By</th>
                     <th scope="col">Reason</th>
                 </tr>

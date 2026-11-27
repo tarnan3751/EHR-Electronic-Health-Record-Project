@@ -108,9 +108,10 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
     var hiddenNotes = Model.Chart.SensitiveNotesHidden == 0 ? "" : $"{Model.Chart.SensitiveNotesHidden} signed {(Model.Chart.SensitiveNotesHidden == 1 ? "note is" : "notes are")} not shown. ";
     <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden.</span> @hiddenLists@hiddenNotes<a asp-page="Chart" asp-all-route-data="sensitiveRoute">Show sensitive items</a></p>
 }
-<p><a asp-page="Lists/History" asp-all-route-data="historyRoute">History of allergies, medications and diagnoses</a></p>
-
+@* Three columns, each a stack of panels (docs/brand: the chart): the standing facts, then the notes and orders, then
+   results, appointments, messages and the portal. Recent visits run across the foot. *@
 <div class="sc-chart">
+    <div class="sc-chart__col">
     @* Allergies, medications and diagnoses: added and changed for a patient on the clinician's panel while the clinic's
        server can be reached (Lists/Entry). Nothing is deleted; an entry that no longer applies gets another status. *@
     <section class="sc-panel" aria-labelledby="chart-allergies">
@@ -122,11 +123,13 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var allergy in Model.KnownAllergies)
                 {
                     <li id="allergy-@allergy.Id">
-                        <strong>@allergy.Display</strong>@if (allergy.Reaction is { } reaction) { <text>: @reaction</text> }
-                        @if (allergy.Criticality == AllergyCriticality.High)
-                        {
-                            <span class="sc-tag sc-tag--danger">High risk</span>
-                        }
+                        <span class="sc-list__main">
+                            <strong>@allergy.Display</strong>@if (allergy.Reaction is { } reaction) { <text>: @reaction</text> }
+                            @if (allergy.Criticality == AllergyCriticality.High)
+                            {
+                                <span class="sc-tag sc-tag--danger">High risk</span>
+                            }
+                        </span>
                         @{ EditLink("allergies", allergy.Id, allergy.Display); }
                     </li>
                 }
@@ -158,11 +161,13 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var medication in Model.Chart.Medications)
                 {
                     <li>
-                        <strong>@medication.Display</strong>@if (medication.Dosage is { } dosage) { <text>: @dosage</text> }
-                        @if (medication.Sensitive)
-                        {
-                            <span class="sc-tag sc-tag--warning">Sensitive</span>
-                        }
+                        <span class="sc-list__main">
+                            <strong>@medication.Display</strong>@if (medication.Dosage is { } dosage) { <text>: @dosage</text> }
+                            @if (medication.Sensitive)
+                            {
+                                <span class="sc-tag sc-tag--warning">Sensitive</span>
+                            }
+                        </span>
                         @{ EditLink("medications", medication.Id, medication.Display); }
                     </li>
                 }
@@ -183,13 +188,15 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var condition in Model.Chart.Conditions)
                 {
                     <li>
-                        <strong>@condition.Display</strong>
-                        @if (condition.Code is { } diagnosisCode) { <text>(@diagnosisCode)</text> }
-                        @if (condition.OnsetDate is { } onset) { <text> since @onset.ToString("yyyy-MM-dd")</text> }
-                        @if (condition.Sensitive)
-                        {
-                            <span class="sc-tag sc-tag--warning">Sensitive</span>
-                        }
+                        <span class="sc-list__main">
+                            <strong>@condition.Display</strong>
+                            @if (condition.Code is { } diagnosisCode) { <text>(@diagnosisCode)</text> }
+                            @if (condition.OnsetDate is { } onset) { <text> since @onset.ToString("yyyy-MM-dd")</text> }
+                            @if (condition.Sensitive)
+                            {
+                                <span class="sc-tag sc-tag--warning">Sensitive</span>
+                            }
+                        </span>
                         @{ EditLink("diagnoses", condition.Id, condition.Display); }
                     </li>
                 }
@@ -201,6 +208,44 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
     </section>
 
+    @* Vital signs (step 9): the newest value of each sign, from the chart's one query of the patient's vital signs. Every set, the trends and recording are on the vital signs page. *@
+    <section class="sc-panel" aria-labelledby="chart-vitals">
+        <h2 class="sc-panel__title" id="chart-vitals">Vital signs</h2>
+        @if (Model.Chart.LatestVitals.Count == 0)
+        {
+            <p class="sc-muted">No vital signs.</p>
+        }
+        else
+        {
+            @* A list, not a table: the panel is a third of the page. Short names, as on the entry form. *@
+            <ul class="sc-list" data-latest-vitals>
+                @foreach (var vital in Model.Chart.LatestVitals)
+                {
+                    <li>
+                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range, or a
+                           child's at or above its screening value (step 9d). *@
+                        <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
+                        @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
+                        @foreach (var flag in vital.Flags)
+                        {
+                            <span class="sc-tag sc-tag--warning">@flag</span>
+                        }
+                        @* Up or down against the reading before it (step 9b), in a shape and in words. *@
+                        @if (vital.Direction is { } direction)
+                        {
+                            <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
+                        }
+                        <span class="sc-muted">· @Clinic.Day(vital.TakenAt)</span>
+                    </li>
+                }
+            </ul>
+        }
+        <p><a asp-page="Vitals/Index" asp-route-patientId="@Model.Patient.Id" data-vitals>Flowsheet, trends and recording</a></p>
+    </section>
+    <p class="sc-chart__more"><a asp-page="Lists/History" asp-all-route-data="historyRoute">History of allergies, medications and diagnoses</a></p>
+    </div>
+
+    <div class="sc-chart__col">
     <section class="sc-panel" aria-labelledby="chart-notes">
         <h2 class="sc-panel__title" id="chart-notes">Clinical notes</h2>
         @* UC 9 and UC 10: dictate a note for this patient, offered as "New note" is: for a patient on the clinician's panel,
@@ -284,8 +329,10 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var order in Model.Chart.Orders)
                 {
                     <li id="order-@order.Id">
-                        <strong>@order.Display</strong> (@Ehr.Domain.Orders.OrderForms.TypeNames[order.Type])
-                        @Ehr.Domain.Orders.OrderForms.Summary(order.Type, order.Details) · signed @Clinic.Format(order.SignedAt)
+                        <span class="sc-list__main">
+                            <strong>@order.Display</strong> (@Ehr.Domain.Orders.OrderForms.TypeNames[order.Type])
+                            @Ehr.Domain.Orders.OrderForms.Summary(order.Type, order.Details) · signed @Clinic.Format(order.SignedAt)
+                        </span>
                         @if (Model.OnPanel && OnPrem.IsReachable)
                         {
                             @* A signed order is never edited: "Change" signs a new order in its place, and "Discontinue…"
@@ -325,7 +372,9 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
         <p><a asp-page="Orders/Discontinued" asp-all-route-data="discontinuedRoute">Discontinued orders</a></p>
     </section>
+    </div>
 
+    <div class="sc-chart__col">
     @* Lab orders whose results are in (step 7), part of the chart's one recorded read: those still to acknowledge
        first, abnormal before the rest. Each opens its results. *@
     <section class="sc-panel" aria-labelledby="chart-results">
@@ -359,41 +408,6 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
     </section>
 
-    @* Vital signs (step 9): the newest value of each sign, from the chart's one query of the patient's vital signs. Every set, the trends and recording are on the vital signs page. *@
-    <section class="sc-panel" aria-labelledby="chart-vitals">
-        <h2 class="sc-panel__title" id="chart-vitals">Vital signs</h2>
-        @if (Model.Chart.LatestVitals.Count == 0)
-        {
-            <p class="sc-muted">No vital signs.</p>
-        }
-        else
-        {
-            @* A list, not a table: the panel is a third of the page. Short names, as on the entry form. *@
-            <ul class="sc-list" data-latest-vitals>
-                @foreach (var vital in Model.Chart.LatestVitals)
-                {
-                    <li>
-                        @* A blood pressure is one reading (step 9c): one item, both numbers, flagged when either is outside its range, or a
-                           child's at or above its screening value (step 9d). *@
-                        <strong>@(vital.Diastolic is null ? Ehr.Domain.Results.VitalSigns.Name(vital.Code, vital.Display) : "Blood pressure")</strong>
-                        @vital.Shown @Ehr.Domain.Results.Units.Shown(vital.Unit)
-                        @foreach (var flag in vital.Flags)
-                        {
-                            <span class="sc-tag sc-tag--warning">@flag</span>
-                        }
-                        @* Up or down against the reading before it (step 9b), in a shape and in words. *@
-                        @if (vital.Direction is { } direction)
-                        {
-                            <span class="sc-trendmark" data-direction="@direction"><span aria-hidden="true">@(direction == "up" ? "▲" : "▼")</span><span class="sc-visually-hidden">@direction from @vital.PreviousShown</span></span>
-                        }
-                        <span class="sc-muted">· @Clinic.Day(vital.TakenAt)</span>
-                    </li>
-                }
-            </ul>
-        }
-        <p><a asp-page="Vitals/Index" asp-route-patientId="@Model.Patient.Id" data-vitals>Flowsheet, trends and recording</a></p>
-    </section>
-
     @* Appointments still to come (FR-17), part of the chart's one recorded read; booked for a patient on the
        clinician's panel while the clinic's server can be reached. *@
     <section class="sc-panel" aria-labelledby="chart-appointments">
@@ -414,8 +428,10 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var appointment in Model.Chart.Upcoming)
                 {
                     <li>
-                        <strong>@Clinic.Format(appointment.StartsAt)</strong> · @appointment.Minutes minutes · @appointment.Clinician
-                        <br>@appointment.Reason
+                        <span class="sc-list__main">
+                            <strong>@Clinic.Format(appointment.StartsAt)</strong> · @appointment.Minutes minutes · @appointment.Clinician
+                            <br>@appointment.Reason
+                        </span>
                         <span class="sc-list__actions"><a asp-page="/Schedule/Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @Clinic.Format(appointment.StartsAt)">Open</a></span>
                     </li>
                 }
@@ -486,6 +502,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         @* Step 13e: the forms asked for before visits, each a sensitive item, on their own page; only how many here. *@
         <p><a asp-page="Forms/Index" asp-route-patientId="@Model.Patient.Id" data-forms>Pre-visit forms@(Model.Chart.Forms > 0 ? $" ({Model.Chart.Forms})" : "")</a></p>
     </section>
+    </div>
 
     <section class="sc-panel sc-panel--wide" aria-labelledby="chart-visits">
         <h2 class="sc-panel__title" id="chart-visits">Recent visits</h2>
@@ -523,8 +540,8 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
 </div>
 
 @functions {
-    // "Add ..." above a list, for a patient on the clinician's panel; off-site with the clinic's server down, a
-    // sentence in its place.
+    // "Add ..." beside a list's title, for a patient on the clinician's panel; off-site with the clinic's server down,
+    // a sentence in its place, under the title.
     void AddLink(string list, string label)
     {
         if (Model.OnPanel && OnPrem.IsReachable)
@@ -550,7 +567,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
         }
     }
 
-    // "Change" after an entry: a plain link, so Tab reaches it and Enter follows it.
+    // "Change" on the right of an entry: a plain link, so Tab reaches it and Enter follows it.
     void EditLink(string list, Guid entry, string display)
     {
         if (Model.OnPanel && OnPrem.IsReachable)

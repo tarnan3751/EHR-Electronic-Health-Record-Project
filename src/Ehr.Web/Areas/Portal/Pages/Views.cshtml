@@ -4,6 +4,7 @@
     ViewData["Title"] = Model.ActingFor is { } name ? $"Who viewed {name}'s record" : "Who viewed my record";
     var own = Model.Own;
 }
+<div class="sc-pagehead"><a asp-page="/Index" class="sc-back">Back to home</a></div>
 <h1>@ViewData["Title"]</h1>
 @if (!Model.Available)
 {
@@ -29,7 +30,7 @@ else
     }
     @if (Model.Lines.Count == 0)
     {
-        <p>@(Model.PastTheEnd ? "No more views to show." : own ? "Nobody has viewed your record yet." : "Nobody has viewed the record yet.")</p>
+        <p class="sc-empty">@(Model.PastTheEnd ? "No more views to show." : own ? "Nobody has viewed your record yet." : "Nobody has viewed the record yet.")</p>
         @if (Model.PastTheEnd)
         {
             <p><a asp-page="/Views">Newest views</a></p>
@@ -37,14 +38,15 @@ else
     }
     else
     {
-        <section class="sc-panel" aria-label="Views">
-            <ul class="sc-list">
+        @* One row a view: who, and when on the right; what they saw under it. *@
+        <section aria-label="Views">
+            <ul class="sc-rows">
                 @foreach (var line in Model.Lines)
                 {
                     <li data-who="@line.Kind">
                         <div><strong>@line.Who</strong>@if (line.Role is { } role) {<text>, @role</text>}@if (line.Emergency) {<text> </text><span class="sc-tag sc-tag--warning">Emergency access</span>}</div>
-                        <div>@line.Part</div>
-                        <div class="sc-muted"><time datetime="@line.At.UtcDateTime.ToString("yyyy-MM-ddTHH:mmZ")">@Clinic.Format(line.At, "MMM d, yyyy, HH:mm")</time></div>
+                        <div class="sc-rows__meta">@line.Part</div>
+                        <div class="sc-muted sc-rows__end"><time datetime="@line.At.UtcDateTime.ToString("yyyy-MM-ddTHH:mmZ")">@Clinic.Format(line.At, "MMM d, yyyy, HH:mm")</time></div>
                     </li>
                 }
             </ul>
@@ -64,4 +66,3 @@ else
         }
     }
 }
-<p><a asp-page="/Index">Back to home</a></p>

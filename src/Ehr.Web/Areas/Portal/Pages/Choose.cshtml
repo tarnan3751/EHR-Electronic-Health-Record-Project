@@ -15,22 +15,23 @@
     return;
 }
 <p class="sc-muted">Choose a record. You can switch at any time under Sharing.</p>
-<ul class="sc-results">
+@* One row a record: whose, and the way to look at it on the right. *@
+<ul class="sc-rows">
     @if (Model.HasOwnRecord)
     {
-        <li class="sc-result" data-record="own">
+        <li data-record="own">
             <h2>My record</h2>
-            <form method="post" asp-page="/Acting" asp-page-handler="Mine">
+            <form method="post" asp-page="/Acting" asp-page-handler="Mine" class="sc-rows__end">
                 <button type="submit" class="sc-btn sc-btn--primary" autofocus>View my record</button>
             </form>
         </li>
     }
     @foreach (var record in Model.Records)
     {
-        <li class="sc-result" data-record="shared">
+        <li data-record="shared">
             <h2>@record.PatientName</h2>
-            <p>Shared with you. @ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
-            <form method="post" asp-page="/Acting">
+            <p class="sc-rows__meta">Shared with you. @ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
+            <form method="post" asp-page="/Acting" class="sc-rows__end">
                 <input type="hidden" name="grantId" value="@record.GrantId">
                 <button type="submit" class="sc-btn @(Model.HasOwnRecord ? null : "sc-btn--primary")">View this record</button>
             </form>

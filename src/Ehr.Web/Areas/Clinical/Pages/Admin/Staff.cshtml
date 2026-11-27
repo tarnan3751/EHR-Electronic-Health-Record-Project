@@ -19,44 +19,47 @@
 }
 <div asp-validation-summary="ModelOnly" class="sc-notice sc-notice--danger"></div>
 
-<div class="sc-table-wrap">
+@* Each row's name, roles and status as wide as they are, the email taking the rest, and the row's actions on the right
+   on one line: the link to the desktop sign-ins, the setup link (what most account trouble needs) as the one button with
+   an edge, and the authenticator reset and the account switch quiet, since they lock the person out until they act. *@
+<div class="sc-table-wrap sc-staff">
     <table class="sc-table">
         <thead>
-            <tr><th>Name</th><th>Email</th><th>Roles</th><th>Status</th><th><span class="sc-visually-hidden">Actions</span></th></tr>
+            <tr><th class="sc-table__fit">Name</th><th>Email</th><th class="sc-table__fit">Roles</th><th class="sc-table__fit">Status</th><th class="sc-table__actions"><span class="sc-visually-hidden">Actions</span></th></tr>
         </thead>
         <tbody>
             @foreach (var member in Model.Staff)
             {
                 <tr>
-                    <td>@member.DisplayName</td>
+                    <td class="sc-table__fit">@member.DisplayName</td>
                     <td>@member.Email</td>
-                    <td>@string.Join(", ", member.Roles)</td>
+                    <td class="sc-table__fit">@string.Join(", ", member.Roles)</td>
                     <td>@StaffModel.StatusOf(member)</td>
-                    <td>
-                        @if (member.Roles.Contains(StaffRoles.Clinician))
-                        {
-                            @* Anyone's, their own included: the remote wipe for a lost laptop (DesktopSignIns). A link, since it
-                               opens a page; the buttons beside it act at once, and none is the page's primary. *@
-                            <p><a asp-page="/Admin/DesktopSignIns" asp-route-id="@member.Id">Desktop sign-ins</a></p>
-                        }
-                        @if (member.Id != Model.CurrentUserId)
-                        {
-                            <div class="sc-actions">
+                    <td class="sc-table__actions">
+                        <div class="sc-actions">
+                            @if (member.Roles.Contains(StaffRoles.Clinician))
+                            {
+                                @* Anyone's, their own included: the remote wipe for a lost laptop (DesktopSignIns). A link, since it
+                                   opens a page; the buttons beside it act at once, and none is the page's primary. *@
+                                <a asp-page="/Admin/DesktopSignIns" asp-route-id="@member.Id">Desktop sign-ins</a>
+                            }
+                            @if (member.Id != Model.CurrentUserId)
+                            {
                                 <form method="post" asp-page-handler="Reissue"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">New setup link</button></form>
                                 @if (member.TwoFactorEnabled)
                                 {
-                                    <form method="post" asp-page-handler="ResetAuthenticator"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">Reset authenticator</button></form>
+                                    <form method="post" asp-page-handler="ResetAuthenticator"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact sc-btn--quiet">Reset authenticator</button></form>
                                 }
                                 @if (StaffAccounts.IsDisabled(member))
                                 {
-                                    <form method="post" asp-page-handler="Enable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">Enable account</button></form>
+                                    <form method="post" asp-page-handler="Enable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact sc-btn--quiet">Enable account</button></form>
                                 }
                                 else
                                 {
-                                    <form method="post" asp-page-handler="Disable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">Disable account</button></form>
+                                    <form method="post" asp-page-handler="Disable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact sc-btn--quiet sc-btn--danger">Disable account</button></form>
                                 }
-                            </div>
-                        }
+                            }
+                        </div>
                     </td>
                 </tr>
             }
@@ -64,8 +67,9 @@
     </table>
 </div>
 
-<h2>Add a staff account</h2>
-<form method="post" class="sc-form">
+@* A card at the form's width, under the table it adds to. *@
+<form method="post" class="sc-form sc-formcard">
+    <h2>Add a staff account</h2>
     <div class="sc-field">
         <label asp-for="Input.Email" class="sc-field__label">Email</label>
         <input asp-for="Input.Email" class="sc-field__input" type="email" autocomplete="off" required>

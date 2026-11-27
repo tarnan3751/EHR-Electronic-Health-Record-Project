@@ -13,7 +13,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
 </div>
 <h1>People who can see this record: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Done is "recorded")
@@ -27,14 +27,14 @@ else if (Model.Done is "removed")
 <p class="sc-muted">Each person signs in to the portal with their own account. Only the patient can let them see sensitive items.</p>
 @if (Model.Grants.Count == 0)
 {
-    <p class="sc-muted">No one else has access.</p>
+    <p class="sc-empty">No one else has access.</p>
 }
 else
 {
     <div class="sc-table-wrap">
         <table class="sc-table">
             <thead>
-                <tr><th scope="col">Person</th><th scope="col">Can see</th><th scope="col">Sensitive items</th><th scope="col">Given</th><th scope="col">Status</th><th scope="col"><span class="sc-visually-hidden">Action</span></th></tr>
+                <tr><th scope="col">Person</th><th scope="col">Can see</th><th scope="col">Sensitive items</th><th scope="col" class="sc-table__fit">Given</th><th scope="col" class="sc-table__fit">Status</th><th scope="col" class="sc-table__actions"><span class="sc-visually-hidden">Action</span></th></tr>
             </thead>
             <tbody>
                 @foreach (var grant in Model.Grants)
@@ -43,8 +43,8 @@ else
                         <td>@grant.Email</td>
                         <td>@ProxyAccess.ScopeLabel(grant.Scope)</td>
                         <td>@(grant.IncludeSensitive ? "Shown (the patient allowed it)" : "Hidden")</td>
-                        <td>@(grant.ByClinic ? "By the clinic" : "By the patient"), @Clinic.Day(grant.GrantedAt)</td>
-                        <td>
+                        <td class="sc-table__fit">@(grant.ByClinic ? "By the clinic" : "By the patient"), @Clinic.Day(grant.GrantedAt)</td>
+                        <td class="sc-table__fit">
                             @if (grant.InForce)
                             {
                                 <span class="sc-tag sc-tag--success">In force</span> <span>until @Clinic.Day(grant.ExpiresAt)</span>
@@ -58,7 +58,7 @@ else
                                 <span class="sc-tag">Expired</span> <span>@Clinic.Day(grant.ExpiresAt)</span>
                             }
                         </td>
-                        <td>
+                        <td class="sc-table__actions">
                             @if (grant.InForce && Model.OnPanel && OnPrem.IsReachable)
                             {
                                 <form method="post" asp-page-handler="Revoke" asp-route-patientId="@patient.Id">
@@ -73,6 +73,7 @@ else
         </table>
     </div>
 }
+<div class="sc-sheet">
 <h2>Give access</h2>
 @if (!Model.OnPanel)
 {
@@ -131,3 +132,4 @@ else
         </div>
     </form>
 }
+</div>

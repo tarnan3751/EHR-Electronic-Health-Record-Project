@@ -13,9 +13,11 @@
 }
 @* Step 18 (UC 24). The patient by ID only, and nothing from the record: the events are the audit log's own, with no
    values, as the audit page shows them; times in UTC, as the audit log's are (docs/brand: Dates). Keyboard first
-   (NFR-12): the form's first choice, then the note, then "Mark reviewed". *@
+   (NFR-12): the form's first choice, then the note, then "Mark reviewed". The access and what was done under it on the
+   left, the review beside them on the right, which a narrow window puts under them. *@
 <div class="sc-pagehead">
-    <p><a asp-page="/Inbox/Index">Back to inbox</a> · <a asp-page="Audit" asp-route-flagged="true">Emergency access in the audit log</a></p>
+    <a class="sc-back" asp-page="/Inbox/Index">Back to inbox</a>
+    <a asp-page="Audit" asp-route-flagged="true">Emergency access in the audit log</a>
 </div>
 <h1>Emergency access @if (review is null) {<span class="sc-tag sc-tag--danger">Review</span>} else {<span class="sc-tag">Reviewed</span>}</h1>
 <p class="sc-lede">Check that the chart was needed. The patient is shown by ID only, since administrators can't see patient data.</p>
@@ -32,92 +34,98 @@
 {
     <p class="sc-notice sc-notice--danger" role="alert" data-review-problem><span class="sc-notice__state">Not saved.</span> @problem</p>
 }
-<dl class="record" data-emergency-access>
-    <dt>Clinician</dt>
-    <dd>@access.Clinician</dd>
-    <dt>Patient ID</dt>
-    <dd class="sc-table__id">@access.PatientId</dd>
-    <dt>Began</dt>
-    <dd class="sc-table__mono">@Utc(access.GrantedAt)</dd>
-    <dt>@(ended ? "Ended" : "Ends")</dt>
-    <dd class="sc-table__mono">@Utc(access.ExpiresAt)</dd>
-    <dt>Reason given</dt>
-    <dd><span class="sc-note__text">@access.Reason</span></dd>
-</dl>
-<h2>What they did</h2>
-<p class="sc-muted">What this clinician viewed or changed for this patient while the access lasted, from the audit log. Never the values.</p>
-@if (access.Events.Count == 0)
-{
-    <p class="sc-muted">No events.</p>
-}
-else
-{
-    <div class="sc-table-wrap">
-        <table class="sc-table" data-access-events>
-            <thead>
-                <tr><th scope="col">When (UTC)</th><th scope="col">What</th><th scope="col">Part</th><th scope="col">Row</th><th scope="col">Site</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var e in access.Events)
-                {
-                    <tr>
-                        <td class="sc-table__mono">@e.OccurredAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                        <td>@(e.Action == AuditActions.BreakGlass ? "Emergency access" : e.Action)</td>
-                        @if (e.Part is { } part) { <td class="sc-table__mono">@part</td> } else { <td class="sc-table__muted">—</td> }
-                        @if (e.TableName is { } table) { <td class="sc-table__id">@table @e.RowId</td> } else { <td class="sc-table__muted">—</td> }
-                        <td>@(e.Source == AuditSources.Cloud ? "Off-site" : "On-site")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+<div class="sc-access">
+    <div class="sc-access__done">
+        <dl class="record sc-panel" data-emergency-access>
+            <dt>Clinician</dt>
+            <dd>@access.Clinician</dd>
+            <dt>Patient ID</dt>
+            <dd class="sc-table__id">@access.PatientId</dd>
+            <dt>Began</dt>
+            <dd class="sc-table__mono">@Utc(access.GrantedAt)</dd>
+            <dt>@(ended ? "Ended" : "Ends")</dt>
+            <dd class="sc-table__mono">@Utc(access.ExpiresAt)</dd>
+            <dt>Reason given</dt>
+            <dd><span class="sc-note__text">@access.Reason</span></dd>
+        </dl>
+        <h2>What they did</h2>
+        <p class="sc-muted">What this clinician viewed or changed for this patient while the access lasted, from the audit log. Never the values.</p>
+        @if (access.Events.Count == 0)
+        {
+            <p class="sc-empty">No events.</p>
+        }
+        else
+        {
+            <div class="sc-table-wrap">
+                <table class="sc-table" data-access-events>
+                    <thead>
+                        <tr><th scope="col" class="sc-table__fit">When (UTC)</th><th scope="col" class="sc-table__fit">What</th><th scope="col" class="sc-table__fit">Part</th><th scope="col">Row</th><th scope="col" class="sc-table__fit">Site</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in access.Events)
+                        {
+                            <tr>
+                                <td class="sc-table__mono">@e.OccurredAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>@(e.Action == AuditActions.BreakGlass ? "Emergency access" : e.Action)</td>
+                                @if (e.Part is { } part) { <td class="sc-table__mono">@part</td> } else { <td class="sc-table__muted">—</td> }
+                                @if (e.TableName is { } table) { <td class="sc-table__id">@table @e.RowId</td> } else { <td class="sc-table__muted">—</td> }
+                                <td>@(e.Source == AuditSources.Cloud ? "Off-site" : "On-site")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (access.MoreEvents)
+            {
+                <p class="sc-muted">Showing the first @Ehr.Domain.Audit.EmergencyAccessReviews.EventLimit. <a asp-page="Audit" asp-route-actor="@access.ClinicianId" asp-route-patient="@access.PatientId" asp-route-from="@access.GrantedAt.UtcDateTime.ToString("yyyy-MM-dd")" asp-route-to="@access.ExpiresAt.UtcDateTime.ToString("yyyy-MM-dd")">See them all in the audit log</a></p>
+            }
+        }
     </div>
-    @if (access.MoreEvents)
-    {
-        <p class="sc-muted">Showing the first @Ehr.Domain.Audit.EmergencyAccessReviews.EventLimit. <a asp-page="Audit" asp-route-actor="@access.ClinicianId" asp-route-patient="@access.PatientId" asp-route-from="@access.GrantedAt.UtcDateTime.ToString("yyyy-MM-dd")" asp-route-to="@access.ExpiresAt.UtcDateTime.ToString("yyyy-MM-dd")">See them all in the audit log</a></p>
-    }
-}
-<h2>Review</h2>
-@if (review is not null)
-{
-    <p data-review><span class="sc-tag @(review.Outcome == EmergencyAccessOutcomes.NotAppropriate ? "sc-tag--danger" : "sc-tag--success")">@EmergencyAccessOutcomes.Names[review.Outcome]</span> Reviewed by @access.Reviewer, <span class="sc-table__mono">@Utc(review.ReviewedAt)</span>.</p>
-    <p class="sc-note__text" data-review-note>@review.Note</p>
-}
-else if (!ended)
-{
-    <p class="sc-muted">Available once the access ends.</p>
-}
-else if (access.ClinicianId == userId)
-{
-    <p class="sc-notice sc-notice--info" data-review-own><span class="sc-notice__state">Your own emergency access.</span> Another administrator reviews it.</p>
-}
-else if (!OnPrem.IsReachable)
-{
-    <p class="sc-muted" data-review-offline>Marking an access reviewed needs the clinic's server. The access remains readable.</p>
-}
-else
-{
-    <form method="post" class="sc-form" data-review-form>
-        <fieldset class="sc-field" aria-describedby="@(Model.Errors.ContainsKey("Outcome") ? "review-outcome-error" : null)">
-            <legend class="sc-field__label">Was it appropriate?</legend>
-            @foreach (var outcome in EmergencyAccessOutcomes.All)
-            {
-                <label class="sc-check"><input type="radio" name="Outcome" value="@outcome" checked="@(Model.Outcome == outcome)" autofocus="@(outcome == EmergencyAccessOutcomes.Appropriate)"> @EmergencyAccessOutcomes.Names[outcome]</label>
-            }
-            @if (Model.Errors.TryGetValue("Outcome", out var outcomeError))
-            {
-                <p class="sc-field__error" id="review-outcome-error">@outcomeError</p>
-            }
-        </fieldset>
-        <div class="sc-field">
-            <label for="review-note" class="sc-field__label">Note</label>
-            <textarea id="review-note" class="sc-field__input" name="Note" rows="4" maxlength="500" required
-                      aria-invalid="@(Model.Errors.ContainsKey("Note") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Note") ? "review-note-error review-note-hint" : "review-note-hint")">@Model.Note</textarea>
-            @if (Model.Errors.TryGetValue("Note", out var noteError))
-            {
-                <p class="sc-field__error" id="review-note-error">@noteError</p>
-            }
-            <p class="sc-field__hint" id="review-note-hint">What you checked and found, in 10 to 500 characters. It's kept with the review and can't be changed. The clinician doesn't see it.</p>
-        </div>
-        <button class="sc-btn sc-btn--primary">Mark reviewed</button>
-    </form>
-}
+    <section class="sc-panel sc-access__review">
+        <h2 class="sc-panel__title">Review</h2>
+        @if (review is not null)
+        {
+            <p data-review><span class="sc-tag @(review.Outcome == EmergencyAccessOutcomes.NotAppropriate ? "sc-tag--danger" : "sc-tag--success")">@EmergencyAccessOutcomes.Names[review.Outcome]</span> Reviewed by @access.Reviewer, <span class="sc-table__mono">@Utc(review.ReviewedAt)</span>.</p>
+            <p class="sc-note__text" data-review-note>@review.Note</p>
+        }
+        else if (!ended)
+        {
+            <p class="sc-muted">Available once the access ends.</p>
+        }
+        else if (access.ClinicianId == userId)
+        {
+            <p class="sc-notice sc-notice--info" data-review-own><span class="sc-notice__state">Your own emergency access.</span> Another administrator reviews it.</p>
+        }
+        else if (!OnPrem.IsReachable)
+        {
+            <p class="sc-muted" data-review-offline>Marking an access reviewed needs the clinic's server. The access remains readable.</p>
+        }
+        else
+        {
+            <form method="post" class="sc-form" data-review-form>
+                <fieldset class="sc-field" aria-describedby="@(Model.Errors.ContainsKey("Outcome") ? "review-outcome-error" : null)">
+                    <legend class="sc-field__label">Was it appropriate?</legend>
+                    @foreach (var outcome in EmergencyAccessOutcomes.All)
+                    {
+                        <label class="sc-check"><input type="radio" name="Outcome" value="@outcome" checked="@(Model.Outcome == outcome)" autofocus="@(outcome == EmergencyAccessOutcomes.Appropriate)"> @EmergencyAccessOutcomes.Names[outcome]</label>
+                    }
+                    @if (Model.Errors.TryGetValue("Outcome", out var outcomeError))
+                    {
+                        <p class="sc-field__error" id="review-outcome-error">@outcomeError</p>
+                    }
+                </fieldset>
+                <div class="sc-field">
+                    <label for="review-note" class="sc-field__label">Note</label>
+                    <textarea id="review-note" class="sc-field__input" name="Note" rows="4" maxlength="500" required
+                              aria-invalid="@(Model.Errors.ContainsKey("Note") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Note") ? "review-note-error review-note-hint" : "review-note-hint")">@Model.Note</textarea>
+                    @if (Model.Errors.TryGetValue("Note", out var noteError))
+                    {
+                        <p class="sc-field__error" id="review-note-error">@noteError</p>
+                    }
+                    <p class="sc-field__hint" id="review-note-hint">What you checked and found, in 10 to 500 characters. It's kept with the review and can't be changed. The clinician doesn't see it.</p>
+                </div>
+                <button class="sc-btn sc-btn--primary">Mark reviewed</button>
+            </form>
+        }
+    </section>
+</div>

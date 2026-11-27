@@ -13,9 +13,9 @@
     }
     else
     {
-        <p class="sc-muted">No upcoming appointments.</p>
+        <p class="sc-empty">No upcoming appointments.</p>
     }
-    <p>To book, change or cancel an appointment, contact the clinic.</p>
+    <p class="sc-muted">To book, change or cancel an appointment, contact the clinic.</p>
     <h2>Earlier</h2>
     @if (appointments.Past.Count > 0)
     {
@@ -23,7 +23,7 @@
     }
     else
     {
-        <p class="sc-muted">No earlier appointments.</p>
+        <p class="sc-empty">No earlier appointments.</p>
     }
 }
 else

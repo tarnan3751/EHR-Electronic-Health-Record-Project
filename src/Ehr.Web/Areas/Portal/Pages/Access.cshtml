@@ -33,13 +33,14 @@ else if (Model.Records.Count == 0)
 }
 else
 {
-    <ul class="sc-results">
+    @* One row a record: whose, and what of it until when; the way to look at it on the right. *@
+    <ul class="sc-rows">
         @foreach (var record in Model.Records)
         {
-            <li class="sc-result" data-record>
+            <li data-record>
                 <h3>@record.PatientName</h3>
-                <p>@ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
-                <form method="post" asp-page="/Acting">
+                <p class="sc-rows__meta">@ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
+                <form method="post" asp-page="/Acting" class="sc-rows__end">
                     <input type="hidden" name="grantId" value="@record.GrantId">
                     <button type="submit" class="sc-btn">View this record</button>
                 </form>
@@ -66,16 +67,17 @@ else
     }
     else
     {
-        <ul class="sc-results">
+        @* One row a person: their address, then what they can see, and the buttons that change it under that. *@
+        <ul class="sc-rows">
             @foreach (var grant in inForce)
             {
-                <li class="sc-result" data-grant>
+                <li data-grant>
                     <h3>@grant.Email</h3>
-                    <p>
+                    <p class="sc-rows__meta">
                         @ProxyAccess.ScopeLabel(grant.Scope). Until @Clinic.Plain(grant.ExpiresAt, "MMM d, yyyy").
                         @(grant.ByClinic ? "Shared by your clinic." : "Shared by you.")
                     </p>
-                    <p>@(grant.IncludeSensitive ? "They can also see sensitive items, and see and fill in your pre-visit forms." : "They can't see sensitive items or your pre-visit forms.")</p>
+                    <p class="sc-rows__meta">@(grant.IncludeSensitive ? "They can also see sensitive items, and see and fill in your pre-visit forms." : "They can't see sensitive items or your pre-visit forms.")</p>
                     @if (OnPrem.IsReachable)
                     {
                         <div class="sc-actions">
@@ -110,7 +112,7 @@ else
                 <li>Sharing ends after the time you choose, and you can stop it at any time.</li>
             </ul>
         </div>
-        <form method="post" class="sc-form">
+        <form method="post" class="sc-form sc-formcard">
             @if (Model.Errors.Count > 0)
             {
                 <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> Fix the highlighted fields and try again.</p>
@@ -166,7 +168,7 @@ else
     @if (ended.Count > 0)
     {
         <h2>Sharing that has ended</h2>
-        <ul class="sc-list">
+        <ul class="sc-list sc-ended">
             @foreach (var grant in ended)
             {
                 <li>@grant.Email <span class="sc-muted">· @(grant.RevokedAt is { } revoked ? $"stopped {Clinic.Plain(revoked, "MMM d, yyyy")}" : $"ended {Clinic.Plain(grant.ExpiresAt, "MMM d, yyyy")}")</span></li>

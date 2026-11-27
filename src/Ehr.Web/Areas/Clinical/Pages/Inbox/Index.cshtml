@@ -34,7 +34,7 @@
 }
 @if (Model.Items.Items.Count == 0)
 {
-    <p class="sc-muted">@(Model.Done ? "Nothing done yet." : "Nothing needs your action.")</p>
+    <p class="sc-empty">@(Model.Done ? "Nothing done yet." : "Nothing needs your action.")</p>
 }
 else
 {
@@ -42,15 +42,16 @@ else
     {
         <p class="sc-muted" id="inbox-done-note">Marking an item done can't be undone.</p>
     }
-    @* Each row: when, one line saying what it is, the patient, then what to do about it. *@
+    @* Each row: when, one line saying what it is, the patient, then what to do about it, on the right. The line takes
+       what the other columns leave. *@
     <div class="sc-table-wrap">
         <table class="sc-table">
             <thead>
                 <tr>
-                    <th scope="col">@(Model.Done ? "Done" : "Received")</th>
+                    <th scope="col" class="sc-table__fit">@(Model.Done ? "Done" : "Received")</th>
                     <th scope="col">What</th>
-                    <th scope="col">Patient</th>
-                    <th scope="col"><span class="sc-visually-hidden">Actions</span></th>
+                    <th scope="col" class="sc-table__fit">Patient</th>
+                    <th scope="col" class="sc-table__actions"><span class="sc-visually-hidden">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -73,7 +74,7 @@ else
                         </td>
                         @if (item.PatientName is not null && clinician)
                         {
-                            <td><a asp-page="/Patients/Chart" asp-route-id="@item.PatientId">@item.PatientName</a> <span class="sc-table__mono">@item.PatientMrn</span></td>
+                            <td class="sc-table__fit"><a asp-page="/Patients/Chart" asp-route-id="@item.PatientId">@item.PatientName</a> <span class="sc-table__mono sc-table__muted">@item.PatientMrn</span></td>
                         }
                         else if (item.PatientId is { } patient)
                         {
@@ -84,7 +85,7 @@ else
                         {
                             <td class="sc-table__muted">—</td>
                         }
-                        <td>
+                        <td class="sc-table__actions">
                             <div class="sc-actions">
                                 @if (clinician && item.Kind == InboxItemKind.FormAlert && item.SourceTable == "questionnaire_responses" && item.PatientId is { } formPatient && item.DoneAt is null)
                                 {

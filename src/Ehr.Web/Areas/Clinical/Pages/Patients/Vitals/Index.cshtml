@@ -17,7 +17,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Vitals.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
 </div>
 <h1>Vital signs: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Marked is > 0)
@@ -29,7 +29,9 @@
     <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved.</span> The patient can now see these vital signs.</p>
 }
 
-@* The form comes first: the cursor starts in it (NFR-12), and the flowsheet and trends stay in view under it. *@
+@* The form comes first, in its panel: the cursor starts in it (NFR-12), and the flowsheet and trends stay in view under
+   it. *@
+<div class="sc-sheet">
 <h2>Record vital signs</h2>
 @if (!Model.OnPanel)
 {
@@ -84,11 +86,12 @@ else
         </div>
     </form>
 }
+</div>
 
 <h2>Flowsheet</h2>
 @if (recorded.Count == 0)
 {
-    <p class="sc-muted">No vital signs.</p>
+    <p class="sc-empty">No vital signs.</p>
 }
 else
 {
@@ -97,7 +100,7 @@ else
             <caption class="sc-visually-hidden">@(Model.Times.Count == 1 ? "The latest set of vital signs." : $"The latest {Model.Times.Count} sets of vital signs, newest first.") Times are @Clinic.ClockName.</caption>
             <thead>
                 <tr>
-                    <th scope="col">Vital sign</th>
+                    <th scope="col" class="sc-table__fit">Vital sign</th>
                     @foreach (var time in Model.Times)
                     {
                         <th scope="col" class="sc-table__mono">@Clinic.Format(time)</th>

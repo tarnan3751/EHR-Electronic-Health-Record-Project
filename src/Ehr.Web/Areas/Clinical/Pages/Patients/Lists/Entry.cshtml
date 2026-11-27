@@ -38,7 +38,7 @@
 else
 {
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
 <h1>@heading: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Proposed is { } proposed)
@@ -46,7 +46,7 @@ else
     <partial name="~/Areas/Clinical/Pages/Patients/Notes/_ProposedFromDictation.cshtml" model="proposed" />
 }
 
-<form method="post" class="sc-form">
+<form method="post" class="sc-form sc-formcard sc-formcard--wide sc-formgrid">
     @if (Model.IsNew)
     {
         @* The new entry's ID, so posting this form twice saves one entry (ChartLists.SaveAsync). *@

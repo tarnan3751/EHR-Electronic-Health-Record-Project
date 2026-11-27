@@ -6,6 +6,7 @@
   --brand-mint: #5fd4ba;
   --brand-teal: #0b6e5c;
   --surface: #ffffff;
+  --surface-page: var(--surface-subtle);
   --surface-subtle: #f4f6f8;
   --surface-raised: #ffffff;
   --line: #dce2e8;
@@ -42,6 +43,7 @@
   --brand-mint: #5fd4ba;
   --brand-teal: #0b6e5c;
   --surface: var(--brand-navy);
+  --surface-page: var(--surface);
   --surface-subtle: #132336;
   --surface-raised: #182a3f;
   --line: #2a3d53;
@@ -79,6 +81,7 @@
     --brand-mint: #5fd4ba;
     --brand-teal: #0b6e5c;
     --surface: var(--brand-navy);
+    --surface-page: var(--surface);
     --surface-subtle: #132336;
     --surface-raised: #182a3f;
     --line: #2a3d53;

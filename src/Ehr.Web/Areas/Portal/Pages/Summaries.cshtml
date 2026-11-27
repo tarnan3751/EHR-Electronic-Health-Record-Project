@@ -5,6 +5,7 @@
     var own = Model.Own;
     string[] parts = Ehr.Domain.Notes.VisitSummaries.Parts;
 }
+<div class="sc-pagehead"><a asp-page="/Index" class="sc-back">Back to home</a></div>
 <h1>Visit summaries</h1>
 @if (Model.Summaries is not { } summaries)
 {
@@ -30,7 +31,7 @@ else
     }
     @if (items.Count == 0)
     {
-        <p>No visit summaries yet.</p>
+        <p class="sc-empty">No visit summaries yet.</p>
     }
     else
     {
@@ -61,4 +62,3 @@ else
         </ul>
     }
 }
-<p><a asp-page="/Index">Back to home</a></p>
