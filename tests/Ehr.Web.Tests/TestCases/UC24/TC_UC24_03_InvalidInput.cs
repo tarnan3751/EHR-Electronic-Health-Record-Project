@@ -27,9 +27,9 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 //   3. Open Dr. Twice's access as both reviewers; Second Reviewer saves; First Reviewer saves from the page opened first.
 //   4. Post a review of an access still in force.
 //   5. GET the page as a clinician, signed out, and for an unknown ID.
-// Expected result: Step 1: the page again, "Say whether the access was appropriate.", "Write a note…", "Use at least 10
-//   characters.", "Use 500 characters or fewer."; nothing saved. Step 2: "Your own emergency access. Another
-//   administrator reviews it." and no form; the post "Not saved. This is your own emergency access…"; nothing saved.
+// Expected result: Step 1: the page again, "Select whether it was appropriate.", "Note is required.", "Note must be 10
+//   to 500 characters." (twice); nothing saved. Step 2: "Your own access. Another
+//   administrator reviews it." and no form; the post "Not saved. This is your own access…"; nothing saved.
 //   Step 3: "Not saved. Someone reviewed this access first…", Second Reviewer's review shown and kept. Step 4: "Not
 //   saved. This access is still in force…". Step 5: /denied, /sign-in, and 404.
 // Creator: Tahseen Arnan
@@ -47,10 +47,10 @@ public class TC_UC24_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         // 1.
         using (var noOutcome = await ReviewAsync(first.Client, twice.Id, null, Note))
         {
-            Assert.Contains("Say whether the access was appropriate.", await ReadAsync(noOutcome));
+            Assert.Contains("Select whether it was appropriate.", await ReadAsync(noOutcome));
         }
 
-        foreach (var (note, said) in new[] { ("", "Write a note: what you checked, and what you found."), ("Too short", "Use at least 10 characters."), (new string('x', 501), "Use 500 characters or fewer.") })
+        foreach (var (note, said) in new[] { ("", "Note is required."), ("Too short", "Note must be 10 to 500 characters."), (new string('x', 501), "Note must be 10 to 500 characters.") })
         {
             using var refused = await ReviewAsync(first.Client, twice.Id, EmergencyAccessOutcomes.Appropriate, note);
             Assert.Contains(said, await ReadAsync(refused));
@@ -63,11 +63,11 @@ public class TC_UC24_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         var own = await GrantAsync(apps, "", clinician: both);
         await EndAsync(apps, own.Id);
         var ownPage = await own.Session.Client.GetStringAsync($"/admin/emergency-access/{own.Id}", Cancel);
-        Assert.Contains("Your own emergency access.</span> Another administrator reviews it.", ownPage);
+        Assert.Contains("Your own access.</span> Another administrator reviews it.", ownPage);
         Assert.DoesNotContain("data-review-form", ownPage);
         using (var forged = await own.Session.Client.PostAsync($"/admin/emergency-access/{own.Id}", Form(("Outcome", EmergencyAccessOutcomes.Appropriate), ("Note", Note), ("__RequestVerificationToken", Token(await own.Session.Client.GetStringAsync("/inbox", Cancel)))), TestContext.Current.CancellationToken))
         {
-            Assert.Contains("Not saved.</span> This is your own emergency access.", await ReadAsync(forged));
+            Assert.Contains("Not saved.</span> This is your own access.", await ReadAsync(forged));
         }
 
         Assert.Empty(await ReviewsAsync(apps, own.Id));

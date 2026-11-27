@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   POST /sign-in; GET /patients; POST /sign-in/enroll with a wrong code, then the right one. On the on-prem app (the
 //   on-site address). The clinic's server is up.
 // Test data: Clinician "Dr. Not Admin" and admin "The Admin", with fresh @example.test addresses. New account: a fresh
-//   @example.test address, Name to show "Nurse Test 01", role Clinician. Short password "short-pw-1" (10 characters);
+//   @example.test address, Display name "Nurse Test 01", role Clinician. Short password "short-pw-1" (10 characters);
 //   new password "nurse-test-password-1234". The codes are computed from the key the enrollment page shows.
 // Steps:
 //   1. As the clinician, post the account creation form.

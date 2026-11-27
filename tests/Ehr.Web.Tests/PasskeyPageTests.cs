@@ -216,7 +216,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
 
         using var reset = await PostFormAsync(adminSession.Client, "/admin/staff?handler=ResetAuthenticator", "/admin/staff", ("id", account.Id));
 
-        Assert.Contains("Dr. Lost Laptop will set up an authenticator app again at their next sign-in. Their 2 passkeys were removed.", Words(await ReadAsync(reset)));
+        Assert.Contains("Authenticator reset for Dr. Lost Laptop. Their 2 passkeys were removed.", Words(await ReadAsync(reset)));
         Assert.Empty(await PasskeysAsync(account));
         Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.PasskeyRemoved, actorId: admin.Id));
         // The audit page shows them, about no patient, with the passkey named by its hash (step 18a keeps such an event's
@@ -552,7 +552,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
 
         foreach (var reset in await Task.WhenAll(resets))
         {
-            Assert.Contains("Dr. Reset Twice will set up an authenticator app again at their next sign-in.", Words(await ReadAsync(reset)));
+            Assert.Contains("Authenticator reset for Dr. Reset Twice.", Words(await ReadAsync(reset)));
             reset.Dispose();
         }
 
@@ -589,7 +589,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             foreach (var reset in resets)
             {
                 Assert.True(reset.StatusCode == HttpStatusCode.OK, $"Run {run}: {(int)reset.StatusCode}.");
-                Assert.Contains("will set up an authenticator app again at their next sign-in. Their passkey was removed.", Words(await ReadAsync(reset)));
+                Assert.Contains("Their passkey was removed.", Words(await ReadAsync(reset)));
                 reset.Dispose();
             }
 
@@ -663,7 +663,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             Assert.DoesNotContain("Optimistic concurrency failure", acted);
             if (action == "Disable")
             {
-                Assert.Contains("is disabled and can no longer sign in.", acted);
+                Assert.Contains("is disabled.", acted);
                 Assert.True(StaffAccounts.IsDisabled(user), $"Run {run}: the account isn't disabled.");
             }
             else

@@ -212,7 +212,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Forms Admin", StaffRoles.Admin));
         using (var disabled = await PostFormAsync(admin.Client, "/admin/staff?handler=Disable", "/admin/staff", ("id", visit.Clinician.Id)))
         {
-            Assert.Contains("is disabled and can no longer sign in", await ReadAsync(disabled));
+            Assert.Contains("is disabled.", await ReadAsync(disabled));
         }
 
         Assert.Contains($"href=\"/patients/{visit.Patient}/forms/{answers}\"", await colleague.Client.GetStringAsync("/inbox", Cancel));

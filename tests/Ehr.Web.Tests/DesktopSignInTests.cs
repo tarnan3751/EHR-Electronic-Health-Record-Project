@@ -82,7 +82,7 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
         using var reset = await resetting;
         using var signedIn = await signingIn;
 
-        Assert.Contains("will set up an authenticator app again", Words(await ReadAsync(reset)));
+        Assert.Contains("Authenticator reset for ", Words(await ReadAsync(reset)));
         Assert.Equal(HttpStatusCode.Unauthorized, signedIn.StatusCode);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.SignInFailed, actorId: account.Id));

@@ -111,7 +111,7 @@ public class TC_UC20_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
 
         var admin = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Synthetic Admin", StaffRoles.Admin));
         var page = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}&Action={AuditActions.SentToLab}", Cancel);
-        Assert.Matches($"(?s)<td>Lab</td>\\s*<td>sent_to_lab</td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td class=\"sc-table__id\">orders {order}</td>", page);
+        Assert.Matches($"(?s)<td>Lab</td>\\s*<td>Sent to lab</td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td class=\"sc-table__id\">orders {order}</td>", page);
         Assert.Contains("<td>Lab</td>", await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}&Action={AuditActions.Insert}", Cancel));
     }
 

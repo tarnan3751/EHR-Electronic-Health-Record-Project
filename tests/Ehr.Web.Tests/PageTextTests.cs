@@ -42,7 +42,7 @@ public partial class PageTextTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await admin.Client.GetStringAsync($"/admin/emergency-access/{access.Id}", Cancel);
 
-        Assert.Contains("<h1>Emergency access <span class=\"sc-tag sc-tag--danger\">Review</span></h1>", html);
+        Assert.Contains("<h1>Break-the-glass access <span class=\"sc-tag sc-tag--danger\">Review</span></h1>", html);
     }
 
     // Two spaces between words, as a page's text reads once its tags are taken out.

@@ -41,7 +41,7 @@ public class TC_UC24_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 
         // 1.
         var inForce = await reviewer.Client.GetStringAsync($"/admin/emergency-access/{early.Id}", Cancel);
-        Assert.Matches("In force until [0-9-]+ [0-9:]+ UTC\\.</span> It can be marked reviewed once it ends", inForce);
+        Assert.Matches("In force until [0-9-]+ [0-9:]+ UTC\\.</span> Review it once it ends.", inForce);
         Assert.DoesNotContain("data-review-form", inForce);
 
         // 2.

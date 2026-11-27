@@ -41,7 +41,7 @@ public partial class StaffAdminTests(WebApps apps) : IClassFixture<WebApps>
         var account = await apps.CreateStaffAsync("Dr. Lost Phone", StaffRoles.Clinician);
 
         using var reset = await PostFormAsync(admin.Client, "/admin/staff?handler=ResetAuthenticator", "/admin/staff", ("id", account.Id));
-        Assert.Contains("will set up an authenticator app again", await ReadAsync(reset));
+        Assert.Contains("Authenticator reset for ", await ReadAsync(reset));
 
         var client = Client(apps.OnPrem, new CookieContainer());
         using var next = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
@@ -58,7 +58,7 @@ public partial class StaffAdminTests(WebApps apps) : IClassFixture<WebApps>
 
         using var disabled = await PostFormAsync(admin.Client, "/admin/staff?handler=Disable", "/admin/staff", ("id", account.Id));
         var staffPage = await ReadAsync(disabled);
-        Assert.Contains("is disabled and can no longer sign in", staffPage);
+        Assert.Contains("is disabled.", staffPage);
         Assert.Contains("<td>Disabled</td>", staffPage);
 
         var client = Client(apps.OnPrem, new CookieContainer());

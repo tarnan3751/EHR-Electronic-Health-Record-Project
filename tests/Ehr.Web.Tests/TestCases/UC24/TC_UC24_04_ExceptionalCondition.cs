@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 //   1. On the cloud app, open the access and review it.
 //   2. On the cut-off app, open another ended access; post a review to it anyway.
 // Expected result: Step 1: the page reads as on-site; the post crosses the WAN link and the review is saved. Step 2:
-//   "Marking an access reviewed needs the clinic's server. The access remains readable.", no form; the post answers 503
+//   "Marking an access reviewed needs the clinic's server.", no form; the post answers 503
 //   with the "Not saved" page showing the note; nothing saved.
 // Creator: Tahseen Arnan
 public class TC_UC24_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
@@ -53,7 +53,7 @@ public class TC_UC24_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         await EndAsync(apps, other.Id);
         var cutOff = Client(apps.CloudCutOff, reviewer.Jar);
         var readOnly = await cutOff.GetStringAsync($"/admin/emergency-access/{other.Id}", Cancel);
-        Assert.Contains("Marking an access reviewed needs the clinic's server. The access remains readable.", readOnly);
+        Assert.Contains("Marking an access reviewed needs the clinic's server.", readOnly);
         Assert.DoesNotContain("data-review-form", readOnly);
         using (var request = new HttpRequestMessage(HttpMethod.Post, $"/admin/emergency-access/{other.Id}")
         {

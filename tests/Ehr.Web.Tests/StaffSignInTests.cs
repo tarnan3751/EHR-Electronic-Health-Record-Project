@@ -213,7 +213,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         using (var reset = await resetting)
         {
-            Assert.Contains("will set up an authenticator app again at their next sign-in.", Words(await ReadAsync(reset)));
+            Assert.Contains("Authenticator reset for ", Words(await ReadAsync(reset)));
         }
 
         using var posted = await posting;
@@ -547,7 +547,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
                 "/admin/staff?handler=ResetAuthenticator", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel));
 
             Assert.True(posts.All(p => p.StatusCode == HttpStatusCode.OK), $"Run {run}: {string.Join(", ", posts.Select(p => (int)p.StatusCode))}.");
-            Assert.Contains("will set up an authenticator app again", Words(await ReadAsync(posts[1])));
+            Assert.Contains("Authenticator reset for ", Words(await ReadAsync(posts[1])));
             Array.ForEach(posts, p => p.Dispose());
             Assert.False((await AccountOfAsync(account)).TwoFactorEnabled, $"Run {run}: enrolled after the reset answered.");
             apps.Clock.Pass(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(5));
@@ -593,7 +593,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         using var acted = await posted[1];
 
         Assert.Equal((HttpStatusCode.OK, HttpStatusCode.OK), (enrolled.StatusCode, acted.StatusCode));
-        Assert.Contains(action == "Reissue" ? "/sign-in/setup?user=" : "will set up an authenticator app again", Words(await ReadAsync(acted)));
+        Assert.Contains(action == "Reissue" ? "/sign-in/setup?user=" : "Authenticator reset for ", Words(await ReadAsync(acted)));
         Assert.Equal(actionFirst ? "/sign-in" : "/sign-in/enroll", PathOf(enrolled));
         var user = await AccountOfAsync(account);
         Assert.True(action == "Reissue" ? user.PasswordHash is null : !user.TwoFactorEnabled, "The action didn't apply.");

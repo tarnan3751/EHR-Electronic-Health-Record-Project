@@ -94,7 +94,7 @@ before step 20 takes as a waiting recording refused for good.
   is shown in the server's words, for a round and a chart download, keeps the session, and asks for an update check
   once.
 - **TC-UC8-13** (`tests/Ehr.Web.Tests/TestCases/UC8/TC_UC8_13_RevokedAfterDisabled.cs`): disabled first from the staff
-  page, which says what stays on their computers until their desktop sign-ins are revoked, the token is refused
+  page, which says to revoke their desktop sign-ins now, the token is refused
   plainly on both sites; the revoke page says revoking works before or after; revoked, the same token is refused with
   `Ehr-Sign-In: revoked` on both sites. The app's side is TC-UC7-12's.
 - **TC-UC8-08** (`src/Ehr.Desktop/src-tauri/src/sync.rs`, `an_ended_sign_in_keeps_the_session_and_says_so`): a round

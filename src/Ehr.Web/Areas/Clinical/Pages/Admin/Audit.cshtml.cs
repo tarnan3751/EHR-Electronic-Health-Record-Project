@@ -113,4 +113,18 @@ public class AuditModel(AuditLog log, StaffAccounts accounts, EmergencyAccessRev
         route["Before"] = Log.Events[^1].OccurredAt.ToString("o", CultureInfo.InvariantCulture);
         return route;
     }
+
+    // An action as the audit pages name it: its code in words ("sign_in_failed" is "Sign-in failed"), the code itself
+    // staying the filter's value.
+    public static string ActionName(string action) => action switch
+    {
+        AuditActions.BreakGlass => "Break the glass",
+        AuditActions.MfaEnrolled => "Authenticator set up",
+        AuditActions.BootstrapAdmin => "First admin created",
+        AuditActions.DesktopRevoked => "Desktop sign-ins revoked",
+        AuditActions.EnrollmentIssued => "Enrollment code issued",
+        _ when action.StartsWith("ai_", StringComparison.Ordinal) => "AI " + action[3..].Replace('_', ' '),
+        _ => char.ToUpperInvariant(action[0]) + action[1..].Replace("sign_in", "sign-in", StringComparison.Ordinal)
+            .Replace("sign_out", "sign-out", StringComparison.Ordinal).Replace('_', ' '),
+    };
 }

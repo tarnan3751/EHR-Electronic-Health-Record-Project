@@ -55,16 +55,16 @@ public class EmergencyAccessModel(EmergencyAccessReviews reviews) : PageModel
         Access = access;
         if (Outcome is null || !EmergencyAccessOutcomes.All.Contains(Outcome))
         {
-            Errors[nameof(Outcome)] = "Say whether the access was appropriate.";
+            Errors[nameof(Outcome)] = "Select whether it was appropriate.";
         }
 
         if (string.IsNullOrEmpty(Note))
         {
-            Errors[nameof(Note)] = "Write a note: what you checked, and what you found.";
+            Errors[nameof(Note)] = "Note is required.";
         }
         else if (Note.Length is < 10 or > 500)
         {
-            Errors[nameof(Note)] = Note.Length < 10 ? "Use at least 10 characters." : "Use 500 characters or fewer.";
+            Errors[nameof(Note)] = "Note must be 10 to 500 characters.";
         }
 
         if (Errors.Count > 0)
@@ -83,11 +83,11 @@ public class EmergencyAccessModel(EmergencyAccessReviews reviews) : PageModel
             default:
                 Problem = outcome switch
                 {
-                    ReviewOutcome.AlreadyReviewed => "Someone reviewed this access first. Their review is below, and nothing changed.",
-                    ReviewOutcome.NotEnded => "This access is still in force. Review it once it has ended, so the review covers everything done under it.",
-                    ReviewOutcome.OwnAccess => "This is your own emergency access. Another administrator reviews it.",
-                    ReviewOutcome.NoteLength => "The note needs 10 to 500 characters.",
-                    _ => "Say whether the access was appropriate.",
+                    ReviewOutcome.AlreadyReviewed => "Someone reviewed this access first.",
+                    ReviewOutcome.NotEnded => "This access is still in force. Review it once it ends.",
+                    ReviewOutcome.OwnAccess => "This is your own access. Another administrator reviews it.",
+                    ReviewOutcome.NoteLength => "Note must be 10 to 500 characters.",
+                    _ => "Select whether it was appropriate.",
                 };
                 Access = (await reviews.ReadAsync(id, HttpContext.RequestAborted))!;
                 return Page();

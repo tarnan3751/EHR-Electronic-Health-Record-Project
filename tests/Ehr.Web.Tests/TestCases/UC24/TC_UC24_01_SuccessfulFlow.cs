@@ -71,22 +71,22 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Dr. Covering", page);
         Assert.Contains($"<dd class=\"sc-table__id\">{access.Patient}</dd>", page);
         Assert.Contains("Synthetic: covering the ward tonight, asked by the charge nurse.", page);
-        Assert.Contains("<td>Emergency access</td>", page);
-        Assert.Contains($"<td>{AuditActions.Read}</td>", page);
+        Assert.Contains("<td>Break the glass</td>", page);
+        Assert.Contains("<td>Read</td>", page);
         Assert.Contains("patient_assignments", page);
         Assert.Contains("messages", page);
         Assert.DoesNotContain("Reviewedchart", page);
         Assert.DoesNotContain("Synthetic words of a message", page);
         Assert.DoesNotContain("Synthetic subject", page);
         Assert.Contains("data-review-form", page);
-        Assert.Contains("It's kept with the review and can't be changed.", page);
+        Assert.Contains("This can't be undone.", page);
 
         // 4.
         using (var reviewed = await ReviewAsync(reviewer.Client, access.Id, EmergencyAccessOutcomes.Appropriate, Note))
         {
             var after = await ReadAsync(reviewed);
             Assert.Equal($"/admin/emergency-access/{access.Id}", PathOf(reviewed));
-            Assert.Contains("Reviewed.</span> It's done in every administrator's inbox.", after);
+            Assert.Contains("Reviewed.</span></p>", after);
             Assert.Contains("<span class=\"sc-tag sc-tag--success\">Appropriate</span> Reviewed by Reviewer One", after);
             Assert.Contains(Note, after);
             Assert.DoesNotContain("data-review-form", after);
@@ -101,7 +101,7 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         // 5.
         var audit = await reviewer.Client.GetStringAsync($"/admin/audit?Patient={access.Patient}&Flagged=true", Cancel);
-        Assert.Contains("Emergency access <span class=\"sc-tag\">Reviewed</span>", audit);
+        Assert.Contains("Break the glass <span class=\"sc-tag\">Reviewed</span>", audit);
         Assert.DoesNotContain("sc-tag sc-tag--danger\">Review</span>", audit);
         Assert.DoesNotContain("sc-table__flagged", audit);
         Assert.Contains($"<a data-review-link href=\"/admin/emergency-access/{access.Id}\">Open the review</a>", audit);
