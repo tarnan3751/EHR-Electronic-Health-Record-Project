@@ -94,8 +94,8 @@ chart, type a sentence under **New draft** and **Save draft**: it waits on this 
 nothing is sent when the servers come back. `docker compose start onprem-app cloud-app`, and once they're up, in
 Safari as the administrator at https://ehr.example.com:8443: **Staff**, **Disable** the clinician; the page says that
 what SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked, and to revoke them now.
-Open SwiftChart: it opens on the lock, and within a few seconds the lock reads "Signed out: the server ended this
-sign-in …", asking for the password and the code; nothing of the chart. Don't sign out (that would drop what the
+Open SwiftChart: it opens on the lock, and within a few seconds the lock reads "Signed out. The server ended this
+sign-in. …", asking for the password and the code; nothing of the chart. Don't sign out (that would drop what the
 revocation needs to reach this computer); quit it. In Safari, the clinician's **Desktop sign-ins**: note the count and
 both paragraphs; choose **Revoke and delete**: the staff page says their desktop sign-ins are revoked. (This is the
 order the final review found skipped the wipe; revoking first works the same.)
@@ -181,7 +181,7 @@ its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock:
 after unlocking says "SwiftChart 0.2.1.", with the charts as they were. Note whether SmartScreen or anything else asked.
 
 **W5. Disabled, revoked, and the wipe.** As the Mac's M6 and M7, in Edge as the administrator: stop the two apps, save
-a draft, quit SwiftChart, start the apps, disable the clinician, open SwiftChart (it locks: "Signed out: …"), quit it
+a draft, quit SwiftChart, start the apps, disable the clinician, open SwiftChart (it locks: "Signed out. …"), quit it
 without signing out, revoke, open SwiftChart again: "Deleted: …" within a few seconds. Then in PowerShell:
 
 ```

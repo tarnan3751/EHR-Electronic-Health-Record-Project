@@ -68,11 +68,11 @@ struct App {
 }
 
 /// Said when the app starts with servers other than the ones the kept sign-in was made with (step 19a's final review).
-const OTHER_SERVERS: &str = "Signed out: this app was started with servers other than the ones you signed in with, and \
-                             only those can open its lock. Sign in again; nothing on this computer was deleted.";
+const OTHER_SERVERS: &str = "Signed out. SwiftChart started with different servers from the ones you signed in with. \
+                             Sign in again. Nothing on this computer was deleted.";
 
 /// What the commands that read the offline charts answer while the window is locked.
-const LOCKED: &str = "Locked: unlock the window to see the offline charts.";
+const LOCKED: &str = "Locked. Unlock the window to see the offline charts.";
 
 impl App {
     fn store(&self) -> Result<MutexGuard<'_, Store>, String> {
@@ -640,7 +640,7 @@ fn after_unlock(answer: sync::Unlock) -> Next {
         sync::Unlock::Refused(problem) => Next::Refused(problem),
         sync::Unlock::SignInEnded => Next::Ended(
             sync::Ending::SignIn,
-            "A sign-in lasts at most 12 hours: enter the code from your authenticator app too."
+            "A sign-in lasts at most 12 hours. Enter the code from your authenticator app too."
                 .to_owned(),
         ),
         sync::Unlock::SessionOver => Next::Ended(sync::Ending::Session, SESSION_OVER.to_owned()),
@@ -655,7 +655,7 @@ fn after_sign_in(answer: Result<(), sync::SignInFailure>, need: Need, code: &str
     match answer {
         Ok(()) => Next::Opened,
         Err(sync::SignInFailure::Refused(_)) if code.trim().is_empty() => Next::Refused(
-            "Enter the code from your authenticator app too: the clinic's server can be reached, so it takes both."
+            "Enter the code from your authenticator app too. The clinic's server can be reached, so it takes both."
                 .to_owned(),
         ),
         Err(sync::SignInFailure::Refused(problem)) => Next::Refused(problem),
@@ -666,7 +666,7 @@ fn after_sign_in(answer: Result<(), sync::SignInFailure>, need: Need, code: &str
     }
 }
 
-const SESSION_OVER: &str = "Signed out: the server ended this sign-in. Sign in again with your password and the code from \
+const SESSION_OVER: &str = "Signed out. The server ended this sign-in. Sign in again with your password and the code from \
                             your authenticator app.";
 
 /// The lock's password, checked on this computer against its hash, when no server could check it. Wrong ones are
@@ -794,14 +794,13 @@ fn quit(handle: AppHandle) {
     handle.exit(0);
 }
 
-const TOO_MANY: &str = "Too many wrong passwords: only a sign-in with your password and the code from your \
-                        authenticator app opens this window now, once the clinic's server can be reached. Nothing on \
-                        this computer was deleted.";
+const TOO_MANY: &str = "Too many wrong passwords. Once the clinic's server can be reached, sign in with your password \
+                        and the code from your authenticator app. Nothing on this computer was deleted.";
 
 fn wait_problem(seconds: i64) -> String {
     let minutes = (seconds.max(1) + 59) / 60;
     format!(
-        "Too many wrong passwords: try again in {minutes} {}.",
+        "Too many wrong passwords. Try again in {minutes} {}.",
         if minutes == 1 { "minute" } else { "minutes" }
     )
 }

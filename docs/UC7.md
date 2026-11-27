@@ -57,9 +57,8 @@ A server's no stands: once one has said "wrong password" or "locked out", nothin
 **Only the servers the sign-in was made with** answer for the lock (step 19a's final review). Any server can answer yes
 to a password, so the app keeps, with the lock's record, the servers each sign-in was made with (the built-in ones, or
 `EHR_SYNC_SERVERS` in a development build), and asks only those. Started with any others, it forgets the kept sign-in and its record before
-anything is sent, the token included, and the sign-in form says: "Signed out: this app was started with servers other
-than the ones you signed in with, and only those can open its lock. Sign in again; nothing on this computer was
-deleted." So the hash on this computer isn't used then either: the lock is gone, and only a sign-in opens the offline
+anything is sent, the token included, and the sign-in form says: "Signed out. SwiftChart started with different
+servers from the ones you signed in with. Sign in again. Nothing on this computer was deleted." So the hash on this computer isn't used then either: the lock is gone, and only a sign-in opens the offline
 charts. A release build takes HTTPS servers only, so nothing on the computer can stand in for one unauthenticated, and
 since step 20 only the ones it was built for (`EHR_BUILD_SERVERS` when it was compiled), so it can't be started pointing
 at another server at all; the sign-in form names them ("Signs in to: …"), so a person can see where their password
@@ -68,8 +67,8 @@ goes.
 **Past the 12 hours with no server** (decided under the plan's first principle: an outage is when the offline chart is
 needed, and the password still has to be known). The password alone opens the offline charts, to read and to save
 drafts and recordings on this computer, which wait in its outbox. A banner says so, with when the charts were last
-updated, and **Sign in now**: "Offline: a sign-in with your code is needed as soon as the clinic's server can be
-reached", or "Sign in again:" once a server answers. The window isn't locked again each time a server says the 12 hours
+updated, and **Sign in now**: "Offline. Sign in with your code as soon as the clinic's server can be reached.",
+or "Sign in again." once a server answers. The window isn't locked again each time a server says the 12 hours
 are over (the cloud app does, every 10 seconds, while the clinic's server is cut off, and the sign-in itself needs the
 clinic's server); its next lock asks for the full sign-in again. The offline charts still close 30 days after the
 sign-in, as before.
@@ -129,8 +128,8 @@ earlier build say that when isn't recorded, until they are downloaded again.
 A sign-in's session lets the app open its offline copy for 30 days (the sign-in's `offlineAccess`). A computer that
 stops reaching any server, a revoked one that is never connected again included, could otherwise keep its charts open
 with the password alone. So, Tahseen's ruling 14b: when the 30 days pass, by this computer's clock, the window locks,
-as soon as no recording holds it off, and also opens on that lock at start: "Locked: the offline charts open for 30
-days after a sign-in, and yours have passed. Nothing on this computer was deleted." Only a full sign-in, the password
+as soon as no recording holds it off, and also opens on that lock at start: "Locked. It's been 30 days since you
+signed in, so the offline charts are closed. Nothing on this computer was deleted." Only a full sign-in, the password
 and the code, opens it, and only once a server can complete one: the password alone is never enough, whether or not a
 server can be reached (`lock.rs`, `Why::OfflineEnded`). Nothing is deleted, and the session is kept, so the next server
 to answer says what became of it: a revoked one is wiped (below); one merely over is ended, keeping what the

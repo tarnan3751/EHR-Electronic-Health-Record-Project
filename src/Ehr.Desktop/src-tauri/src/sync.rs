@@ -62,8 +62,8 @@ const BATCH: usize = 100;
 /// What an ended session's round asks for: changes since a watermark no transaction reaches, so nothing comes back.
 const PROBE: &str = "/api/sync/quick-texts?since=18446744073709551615";
 /// Said of an ended session: the window's lock asks for a full sign-in (main.rs).
-const ENDED: &str = "Signed out: the server ended this sign-in. Sign in again with your password and the code from \
-                     your authenticator app; nothing on this computer opens until you do.";
+const ENDED: &str = "Signed out. The server ended this sign-in. Sign in again with your password and the code from \
+                     your authenticator app. Nothing on this computer opens until you do.";
 
 pub struct Sync {
     http: Client,

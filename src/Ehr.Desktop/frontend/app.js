@@ -754,19 +754,19 @@ function unlockWindow() {
 
 // Why it locked, as the lock says it: each starts with its state word (docs/brand).
 const lockReasons = {
-  idle: (view) => ['Locked:', ` nothing was done here for ${view.idleMinutes} minutes.`],
-  started: () => ['Locked:', ' SwiftChart opens locked while a clinician is signed in.'],
-  asked: () => ['Locked:', ' this window was locked.'],
-  longest: () => ['Locked:', ' a sign-in lasts at most 12 hours.'],
-  wrongPasswords: () => ['Locked:', ' too many wrong passwords were typed here.'],
-  ended: () => ['Signed out:', ' the server ended this sign-in: your password was changed, your account was locked or disabled, or it is 30 days since you signed in.'],
-  offlineEnded: () => ['Locked:', ' the offline charts open for 30 days after a sign-in, and yours have passed. Nothing on this computer was deleted.'],
+  idle: (view) => ['Locked.', ` Nothing was done here for ${view.idleMinutes} minutes.`],
+  started: () => ['Locked.', ' SwiftChart opens locked while a clinician is signed in.'],
+  asked: () => ['Locked.', ' You locked this window.'],
+  longest: () => ['Locked.', ' A sign-in lasts at most 12 hours.'],
+  wrongPasswords: () => ['Locked.', ' Too many wrong passwords were typed here.'],
+  ended: () => ['Signed out.', ' The server ended this sign-in. Your password or authenticator was reset, your account was locked or disabled, or 30 days passed.'],
+  offlineEnded: () => ['Locked.', ' It\'s been 30 days since you signed in, so the offline charts are closed. Nothing on this computer was deleted.'],
 };
 
 const lockHow = {
   password: 'Enter your password to unlock. What you typed is kept, and sync carries on.',
   signIn: 'Enter your password and the code from your authenticator app. If the clinic\'s server can\'t be reached, your password alone opens the offline charts. What you typed is kept.',
-  signedOut: 'Sign in again with your password and the code from your authenticator app to come back to this window as you left it.',
+  signedOut: 'Sign in again with your password and the code from your authenticator app. The window comes back as you left it.',
 };
 
 function renderLock(view) {
@@ -796,10 +796,10 @@ function renderSignInNeeded(view) {
   byId('sign-in-needed').hidden = !needed;
   if (!needed) return;
   byId('sign-in-needed-text').replaceChildren(
-    el('span', { className: 'sc-notice__state', textContent: serverAnswered ? 'Sign in again:' : 'Offline:' }),
+    el('span', { className: 'sc-notice__state', textContent: serverAnswered ? 'Sign in again.' : 'Offline.' }),
     serverAnswered
-      ? ' a sign-in lasts at most 12 hours, and a server is answering. If signing in says the clinic\'s server can\'t be reached, your password alone still opens the offline charts.'
-      : ' a sign-in with your code is needed as soon as the clinic\'s server can be reached.',
+      ? ' A sign-in lasts at most 12 hours. If signing in can\'t reach the clinic\'s server, your password alone still opens the offline charts.'
+      : ' Sign in with your code as soon as the clinic\'s server can be reached.',
     ` ${chartsUpdatedText(view.chartsUpdated)} Drafts and recordings are saved on this computer and sent after you sign in.`,
   );
 }

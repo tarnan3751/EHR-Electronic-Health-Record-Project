@@ -34,7 +34,7 @@ Write down, for each numbered step, whether you saw what it says, and anything t
 1. **The warning.** In the desktop app, open a chart, type a sentence under **New draft**, don't save, and leave the
    keyboard and mouse alone. After about 2½ minutes: a dialog "This window will lock soon" with a countdown, the focus on
    **Stay unlocked**. Press Enter: it closes, and your sentence is there.
-2. **The lock.** Leave it alone again until it locks. You should see only the lock: the mark, "Locked: nothing was done
+2. **The lock.** Leave it alone again until it locks. You should see only the lock: the mark, "Locked. Nothing was done
    here for 3 minutes.", when the offline charts were last updated, **Password**, **Unlock**, and **Sign out** under your
    name. Nothing of the chart. Then:
    - press Tab several times: the focus goes only to the lock's field and buttons;
@@ -55,7 +55,7 @@ Write down, for each numbered step, whether you saw what it says, and anything t
    `docker compose stop cloud-app` too, lock again the same way, and unlock: it opens, and the status at the top says
    Offline.
 7. **Wrong passwords with no server.** Lock again, and type a wrong password five times: the fifth answers "Too many
-   wrong passwords: try again in 15 minutes." Then `docker compose start onprem-app cloud-app`, and once they're up,
+   wrong passwords. Try again in 15 minutes." Then `docker compose start onprem-app cloud-app`, and once they're up,
    unlock with the right password: the server checks it now, and it opens.
 8. **Out of sight, and back.** Hide the app (Cmd+H) for longer than 3 minutes, then bring it back (Cmd+Tab): the lock,
    with no glimpse of the chart first. Unlock.
@@ -64,7 +64,7 @@ Write down, for each numbered step, whether you saw what it says, and anything t
 10. **Sleep.** Put the Mac to sleep (close the lid, or Apple menu > Sleep) for more than 3 minutes. Wake it and unlock
     the Mac: the app's lock is already showing, with no glimpse of the chart. Unlock.
 11. **Safari, a window out of sight.** Safari has now been minimized for more than 15 minutes since step 4. Bring it
-    back: the page says "Signed out:" with nothing of the patient's. Choose **Sign in again**, and sign in: the message
+    back: the page says "Signed out." with nothing of the patient's. Choose **Sign in again**, and sign in: the message
     form is back with your sentence.
 12. **Safari, coming back.** Sign out, then press Back: no signed-in page comes back from the cache.
 13. **The 12-hour end, with the sign-in's time shortened.** Quit the desktop app and start it with the sign-in's 12
@@ -74,15 +74,15 @@ Write down, for each numbered step, whether you saw what it says, and anything t
     EHR_DEBUG_IDLE_SECONDS=180 EHR_DEBUG_SIGN_IN_SECONDS=150 cargo tauri dev
     ```
 
-    - Your sign-in is older than that, so it opens on "Locked: a sign-in lasts at most 12 hours.", with **Password** and
+    - Your sign-in is older than that, so it opens on "Locked. A sign-in lasts at most 12 hours.", with **Password** and
       **Code** and a highlighted "Offline charts last updated … Nothing is brought back until you sign in again." Sign in
       with your password and a code: it opens. (The server's own 12 hours aren't shortened: TC-UC8-07 tests those.)
     - About 2 minutes later a dialog says "A sign-in lasts at most 12 hours, and yours ends in …" with **Keep working**;
       press it. At 2½ minutes the window locks again, asking for the password and the code.
     - `docker compose stop onprem-app cloud-app`, type the password only, and **Sign in**: it opens, with a banner
-      "Offline: a sign-in with your code is needed as soon as the clinic's server can be reached", the charts' time, and
+      "Offline. Sign in with your code as soon as the clinic's server can be reached.", the charts' time, and
       **Sign in now**.
-    - `docker compose start onprem-app cloud-app`: within 10 seconds the banner begins "Sign in again:", and the window
+    - `docker compose start onprem-app cloud-app`: within 10 seconds the banner begins "Sign in again.", and the window
       stays open.
     - **Sign in now**, then the password and a code: it opens, and the banner has gone.
 14. **Started with other servers.** Quit, and start it once naming only the clinic's server:
