@@ -3202,6 +3202,98 @@
         border-bottom: 0;
     }
 
+    /* Two columns of the same width: panels two to a row (an appointment and what can be done with it), or a request
+       beside its answer. One column on a narrow window. */
+    .sc-split--even {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 64rem) {
+        .sc-split--even {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    /* A panel with no title (a record's facts): its first line clear of the frame's top. A panel titled a level down
+       (a visit's forms) has the same head as one titled with an h2. */
+    .sc-sheet > :first-child:not(h2, h3) {
+        margin-top: var(--space-5);
+    }
+
+    .sc-sheet > h3:first-child {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1) var(--space-2);
+        min-height: calc(28px + 2 * var(--space-3));
+        margin: 0 calc(-1 * var(--space-6)) var(--space-4);
+        padding: var(--space-2) var(--space-6);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    /* In a panel's form, a box of several lines takes the form's width, and a button keeps its own. In a form of short
+       fields, the reason for a visit, with its hint, takes the card's width. */
+    .sc-sheet > .sc-form > .sc-field:has(textarea) {
+        grid-column: 1 / -1;
+    }
+
+    .sc-sheet > .sc-form > .sc-btn {
+        justify-self: start;
+    }
+
+    .sc-formgrid > .sc-field:has(#appointment-reason) {
+        grid-column: 1 / -1;
+    }
+
+    /* Two ways back on the line above the title: both breadcrumbs on its left, the page's own action on its right. A
+       way on beside a breadcrumb ("Open the chart") has a list link's weight. */
+    .sc-pagehead > p:has(> .sc-back) + p:has(> .sc-back) {
+        margin-right: auto;
+    }
+
+    .sc-pagehead p > .sc-back ~ a {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-pagehead p > .sc-back ~ a:hover,
+    .sc-pagehead p > .sc-back ~ a:focus-visible {
+        text-decoration: underline;
+    }
+
+    /* Panels and cards side by side keep only the columns' gap; a panel's fields take their cell's width, three to a
+       row at most on a wide page and two in half of one; a list ends at the panel's padding. */
+    .sc-split > :is(.sc-sheet, .sc-formcard) {
+        margin: 0;
+    }
+
+    .sc-sheet > .sc-form {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    }
+
+    .sc-split--even .sc-sheet > .sc-form {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    }
+
+    .sc-sheet > .sc-form > .sc-field {
+        max-width: none;
+    }
+
+    /* Fields with a hint under one of them line up by their tops, not their bottoms. */
+    .sc-sheet > .sc-form:has(> .sc-field > .sc-field__hint) {
+        align-items: start;
+    }
+
+    .sc-sheet > .sc-form > .sc-field:has(#appointment-reason) {
+        grid-column: 1 / -1;
+    }
+
+    .sc-sheet > .sc-list:last-child {
+        margin-bottom: 0;
+    }
+
     /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
        comment; anything two areas share belongs in the components layer.
        ---- */
