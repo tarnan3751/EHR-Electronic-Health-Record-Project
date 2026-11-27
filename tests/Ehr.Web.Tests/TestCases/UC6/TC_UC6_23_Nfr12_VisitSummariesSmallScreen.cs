@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. Open Visit summaries.
 //   2. Press Tab until "Show sensitive summaries" has the focus, and press Enter.
 //   3. Open Visit summaries again, in the light theme and in the dark.
-// Expected result: Step 1: the page is no wider than the window; the notice reads "Sensitive items hidden:" and its
+// Expected result: Step 1: the page is no wider than the window; the notice reads "Sensitive summaries hidden." and its
 //   link "Show sensitive summaries". Step 2: the focused link shows the focus ring; Enter opens
 //   /portal/summaries?sensitive=true, which shows the sensitive summary and is no wider than the window either. Step 3:
 //   in each theme the page is no wider than the window, the summary's card and the placeholder are both padded by the
@@ -80,7 +80,7 @@ public class TC_UC6_23_Nfr12_VisitSummariesSmallScreen(WebApps apps) : IClassFix
 
         await page.GotoAsync($"{server.Url}/portal/summaries");
         Assert.True(await page.EvaluateAsync<bool>(fits), "The page scrolls sideways at 360 pixels.");
-        Assert.Contains("Sensitive items hidden:", await page.Locator("[data-sensitive=hidden]").TextContentAsync());
+        Assert.Contains("Sensitive summaries hidden.", await page.Locator("[data-sensitive=hidden]").TextContentAsync());
         await AiReviewBrowserTests.TabToAsync(page, "a[href='/portal/summaries?sensitive=true']");
         Assert.Equal("Show sensitive summaries", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         Assert.True(await page.EvaluateAsync<bool>(focusRing));

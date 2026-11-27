@@ -21,15 +21,15 @@ else
         || summaries.Summaries.Any(s => s.Sensitive) || summaries.Withdrawn.Any(w => w.Sensitive);
     <h1>Health record of @patient.GivenName @patient.FamilyName</h1>
     <p class="sc-muted">A copy from the SwiftChart patient portal, as of @Clinic.Format(Model.At, "MMM d, yyyy HH:mm").</p>
-    <p class="sc-muted sc-screen-only">To print it, or to save it as a PDF, use your browser's Print command.</p>
+    <p class="sc-muted sc-screen-only">To print it or save it as a PDF, use your browser's Print command.</p>
     @if (Model.MaySeeSensitive && hidden > 0)
     {
         @* Left out until asked for (docs/brand: sensitive items). On screen only: paper never says that anything was left out. *@
-        <p class="sc-notice sc-notice--info sc-screen-only" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @hidden @(hidden == 1 ? "diagnosis, medication or visit summary is" : "diagnoses, medications or visit summaries are") not shown. <a asp-page="/Record/Print" asp-route-sensitive="true">Show sensitive items</a></p>
+        <p class="sc-notice sc-notice--info sc-screen-only" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden.</span> @hidden @(hidden == 1 ? "diagnosis, medication or visit summary is not" : "diagnoses, medications or visit summaries are not") shown. <a asp-page="/Record/Print" asp-route-sensitive="true">Show sensitive items</a></p>
     }
     else if (Model.MaySeeSensitive && record.SensitiveShown && anyShown)
     {
-        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="/Record/Print" class="sc-screen-only">Hide sensitive items</a></p>
+        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown.</span> Your view is logged. <a asp-page="/Record/Print" class="sc-screen-only">Hide sensitive items</a></p>
     }
 
     <section class="sc-panel" aria-labelledby="record-about">
@@ -290,4 +290,4 @@ else
         }
     </section>
 }
-<p class="sc-screen-only"><a asp-page="/Record/Index">Back to Download @(own ? "my record" : "this record")</a></p>
+<p class="sc-screen-only"><a asp-page="/Record/Index">Back to download</a></p>

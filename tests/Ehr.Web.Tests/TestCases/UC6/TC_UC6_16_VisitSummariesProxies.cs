@@ -28,10 +28,10 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   3. The proxy with sensitive items follows "Show sensitive summaries".
 //   4. Dr. Test marks the first note sensitive. The proxies without sensitive items open Visit summaries.
 // Expected result: Step 1: each sees the first summary. Step 2: the proxies without sensitive items get exactly the
-//   page they had in step 1, asking or not (their form tokens aside); the proxy with them sees "Sensitive items hidden:
-//   1 visit summary is not shown." Step 3: both summaries, the second tagged "Sensitive", and "Sensitive items shown:
-//   your view of them is recorded.", recorded as a view of sensitive items under the proxy's account and the patient.
-//   Step 4: the proxies without sensitive items see "There are no visit summaries yet." and nothing of either.
+//   page they had in step 1, asking or not (their form tokens aside); the proxy with them sees "Sensitive summaries
+//   hidden. 1 visit summary is not shown." Step 3: both summaries, the second tagged "Sensitive", and "Sensitive
+//   summaries shown. Your view is logged.", recorded as a view of sensitive items under the proxy's account and the patient.
+//   Step 4: the proxies without sensitive items see "No visit summaries yet." and nothing of either.
 // Creator: Tahseen Arnan
 public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebApps>
 {
@@ -54,7 +54,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         {
             var page = await PortalAsync(proxy.Client);
             Assert.Contains(TalkedAbout, page);
-            Assert.Contains("Written by the care team after a visit", Words(page));
+            Assert.Contains("From the care team after each visit", Words(page));
             before[proxy] = WithoutTokens(page);
         }
 
@@ -71,7 +71,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         }
 
         var hidden = await PortalAsync(allowed.Client);
-        Assert.Contains("Sensitive items hidden: 1 visit summary is not shown. Show sensitive summaries", Words(hidden));
+        Assert.Contains("Sensitive summaries hidden. 1 visit summary is not shown. Show sensitive summaries", Words(hidden));
         Assert.Contains("href=\"/portal/summaries?sensitive=true\"", hidden);
         Assert.DoesNotContain("something private", hidden);
         var viewsBefore = await apps.AuditEventsAsync(AuditActions.ReadSensitive, allowed.Account, patient.Patient);
@@ -79,7 +79,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("We talked about something private.", shown);
         Assert.Contains(TalkedAbout, shown);
         Assert.Contains(">Sensitive</span>", shown);
-        Assert.Contains("Sensitive items shown: your view of them is recorded.", Words(shown));
+        Assert.Contains("Sensitive summaries shown. Your view is logged.", Words(shown));
         Assert.Equal(viewsBefore + 1, await apps.AuditEventsAsync(AuditActions.ReadSensitive, allowed.Account, patient.Patient));
 
         // The first note marked: its summary is sensitive with it, and gone at once for the proxies without them.
@@ -91,7 +91,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         foreach (var proxy in new[] { without, messaging })
         {
             var gone = Words(await PortalAsync(proxy.Client));
-            Assert.Contains("There are no visit summaries yet.", gone);
+            Assert.Contains("No visit summaries yet.", gone);
             Assert.DoesNotContain(TalkedAbout, gone);
             Assert.DoesNotContain("Sensitive", gone);
         }

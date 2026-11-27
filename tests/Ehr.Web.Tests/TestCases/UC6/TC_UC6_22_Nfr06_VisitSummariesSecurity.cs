@@ -69,7 +69,7 @@ public class TC_UC6_22_Nfr06_VisitSummariesSecurity(WebApps apps) : IClassFixtur
             var html = await ReadAsync(response);
             Assert.True(response.Headers.CacheControl?.NoStore);
             Assert.Contains(TalkedAbout, html);
-            Assert.Contains("was withdrawn by your care team.", Words(html));
+            Assert.Contains("Your care team withdrew the visit summary from", Words(html));
             // The app bar names the signed-in account by its address, which these tests make of hex digits: the
             // account's own login, not an identifier of anything the page shows.
             var markup = WithoutTokens(html).Replace(reader.Email, "", StringComparison.OrdinalIgnoreCase);

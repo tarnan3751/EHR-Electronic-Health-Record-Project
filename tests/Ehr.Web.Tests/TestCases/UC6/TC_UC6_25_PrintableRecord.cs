@@ -74,7 +74,7 @@ public class TC_UC6_25_PrintableRecord(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Written by Dr. Print", words);
         Assert.Contains(TalkedAbout, words);
         Assert.Contains("<h4>What happens next</h4>", html);
-        Assert.Contains("Sensitive items hidden: 2 diagnoses, medications or visit summaries are not shown. Show sensitive items", words);
+        Assert.Contains("Sensitive items hidden. 2 diagnoses, medications or visit summaries are not shown. Show sensitive items", words);
         Assert.Contains("href=\"/portal/record/print?sensitive=true\"", html);
         Assert.DoesNotContain("sertraline", words);
         Assert.DoesNotContain("anxiety", words);

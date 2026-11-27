@@ -106,7 +106,7 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
         Assert.DoesNotContain(observations, o => o.Code?.Coding.Any(c => c.Code is "85354-9" or "8480-6" or "8462-4") == true);
         Assert.Contains(observations, o => o.Code?.Coding.Any(c => c.Code == VitalSign.HeartRate) == true);
         Assert.DoesNotContain("128/82", Words(page));
-        Assert.Contains("was withdrawn by your care team.", Words(page));
+        Assert.Contains("Your care team withdrew the visit summary from", Words(page));
 
         // The printable page's summaries and placeholders are the summaries page's: the same items, in the same order,
         // with the same words, so the two can't drift apart.

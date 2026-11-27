@@ -61,7 +61,7 @@ public class TC_UC6_20_VisitSummariesOffSite(WebApps apps) : IClassFixture<WebAp
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Words(await Client(apps.CloudCutOff, patient.Jar).GetStringAsync("/portal/summaries", Cancel));
         Assert.Contains(TalkedAbout, cutOff);
-        Assert.Contains("was withdrawn by your care team.", cutOff);
+        Assert.Contains("Your care team withdrew the visit summary from", cutOff);
         Assert.DoesNotContain("wrong visit", cutOff);
         Assert.Contains("Read-only. The clinic's server can't be reached", cutOff);
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
