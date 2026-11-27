@@ -14,7 +14,7 @@
     }
     @foreach (var warning in Model.Warnings)
     {
-        <p class="sc-proposal__warning">Check: @Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ProposedFromDictation.WarningWords(warning.Code) “@warning.Said”</p>
+        <p class="sc-proposal__warning">Check. @Ehr.Web.Areas.Clinical.Pages.Patients.Notes.ProposedFromDictation.WarningWords(warning.Code) “@warning.Said”</p>
     }
     <p>Dictated @Clinic.Format(Model.DictatedAt). <a asp-page="/Patients/Notes/Review" asp-route-patientId="@Model.Row.PatientId" asp-route-draftId="@Model.DraftId" asp-route-reviewId="@Model.Row.ReviewId">Back to review</a></p>
 </section>

@@ -352,7 +352,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, CountOf(html, "data-chart-proposal-heard-after"));
         Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
-        Assert.Contains("Check: you may have corrected this just after it: “penicillin”", said);
+        Assert.Contains("Check. You may have corrected this just after it: “penicillin”", said);
         Assert.Contains($"href=\"{OrderFormPath(dictated.Patient, dictated.Order)}\"", html.Replace("&amp;", "&", StringComparison.Ordinal));
         Assert.Contains($"href=\"/patients/{dictated.Patient}/allergies?proposal={dictated.Allergy}\"", html);
         Assert.Contains("Open in the order form", said);
@@ -503,7 +503,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             var said = RefillRequestTests.Said(html);
             var allergy = (await StateAsync(apps, dictated.Allergy)).Split('|')[2];
             Assert.Contains("Allergy to add Allergy added", said);
-            Assert.DoesNotContain("Check: you may have corrected", said);
+            Assert.DoesNotContain("Check. You may have corrected", said);
             Assert.Contains("data-chart-proposal-made", LinkTo(html, $"/patients/{dictated.Patient}#allergy-{allergy}"));
             Assert.Contains("See the allergy on the chart", said);
         }
