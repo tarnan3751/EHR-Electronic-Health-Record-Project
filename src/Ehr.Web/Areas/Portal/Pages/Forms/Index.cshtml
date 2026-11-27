@@ -10,7 +10,7 @@
     var toFill = (Model.Forms?.Forms ?? []).Where(form => form.Response is null && !form.ClosedAt(now))
         .OrderBy(form => form.AppointmentStartsAt).ToList();
     var sent = (Model.Forms?.Forms ?? []).Where(form => form.Response is not null).OrderByDescending(form => form.Response!.AnsweredAt).ToList();
-    static string When(DateTimeOffset moment) => $"{moment.UtcDateTime:MMM d, yyyy, HH:mm} UTC";
+    string When(DateTimeOffset moment) => Clinic.Format(moment, "MMM d, yyyy, HH:mm");
 }
 <h1>Pre-visit forms</h1>
 @if (Model.Forms is null)

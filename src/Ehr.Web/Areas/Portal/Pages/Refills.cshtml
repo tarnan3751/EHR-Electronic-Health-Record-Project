@@ -119,7 +119,7 @@ else
                             {
                                 <span class="sc-tag sc-tag--warning">Sensitive</span>
                             }
-                            <span class="sc-muted">Asked @request.RequestedAt.UtcDateTime.ToString("MMM d, yyyy") UTC@(request.Asked switch { "you" => " by you", "proxy" => " by someone you share your record with", _ => "" })</span>
+                            <span class="sc-muted">Asked @Clinic.Format(request.RequestedAt, "MMM d, yyyy")@(request.Asked switch { "you" => " by you", "proxy" => " by someone you share your record with", _ => "" })</span>
                         </p>
                         @if (request.Note is { } note)
                         {
@@ -127,11 +127,11 @@ else
                         }
                         @if (request.Status == RefillRequestStatus.Completed)
                         {
-                            <p data-refill-answer>Approved @request.DecidedAt!.Value.UtcDateTime.ToString("MMM d, yyyy") UTC: your care team ordered @request.OrderedDisplay.</p>
+                            <p data-refill-answer>Approved @Clinic.Format(request.DecidedAt!.Value, "MMM d, yyyy"): your care team ordered @request.OrderedDisplay.</p>
                         }
                         else if (request.Status == RefillRequestStatus.Rejected)
                         {
-                            <p data-refill-answer>Declined @request.DecidedAt!.Value.UtcDateTime.ToString("MMM d, yyyy") UTC. Your care team says:</p>
+                            <p data-refill-answer>Declined @Clinic.Format(request.DecidedAt!.Value, "MMM d, yyyy"). Your care team says:</p>
                             <p class="sc-note__text" data-refill-message>@request.DeclineMessage</p>
                         }
                         else

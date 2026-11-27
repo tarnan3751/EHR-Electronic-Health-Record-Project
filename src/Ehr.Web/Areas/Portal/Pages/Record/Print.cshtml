@@ -20,7 +20,7 @@ else
     var anyShown = record.Medications.Entries.Any(m => m.Sensitive) || record.Conditions.Entries.Any(c => c.Sensitive)
         || summaries.Summaries.Any(s => s.Sensitive) || summaries.Withdrawn.Any(w => w.Sensitive);
     <h1>Health record of @patient.GivenName @patient.FamilyName</h1>
-    <p class="sc-muted">A copy from the SwiftChart patient portal, as of @Model.At.UtcDateTime.ToString("MMM d, yyyy HH:mm") UTC.</p>
+    <p class="sc-muted">A copy from the SwiftChart patient portal, as of @Clinic.Format(Model.At, "MMM d, yyyy HH:mm").</p>
     <p class="sc-muted sc-screen-only">To print it, or to save it as a PDF, use your browser's Print command.</p>
     @if (Model.MaySeeSensitive && hidden > 0)
     {
@@ -163,7 +163,7 @@ else
                                 </td>
                                 <td>@ResultExplanation.Value(result)@if (flag is ResultFlag.High or ResultFlag.Low) { <text> </text><span class="sc-tag sc-tag--warning">@(flag == ResultFlag.High ? "High" : "Low")</span> }</td>
                                 <td>@ResultExplanation.Range(result)</td>
-                                <td>@result.EffectiveAt.UtcDateTime.ToString("MMM d, yyyy") UTC</td>
+                                <td>@Clinic.Format(result.EffectiveAt, "MMM d, yyyy")</td>
                             </tr>
                         }
                     </tbody>
@@ -198,7 +198,7 @@ else
                             <tr>
                                 <td>@(entry.Diastolic is null ? VitalSigns.Name(sign.Code ?? "", sign.Display) : "Blood pressure")</td>
                                 <td>@value @Units.Shown(sign.Unit)</td>
-                                <td>@sign.EffectiveAt.UtcDateTime.ToString("MMM d, yyyy HH:mm") UTC</td>
+                                <td>@Clinic.Format(sign.EffectiveAt, "MMM d, yyyy HH:mm")</td>
                             </tr>
                         }
                     </tbody>
@@ -226,8 +226,8 @@ else
                         @foreach (var appointment in record.Appointments.Entries)
                         {
                             <tr>
-                                <td>@appointment.StartsAt.UtcDateTime.ToString("dddd, MMM d, yyyy")</td>
-                                <td>@appointment.StartsAt.UtcDateTime.ToString("HH:mm") UTC, @appointment.Minutes minutes</td>
+                                <td>@Clinic.Plain(appointment.StartsAt, "dddd, MMM d, yyyy")</td>
+                                <td>@Clinic.Format(appointment.StartsAt, "HH:mm"), @appointment.Minutes minutes</td>
                                 <td>@appointment.Clinician</td>
                                 <td>@appointment.Reason</td>
                                 <td>@PrintModel.AppointmentSaid(appointment.Status)</td>
@@ -268,7 +268,7 @@ else
                     {
                         var summary = summaries.Summaries.ElementAt(item.Index);
                         <li data-summary="standing">
-                            <h3>@summary.NoteSignedAt.UtcDateTime.ToString("MMM d, yyyy") UTC</h3>
+                            <h3>@Clinic.Format(summary.NoteSignedAt, "MMM d, yyyy")</h3>
                             <p class="sc-muted">Written by @summary.ReleasedBy@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</p>
                             <h4>@parts[0]</h4>
                             <p class="sc-note__text">@summary.TalkedAbout</p>

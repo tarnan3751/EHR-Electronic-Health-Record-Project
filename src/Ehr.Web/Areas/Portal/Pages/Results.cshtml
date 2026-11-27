@@ -35,7 +35,7 @@ else
                     @* The flex layout is on a span inside the summary, so the summary keeps its open/close marker. *@
                     <summary><span class="sc-result__line">
                         <strong>@result.Display</strong>
-                        <span class="sc-result__date">@result.EffectiveAt.UtcDateTime.ToString("MMM d, yyyy") UTC</span>
+                        <span class="sc-result__date">@Clinic.Format(result.EffectiveAt, "MMM d, yyyy")</span>
                         @if (flag == ResultFlag.High)
                         {
                             <span class="sc-tag sc-tag--warning">High</span>
@@ -75,7 +75,7 @@ else
                         @if (OnPrem.IsReachable && Model.MayMessage)
                         {
                             <form method="post" asp-page="/Messages/New" asp-page-handler="About">
-                                <input type="hidden" name="Subject" value="@($"About {(Model.Acting ? "the" : "my")} {result.Display} result from {result.EffectiveAt.UtcDateTime:MMM d, yyyy}")">
+                                <input type="hidden" name="Subject" value="@($"About {(Model.Acting ? "the" : "my")} {result.Display} result from {Clinic.Plain(result.EffectiveAt, "MMM d, yyyy")}")">
                                 <button type="submit" class="sc-btn">Ask about this result</button>
                             </form>
                         }

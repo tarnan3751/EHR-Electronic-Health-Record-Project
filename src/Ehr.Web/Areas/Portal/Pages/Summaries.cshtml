@@ -40,7 +40,7 @@ else
                 @if (item.Summary is { } summary)
                 {
                     <li class="sc-result sc-result--plain" data-summary="standing">
-                        <h2>@summary.NoteSignedAt.UtcDateTime.ToString("MMM d, yyyy") UTC</h2>
+                        <h2>@Clinic.Format(summary.NoteSignedAt, "MMM d, yyyy")</h2>
                         <p class="sc-muted">Written by @summary.ReleasedBy@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</p>
                         <h3>@parts[0]</h3>
                         <p class="sc-note__text">@summary.TalkedAbout</p>

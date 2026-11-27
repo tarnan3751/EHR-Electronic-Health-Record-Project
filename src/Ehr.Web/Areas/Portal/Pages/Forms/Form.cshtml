@@ -9,7 +9,7 @@
     var definition = form.Definition;
     var answered = form.Response;
     var now = DateTimeOffset.UtcNow;
-    static string When(DateTimeOffset moment) => $"{moment.UtcDateTime:MMM d, yyyy, HH:mm} UTC";
+    string When(DateTimeOffset moment) => Clinic.Format(moment, "MMM d, yyyy, HH:mm");
 }
 <h1>Pre-visit form</h1>
 @foreach (var help in Model.Help)

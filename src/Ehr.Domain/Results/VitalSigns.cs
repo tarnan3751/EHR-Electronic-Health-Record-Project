@@ -287,7 +287,7 @@ public sealed class Trend
     // What the chart shows, in a sentence, for a reader who can't see it.
     public string Summary => SummaryOn(at => at.UtcDateTime.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture));
 
-    // The same sentence with its two days as the clinic's calendar has them (step 10d), for clinician pages.
+    // The same sentence with its two days as the clinic's calendar has them (step 10d), for clinician pages and the portal.
     public string SummaryIn(Ehr.Domain.Time.ClinicTime clinic) => SummaryOn(at => clinic.Plain(at, "MMM d, yyyy"));
 
     string SummaryOn(Func<DateTimeOffset, string> day)

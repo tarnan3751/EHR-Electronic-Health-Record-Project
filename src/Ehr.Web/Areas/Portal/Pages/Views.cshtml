@@ -20,7 +20,7 @@ else
             : Model.MaySeeSensitive ? "Each time the record, or part of it, was shown to the clinic's staff, the lab or you"
             : "Each time the record, or part of it, was shown to the patient's care team, the lab or you")
         in the last @ViewsModel.Months months, newest first. A clinician's search, list or schedule that showed @(own ? "your" : "the patient's") name counts.
-        Times are UTC, and a view from the last minute may not be listed yet.
+        A view from the last minute may not be listed yet.
     </p>
     @* Only to someone who may be shown a view through emergency access: the patient, and a proxy with sensitive items. *@
     @if (Model.MaySeeSensitive && Model.Lines.Any(line => line.Emergency))
@@ -44,7 +44,7 @@ else
                     <li data-who="@line.Kind">
                         <div><strong>@line.Who</strong>@if (line.Role is { } role) {<text>, @role</text>}@if (line.Emergency) {<text> </text><span class="sc-tag sc-tag--warning">Emergency access</span>}</div>
                         <div>@line.Part</div>
-                        <div class="sc-muted"><time datetime="@line.At.UtcDateTime.ToString("yyyy-MM-ddTHH:mmZ")">@line.At.UtcDateTime.ToString("MMM d, yyyy, HH:mm") UTC</time></div>
+                        <div class="sc-muted"><time datetime="@line.At.UtcDateTime.ToString("yyyy-MM-ddTHH:mmZ")">@Clinic.Format(line.At, "MMM d, yyyy, HH:mm")</time></div>
                     </li>
                 }
             </ul>

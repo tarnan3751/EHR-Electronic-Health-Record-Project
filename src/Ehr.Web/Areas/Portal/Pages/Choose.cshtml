@@ -29,7 +29,7 @@
     {
         <li class="sc-result" data-record="shared">
             <h2>@record.PatientName</h2>
-            <p>Shared with you. @ProxyAccess.ScopeLabel(record.Scope). Until @record.ExpiresAt.UtcDateTime.ToString("MMM d, yyyy").</p>
+            <p>Shared with you. @ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
             <form method="post" asp-page="/Acting">
                 <input type="hidden" name="grantId" value="@record.GrantId">
                 <button type="submit" class="sc-btn @(Model.HasOwnRecord ? null : "sc-btn--primary")">View this record</button>
