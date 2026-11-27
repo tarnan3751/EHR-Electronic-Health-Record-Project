@@ -31,11 +31,11 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //      the clinician's forms page.
 //   4. For another patient, check in an appointment with both forms asked for, its start then two hours past; open the
 //      portal's home and list; send the GAD-7; open the clinician's page; end the visit; send the PHQ-9.
-// Expected result: Step 1: the GAD-7 says when it can be filled in, from five days ahead; sending it is 409, "Not sent:
-//   your answers were not sent to your care team. This form can't be filled in yet.", nothing stored. Step 2: "Fill it in by
+// Expected result: Step 1: the GAD-7 says when it can be filled in, from five days ahead; sending it is 409, "Not sent.
+//   This form can't be filled in yet.", nothing stored. Step 2: "Fill it in by
 //   <tomorrow>, 16:20 UTC", the scheduled end; stored.
 //   Step 3: sending is 409, the page leading with the help about self-harm (without saying the care team will read the
-//   answers), then "Not sent: your answers were not sent to your care team. This form can no longer be filled in.",
+//   answers), then "Not sent. This form can no longer be filled in.",
 //   and "Not monitored."; nothing stored and no inbox item; the portal lists the GAD-7 as sent and not the PHQ-9, whose
 //   page says it can no longer be filled in; the clinician sees both under the cancelled appointment, the PHQ-9 "Not
 //   answered. Closed.". Step 4: "Pre-visit forms (2 to fill in)", each "Fill it in by" 12 hours after the scheduled end;
@@ -73,7 +73,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
         using (var early = await SendAsync(portal, gad, answers))
         {
             Assert.Equal(HttpStatusCode.Conflict, early.StatusCode);
-            Assert.Contains("Not sent: your answers were not sent to your care team. This form can't be filled in yet.",
+            Assert.Contains("Not sent. This form can't be filled in yet.",
                 Text(await early.Content.ReadAsStringAsync(Cancel)));
         }
 
@@ -85,7 +85,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
             Text(await portal.GetStringAsync(FormPath(gad), Cancel)));
         using (var sent = await SendAsync(portal, gad, answers))
         {
-            Assert.Contains("Answers sent:", Text(await ReadAsync(sent)));
+            Assert.Contains("Sent. Your care team will go over your answers", Text(await ReadAsync(sent)));
         }
 
         using (var cancelled = await AppointmentTests.ChangeAsync(visit.Session.Client, visit.Appointment, "Cancel", ("CancelReason", "Synthetic: unwell")))
@@ -100,7 +100,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
             var page = Text(await tooLate.Content.ReadAsStringAsync(Cancel));
             const string Help = "If you are thinking about hurting yourself, or feel you might act on these thoughts, call 911 or go to the nearest emergency room now. "
                 + "You can call or text 988 at any time, day or night, to talk with someone at the 988 Suicide & Crisis Lifeline.";
-            const string NotSent = "Not sent: your answers were not sent to your care team. This form can no longer be filled in.";
+            const string NotSent = "Not sent. This form can no longer be filled in.";
             Assert.Contains(Help, page);
             Assert.Contains(NotSent, page);
             Assert.True(page.IndexOf(Help, StringComparison.Ordinal) < page.IndexOf(NotSent, StringComparison.Ordinal), "The help comes first.");
@@ -153,7 +153,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(Text(await portal.GetStringAsync("/portal/forms", Cancel)), $"Fill it in by {portalCloses} UTC\\.").Count);
         using (var sent = await SendAsync(portal, gad, Answers(GadItems, 0, 0, 0, 0, 0, 0, 0)))
         {
-            Assert.Contains("Answers sent:", Text(await ReadAsync(sent)));
+            Assert.Contains("Sent. Your care team will go over your answers", Text(await ReadAsync(sent)));
         }
 
         Assert.Contains($"until {closes} UTC, while the visit is in progress.",

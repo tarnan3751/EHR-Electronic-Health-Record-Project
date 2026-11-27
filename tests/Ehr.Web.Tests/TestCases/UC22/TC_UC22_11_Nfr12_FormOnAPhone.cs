@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   3. Press Tab until "Send to my care team" has the focus, and press Enter.
 // Expected result: Step 1: no sideways scrolling in either theme; seven groups, each named by its question; every
 //   answer at least 44 pixels tall. Step 2: each down arrow chooses "Several days", the focus ring showing on it. Step
-//   3: the page says "Answers sent:", and the answers are stored with the database's score of 7. No script errors.
+//   3: the page says "Sent.", and the answers are stored with the database's score of 7. No script errors.
 //   The answers, on both pages, at every width and in both themes: no sideways scrolling and no element wider than the
 //   window; ten questions, each answer beneath its question, at its left edge, at least half the list's width.
 // Creator: Tahseen Arnan
@@ -84,7 +84,7 @@ public class TC_UC22_11_Nfr12_FormOnAPhone(WebApps apps) : IClassFixture<WebApps
         Assert.Equal("Send to my care team", (await page!.EvaluateAsync<string>("document.activeElement.textContent")).Trim());
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("sent=true", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("Answers sent:", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Sent. Your care team will go over your answers", await page.Locator("main").TextContentAsync());
         Assert.Equal(["7"], await QueryAsync(apps, "SELECT score::text FROM ehr.questionnaire_responses WHERE request_id = @request", ("request", request)));
         Assert.Empty(errors);
     }
