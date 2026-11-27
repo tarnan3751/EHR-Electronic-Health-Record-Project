@@ -3986,9 +3986,8 @@
         white-space: nowrap;
     }
 
-    /* Wide enough for set columns: the time and who did it first, the IDs on one line cut short on screen (the whole
-       ID stays in the cell, to select and copy), and the reason and the fields changed taking what is left. Narrower,
-       the columns fit their values as any table's do. */
+    /* Wide enough for set columns: the time and who did it first, the IDs whole, wrapping where they must, and the
+       reason and the fields changed taking what is left. Narrower, the columns fit their values as any table's do. */
     @media (min-width: 80rem) {
         .sc-audit .sc-table {
             table-layout: fixed;
@@ -4020,13 +4019,6 @@
 
         .sc-audit td:nth-child(2) {
             overflow-wrap: anywhere;
-        }
-
-        .sc-audit td.sc-table__id {
-            min-width: 0;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: ellipsis;
         }
     }
 
