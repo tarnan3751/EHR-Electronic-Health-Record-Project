@@ -33,7 +33,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Expected result: Step 1: no warning; the server gives the session 15 minutes. Step 2: both tabs warn; the first's
 //   warning closes when the second stays signed in. Step 3: no warning; the session still has 15 minutes, by the
 //   page's own keep-alive. Step 4: no warning and no end; at 20 minutes the visit stops at its limit and asks who each
-//   voice is, and the session has 15 minutes left. Step 5: the warning opens, with the sentence that the dictation
+//   voice is, and the session has 15 minutes left. Step 5: the warning opens, with the sentence that the listening
 //   service discards a visit left paused for 10 minutes.
 // Creator: Tahseen Arnan
 [Collection(BrowserTests.Collection)]
@@ -160,6 +160,6 @@ public class TC_UC11_09_ActivityKeepsTheSession(WebApps apps) : IClassFixture<We
         await IdleAsync(apps, page, TimeSpan.FromMinutes(13));
         await page.WaitForSelectorAsync(OpenWarning);
         Assert.True(await page.IsVisibleAsync("[data-session-waiting]"));
-        Assert.Contains("The dictation service discards a visit left like that for 10 minutes", await page.TextContentAsync("[data-session-waiting]"));
+        Assert.Contains("The listening service discards a visit left like that for 10 minutes", await page.TextContentAsync("[data-session-waiting]"));
     }
 }
