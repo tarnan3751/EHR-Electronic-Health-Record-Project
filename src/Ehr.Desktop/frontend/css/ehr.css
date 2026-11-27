@@ -2059,15 +2059,10 @@
         padding-right: 0;
     }
 
-    /* A quiet button among them (a form of one button each) is padded as the links are, so the gaps between the words
-       are even, and the last word ends on the column's edge. */
+    /* A quiet button among them (a form of one button each) keeps a button's edge, so it is never taken for the link
+       beside it, which opens a page where the button acts at once; a quiet danger one keeps its danger ink. */
     .sc-table__actions .sc-btn--quiet {
-        padding-inline: var(--space-2);
-    }
-
-    .sc-table__actions .sc-actions > :last-child > .sc-btn--quiet:only-child,
-    .sc-table__actions .sc-actions > .sc-btn--quiet:last-child {
-        padding-right: 0;
+        border-color: var(--line-strong);
     }
 
     .sc-table__actions p,
