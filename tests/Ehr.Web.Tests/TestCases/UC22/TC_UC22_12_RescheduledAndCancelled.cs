@@ -31,17 +31,15 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //      the clinician's forms page.
 //   4. For another patient, check in an appointment with both forms asked for, its start then two hours past; open the
 //      portal's home and list; send the GAD-7; open the clinician's page; end the visit; send the PHQ-9.
-// Expected result: Step 1: the GAD-7 says when it can be filled in, from five days ahead; sending it is 409, "Not sent.
-//   This form can't be filled in yet.", nothing stored. Step 2: "Fill it in by
-//   <tomorrow>, 16:20 UTC", the scheduled end; stored.
+// Expected result: Step 1: the GAD-7 says when it opens, five days ahead; sending it is 409, "Not sent. This form isn't
+//   open yet.", nothing stored. Step 2: the portal's list says "Due <tomorrow>, 16:20 UTC.", the scheduled end; stored.
 //   Step 3: sending is 409, the page leading with the help about self-harm (without saying the care team will read the
-//   answers), then "Not sent. This form can no longer be filled in.",
-//   and "Not monitored."; nothing stored and no inbox item; the portal lists the GAD-7 as sent and not the PHQ-9, whose
-//   page says it can no longer be filled in; the clinician sees both under the cancelled appointment, the PHQ-9 "Not
-//   answered. Closed.". Step 4: "Pre-visit forms (2 to fill in)", each "Fill it in by" 12 hours after the scheduled end;
-//   the GAD-7 stored; the clinician sees the PHQ-9 open until that time, "while the visit is in progress."; once the visit
-//   ends, sending the PHQ-9 is 409, "This form can no longer be filled in.", and the clinician sees "Not answered.
-//   Closed.".
+//   answers), then "Not sent. This form is closed.", and "Not monitored."; nothing stored and no inbox item; the portal
+//   lists the GAD-7 as sent and not the PHQ-9, whose page says it is closed; the clinician sees both under the cancelled
+//   appointment, the PHQ-9 "Not answered. Closed.". Step 4: "Pre-visit forms (2 to fill in)", each "Due" 12 hours
+//   after the scheduled end; the GAD-7 stored; the clinician sees the PHQ-9 open until that time, "while the visit is in
+//   progress."; once the visit ends, sending the PHQ-9 is 409, "This form is closed.", and the clinician sees "Not
+//   answered. Closed.".
 // Creator: Tahseen Arnan
 public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<WebApps>
 {
@@ -66,12 +64,12 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
         }
 
         await RescheduleAsync(12);
-        Assert.Contains($"You can fill it in from {visit.Now.UtcDateTime.Date.AddDays(5):MMM d, yyyy}, 16:00 UTC", Text(await portal.GetStringAsync(FormPath(gad), Cancel)));
+        Assert.Contains($"Opens {visit.Now.UtcDateTime.Date.AddDays(5):MMM d, yyyy}, 16:00 UTC", Text(await portal.GetStringAsync(FormPath(gad), Cancel)));
         var answers = Answers(GadItems, 0, 0, 0, 0, 0, 0, 0);
         using (var early = await SendAsync(portal, gad, answers))
         {
             Assert.Equal(HttpStatusCode.Conflict, early.StatusCode);
-            Assert.Contains("Not sent. This form can't be filled in yet.",
+            Assert.Contains("Not sent. This form isn't open yet.",
                 Text(await early.Content.ReadAsStringAsync(Cancel)));
         }
 
@@ -79,11 +77,11 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
 
         await RescheduleAsync(1);
         // Booked: it closes at the appointment's scheduled end, 20 minutes after its start.
-        Assert.Contains($"Fill it in by {visit.Now.UtcDateTime.Date.AddDays(1):MMM d, yyyy}, 16:20 UTC, in one go",
-            Text(await portal.GetStringAsync(FormPath(gad), Cancel)));
+        Assert.Contains($"Due {visit.Now.UtcDateTime.Date.AddDays(1):MMM d, yyyy}, 16:20 UTC.",
+            Text(await portal.GetStringAsync("/portal/forms", Cancel)));
         using (var sent = await SendAsync(portal, gad, answers))
         {
-            Assert.Contains("Sent. Your care team will go over your answers", Text(await ReadAsync(sent)));
+            Assert.Contains("<span class=\"sc-notice__state\">Sent.</span>", await ReadAsync(sent));
         }
 
         using (var cancelled = await AppointmentTests.ChangeAsync(visit.Session.Client, visit.Appointment, "Cancel", ("CancelReason", "Synthetic: unwell")))
@@ -98,7 +96,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
             var page = Text(await tooLate.Content.ReadAsStringAsync(Cancel));
             const string Help = "If you are thinking about hurting yourself, or feel you might act on these thoughts, call 911 or go to the nearest emergency room now. "
                 + "You can call or text 988 at any time, day or night, to talk with someone at the 988 Suicide & Crisis Lifeline.";
-            const string NotSent = "Not sent. This form can no longer be filled in.";
+            const string NotSent = "Not sent. This form is closed.";
             Assert.Contains(Help, page);
             Assert.Contains(NotSent, page);
             Assert.True(page.IndexOf(Help, StringComparison.Ordinal) < page.IndexOf(NotSent, StringComparison.Ordinal), "The help comes first.");
@@ -112,7 +110,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
         var list = await portal.GetStringAsync("/portal/forms", Cancel);
         Assert.Contains("data-form=\"sent\"", list);
         Assert.DoesNotContain("data-form=\"open\"", list);
-        Assert.Contains("This form can no longer be filled in.", Text(await portal.GetStringAsync(FormPath(phq), Cancel)));
+        Assert.Contains("This form is closed.", Text(await portal.GetStringAsync(FormPath(phq), Cancel)));
         var clinician = Text(await visit.Session.Client.GetStringAsync(FormsPath(visit.Patient) + "?sensitive=true", Cancel));
         Assert.Contains("Cancelled", clinician);
         Assert.Contains("Score 0 of 21 · Below mild", clinician);
@@ -148,10 +146,10 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
         var portalCloses = DateTime.ParseExact(closes, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture).ToString("MMM d, yyyy, HH:mm", CultureInfo.InvariantCulture);
         var (portal, _) = await PortalAsync(apps, visit);
         Assert.Contains("Pre-visit forms (2 to fill in)", Text(await portal.GetStringAsync("/portal", Cancel)));
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(Text(await portal.GetStringAsync("/portal/forms", Cancel)), $"Fill it in by {portalCloses} UTC\\.").Count);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(Text(await portal.GetStringAsync("/portal/forms", Cancel)), $"Due {portalCloses} UTC\\.").Count);
         using (var sent = await SendAsync(portal, gad, Answers(GadItems, 0, 0, 0, 0, 0, 0, 0)))
         {
-            Assert.Contains("Sent. Your care team will go over your answers", Text(await ReadAsync(sent)));
+            Assert.Contains("<span class=\"sc-notice__state\">Sent.</span>", await ReadAsync(sent));
         }
 
         Assert.Contains($"until {closes} UTC, while the visit is in progress.",
@@ -164,7 +162,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
         using (var ended = await SendAsync(portal, phq, Answers(PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 0)))
         {
             Assert.Equal(HttpStatusCode.Conflict, ended.StatusCode);
-            Assert.Contains("This form can no longer be filled in.", Text(await ended.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("This form is closed.", Text(await ended.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Empty(await QueryAsync(apps, "SELECT id::text FROM ehr.questionnaire_responses WHERE request_id = @request", ("request", phq)));

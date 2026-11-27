@@ -84,7 +84,7 @@ public class TC_UC22_11_Nfr12_FormOnAPhone(WebApps apps) : IClassFixture<WebApps
         Assert.Equal("Send to my care team", (await page!.EvaluateAsync<string>("document.activeElement.textContent")).Trim());
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("sent=true", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("Sent. Your care team will go over your answers", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Sent.", await page.Locator("main").TextContentAsync());
         Assert.Equal(["7"], await QueryAsync(apps, "SELECT score::text FROM ehr.questionnaire_responses WHERE request_id = @request", ("request", request)));
         Assert.Empty(errors);
     }

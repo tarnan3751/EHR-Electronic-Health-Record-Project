@@ -115,7 +115,7 @@ public class PortalClinicTimeTests(WebApps apps) : IClassFixture<WebApps>
         var (_, jar) = await PreVisitFormTests.PortalAsync(apps, visit);
         var forms = PreVisitFormTests.Text(await GetAsync(chicago, jar, "/portal/forms"));
         Assert.Contains($"Before your appointment on {Clock.Format(start, "MMM d, yyyy, HH:mm")} with Dr. Clock Forms.", forms);
-        Assert.Contains($"Fill it in by {Clock.Format(start.AddMinutes(20), "MMM d, yyyy, HH:mm")}.", forms);
+        Assert.Contains($"Due {Clock.Format(start.AddMinutes(20), "MMM d, yyyy, HH:mm")}.", forms);
         var clinical = await (await SignInAsync(chicago, visit.Clinician)).Client.GetStringAsync($"/appointments/{visit.Appointment}", Cancel);
         Assert.Contains(Clock.Range(start, start.AddMinutes(20)), clinical);
     }
