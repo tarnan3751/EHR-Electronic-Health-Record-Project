@@ -104,10 +104,10 @@ public class PortalTestNameTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<dd>0.4 to 4 mIU/L</dd>", decoded);
         Assert.Contains("Your result is above the normal range (0.4 to 4 mIU/L).", words);
         Assert.DoesNotContain("m[IU]/L", decoded);
-        Assert.Contains("Leukocytes: 2 values from", words);
+        Assert.Contains("Leukocytes, 2 values from", words);
         Assert.Contains("Latest 7.2 10³/µL, up from 6.1.", words);
         Assert.Contains("Oxygen saturation (%)", words);
-        Assert.Contains("Oxygen saturation: 2 values from", words);
+        Assert.Contains("Oxygen saturation, 2 values from", words);
         Assert.DoesNotContain("Arterial blood", words);
 
         var printHtml = await portal.GetStringAsync("/portal/record/print", Cancel);
@@ -124,11 +124,15 @@ public class PortalTestNameTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Oxygen saturation", print);
         Assert.DoesNotContain("Arterial blood", print);
 
-        // The clinician's pages and the patient's file keep the record's own names and units.
+        // The clinician's results page and the patient's file keep the record's own names and units. The clinic's vital
+        // signs page names a sign as its form does, in its trends as in its rows.
         var clinical = Words(await session.Client.GetStringAsync(ResultTests.Path(patient, orders[1]), Cancel));
         Assert.Contains(LeukocytesName, clinical);
         Assert.Contains("10*3/uL", clinical);
-        Assert.Contains("Oxygen saturation in Arterial blood by Pulse oximetry", Words(await session.Client.GetStringAsync(VitalTests.Path(patient), Cancel)));
+        var vitals = Words(await session.Client.GetStringAsync(VitalTests.Path(patient), Cancel));
+        Assert.Contains("Oxygen saturation (%)", vitals);
+        Assert.Contains("Oxygen saturation, 2 values from", vitals);
+        Assert.DoesNotContain("Arterial blood", vitals);
         var file = await portal.GetStringAsync("/portal/record?handler=File", Cancel);
         Assert.Contains(LeukocytesName, file);
         Assert.Contains("10*3/uL", file);

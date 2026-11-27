@@ -81,7 +81,7 @@ public class TC_UC4_21_VitalSignRangesByAge(WebApps apps) : IClassFixture<WebApp
             "SELECT code || ' ' || trim_scale(reference_low) || '-' || trim_scale(reference_high) FROM ehr.observations WHERE patient_id = @patient ORDER BY effective_at", child));
         Assert.DoesNotContain("sc-trend__point--outside", page);
         Assert.DoesNotContain("128, outside the range", page);
-        Assert.Contains("Reference range 59 to 123. That range is for the latest reading; earlier ones are marked against the range for the patient's age then.", Words(page));
+        Assert.Contains("Reference range 59 to 123. That range is for the latest reading. Earlier ones are marked against the range for the patient's age then.", Words(page));
         Assert.DoesNotContain("High", System.Text.RegularExpressions.Regex.Match(page, "(?s)<th scope=\"row\">Heart rate.*?</tr>").Value);
     }
 }
