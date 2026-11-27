@@ -53,7 +53,7 @@ public sealed class SecureMessages(EhrDbContext db, IEmailSender email)
         SaveAsync(cancellationToken, NewMessage(thread, patient, sender, body));
 
     // What the portal says when a patient has reached the day's or the hour's limit.
-    public const string TooMany = "You've sent a lot of messages today. Please call the clinic, or try again later.";
+    public const string TooMany = "You've sent a lot of messages today. Call the clinic, or try again later.";
 
     // Records that the signed-in side has now read the other side's messages in a thread: the patient, the staff's; a
     // clinician with the patient on their panel, the patient's. The database marks each once and refuses anyone else,

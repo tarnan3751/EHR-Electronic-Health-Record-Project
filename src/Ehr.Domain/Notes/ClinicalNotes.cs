@@ -91,7 +91,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         var errors = NoteContent.From(draft).Validate(signing: true).ToList();
         if (draft.StructuredVersion != draft.Version)
         {
-            errors.Add("This draft changed in another client. Reopen it, check all four sections, and save before signing.");
+            errors.Add("This draft changed in another window or app. Reopen it, check all four sections, and save before signing.");
         }
         else if (draft.History is not null)
         {
@@ -159,7 +159,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
                 // A retry that ticks or clears "Sensitive" can't change a note that was already signed (step 10).
                 return new(409, [existing.Sensitive
                     ? "This note was already signed, as sensitive. Open the signed note from the chart."
-                    : "This note was already signed, and not as sensitive. A signed note can't be changed: open it from the chart."]);
+                    : "This note was already signed, and not as sensitive. A signed note can't be changed. Open it from the chart."]);
             }
 
             return existing.DraftVersion == version
@@ -259,8 +259,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
                 ? new(403, ["Only the person who marked it sensitive, or the note's signer, can unmark it."])
                 : new(409, [(addendum, summary, sensitive) switch
                 {
-                    (not null, _, false) => "This can't be unmarked: an addendum to a sensitive note is sensitive, or it has already been unmarked.",
-                    (_, not null, false) => "This can't be unmarked: a summary of a sensitive note or addendum is sensitive, or it has already been unmarked.",
+                    (not null, _, false) => "This can't be unmarked. An addendum to a sensitive note is sensitive too, or it was already unmarked.",
+                    (_, not null, false) => "This can't be unmarked. A summary of a sensitive note or addendum is sensitive too, or it was already unmarked.",
                     _ => "This has already been changed. Open the note again.",
                 }]);
         }

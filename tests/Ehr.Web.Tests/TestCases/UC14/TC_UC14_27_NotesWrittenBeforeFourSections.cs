@@ -43,7 +43,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   again; the saved draft is exactly as it was. Step 5: the draft is saved, in one update that writes the four sections
 //   and clears the History, and signing is refused with "Enter Objective before signing." Step 6: the note is signed in
 //   four sections. Step 7: nothing is saved: the four sections' headings are 15 bytes longer, and the page says "This
-//   draft is at the size limit: shorten it by a few words to save it in four sections.", with the "Check:" notice
+//   draft is at the size limit. Shorten it by a few words to save it in four sections.", with the "Check:" notice
 //   without JavaScript. Step 8: the draft is saved in four sections, at exactly 64 KiB.
 // Creator: Tahseen Arnan
 public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFixture<WebApps>
@@ -148,7 +148,7 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
     [Fact]
     public async Task A_draft_written_before_four_sections_at_the_size_limit_is_told_to_shorten_it_by_a_few_words()
     {
-        const string AtLimit = "This draft is at the size limit: shorten it by a few words to save it in four sections.";
+        const string AtLimit = "This draft is at the size limit. Shorten it by a few words to save it in four sections.";
         var (clinician, patient, session) = await OnPanelAsync(apps);
         var (history, assessment) = (new string('界', 16_000), new string('界', 5_836));
         var draft = await EarlierNotes.DraftAsync(apps.Database, clinician.Id, patient, history, assessment, "");

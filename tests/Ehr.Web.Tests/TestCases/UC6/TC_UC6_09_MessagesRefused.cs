@@ -80,7 +80,7 @@ public class TC_UC6_09_MessagesRefused(WebApps apps) : IClassFixture<WebApps>
 
         using var eleventh = await PostFormAsync(portal.Client, "/portal/messages/new", "/portal/messages/new", ("Subject", "Synthetic: one too many"), ("Body", "Synthetic: again"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, eleventh.StatusCode);
-        Assert.Contains("Please call the clinic, or try again later.", await eleventh.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("Call the clinic, or try again later.", await eleventh.Content.ReadAsStringAsync(Cancel));
         Assert.Equal(10, (await RowsAsync(apps, patient, "body")).Count);
     }
 }

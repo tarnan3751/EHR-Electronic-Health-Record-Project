@@ -184,7 +184,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         var approved = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         var current = NoteContent.From(draft);
         if (!append && approved.Keys.Any(field => current.Sections[Section(field)].Text.Length > 0))
-            return ReviewResult.Invalid("The draft already contains text. Compare it below and explicitly allow appending approved values; existing text will be preserved.");
+            return ReviewResult.Invalid("The draft already has text. Compare it below, then choose to add the approved values after it. The existing text stays.");
         var merged = Merge(current, approved);
         if (merged.Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors) return new(422, errors);
         merged.ApplyTo(draft);
