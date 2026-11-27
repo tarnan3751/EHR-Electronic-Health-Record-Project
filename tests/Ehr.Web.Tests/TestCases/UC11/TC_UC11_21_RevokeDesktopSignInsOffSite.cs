@@ -58,7 +58,7 @@ public class TC_UC11_21_RevokeDesktopSignInsOffSite(WebApps apps) : IClassFixtur
         // 3.
         var never = await apps.CreateStaffAsync("Dr. Never", StaffRoles.Clinician);
         var none = await admin.Client.GetStringAsync($"/admin/staff/{never.Id}/desktop", Cancel);
-        Assert.Contains("None: Dr. Never has no desktop sign-in to revoke.", Words(none));
+        Assert.Contains("No desktop sign-ins. Dr. Never has none to revoke.", Words(none));
         Assert.DoesNotContain("Revoke and delete", none);
     }
 }

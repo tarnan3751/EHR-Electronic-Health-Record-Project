@@ -28,10 +28,10 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 //   4. Post a review of an access still in force.
 //   5. GET the page as a clinician, signed out, and for an unknown ID.
 // Expected result: Step 1: the page again, "Say whether the access was appropriate.", "Write a note…", "Use at least 10
-//   characters.", "Use 500 characters or fewer."; nothing saved. Step 2: "Your own emergency access: another
-//   administrator reviews it." and no form; the post "Not saved: this is your own emergency access…"; nothing saved.
-//   Step 3: "Not saved: someone reviewed this access first…", Second Reviewer's review shown and kept. Step 4: "Not
-//   saved: this access is still in force…". Step 5: /denied, /sign-in, and 404.
+//   characters.", "Use 500 characters or fewer."; nothing saved. Step 2: "Your own emergency access. Another
+//   administrator reviews it." and no form; the post "Not saved. This is your own emergency access…"; nothing saved.
+//   Step 3: "Not saved. Someone reviewed this access first…", Second Reviewer's review shown and kept. Step 4: "Not
+//   saved. This access is still in force…". Step 5: /denied, /sign-in, and 404.
 // Creator: Tahseen Arnan
 public class TC_UC24_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
@@ -65,11 +65,11 @@ public class TC_UC24_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         var own = await GrantAsync(apps, "", clinician: both);
         await EndAsync(apps, own.Id);
         var ownPage = await own.Session.Client.GetStringAsync($"/admin/emergency-access/{own.Id}", Cancel);
-        Assert.Contains("Your own emergency access:</span> another administrator reviews it.", ownPage);
+        Assert.Contains("Your own emergency access.</span> Another administrator reviews it.", ownPage);
         Assert.DoesNotContain("data-review-form", ownPage);
         using (var forged = await own.Session.Client.PostAsync($"/admin/emergency-access/{own.Id}", Form(("Outcome", EmergencyAccessOutcomes.Appropriate), ("Note", Note), ("__RequestVerificationToken", Token(await own.Session.Client.GetStringAsync("/inbox", Cancel)))), TestContext.Current.CancellationToken))
         {
-            Assert.Contains("Not saved:</span> this is your own emergency access.", await ReadAsync(forged));
+            Assert.Contains("Not saved.</span> This is your own emergency access.", await ReadAsync(forged));
         }
 
         Assert.Empty(await ReviewsAsync(apps, own.Id));
@@ -85,7 +85,7 @@ public class TC_UC24_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             ("Outcome", EmergencyAccessOutcomes.NotAppropriate), ("Note", "Synthetic: a second opinion, too late.")))
         {
             var answer = await ReadAsync(late);
-            Assert.Contains("Not saved:</span> someone reviewed this access first.", answer);
+            Assert.Contains("Not saved.</span> Someone reviewed this access first.", answer);
             Assert.Contains("Reviewed by Second Reviewer", answer);
         }
 
@@ -95,7 +95,7 @@ public class TC_UC24_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         var inForce = await GrantAsync(apps, "Dr. Still In Force");
         using (var early = await first.Client.PostAsync($"/admin/emergency-access/{inForce.Id}", Form(("Outcome", EmergencyAccessOutcomes.Appropriate), ("Note", Note), ("__RequestVerificationToken", Token(await first.Client.GetStringAsync("/inbox", Cancel)))), TestContext.Current.CancellationToken))
         {
-            Assert.Contains("Not saved:</span> this access is still in force.", await ReadAsync(early));
+            Assert.Contains("Not saved.</span> This access is still in force.", await ReadAsync(early));
         }
 
         Assert.Empty(await ReviewsAsync(apps, inForce.Id));

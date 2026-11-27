@@ -31,8 +31,8 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 // Expected result: Step 1 shows the chart with no reason asked and no break_glass event. Step 2 is sent to
 //   /patients/{id}/reason, which doesn't show the patient's name, and nothing is read. Step 3 shows the chart with the
 //   "Emergency access" notice, and the grant ends four hours after it was given. Step 4 shows the chart without asking.
-//   Step 5 lists one break_glass event, marked Review, with the clinician's name, the patient's ID and the reason. Step 6
-//   is sent to the reason page again.
+//   Step 5 lists one break_glass event, shown as "Emergency access", marked Review, with the clinician's name, the
+//   patient's ID and the reason. Step 6 is sent to the reason page again.
 // Creator: Luke Garcia
 public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
 {
@@ -94,7 +94,7 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
         var audit = await ReadAsync(await adminSession.Client.GetAsync($"/admin/audit?Flagged=true&Patient={patient}", Cancel));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.BreakGlass, clinician.Id, patient));
         Assert.Contains("<tr class=\"sc-table__flagged\">", audit);
-        Assert.Contains("break_glass <span class=\"sc-tag sc-tag--danger\">Review</span>", audit);
+        Assert.Contains("Emergency access <span class=\"sc-tag sc-tag--danger\">Review</span>", audit);
         Assert.Contains("Dr. Night Cover", audit);
         Assert.Contains(patient.ToString(), audit);
         Assert.Contains(Reason, audit);

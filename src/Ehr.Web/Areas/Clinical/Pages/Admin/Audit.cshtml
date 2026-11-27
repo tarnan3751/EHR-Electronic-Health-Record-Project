@@ -6,7 +6,15 @@
     ViewData["Title"] = "Audit";
 }
 <h1>Audit</h1>
-<p class="sc-lede">Every view and change of patient information, and every sign-in, newest first. Patients appear by ID (a portal account that acted, by its email), and a change to their information by the names of the fields it changed, never its values. Emergency access is marked for review until an administrator reviews it.</p>
+<p class="sc-lede">Every view and change of patient information, and every sign-in, newest first.</p>
+<details class="sc-prose">
+    <summary>More about what's shown</summary>
+    <ul>
+        <li>Patients appear by ID, and a portal account that acted by its email.</li>
+        <li>A change shows the names of the fields it changed, never their values.</li>
+        <li>Emergency access is flagged until an administrator reviews it.</li>
+    </ul>
+</details>
 <form method="get" class="sc-filters">
     <div class="sc-field">
         <label asp-for="Action" class="sc-field__label">Action</label>
@@ -14,7 +22,7 @@
             <option value="">Any</option>
             @foreach (var action in AuditActions.All)
             {
-                <option value="@action">@action</option>
+                <option value="@action">@(action == AuditActions.BreakGlass ? "Emergency access" : action)</option>
             }
         </select>
     </div>
@@ -83,7 +91,7 @@ else
                         <td>@(e.ActorId is { } actor ? Model.Log.Actors.GetValueOrDefault(actor, actor.ToString()) : e.Source == AuditSources.Lab ? "Lab" : "System")</td>
                         @* An emergency access: "Review" until reviewed, then "Reviewed" and, when so, "Not appropriate"; either way the
                            way to its review (step 18). *@
-                        <td>@e.Action@if (e.Action == AuditActions.BreakGlass && e.RowId is { } access)
+                        <td>@(e.Action == AuditActions.BreakGlass ? "Emergency access" : e.Action)@if (e.Action == AuditActions.BreakGlass && e.RowId is { } access)
                             {
                                 if (Model.Reviews.TryGetValue(access, out var review))
                                 {

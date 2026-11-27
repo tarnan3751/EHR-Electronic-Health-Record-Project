@@ -8,7 +8,7 @@
 @if (Model.SetupLink is { } link)
 {
     <section class="sc-notice sc-notice--success">
-        <p>The account is created. Send this link to the person; it works once, and they choose their password with it. It isn't shown again.</p>
+        <p><span class="sc-notice__state">Account created.</span> Send this setup link to the person. They choose their password with it, and it works once. It isn't shown again.</p>
         <p class="sc-copy">@link</p>
     </section>
 }
@@ -35,8 +35,9 @@
                     <td>
                         @if (member.Roles.Contains(StaffRoles.Clinician))
                         {
-                            @* Anyone's, their own included: the remote wipe for a lost laptop (DesktopSignIns). *@
-                            <a class="sc-btn sc-btn--compact" asp-page="/Admin/DesktopSignIns" asp-route-id="@member.Id">Desktop sign-ins</a>
+                            @* Anyone's, their own included: the remote wipe for a lost laptop (DesktopSignIns). A link, since it
+                               opens a page; the buttons beside it act at once, and none is the page's primary. *@
+                            <p><a asp-page="/Admin/DesktopSignIns" asp-route-id="@member.Id">Desktop sign-ins</a></p>
                         }
                         @if (member.Id != Model.CurrentUserId)
                         {
@@ -48,11 +49,11 @@
                                 }
                                 @if (StaffAccounts.IsDisabled(member))
                                 {
-                                    <form method="post" asp-page-handler="Enable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">Enable</button></form>
+                                    <form method="post" asp-page-handler="Enable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">Enable account</button></form>
                                 }
                                 else
                                 {
-                                    <form method="post" asp-page-handler="Disable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">Disable</button></form>
+                                    <form method="post" asp-page-handler="Disable"><input type="hidden" name="id" value="@member.Id"><button class="sc-btn sc-btn--compact">Disable account</button></form>
                                 }
                             </div>
                         }

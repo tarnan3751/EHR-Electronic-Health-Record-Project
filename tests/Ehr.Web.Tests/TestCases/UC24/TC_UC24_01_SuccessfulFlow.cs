@@ -28,10 +28,10 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 //   4. Choose "Appropriate", write the note, and select "Mark reviewed".
 //   5. Open the audit page's emergency accesses for the patient.
 // Expected result: Step 2: one item, "Emergency access to review", the patient by ID and no name, "Review the access",
-//   and no "Mark done". Step 3: the page names Dr. Covering, the patient's ID, the reason, and the events (break_glass,
-//   reads, the inserts of the panel row and the message) with no name and no word of the message. Step 4: "Reviewed:",
-//   the outcome, Reviewer One and the note; every administrator's item, the bootstrap admin's included, is done. Step 5:
-//   the access is tagged "Reviewed", not "Review", untinted, with "Open the review".
+//   and no "Mark done". Step 3: the page names Dr. Covering, the patient's ID, the reason, and the events (the emergency
+//   access, reads, the inserts of the panel row and the message) with no name and no word of the message. Step 4:
+//   "Reviewed.", the outcome, Reviewer One and the note; every administrator's item, the bootstrap admin's included, is
+//   done. Step 5: the access is tagged "Reviewed", not "Review", untinted, with "Open the review".
 // Creator: Tahseen Arnan
 public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -73,7 +73,7 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Dr. Covering", page);
         Assert.Contains($"<dd class=\"sc-table__id\">{access.Patient}</dd>", page);
         Assert.Contains("Synthetic: covering the ward tonight, asked by the charge nurse.", page);
-        Assert.Contains($"<td>{AuditActions.BreakGlass}</td>", page);
+        Assert.Contains("<td>Emergency access</td>", page);
         Assert.Contains($"<td>{AuditActions.Read}</td>", page);
         Assert.Contains("patient_assignments", page);
         Assert.Contains("messages", page);
@@ -87,7 +87,7 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         {
             var after = await ReadAsync(reviewed);
             Assert.Equal($"/admin/emergency-access/{access.Id}", PathOf(reviewed));
-            Assert.Contains("Reviewed:</span> the access is marked reviewed", after);
+            Assert.Contains("Reviewed.</span> It's done in every administrator's inbox.", after);
             Assert.Contains("<span class=\"sc-tag sc-tag--success\">Appropriate</span> Reviewed by Reviewer One", after);
             Assert.Contains(Note, after);
             Assert.DoesNotContain("data-review-form", after);
@@ -102,7 +102,7 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         // 5.
         var audit = await reviewer.Client.GetStringAsync($"/admin/audit?Patient={access.Patient}&Flagged=true", Cancel);
-        Assert.Contains($"{AuditActions.BreakGlass} <span class=\"sc-tag\">Reviewed</span>", audit);
+        Assert.Contains("Emergency access <span class=\"sc-tag\">Reviewed</span>", audit);
         Assert.DoesNotContain("sc-tag sc-tag--danger\">Review</span>", audit);
         Assert.DoesNotContain("sc-table__flagged", audit);
         Assert.Contains($"<a data-review-link href=\"/admin/emergency-access/{access.Id}\">Open the review</a>", audit);

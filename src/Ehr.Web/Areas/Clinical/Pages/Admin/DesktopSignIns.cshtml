@@ -9,14 +9,19 @@
 
 @if (Model.Unended == 0)
 {
-    <p class="sc-notice sc-notice--info" data-desktop-none><span class="sc-notice__state">None:</span> @name has no desktop sign-in to revoke.</p>
+    <p class="sc-notice sc-notice--info" data-desktop-none><span class="sc-notice__state">No desktop sign-ins.</span> @name has none to revoke.</p>
 }
 else
 {
-    <p data-desktop-count>@name has @Model.Unended desktop @(Model.Unended == 1 ? "sign-in that hasn't" : "sign-ins that haven't") ended. The desktop app makes one at each sign-in with the password and the code, so a computer in daily use makes one or two a day, and holds only its latest.</p>
+    <p data-desktop-count>@name has @Model.Unended desktop @(Model.Unended == 1 ? "sign-in that hasn't" : "sign-ins that haven't") ended. A computer in daily use makes one or two a day and keeps only its latest.</p>
     <section class="sc-notice sc-notice--warning" data-desktop-confirm>
-        <p>Revoke @name's desktop sign-ins? Each computer they've signed in to with SwiftChart stops syncing now, and deletes everything SwiftChart keeps on it — its offline charts, and any drafts and recordings not yet sent, which are lost — the next time it reaches either server. A computer that never connects again keeps its data, locked, and closes it 30 days after its last sign-in. They can sign in again afterwards unless the account is disabled.</p>
-        <p data-desktop-order>Revoking is what deletes it. Disabling the account, or resetting its password or authenticator, ends these sign-ins but deletes nothing; revoking works before or after either, unless someone signs out of SwiftChart on one of those computers in between, which leaves that computer out of reach. Revoke at once.</p>
+        <p><strong>Revoke @name's desktop sign-ins?</strong> Each computer they've signed in to with SwiftChart stops syncing now.</p>
+        <ul>
+            <li>The next time it reaches either server, it deletes everything SwiftChart keeps on it: offline charts, and any drafts and recordings not yet sent, which are lost.</li>
+            <li>A computer that never connects again keeps its data locked, and closes it 30 days after its last sign-in.</li>
+            <li>They can sign in again afterwards, unless the account is disabled.</li>
+        </ul>
+        <p data-desktop-order>Revoking is what deletes it. Disabling the account or resetting its password or authenticator ends these sign-ins but deletes nothing. Revoke at once: if someone signs out of SwiftChart on one of those computers first, it's out of reach.</p>
     </section>
     @if (!OnPrem.IsReachable)
     {

@@ -84,7 +84,7 @@ public class TC_UC12_04_EverythingAudited(WebApps apps) : IClassFixture<WebApps>
         // And as the admin reviews it.
         var adminSession = await SignInAsync(apps.OnPrem, admin);
         var audit = await ReadAsync(await adminSession.Client.GetAsync($"/admin/audit?Patient={patient}", Cancel));
-        Assert.Contains("break_glass <span class=\"sc-tag sc-tag--danger\">Review</span>", audit);
+        Assert.Contains("Emergency access <span class=\"sc-tag sc-tag--danger\">Review</span>", audit);
         Assert.Contains($"<td>{AuditActions.Insert}</td>", audit);
         Assert.Contains($"<td>{AuditActions.Read}</td>", audit);
         Assert.Contains("Paged by the ward; the patient&#x27;s own doctor is away.", audit);
