@@ -23,9 +23,11 @@
         text-size-adjust: 100%;
     }
 
+    /* The page's ground is surface-page; what is on it (cards, tables, toolbars) sits on surface-raised, so it has an
+       edge in both themes. */
     body {
         margin: 0;
-        background: var(--surface);
+        background: var(--surface-page);
         color: var(--ink);
         font-family: var(--font-sans);
         font-size: 16px;
@@ -152,8 +154,10 @@
         cursor: pointer;
     }
 
+    /* Dates and times never break mid-value, and their figures line up from row to row. */
     time {
         white-space: nowrap;
+        font-variant-numeric: tabular-nums;
     }
 
     /* The keyboard focus ring, the same on everything that takes focus. Never removed. */
@@ -184,6 +188,7 @@
         border-collapse: collapse;
         font-size: 14px;
         line-height: 20px;
+        font-variant-numeric: tabular-nums;
     }
 
     th {
@@ -191,14 +196,23 @@
         font-weight: 600;
         background: var(--surface-subtle);
         color: var(--ink);
-        padding: var(--space-2) var(--space-3);
+        padding: var(--space-3) var(--space-4);
         border-bottom: 1px solid var(--line);
+        vertical-align: baseline;
+    }
+
+    /* A column's header is a caption over its values; a row's header (th scope="row") stays ink, as its row's name. */
+    thead th {
+        padding-block: var(--space-2);
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--ink-muted);
     }
 
     td {
-        padding: var(--space-2) var(--space-3);
+        padding: var(--space-3) var(--space-4);
         border-bottom: 1px solid var(--line);
-        vertical-align: top;
+        vertical-align: baseline;
     }
 
     /* Motion is short and functional, and off for anyone who asks. */
@@ -440,7 +454,7 @@
     .sc-page {
         max-width: calc(var(--width-content) + 2 * var(--space-5));
         margin: 0 auto;
-        padding: var(--space-6) var(--space-5) var(--space-16);
+        padding: var(--space-8) var(--space-5) var(--space-16);
     }
 
     .sc-page--reading {
@@ -501,13 +515,70 @@
         align-items: center;
         justify-content: space-between;
         gap: var(--space-2) var(--space-4);
-        margin: 0 0 var(--space-4);
+        min-height: 28px;
+        margin: calc(-1 * var(--space-2)) 0 var(--space-5);
         font-size: 14px;
         line-height: 20px;
     }
 
     .sc-pagehead > * {
         margin: 0;
+    }
+
+    .sc-pagehead .sc-muted {
+        font-size: 14px;
+    }
+
+    /* The way back, as a small breadcrumb: muted, with a chevron drawn before it, underlined only on hover and focus. */
+    .sc-back {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-2);
+        color: var(--ink-muted);
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-back::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-left: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+    }
+
+    .sc-back:hover,
+    .sc-back:focus-visible {
+        color: var(--accent-ink);
+        text-decoration: underline;
+    }
+
+    /* A section's heading with what belongs to it on the right, such as a day's heading and the way to the next. */
+    .sc-sectionhead {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2) var(--space-4);
+        margin: var(--space-8) 0 var(--space-3);
+    }
+
+    .sc-sectionhead > * {
+        margin: 0;
+    }
+
+    /* A list or table with nothing in it: one quiet line, framed, so the empty space reads as meant. */
+    .sc-empty {
+        margin: 0 0 var(--space-4);
+        padding: var(--space-8) var(--space-4);
+        text-align: center;
+        color: var(--ink-muted);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
     }
 
     /* A title with its status beside it. */
@@ -583,8 +654,9 @@
         color: var(--danger);
     }
 
-    /* For a row of actions inside a table or a list. */
-    .sc-btn--compact {
+    /* For a row of actions inside a table or a list, and the page's own actions on the line above its title. */
+    .sc-btn--compact,
+    .sc-pagehead .sc-btn {
         height: 28px;
         padding: 0 var(--space-3);
     }
@@ -610,6 +682,12 @@
         filter: brightness(0.96);
     }
 
+    /* A secondary button darkens its ground on hover rather than its border, in both themes. */
+    .sc-btn:not(.sc-btn--primary, .sc-btn--quiet, .sc-btn--danger):hover:not(:disabled) {
+        filter: none;
+        background: var(--surface-subtle);
+    }
+
     .sc-btn--quiet:hover:not(:disabled) {
         filter: none;
         text-decoration: underline;
@@ -622,15 +700,16 @@
         color: var(--ink-muted);
     }
 
+    /* A keyboard shortcut on its control: a quiet chip tinted from the control's own text, so it reads as part of the
+       control rather than a box beside it. */
     .sc-kbd {
         font-family: var(--font-mono);
-        font-size: 12px;
+        font-size: 11px;
         line-height: 16px;
         font-weight: 600;
-        padding: 0 var(--space-1);
+        padding: 0 5px;
         border-radius: var(--radius-xs);
-        border: 1px solid currentColor;
-        opacity: 0.85;
+        background: color-mix(in srgb, currentColor 14%, transparent);
         white-space: nowrap;
     }
 
@@ -1137,7 +1216,7 @@
         align-items: center;
         gap: var(--space-2) var(--space-6);
         padding: var(--space-3) var(--space-5);
-        background: var(--surface-subtle);
+        background: var(--surface-raised);
         border-bottom: 1px solid var(--line);
     }
 
@@ -1165,10 +1244,8 @@
     }
 
     .sc-banner__mrn {
-        font-family: var(--font-mono);
-        font-size: 13px;
-        line-height: 20px;
-        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
         color: var(--ink);
     }
 
@@ -1375,6 +1452,41 @@
         font-weight: 600;
     }
 
+    /* A line whose text is wrapped in sc-list__main is a row: the text on the left, its actions on the right, on the
+       first line's baseline. */
+    .sc-list > li:has(> .sc-list__main) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--space-1) var(--space-4);
+    }
+
+    /* The text keeps at least 16rem beside its actions; where several actions would squeeze it more, they go under it. */
+    .sc-list__main {
+        flex: 1 1 16rem;
+        min-width: 0;
+    }
+
+    .sc-list > li > .sc-list__actions {
+        flex: none;
+    }
+
+    .sc-list > li:has(> .sc-list__main) > .sc-list__actions {
+        margin: 0 0 0 auto;
+        flex-wrap: nowrap;
+    }
+
+    /* In a list of record lines, a link is plainly one by its place and weight: underlined on hover and focus. */
+    .sc-list a:not(.sc-btn) {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-list a:not(.sc-btn):hover,
+    .sc-list a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
     /* A conversation: messages oldest first, each in its own block. The reader's own are set in from the left, and
        marked with the accent bar, so who wrote what is clear without color alone (each also says who). */
     .sc-thread {
@@ -1421,7 +1533,7 @@
            container and can't widen the page. */
         position: relative;
         border: 1px solid var(--line);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-md);
         overflow: clip;
         margin: 0 0 var(--space-4);
         background: var(--surface-raised);
@@ -1444,11 +1556,71 @@
         border-bottom: 0;
     }
 
+    /* Dates, times, MRNs and readings in a table: the text font with tabular figures, so they line up from row to row,
+       and never broken mid-value. (Mono stays for what is compared character by character: sc-table__id.) */
     .sc-table__mono {
-        font-family: var(--font-mono);
-        font-size: 13px;
-        font-weight: 500;
+        font-variant-numeric: tabular-nums;
         white-space: nowrap;
+    }
+
+    /* A row is one thing: it lights up under the pointer. */
+    .sc-table tbody tr:hover td {
+        background: var(--surface-subtle);
+    }
+
+    /* A link in a table is plainly one by its place and weight: underlined on hover and focus, not always. */
+    .sc-table a:not(.sc-btn) {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-table a:not(.sc-btn):hover,
+    .sc-table a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    /* A column only as wide as what is in it, such as a date or an MRN; the column left without it takes the rest. */
+    .sc-table__fit {
+        width: 1%;
+        white-space: nowrap;
+    }
+
+    /* A row's actions: in the last column, on the right, on one line and one baseline, links drawn like the compact
+       quiet button beside the buttons. A note under them wraps. */
+    .sc-table__actions {
+        width: 1%;
+        white-space: nowrap;
+        text-align: right;
+    }
+
+    .sc-table__actions .sc-actions {
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+    }
+
+    .sc-table__actions .sc-actions > a:not(.sc-btn),
+    .sc-table__actions > a:not(.sc-btn) {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 var(--space-2);
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+    }
+
+    .sc-table__actions .sc-actions > a:not(.sc-btn):last-child,
+    .sc-table__actions > a:not(.sc-btn):last-child {
+        padding-right: 0;
+    }
+
+    .sc-table__actions p,
+    .sc-table__actions > .sc-muted {
+        display: block;
+        min-width: 16rem;
+        margin: var(--space-2) 0 0;
+        white-space: normal;
+        text-align: left;
     }
 
     .sc-table__id {
@@ -2029,6 +2201,7 @@
 
         .sc-app {
             --surface: transparent;
+            --surface-page: transparent;
             --surface-subtle: transparent;
             --surface-raised: transparent;
             --line: color-mix(in srgb, var(--brand-navy) 25%, transparent);

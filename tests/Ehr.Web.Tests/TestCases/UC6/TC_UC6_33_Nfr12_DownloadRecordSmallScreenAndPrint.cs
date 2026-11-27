@@ -116,7 +116,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         // On screen the print rules change nothing.
         await page.EmulateMediaAsync(new() { Media = Media.Screen, ColorScheme = ColorScheme.Light });
         Assert.Equal("rgb(14, 27, 44)", await page.EvaluateAsync<string>("getComputedStyle(document.body).color"));
-        Assert.Equal("rgb(255, 255, 255)", await page.EvaluateAsync<string>("getComputedStyle(document.body).backgroundColor"));
+        Assert.Equal("rgb(244, 246, 248)", await page.EvaluateAsync<string>("getComputedStyle(document.body).backgroundColor"));
         Assert.NotEqual("none", await DisplayAsync(page, ".sc-appbar"));
         await page.EmulateMediaAsync(new() { Media = Media.Screen, ColorScheme = ColorScheme.Dark });
         Assert.Equal("rgb(232, 238, 243)", await page.EvaluateAsync<string>("getComputedStyle(document.body).color"));
