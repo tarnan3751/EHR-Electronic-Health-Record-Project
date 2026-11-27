@@ -69,6 +69,7 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("/_content/Ehr.Design/js/dictation.", html);
         Assert.Contains("Dictate in English or Spanish, with a microphone.", html);
         Assert.Contains("Nothing goes into the note until you review it.", html);
+        Assert.Contains("The proposals and the transcript they came from are kept with your review.", html);
         Assert.Contains("Orders and allergy changes are never filled in from dictation.", html);
         foreach (var field in new[] { "subjective", "objective", "assessment", "plan" })
         {

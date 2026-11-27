@@ -44,7 +44,7 @@ else
     }
     <section data-dictation data-dictation-api="@Ehr.Web.Api.Dictation.DictationApi.Path" data-patient-id="@Model.Patient.Id" data-draft-id="@Model.DraftId" data-draft-version="@Model.DraftVersion">
         @Html.AntiForgeryToken()
-        <p class="sc-notice sc-notice--info">Dictate in English or Spanish, with a microphone. Nothing goes into the note until you review it. Orders and allergy changes are never filled in from dictation.</p>
+        <p class="sc-notice sc-notice--info">Dictate in English or Spanish, with a microphone. Nothing goes into the note until you review it. The proposals and the transcript they came from are kept with your review. Orders and allergy changes are never filled in from dictation.</p>
         <noscript><p class="sc-notice sc-notice--danger">Dictation needs JavaScript. You can still type the note.</p></noscript>
 
         @* The language of this dictation (the expansion plan's step 17): chosen for each, English first, and never
