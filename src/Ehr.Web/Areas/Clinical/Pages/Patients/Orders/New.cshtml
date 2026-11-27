@@ -171,15 +171,15 @@ else
         }
         @if (Model.KnownType == Ehr.Data.Orders.OrderType.Medication)
         {
-            @* What the checks are, and that no warning doesn't mean safe, before the order is signed. *@
+            @* What the checks are, that no warning doesn't mean safe, and the one limit a clinician must know (uncoded
+               allergies and medications), before the order is signed. *@
             <div class="sc-muted" data-safety-disclaimer>
-                <p>Decision support for this demonstration system, not a complete clinical reference. No warning doesn't mean a combination is safe.</p>
+                <p>Decision support for this demonstration system, not a complete clinical reference. No warning doesn't mean a combination is safe. Allergies and medications without a code aren't checked.</p>
                 <details>
                     <summary>More about what is checked</summary>
                     <ul>
                         <li>A medication order is checked against the patient's allergies and medications.</li>
                         <li>Only items with a drug code are checked.</li>
-                        <li>Allergies and medications without a code aren't checked.</li>
                     </ul>
                 </details>
             </div>
