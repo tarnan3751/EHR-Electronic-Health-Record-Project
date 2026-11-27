@@ -338,6 +338,16 @@ public static class Units
         "/min" => "per minute",
         _ => ucum,
     };
+
+    // For patients (Tahseen's decision of 26 November 2026), in the portal's names, trends, results and printable record:
+    // UCUM's print form for the units whose code reads badly to a patient, and any other as Shown gives it.
+    public static string? ForPatients(string? ucum) => ucum switch
+    {
+        "10*3/uL" => "10³/µL",
+        "10*6/uL" => "10⁶/µL",
+        "m[IU]/L" => "mIU/L",
+        _ => Shown(ucum),
+    };
 }
 
 // A patient's vital signs for the flowsheet page: every one recorded (the latest first, up to a limit), already
