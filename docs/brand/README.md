@@ -162,7 +162,7 @@ Listening to a visit (ambient listening, the expansion plan's step 16) is a page
 
 Some of a chart is more private than the rest: mental-health and substance-use diagnoses, some others by their code, and anything a clinician marks. These are never on screen by accident.
 
-- **Left out, not blurred.** A page doesn't receive sensitive items until someone asks. In their place an info notice says how many are hidden and ends with a plain link to see them: "Sensitive items hidden. 2 diagnoses or medications aren't shown. Show sensitive items".
+- **Left out, not blurred.** A page doesn't receive sensitive items until someone asks. In their place an info notice says how many are hidden and ends with a plain link to see them: "Sensitive items hidden. 2 diagnoses or medications are not shown. Show sensitive items".
 - **Showing them is logged, and the page says so.** Once shown, the notice reads "Sensitive items shown. Your view is logged." with "Hide sensitive items". Never show them without that sentence. Summaries and addenda follow the same pattern ("Sensitive summaries hidden.").
 - **Tagged where they appear.** Each sensitive entry carries a "Sensitive" tag in the warning tone (`sc-tag sc-tag--warning`), after its text and before its actions.
 - **Never in the patient banner, a notification, an email or a page title.** The banner shows allergies only.
@@ -172,7 +172,7 @@ Some of a chart is more private than the rest: mental-health and substance-use d
 
 ### Emergency access
 
-When a clinician opens a patient who isn't one of theirs, a page asks for the reason before the chart opens ("Reason", at least 10 characters; button "Open the chart"). While access lasts, the patient banner carries an "Emergency access" danger tag with the time it ends, and a danger notice under it says once, plainly, that the access and the reason are logged and reviewed.
+When a clinician opens a patient who isn't one of theirs, a page asks for the reason before the chart opens ("Reason", 10 to 500 characters; button "Open the chart"). While access lasts, the patient banner carries an "Emergency access" danger tag with the time it ends, and a danger notice under it says once, plainly, that the access and the reason are logged and reviewed.
 
 ### Admin
 
