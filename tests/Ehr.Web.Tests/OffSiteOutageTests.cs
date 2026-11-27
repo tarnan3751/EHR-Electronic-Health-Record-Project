@@ -36,7 +36,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         using var response = await PlainPostAsync(Client(apps.CloudCutOff, session.Jar), $"/patients/{patient}/reason", token, ("Reason", "Covering <the> night shift"));
 
         var html = await NotSavedAsync(response);
-        Assert.Contains("What you entered is below: copy it", html);
+        Assert.Contains("Copy what you entered below", html);
         Assert.Contains("<label>Reason <textarea readonly rows=\"4\">\nCovering &lt;the&gt; night shift</textarea></label>", html);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, patientId: patient));
     }
@@ -54,7 +54,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await NotSavedAsync(response);
         Assert.DoesNotContain("Text another site chose", html);
-        Assert.Contains("what you entered may still be there", html);
+        Assert.Contains("What you entered may still be there", html);
     }
 
     // What is shown again was kept in memory, never on the cloud server's disk, so a form too large for that isn't kept.
@@ -70,7 +70,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await NotSavedAsync(response);
         Assert.DoesNotContain("Too long to keep.", html);
-        Assert.Contains("what you entered may still be there", html);
+        Assert.Contains("What you entered may still be there", html);
     }
 
     // UC 1's order form during an outage: the order is refused, and what was entered is kept. With JavaScript,
@@ -101,7 +101,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         // As a plain form: the "Not saved" page, with each entry to copy.
         using var posted = await PlainPostAsync(cutOff, path, token, order);
         var html = await NotSavedAsync(posted);
-        Assert.Contains("What you entered is below: copy it", html);
+        Assert.Contains("Copy what you entered below", html);
         Assert.Contains(">\nMetformin 500 mg tablet</textarea>", html);
         Assert.Contains(">\n500 mg</textarea>", html);
         Assert.Contains(">\nBy mouth</textarea>", html);
@@ -256,7 +256,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         foreach (var refused in new[] { push, pull, offlinePanel })
         {
             Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
-            Assert.Equal("Not saved: the on-prem server can't be reached.", await refused.Content.ReadAsStringAsync(Cancel));
+            Assert.Equal("Not saved. The clinic's server can't be reached.", await refused.Content.ReadAsStringAsync(Cancel));
         }
 
         Assert.Equal(HttpStatusCode.OK, quickTexts.StatusCode);
@@ -352,7 +352,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.True(response.Headers.CacheControl?.NoStore);
         var html = await response.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Nothing was saved, because the clinic's server can't be reached.", html);
+        Assert.Contains("Not saved.</span> The clinic's server can't be reached.", html);
         return html;
     }
 }

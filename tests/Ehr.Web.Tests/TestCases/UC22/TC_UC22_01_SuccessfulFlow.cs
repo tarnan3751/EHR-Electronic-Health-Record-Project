@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   2. Follow "Fill in the form".
 //   3. Choose the answers and "Send to my care team".
 //   4. As the clinician, open the patient's pre-visit forms with sensitive items shown.
-// Expected result: Step 1: the forms page says "Not monitored:" and the sentence with 911 and 988, and lists the PHQ-9
+// Expected result: Step 1: the forms page says "Not monitored." and the sentence with 911 and 988, and lists the PHQ-9
 //   before the appointment, to fill in by its end; one recorded view of sensitive items. Step 2: the page's title names
 //   no questionnaire; the prompt and the ten questions in the form's words, each a group of its answers; the authors'
 //   attribution line. Step 3: the page says "Answers sent: your care team will go over them with you at your visit."
@@ -54,7 +54,7 @@ public class TC_UC22_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Pre-visit forms (1 to fill in)", Text(home));
         var sensitiveReads = await apps.AuditEventsAsync(AuditActions.ReadSensitive, visit.Account, visit.Patient);
         var list = Text(await portal.GetStringAsync("/portal/forms", Cancel));
-        Assert.Contains("Not monitored: your care team reads this form before your visit, not when you send it. If you need help now, call 911. "
+        Assert.Contains("Not monitored. Your care team reads this form before your visit, not when you send it. If you need help now, call 911. "
             + "You can call or text 988 at any time to talk with someone at the 988 Suicide & Crisis Lifeline.", list);
         Assert.Contains("Patient Health Questionnaire-9 (PHQ-9) Before your appointment on", list);
         Assert.Contains("with Dr. Forms One. Fill it in by", list);

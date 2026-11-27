@@ -81,7 +81,7 @@ static class DraftSyncApi
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         if (!await phi.IsAssignedAsync(request.PatientId, cancellationToken))
         {
-            return Results.Ok(new PushResult("invalid", Problem: "This patient is no longer on your panel."));
+            return Results.Ok(new PushResult("invalid", Problem: "This patient is no longer in My patients."));
         }
 
         var current = await phi.ReadDraftAsync(request.Id, request.PatientId, cancellationToken);

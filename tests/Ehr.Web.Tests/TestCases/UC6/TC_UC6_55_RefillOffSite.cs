@@ -59,7 +59,7 @@ public class TC_UC6_55_RefillOffSite(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
             var notSaved = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Nothing was saved, because the clinic's server can't be reached.", notSaved);
+            Assert.Contains("Not saved.</span> The clinic's server can't be reached.", notSaved);
             Assert.Contains("Synthetic &lt;note&gt; off-site.", notSaved);
         }
 

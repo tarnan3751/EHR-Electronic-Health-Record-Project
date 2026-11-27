@@ -75,7 +75,7 @@ public class TC_UC21_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             using var refused = await cutOff.SendAsync(request, Cancel);
             Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
             var notSaved = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Nothing was saved, because the clinic's server can't be reached.", notSaved);
+            Assert.Contains("Not saved.</span> The clinic's server can't be reached.", notSaved);
             Assert.Contains("Synthetic &lt;message&gt; during the outage.", notSaved);
         }
 

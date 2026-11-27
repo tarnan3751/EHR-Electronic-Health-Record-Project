@@ -12,11 +12,11 @@ namespace Ehr.Web.Areas.Portal.Pages.Forms;
 public static class FormNotices
 {
     // Above every form, and on the forms page, whatever is answered: the state word, then the sentence.
-    public const string NotMonitoredState = "Not monitored:";
+    public const string NotMonitoredState = "Not monitored.";
 
     public static string NotMonitored(string? proxyFor) =>
         (proxyFor is null
-            ? "your care team reads this form before your visit, not when you send it. If you need help now, call 911. "
+            ? "Your care team reads this form before your visit, not when you send it. If you need help now, call 911. "
             : $"{proxyFor}'s care team reads this form before the visit, not when you send it. If {proxyFor} needs help now, call 911. ")
         + "You can call or text 988 at any time to talk with someone at the 988 Suicide & Crisis Lifeline.";
 

@@ -95,7 +95,7 @@ public class TC_UC1_10_ChangeExceptionalCondition(WebApps apps) : IClassFixture<
         Assert.Equal(HttpStatusCode.ServiceUnavailable, posted.StatusCode);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, changed.StatusCode);
         var notSaved = await posted.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Nothing was saved, because the clinic's server can't be reached.", notSaved);
+        Assert.Contains("Not saved.</span> The clinic's server can't be reached.", notSaved);
         Assert.Contains("Synthetic: typed off-site", notSaved);
         Assert.Equal("active|-|-|-|-", await RowAsync(apps, order));
         Assert.Equal(1, await OrdersAsync(apps, patient));

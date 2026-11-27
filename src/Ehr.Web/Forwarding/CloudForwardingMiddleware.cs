@@ -77,7 +77,7 @@ public sealed class CloudForwardingMiddleware(
                 }
                 else
                 {
-                    await context.Response.WriteAsync("Not saved: the on-prem server can't be reached.", CancellationToken.None);
+                    await context.Response.WriteAsync("Not saved. The clinic's server can't be reached.", CancellationToken.None);
                 }
             }
 
@@ -161,8 +161,8 @@ public sealed class CloudForwardingMiddleware(
     static string NotSavedPage(PathString formPage, List<(string Field, string Value)> entered)
     {
         var next = entered.Count > 0
-            ? "What you entered is below: copy it, then go back and try again once the server is back."
-            : "Go back and try again once it's back; what you entered may still be there.";
+            ? "Copy what you entered below, then go back and try again once the server is back."
+            : "Go back and try again once it's back. What you entered may still be there.";
         // A newline first in each box, which the browser drops, so one that starts the text is kept.
         var fields = string.Concat(entered.Select(entry =>
             $"<label>{HtmlEncoder.Default.Encode(entry.Field)} <textarea readonly rows=\"4\">\n"
@@ -179,7 +179,7 @@ public sealed class CloudForwardingMiddleware(
             </head>
             {{StandalonePage.Open}}
                     <h1>Not saved</h1>
-                    <p class="sc-notice sc-notice--warning" role="alert">Nothing was saved, because the clinic's server can't be reached. {{next}}</p>
+                    <p class="sc-notice sc-notice--warning" role="alert"><span class="sc-notice__state">Not saved.</span> The clinic's server can't be reached. {{next}}</p>
                     <div class="sc-form sc-kept">
                     {{fields}}<p><a href="{{HtmlEncoder.Default.Encode(formPage.ToString())}}" data-back>Back</a></p>
                     </div>

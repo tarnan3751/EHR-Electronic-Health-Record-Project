@@ -59,7 +59,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
 
         if (!await phi.IsAssignedAsync(patient, cancel))
         {
-            return new(403, ["Add this patient to your panel to write a summary for the patient."]);
+            return new(403, ["To write a visit summary, add this patient to My patients."]);
         }
 
         object summary = new VisitSummary
@@ -100,7 +100,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
 
             return refusal.SqlState switch
             {
-                PostgresErrorCodes.InsufficientPrivilege => new(403, ["Add this patient to your panel to write a summary for the patient."]),
+                PostgresErrorCodes.InsufficientPrivilege => new(403, ["To write a visit summary, add this patient to My patients."]),
                 PostgresErrorCodes.UniqueViolation => new(409, ["A summary of this note has already been released. Withdraw it first to write another."]),
                 _ => new(404, ["This note is unavailable."]),
             };
@@ -134,7 +134,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
 
         if (!await phi.IsAssignedAsync(patient, cancel))
         {
-            return new(403, ["Add this patient to your panel to withdraw a summary."]);
+            return new(403, ["To withdraw a visit summary, add this patient to My patients."]);
         }
 
         // Only the column the apps may update; the row is found by its ID, under row-level security.
@@ -153,13 +153,13 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
         {
             // No row the database lets this person change: the panel was checked above, so it is no longer there for them.
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
-            return new(403, ["Add this patient to your panel to withdraw a summary."]);
+            return new(403, ["To withdraw a visit summary, add this patient to My patients."]);
         }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: PostgresErrorCodes.CheckViolation or PostgresErrorCodes.InsufficientPrivilege } refusal)
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
             return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
-                ? new(403, ["Add this patient to your panel to withdraw a summary."])
+                ? new(403, ["To withdraw a visit summary, add this patient to My patients."])
                 : new(409, ["This summary has already been withdrawn. Nothing was changed."]);
         }
         finally

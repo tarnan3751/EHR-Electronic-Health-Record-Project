@@ -36,7 +36,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   <tomorrow>, 16:20 UTC", the scheduled end; stored.
 //   Step 3: sending is 409, the page leading with the help about self-harm (without saying the care team will read the
 //   answers), then "Not sent: your answers were not sent to your care team. This form can no longer be filled in.",
-//   and "Not monitored:"; nothing stored and no inbox item; the portal lists the GAD-7 as sent and not the PHQ-9, whose
+//   and "Not monitored."; nothing stored and no inbox item; the portal lists the GAD-7 as sent and not the PHQ-9, whose
 //   page says it can no longer be filled in; the clinician sees both under the cancelled appointment, the PHQ-9 "Not
 //   answered. Closed.". Step 4: "Pre-visit forms (2 to fill in)", each "Fill it in by" 12 hours after the scheduled end;
 //   the GAD-7 stored; the clinician sees the PHQ-9 open until that time, "while the visit is in progress."; once the visit
@@ -104,7 +104,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
             Assert.Contains(Help, page);
             Assert.Contains(NotSent, page);
             Assert.True(page.IndexOf(Help, StringComparison.Ordinal) < page.IndexOf(NotSent, StringComparison.Ordinal), "The help comes first.");
-            Assert.Contains("Not monitored: your care team reads this form before your visit", page);
+            Assert.Contains("Not monitored. Your care team reads this form before your visit", page);
             Assert.DoesNotContain("will read your answers", page, StringComparison.Ordinal);
         }
 

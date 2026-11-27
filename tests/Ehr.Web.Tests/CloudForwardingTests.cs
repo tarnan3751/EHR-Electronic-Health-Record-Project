@@ -124,7 +124,7 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
         using var response = await page.Client.SendAsync(request, Cancel);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal("Not saved: the on-prem server can't be reached.", await response.Content.ReadAsStringAsync(Cancel));
+        Assert.Equal("Not saved. The clinic's server can't be reached.", await response.Content.ReadAsStringAsync(Cancel));
     }
 
     [Fact]

@@ -20,8 +20,8 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 // Steps:
 //   1. Post the emergency access reason for the patient off-site.
 //   2. Fetch the stylesheet and script the answer links to.
-// Expected result: The answer is 503, an HTML page: "Nothing was saved, because the clinic's server can't be reached.
-//   What you entered is below: copy it, then go back and try again once the server is back.", the reason "Covering
+// Expected result: The answer is 503, an HTML page: "Not saved. The clinic's server can't be reached. Copy what you
+//   entered below, then go back and try again once the server is back.", the reason "Covering
 //   the night shift" in a read-only box, and a "Back" link to the form. The page's only assets are the site's
 //   stylesheet and back-link.js, which the cloud app serves. No emergency access is recorded.
 // Creator: Tahseen Arnan
@@ -47,7 +47,7 @@ public partial class TC_UC2_03_InvalidInput(WebApps apps) : IClassFixture<WebApp
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
         var html = await response.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Nothing was saved, because the clinic's server can't be reached. What you entered is below: copy it, then go back and try again once the server is back.", html);
+        Assert.Contains("Not saved.</span> The clinic's server can't be reached. Copy what you entered below, then go back and try again once the server is back.", html);
         // What was typed, to copy.
         Assert.Contains("<label>Reason <textarea readonly rows=\"4\">\nCovering the night shift</textarea></label>", html);
         // Back to the form, by the browser's history where JavaScript runs, by its address where it doesn't.

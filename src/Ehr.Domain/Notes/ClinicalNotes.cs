@@ -221,7 +221,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (!await phi.IsAssignedAsync(patient, cancel))
         {
-            return new(403, ["Add this patient to your panel to change this."]);
+            return new(403, ["To change this, add this patient to My patients."]);
         }
 
         // Only the two columns the apps may update; the row is found by its ID, under row-level security.
@@ -300,7 +300,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (!await phi.IsAssignedAsync(patient, cancel))
         {
-            return new(403, ["Add this patient to your panel to sign an addendum."]);
+            return new(403, ["To sign an addendum, add this patient to My patients."]);
         }
 
         object addendum = new NoteAddendum { Id = Guid.CreateVersion7(), NoteId = note, PatientId = patient, AuthorId = user.UserId ?? Guid.Empty, Text = text, Sensitive = sensitive };
@@ -321,7 +321,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
             return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
-                ? new(403, ["Add this patient to your panel to sign an addendum."])
+                ? new(403, ["To sign an addendum, add this patient to My patients."])
                 : new(404, ["This note is unavailable."]);
         }
         finally
