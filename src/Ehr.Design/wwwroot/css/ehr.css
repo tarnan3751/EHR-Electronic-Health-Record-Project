@@ -461,9 +461,11 @@
         max-width: calc(var(--width-reading) + 2 * var(--space-5));
     }
 
+    /* One narrow column, as a card (sc-card) a little above the middle of the window: sign-in and the other account
+       pages of both sites. */
     .sc-page--form {
-        max-width: calc(var(--width-form) + 2 * var(--space-5));
-        padding-top: var(--space-12);
+        max-width: calc(var(--width-form) + 2 * var(--space-8) + 2 * var(--space-5));
+        padding-top: max(var(--space-12), 12vh);
     }
 
     @media (max-width: 40rem) {
@@ -471,9 +473,55 @@
             padding-left: var(--space-4);
             padding-right: var(--space-4);
         }
+
+        .sc-page--form {
+            padding-top: var(--space-8);
+        }
     }
 
-    /* The mark alone, above a signed-out account form: one of the brand's few moments. */
+    /* The account pages' card: the lockup, then the page, all on one left edge; its buttons take the card's width. On
+       a phone the page itself is the card. */
+    .sc-card {
+        padding: var(--space-8);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-card h1 {
+        margin-bottom: var(--space-6);
+    }
+
+    /* A page that stands on its own (StandalonePage) has the mark alone at the card's top, on the same edge. */
+    .sc-card > .sc-brandmark {
+        justify-content: flex-start;
+        margin-bottom: var(--space-6);
+    }
+
+    .sc-card > .sc-brandmark img {
+        height: 32px;
+    }
+
+    .sc-card__brand {
+        display: flex;
+        margin: 0 0 var(--space-8);
+    }
+
+    .sc-card__brand img {
+        height: 28px;
+        width: auto;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-card {
+            padding: 0;
+            background: none;
+            border: 0;
+        }
+    }
+
+    /* The mark alone, above a page that stands on its own (StandalonePage) or the desktop app's sign-in: one of the
+       brand's few moments. */
     .sc-brandmark {
         display: flex;
         justify-content: center;
@@ -766,6 +814,21 @@
 
     .sc-app--portal .sc-form > .sc-btn {
         align-self: stretch;
+    }
+
+    /* In the account pages' card (sc-card), the form's button takes the card's width, and what follows the form (the
+       ways to register or reset a password) sits under a hairline. */
+    .sc-card .sc-form > .sc-btn {
+        align-self: stretch;
+    }
+
+    .sc-card > :last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-card > .sc-form + p {
+        padding-top: var(--space-6);
+        border-top: 1px solid var(--line);
     }
 
     /* Text field: the label above, then the input, its hint and its error. */

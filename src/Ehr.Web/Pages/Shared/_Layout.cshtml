@@ -169,16 +169,26 @@
     @* The patient banner, on a page about a patient: directly under the app bar, and it stays put as the page scrolls. *@
     @await RenderSectionAsync("Banner", required: false)
     <main id="main" class="sc-page sc-page--@width">
-        @if (!signedIn && width == "form")
+        @if (width == "form")
         {
-            @* Signed out, an account form: the mark alone, centered above it. *@
-            <p class="sc-brandmark">
-                <img class="sc-art--color" src="~/_content/Ehr.Design/img/swiftchart-mark.svg" alt="SwiftChart" width="56" height="48">
-                <img class="sc-art--reversed" src="~/_content/Ehr.Design/img/swiftchart-mark-reversed.svg" alt="SwiftChart" width="56" height="48">
-            </p>
+            @* An account form, on both sites: one card, and signed out, the lockup at its top, on the form's left edge. *@
+            <div class="sc-card">
+                @if (!signedIn)
+                {
+                    <p class="sc-card__brand">
+                        <img class="sc-art--color" src="~/_content/Ehr.Design/img/swiftchart-lockup.png" alt="SwiftChart" width="123" height="28">
+                        <img class="sc-art--reversed" src="~/_content/Ehr.Design/img/swiftchart-lockup-reversed.png" alt="SwiftChart" width="123" height="28">
+                    </p>
+                }
+                <p id="request-error" class="sc-notice sc-notice--danger" role="alert" hidden></p>
+                @RenderBody()
+            </div>
         }
-        <p id="request-error" class="sc-notice sc-notice--danger" role="alert" hidden></p>
-        @RenderBody()
+        else
+        {
+            <p id="request-error" class="sc-notice sc-notice--danger" role="alert" hidden></p>
+            @RenderBody()
+        }
     </main>
     @if (signedIn)
     {
