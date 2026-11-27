@@ -3642,7 +3642,345 @@
         border-radius: var(--radius-lg);
     }
 
+    /* Visit summaries (step 13a): each a card read top to bottom, its date and who wrote it over a hairline, then its
+       three parts, each under a small muted heading; a withdrawn one on the same surface, with a dashed edge. */
+    .sc-result--plain[data-summary] > h2 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 28px;
+    }
+
+    .sc-result--plain[data-summary="standing"] > h2 + p {
+        margin: var(--space-1) calc(-1 * var(--space-6)) var(--space-2);
+        padding: 0 var(--space-6) var(--space-4);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-result--plain[data-summary] > h3 {
+        margin: var(--space-4) 0 var(--space-1);
+        font-family: var(--font-sans);
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+    }
+
+    .sc-result--plain[data-summary] > h3 + p {
+        margin-bottom: 0;
+    }
+
+    .sc-result--plain[data-summary="withdrawn"] {
+        border-style: dashed;
+        border-color: var(--line-strong);
+    }
+
+    @media (max-width: 40rem) {
+        .sc-result--plain[data-summary="standing"] > h2 + p {
+            margin-inline: calc(-1 * var(--space-4));
+            padding-inline: var(--space-4);
+        }
+    }
+
+    /* A portal form on a card (downloading the record, asking for a refill, a pre-visit form, sharing the record): as
+       wide as the column, its fields the card's width, its buttons at their own width, as wide as the card on a phone. */
+    .sc-formcard {
+        max-width: none;
+        margin: 0 0 var(--space-6);
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-formcard .sc-field {
+        max-width: none;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-formcard {
+            padding: var(--space-4);
+        }
+
+        .sc-formcard .sc-actions > .sc-btn {
+            flex: 1 1 100%;
+        }
+    }
+
+    /* Asking for a refill (step 13d): each medication a choice as tall as a portal control, drawn as a pre-visit form's
+       answers are; the requests as rows, each one's state on the right and its note and answer under it. */
+    [data-refill-form="ask"] > fieldset {
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    [data-refill-form="ask"] > fieldset > legend {
+        margin-bottom: var(--space-2);
+        padding: 0;
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    [data-refill-form="ask"] .sc-check {
+        max-width: none;
+        min-height: var(--control-height-portal);
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        cursor: pointer;
+    }
+
+    [data-refill-form="ask"] .sc-check:has(input:checked) {
+        border-color: var(--primary);
+        background: var(--surface-subtle);
+    }
+
+    li[data-refill] > p:not(.sc-rows__end, .sc-rows__meta) {
+        margin-top: var(--space-2);
+    }
+
+    /* Pre-visit forms (step 13e): the questions on a card, and the answers sent on one too. */
+    .sc-app--portal .sc-answers {
+        max-width: none;
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-app--portal .sc-answers > dd:last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-formcard .sc-choice:last-of-type {
+        margin-bottom: 0;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-app--portal .sc-answers {
+            padding: var(--space-4);
+        }
+    }
+
+    /* On a phone a row's button (fill in a form, look at a record) is as wide as the row. */
+    @media (max-width: 40rem) {
+        .sc-rows__end > .sc-btn {
+            flex: 1 1 100%;
+        }
+    }
+
+    /* A link on a row's right ("See your answers") has a list's link weight. */
+    .sc-rows__end > a:not(.sc-btn) {
+        font-weight: 600;
+    }
+
+    /* Sharing (step 6): the records shared with the account and the people the record is shared with as rows, the
+       latter with their buttons under what they can see; sharing that has ended as a quiet list on a card. */
+    .sc-rows > li > .sc-actions {
+        margin-top: var(--space-3);
+    }
+
+    .sc-ended {
+        padding: var(--space-2) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-ended > li {
+        padding: var(--space-3) 0;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-ended {
+            padding-inline: var(--space-4);
+        }
+    }
+
+    /* Who viewed the record (step 13c): its views as rows, and the way to newer and older ones on the list's left
+       edge. */
+    .sc-app--portal nav.sc-actions > a:not(.sc-btn):first-child {
+        padding-left: 0;
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */
+
+    /* Staff: each row's actions on one line on the right, the setup link the one button with an edge. The quiet ones
+       get a link's padding, so the gaps between the words are even and the last word ends on the column's edge; the
+       one that disables an account is in the danger ink. */
+    .sc-staff .sc-actions > form > .sc-btn--quiet {
+        padding-inline: var(--space-2);
+    }
+
+    .sc-staff .sc-actions > form:last-child > .sc-btn--quiet {
+        padding-right: 0;
+    }
+
+    .sc-staff__disable {
+        color: var(--danger);
+    }
+
+    /* A status on one line, as its column's head is fitted to it (the cell itself is plain: tests read it). */
+    .sc-staff td:nth-child(4) {
+        white-space: nowrap;
+    }
+
+    /* An email breaks where it must, so the row's actions always have their room; on a narrow window, where the
+       table scrolls sideways, it stays whole. */
+    @media (min-width: 48rem) {
+        .sc-staff td:nth-child(2) {
+            overflow-wrap: anywhere;
+        }
+    }
+
+    /* Staff: the new account's form, a card at the form's width under the table it adds to. */
+    .sc-staff__add {
+        max-width: calc(var(--width-form) + 2 * var(--space-6));
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    /* The audit log's filters: as many to a row as fit, the patient's ID two wide so the whole of one shows, and the
+       checkbox on the fields' line. */
+    .sc-audit__filters {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+    }
+
+    .sc-audit__filters .sc-check {
+        align-self: end;
+        align-items: center;
+        min-height: var(--control-height);
+    }
+
+    .sc-audit__filters .sc-check input {
+        margin: 0;
+    }
+
+    @media (min-width: 48rem) {
+        .sc-audit__patient {
+            grid-column: span 2;
+        }
+    }
+
+    /* The audit log. The fields a write changed: a muted line in the caption's size that wraps between names, never
+       inside one. */
+    .sc-audit [data-audit-fields] {
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--ink-muted);
+        overflow-wrap: normal;
+    }
+
+    /* IDs at the text's weight, so a column of them reads quieter than the words beside it; the way to a review on a
+       line of its own words. */
+    .sc-audit .sc-table__id {
+        font-weight: 400;
+    }
+
+    .sc-audit [data-review-link] {
+        white-space: nowrap;
+    }
+
+    /* Wide enough for set columns: the time and who did it first, the IDs on one line cut short on screen (the whole
+       ID stays in the cell, to select and copy), and the reason and the fields changed taking what is left. Narrower,
+       the columns fit their values as any table's do. */
+    @media (min-width: 80rem) {
+        .sc-audit .sc-table {
+            table-layout: fixed;
+        }
+
+        .sc-audit th:nth-child(1) {
+            width: 11rem;
+        }
+
+        .sc-audit th:nth-child(2) {
+            width: 12.5rem;
+        }
+
+        .sc-audit th:nth-child(3) {
+            width: 9.5rem;
+        }
+
+        .sc-audit th:nth-child(4) {
+            width: 10.5rem;
+        }
+
+        .sc-audit th:nth-child(5) {
+            width: 13rem;
+        }
+
+        .sc-audit th:nth-child(6) {
+            width: 5rem;
+        }
+
+        .sc-audit td:nth-child(2) {
+            overflow-wrap: anywhere;
+        }
+
+        .sc-audit td.sc-table__id {
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+    }
+
+    /* The administrator's inbox: a patient, shown by ID, on one line. */
+    .sc-table tr[data-inbox-item] > td.sc-table__id {
+        white-space: nowrap;
+    }
+
+    /* The emergency-access review: the access and what was done under it, and the review beside them in a panel. */
+    .sc-access {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 24rem;
+        gap: var(--space-6);
+        align-items: start;
+    }
+
+    .sc-access__done > dl.record {
+        margin: 0;
+    }
+
+    .sc-access__done > h2 {
+        margin-top: var(--space-6);
+    }
+
+    /* What was done: each value on one line, the row's table and ID taking the rest. */
+    .sc-access [data-access-events] td:not(.sc-table__id) {
+        white-space: nowrap;
+    }
+
+    .sc-access__review {
+        overflow-wrap: anywhere;
+    }
+
+    .sc-access__review fieldset {
+        padding: 0;
+        border: 0;
+    }
+
+    .sc-access__review legend {
+        padding: 0;
+        margin-bottom: var(--space-2);
+    }
+
+    @media (max-width: 64rem) {
+        .sc-access {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    /* A clinician's desktop sign-ins: what revoking does and the choice, at a reading width. */
+    .sc-desktop {
+        max-width: var(--width-reading);
+    }
 }
