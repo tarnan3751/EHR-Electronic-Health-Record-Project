@@ -70,7 +70,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
 
             var html = await ReadAsync(response);
             Assert.Contains("Primarydown, Rowan", html);
-            Assert.Contains("Read-only: the clinic's server can't be reached", Words(html));
+            Assert.Contains("Read-only. The clinic's server can't be reached", Words(html));
             var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
             Assert.Contains(queued, e => e.Action == AuditActions.Read && e.PatientId == patient && e.ActorId == clinician.Id);
             Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient));
@@ -112,7 +112,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
 
             using (var page = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, QuickTexts, signedIn))
             {
-                Assert.Contains("Read-only: the clinic's server can't be reached", Words(await ReadAsync(page)));
+                Assert.Contains("Read-only. The clinic's server can't be reached", Words(await ReadAsync(page)));
             }
         }
         finally
@@ -174,7 +174,7 @@ public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
             using (var during = await SendAsync(apps.CloudPrimaryDrill, HttpMethod.Get, $"/patients/{patient}", signedIn))
             {
                 var html = await ReadAsync(during);
-                Assert.Contains("Read-only: the clinic's server can't be reached. You can look at records, but the newest changes may not appear yet", Words(html));
+                Assert.Contains("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back. The newest changes may not show yet", Words(html));
                 Assert.DoesNotContain("handler=Unassign", html);
             }
 

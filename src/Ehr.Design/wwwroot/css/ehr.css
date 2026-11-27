@@ -391,8 +391,12 @@
             column-gap: var(--space-3);
         }
 
+        /* The account's name takes what the lockup leaves of the first row, and is cut short only when it must be. */
         .sc-appbar__end {
             gap: var(--space-2);
+            flex: 1 1 0;
+            min-width: 0;
+            justify-content: flex-end;
         }
 
         .sc-appbar__nav {
@@ -403,18 +407,32 @@
         }
 
         .sc-appbar__user {
-            max-width: 6.5rem;
+            max-width: none;
+            min-width: 0;
         }
 
-        /* The portal's links wrap onto a second row on a phone, so none is hidden off the edge. */
+        /* The portal's links share one row on a phone, spread across it, and wrap only on a narrower screen, so none is
+           hidden off the edge. */
         .sc-appbar--portal .sc-appbar__nav {
             flex-wrap: wrap;
+            justify-content: space-between;
             overflow-x: visible;
-            gap: 0 var(--space-4);
+            gap: 0 var(--space-2);
         }
 
         .sc-appbar--portal .sc-appbar__link {
             min-height: 40px;
+        }
+    }
+
+    /* The narrowest phones: the portal's links a size smaller (caption's), so they still share one row. */
+    @media (max-width: 23.5rem) {
+        .sc-appbar--portal .sc-appbar__nav {
+            column-gap: var(--space-1);
+        }
+
+        .sc-appbar--portal .sc-appbar__link {
+            font-size: 13px;
         }
     }
 

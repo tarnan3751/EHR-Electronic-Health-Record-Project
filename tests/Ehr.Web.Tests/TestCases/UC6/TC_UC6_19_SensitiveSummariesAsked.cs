@@ -71,7 +71,7 @@ public class TC_UC6_19_SensitiveSummariesAsked(WebApps apps) : IClassFixture<Web
         var forwarded = apps.Forwarded.Count;
         var offSite = await Client(apps.CloudCutOff, patient.Jar).GetStringAsync("/portal/summaries?sensitive=true", Cancel);
         Assert.Contains("We talked about something private.", offSite);
-        Assert.Contains("Read-only: the clinic's server can't be reached", Words(offSite));
+        Assert.Contains("Read-only. The clinic's server can't be reached", Words(offSite));
         Assert.Equal(forwarded, apps.Forwarded.Count);
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
         Assert.Contains(queued, e => e.Action == AuditActions.ReadSensitive && e.PatientId == patient.Patient && e.ActorId == patient.Account);

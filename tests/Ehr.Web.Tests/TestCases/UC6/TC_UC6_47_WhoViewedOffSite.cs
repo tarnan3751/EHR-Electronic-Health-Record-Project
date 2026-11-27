@@ -44,7 +44,7 @@ public class TC_UC6_47_WhoViewedOffSite(WebApps apps) : IClassFixture<WebApps>
         var cutOff = Words(await Client(apps.CloudCutOff, patient.Jar).GetStringAsync(ViewsPath, Cancel));
         Assert.Contains("Dr. Test, clinician", cutOff);
         Assert.Contains("a view from the last minute may not be listed yet", cutOff);
-        Assert.Contains("Read-only: the clinic's server can't be reached", cutOff);
+        Assert.Contains("Read-only. The clinic's server can't be reached", cutOff);
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
         Assert.Single(queued, e => e.Action == AuditActions.Read && e.ActorId == patient.Account && e.PatientId == patient.Patient
             && e.TableName == "audit_events" && e.RowId is null);

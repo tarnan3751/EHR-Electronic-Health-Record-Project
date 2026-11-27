@@ -570,7 +570,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(patients.Order(), Listed(html).Order());
             Assert.Equal(patients.Order(), Listed(typed).Order());
             Assert.Contains("Restricted", html);
-            Assert.Contains("Read-only: the clinic's server can't be reached", Words(html));
+            Assert.Contains("Read-only. The clinic's server can't be reached", Words(html));
             // One read of each patient for each page.
             var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
             var reads = queued.Where(e => e.ActorId == clinician.Id).ToList();

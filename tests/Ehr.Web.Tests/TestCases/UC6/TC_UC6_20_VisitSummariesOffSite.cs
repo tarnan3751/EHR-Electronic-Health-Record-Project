@@ -63,7 +63,7 @@ public class TC_UC6_20_VisitSummariesOffSite(WebApps apps) : IClassFixture<WebAp
         Assert.Contains(TalkedAbout, cutOff);
         Assert.Contains("was withdrawn by your care team.", cutOff);
         Assert.DoesNotContain("wrong visit", cutOff);
-        Assert.Contains("Read-only: the clinic's server can't be reached", cutOff);
+        Assert.Contains("Read-only. The clinic's server can't be reached", cutOff);
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
         Assert.Contains(queued, e => e.Action == AuditActions.Read && e.TableName == "visit_summaries" && e.RowId == standing);
         // Not shipped yet: the clinic doesn't know of the view, so the withdrawal emails nobody (the known limit).

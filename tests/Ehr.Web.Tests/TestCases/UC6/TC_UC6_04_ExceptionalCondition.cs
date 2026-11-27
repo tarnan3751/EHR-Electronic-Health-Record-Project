@@ -24,9 +24,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. Sign in to the portal as Avery Offsite through the connected cloud app.
 //   2. Try to ship the cut-off cloud app's audit queue (it fails: the clinic's server can't be reached).
 //   3. Open /portal/results on the cut-off cloud app with the session cookie.
-// Expected result: The page shows "13.2 g/dL" and the banner "Read-only: the clinic's server can't be reached. You can
-//   look at records, but the newest changes may not appear yet, and nothing can be saved until it's back.", and the
-//   cut-off cloud app's audit queue holds a read of the patient.
+// Expected result: The page shows "13.2 g/dL" and the banner "Read-only. The clinic's server can't be reached, so
+//   nothing can be saved until it's back. The newest changes may not show yet.", and the cut-off cloud app's audit
+//   queue holds a read of the patient.
 // Creator: Simar Rekhi
 public class TC_UC6_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -49,7 +49,7 @@ public class TC_UC6_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApp
 
         var html = await ReadAsync(response);
         Assert.Contains("13.2 g/dL", html);
-        Assert.Contains("Read-only: the clinic's server can't be reached", Words(html));
+        Assert.Contains("Read-only. The clinic's server can't be reached", Words(html));
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
         Assert.Contains(queued, e => e.Action == AuditActions.Read && e.PatientId == patient);
     }

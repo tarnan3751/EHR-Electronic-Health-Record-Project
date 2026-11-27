@@ -136,7 +136,7 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await ReadAsync(response);
         Assert.Contains("Remote, Finley", html);
-        Assert.Contains("Read-only: the clinic's server can't be reached", Words(html));
+        Assert.Contains("Read-only. The clinic's server can't be reached", Words(html));
         // Recorded in the cloud app's queue, waiting for the on-prem app.
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
         Assert.Contains(queued, e => e.Action == AuditActions.Read && e.PatientId == patient && e.ActorId == clinician.Id);

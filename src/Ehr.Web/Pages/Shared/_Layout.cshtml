@@ -112,7 +112,7 @@
                     {
                         <a asp-area="Portal" asp-page="/Messages/Index" class="sc-appbar__link" aria-current="@current("/Messages/")">Messages</a>
                     }
-                    <a asp-area="Portal" asp-page="/Access" class="sc-appbar__link" aria-current="@current("/Access")">Access</a>
+                    <a asp-area="Portal" asp-page="/Access" class="sc-appbar__link" aria-current="@current("/Access")">Sharing</a>
                 }
                 else
                 {
@@ -155,15 +155,15 @@
     {
         @* FR-34: off-site, with the clinic's server down, records can still be read but nothing can be saved. The band
            runs the full width under the app bar on every page. *@
-        <p class="sc-notice sc-notice--warning sc-notice--band" role="status"><span class="sc-notice__state">Read-only:</span> the clinic's server can't be reached. You can look at records, but the newest changes may not appear yet, and nothing can be saved until it's back.</p>
+        <p class="sc-notice sc-notice--warning sc-notice--band" role="status"><span class="sc-notice__state">Read-only.</span> The clinic's server can't be reached, so nothing can be saved until it's back. The newest changes may not show yet.</p>
     }
     @if (acting is not null)
     {
         @* FR-19: a proxy is never left to wonder whose record is on screen. The band sits under the app bar on every
            portal page while the session is acting for someone, with the way back. *@
         <form method="post" asp-area="Portal" asp-page="/Acting" asp-page-handler="Mine" class="sc-notice sc-notice--info sc-notice--band sc-acting" data-acting>
-            <p><span class="sc-notice__state">Viewing as a proxy:</span> this is <strong>@acting.PatientName</strong>'s record@(subject!.OwnPatientId is null ? "." : ", not your own.")</p>
-            <button type="submit" class="sc-btn sc-btn--compact">@(subject!.OwnPatientId is null ? "Choose another record" : "Back to my own record")</button>
+            <p><span class="sc-notice__state">Shared record.</span> You're viewing <strong>@acting.PatientName</strong>'s record@(subject!.OwnPatientId is null ? "." : ", not your own.")</p>
+            <button type="submit" class="sc-btn sc-btn--compact">@(subject!.OwnPatientId is null ? "Choose another record" : "Back to my record")</button>
         </form>
     }
     @* The patient banner, on a page about a patient: directly under the app bar, and it stays put as the page scrolls. *@
@@ -194,7 +194,7 @@
             <div id="session-warning-text">
                 <p data-session-idle-text>Nothing has been done here for a while. To keep @keeps safe, you'll be signed out in <span data-session-countdown>2:00</span> unless you stay signed in.</p>
                 <p data-session-final-text hidden>A sign-in lasts at most 12 hours, and yours ends in <span data-session-countdown>2:00</span>. Save what you're doing, then sign in again.</p>
-                <p data-session-typed hidden>What you've typed on this page stays here if you're signed out, out of sight, until you sign in again.</p>
+                <p data-session-typed hidden>If you're signed out, what you've typed on this page is kept until you sign in again.</p>
                 <p data-session-unreachable hidden>The server couldn't be reached, so you may still be signed out. Check the connection, then select Stay signed in again.</p>
                 <p data-session-waiting hidden>The visit on this page is paused, or waiting for its voices to be named. The dictation service discards a visit left like that for 10 minutes, whether or not you stay signed in.</p>
             </div>
@@ -211,11 +211,11 @@
         <template data-session-ended>
             <main id="main" class="sc-page sc-page--form sc-signed-out">
                 <h1 data-session-ended-heading>Signed out</h1>
-                <p class="sc-notice sc-notice--info" data-session-why="idle"><span class="sc-notice__state">Signed out:</span> nothing was done here for 15 minutes, so you were signed out to keep @keeps safe.</p>
-                <p class="sc-notice sc-notice--info" data-session-why="longest"><span class="sc-notice__state">Signed out:</span> a sign-in lasts at most 12 hours.</p>
-                <p class="sc-notice sc-notice--info" data-session-why="ended"><span class="sc-notice__state">Signed out:</span> this sign-in has ended, in this window or another.</p>
-                <p class="sc-notice sc-notice--info" data-session-why="signed-out"><span class="sc-notice__state">Signed out:</span> you signed out.</p>
-                <p data-session-kept>What you typed is kept in this tab, out of sight, and comes back when you sign in again. If anyone else signs in here, it's cleared.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="idle"><span class="sc-notice__state">Signed out.</span> Nothing was done here for 15 minutes, so you were signed out to keep @keeps safe.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="longest"><span class="sc-notice__state">Signed out.</span> A sign-in lasts at most 12 hours.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="ended"><span class="sc-notice__state">Signed out.</span> This sign-in has ended, in this window or another.</p>
+                <p class="sc-notice sc-notice--info" data-session-why="signed-out"><span class="sc-notice__state">Signed out.</span> You signed out.</p>
+                <p data-session-kept>What you typed is kept in this tab and comes back when you sign in again. If anyone else signs in here, it's cleared.</p>
                 <p><button type="button" class="@button sc-btn--primary" data-session-sign-in>Sign in again</button></p>
                 <iframe class="sc-signed-out__frame" title="Sign in again" data-session-frame hidden></iframe>
             </main>

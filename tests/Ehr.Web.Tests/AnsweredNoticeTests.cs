@@ -57,7 +57,7 @@ public class AnsweredNoticeTests(WebApps apps) : IClassFixture<WebApps>
 
         using var chosen = await PostFormAsync(session.Client, "/portal/acting", "/portal/choose", ("grantId", await GrantIdAsync(apps, patient.Patient)));
         var home = Words(await ReadAsync(chosen));
-        Assert.Contains("Viewing as a proxy: this is Synthetic Banded's record.", home);
+        Assert.Contains("Shared record. You're viewing Synthetic Banded's record.", home);
         Assert.DoesNotContain("not your own", home);
     }
 }

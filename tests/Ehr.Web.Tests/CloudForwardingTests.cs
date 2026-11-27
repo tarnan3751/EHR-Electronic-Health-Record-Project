@@ -178,7 +178,7 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 
             var html = await ReadAsync(response);
             Assert.Contains("Justsaved, Remy", html);
-            Assert.Contains("Read-only: the clinic's server can't be reached", Words(html));
+            Assert.Contains("Read-only. The clinic's server can't be reached", Words(html));
             Assert.False(RemovesLastSaveCookie(response));
             // The read is recorded in the queue, for the on-prem app once it's back.
             var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);

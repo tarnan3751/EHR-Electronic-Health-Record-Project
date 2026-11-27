@@ -88,7 +88,7 @@ static partial class Browser
     }
 
     // What a page says, as a person reads it: its tags taken out and its entities decoded. An assertion about a page's
-    // words then holds however they are marked up: a notice's leading state ("Read-only:") sits in a span of its own.
+    // words then holds however they are marked up: a notice's leading state ("Read-only.") sits in a span of its own.
     public static string Words(string html) => WebUtility.HtmlDecode(Tag().Replace(html, ""));
 
     // Where a followed request ended up.
