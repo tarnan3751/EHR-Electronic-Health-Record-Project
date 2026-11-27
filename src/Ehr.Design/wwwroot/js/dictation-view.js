@@ -18,16 +18,16 @@ window.SwiftChartDictationView = class {
             other_language: "it wasn't heard as Spanish, so it was left out of the proposals",
         };
         const warningWords = {
-            possible_correction: "You may have corrected this later in the dictation: check the highlighted words.",
-            near_unclear_passage: "A passage beside its source was hard to hear: check the highlighted words.",
+            possible_correction: "You may have corrected this later in the dictation. Check the highlighted words.",
+            near_unclear_passage: "A passage beside its source was hard to hear. Check the highlighted words.",
             one_field_holds_dictation: "This section holds the whole dictation. Sort it into the sections it belongs to before accepting it.",
             // Its Spanish words are marked as Spanish where it is shown (warningNote).
-            ambiguous_frequency: "“Cada tercer día” can mean every other day or every third day: check which you meant.",
+            ambiguous_frequency: "“Cada tercer día” can mean every other day or every third day. Check which you meant.",
             // A recorded visit's (the expansion plan's step 16).
-            speaker_unsure: "Who said this couldn't be told with confidence: check the highlighted words.",
-            other_speaker: "Someone else in the room said this: check that it is about the patient.",
+            speaker_unsure: "Who said this couldn't be told with confidence. Check the highlighted words.",
+            other_speaker: "Someone else in the room said this. Check that it's about the patient.",
             patients_own_words: "In the patient's own words. Reword it as your note before you accept it.",
-            part_not_offered: "Part of the visit had something for this section that didn't pass the checks: read the highlighted part.",
+            part_not_offered: "Part of the visit had something for this section that didn't pass the checks. Read the highlighted part.",
         };
         // Who said each passage of a recorded visit, in words beside it, never by colour alone.
         const speakerWords = { clinician: "Clinician", patient: "Patient", other: "Other person", unsure: "Unsure" };
@@ -233,7 +233,7 @@ window.SwiftChartDictationView = class {
                 const notDictated = (field.reasons ?? []).includes("not_dictated");
                 value.append(element("p", notDictated
                     ? "Nothing was dictated for this field. Fill it in during review if it's needed."
-                    : "No suggestion: what was proposed didn't pass the automatic checks. Fill it in during review.", "sc-proposal__message"));
+                    : "No suggestion. What was proposed didn't pass the automatic checks. Fill it in during review.", "sc-proposal__message"));
             } else if (sorting === "pending") {
                 setStatus(status, "Proposing…", "info");
             } else {
@@ -267,7 +267,7 @@ window.SwiftChartDictationView = class {
             const transcriptText = state.transcript?.text ?? "";
             for (const statement of field.statements) {
                 const pair = element("li", undefined, "sc-translation__pair");
-                pair.append(element("p", "Translated from Spanish: check it against the Spanish beside it", "sc-translation__check"));
+                pair.append(element("p", "Translated from Spanish. Check it against the Spanish beside it.", "sc-translation__check"));
                 const said = element("span", `“${statement.sources.map((s) => transcriptText.slice(s.start, s.end)).join(" … ")}”`);
                 said.lang = "es";
                 const spanish = element("p", "You said: ", "sc-translation__spanish");

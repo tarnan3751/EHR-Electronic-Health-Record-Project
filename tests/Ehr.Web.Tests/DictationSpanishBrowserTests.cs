@@ -94,7 +94,7 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
             await page.Locator("[data-dictation-transcript] span[lang=en][title]").First.GetAttributeAsync("title"));
         await page.Keyboard.PressAsync("Alt+Shift+D");
         await page.WaitForURLAsync("**/review/*");
-        Assert.Contains("Translated from Spanish:", await page.ContentAsync());
+        Assert.Contains("Translated from Spanish.", await page.ContentAsync());
         var start = Assert.Single(apps.Dictation.Received, r => r.PathAndQuery == "/v1/sessions");
         Assert.Equal("""{"spokenLanguage":"es"}""", System.Text.Encoding.UTF8.GetString(start.Body));
 

@@ -35,16 +35,16 @@
             tag.className = proposal.state === "pending" ? "sc-tag sc-tag--warning"
                 : proposal.state === "accepted" || proposal.state === "edited" ? "sc-tag sc-tag--success" : "sc-tag";
             card.querySelector("[data-approved-value]").textContent = proposal.state === "rejected"
-                ? "Rejected: no text will be copied." : proposal.approvedValue ? `Approved value: ${proposal.approvedValue}` : "";
+                ? "Rejected. Nothing from it will be added." : proposal.approvedValue ? `Approved value: ${proposal.approvedValue}` : "";
             const controls = card.querySelector("[data-review-controls]");
             if (controls) controls.hidden = proposal.state !== "pending";
         }
         if (snapshot.state === "completed" && snapshot.proposals.length > 0)
             root.querySelector("[data-dictation-sort-message]").textContent = "Review complete. Continue to the note to edit or sign.";
         else if (snapshot.result?.sorting === "done" && snapshot.proposals.length === 0)
-            root.querySelector("[data-dictation-sort-message]").textContent = "There are no usable proposals. Continue to the note to write manually.";
+            root.querySelector("[data-dictation-sort-message]").textContent = "No usable proposals. Continue to the note to write it yourself.";
         const reviewed = snapshot.proposals.filter(p => p.state !== "pending").length;
-        root.querySelector("[data-review-progress]").textContent = `${reviewed} of ${snapshot.proposals.length} proposals reviewed.`;
+        root.querySelector("[data-review-progress]").textContent = `${reviewed} of ${snapshot.proposals.length} ${snapshot.proposals.length === 1 ? "proposal" : "proposals"} reviewed.`;
         root.querySelectorAll('[name="Version"]').forEach(field => { field.value = snapshot.version; });
         const finish = root.querySelector("[data-review-complete] button");
         if (finish) finish.disabled = busy || reviewed !== snapshot.proposals.length;
@@ -58,7 +58,7 @@
         if (event.submitter?.name) data.set(event.submitter.name, event.submitter.value);
         busy = true;
         buttons().forEach(button => { button.disabled = true; });
-        status.textContent = "Saving decision";
+        status.textContent = "Saving decision…";
         let saved = false;
         try {
             const response = await fetch(form.action, {
@@ -68,8 +68,8 @@
             if (response.redirected || !response.headers.get("Content-Type")?.includes("application/json")) throw new Error();
             const result = await response.json();
             if (!response.ok) {
-                showErrors(result.errors || ["The review was not saved. Compare the saved draft and retry."]);
-                status.textContent = "Save failed";
+                showErrors(result.errors || ["Not saved. Check the saved draft and try again."]);
+                status.textContent = "Not saved";
                 return;
             }
             form.querySelectorAll("textarea").forEach(field => dirty.delete(field.id));
@@ -80,8 +80,8 @@
             saved = true;
             render();
         } catch {
-            status.textContent = "Save failed";
-            showErrors(["The clinic server could not confirm this decision. Your edited text is still here. Retry; the same decision request will not be duplicated."]);
+            status.textContent = "Not saved";
+            showErrors(["The clinic's server didn't confirm this decision. Your edited text is still here. Try again. It won't be recorded twice."]);
         } finally {
             busy = false;
             buttons().forEach(button => { button.disabled = false; });
@@ -96,7 +96,7 @@
     root.querySelector("[data-review-retrieve]")?.addEventListener("click", async () => {
         if (busy) return;
         busy = true;
-        status.textContent = "Retrieving trusted dictation result";
+        status.textContent = "Retrieving the finished dictation…";
         try {
             const response = await fetch(root.dataset.stageUrl, {
                 method: "POST", credentials: "same-origin", signal: AbortSignal.timeout(35000),
@@ -105,11 +105,11 @@
             });
             const result = await response.json();
             if (response.ok && result.url) { window.location.assign(result.url); return; }
-            showErrors(result.errors || [result.message || "The result could not be retrieved. Your saved draft is intact; retry or continue manually."]);
-            status.textContent = "Not staged";
+            showErrors(result.errors || [result.message || "The dictation couldn't be retrieved. Your saved draft is unchanged. Try again, or write the note yourself."]);
+            status.textContent = "Not retrieved";
         } catch {
-            status.textContent = "Save failed";
-            showErrors(["The clinic server could not retrieve the result. Your saved draft is intact; retry or discard the unfinished dictation and continue manually."]);
+            status.textContent = "Not retrieved";
+            showErrors(["The clinic's server couldn't retrieve the dictation. Your saved draft is unchanged. Try again, or discard the dictation and write the note yourself."]);
         } finally { busy = false; }
     });
     window.addEventListener("beforeunload", event => {

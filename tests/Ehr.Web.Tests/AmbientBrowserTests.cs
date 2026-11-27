@@ -570,7 +570,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
             "SELECT id::text FROM ehr.ai_note_reviews WHERE patient_id = @id AND mode = 'ambient'", patient)).Single();
         await page.UnrouteAsync("**/ambient/*/result");
         await page.GotoAsync($"{server.Url}/patients/{patient}/notes/drafts/{draft}/review/{review}");
-        Assert.Contains("hasn't been drafted yet. If its voices were named a moment ago, wait a minute and choose Retrieve.",
+        Assert.Contains("Not drafted yet. A visit was recorded at",
+            await page.TextContentAsync("[data-ambient-not-drafted]"));
+        Assert.Contains("If you named its voices a moment ago, wait a minute, then retrieve its draft.",
             await page.TextContentAsync("[data-ambient-not-drafted]"));
         await AiReviewBrowserTests.TabToAsync(page, "[data-review-retrieve]");
         await page.Keyboard.PressAsync("Tab");

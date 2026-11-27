@@ -41,7 +41,7 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //      edit it into others; open the review on an on-site app set to keep transcripts 3 days.
 // Expected result: Step 1: "Listen to the visit" on the clinic's chart only; off-site, the page's "Unavailable:" notice
 //   and no listening controls; the start refused by the cloud app, nothing forwarded, nothing sent to the service. Step 2:
-//   off-site, "Read-only here:" with the review's proposals, no transcript, no decisions and no finishing; the forwarded
+//   off-site, "Read-only here." with the review's proposals, no transcript, no decisions and no finishing; the forwarded
 //   decision and finishing refused with "Finish this review at the clinic…", the review still open with its transcript.
 //   Step 2a: each answered as off-site, under every proof: no listening offered, no transcript, everything refused.
 //   Step 3: 503, no consent recorded; then 500, the service's session discarded, no consent or review recorded. Step 3a:
@@ -86,8 +86,8 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var d = await DraftAsync(apps);
         var offSite = await SignInAsync(apps.Cloud, await apps.ClinicianAsync(), via: apps.OnPrem);
         var html = await offSite.Client.GetStringAsync(d.ReviewUrl, Cancel);
-        Assert.Contains("Read-only here:", html);
-        Assert.Contains("Finish this review at the clinic: the conversation can be read only at the clinic.", html);
+        Assert.Contains("Read-only here.</span>", html);
+        Assert.Contains("Finish this review at the clinic, where the conversation can be read.", html);
         Assert.Contains(">The conversation can be read only at the clinic.</p>", html);
         Assert.DoesNotContain("clinic&#x27;s network", html);
         Assert.Contains("Your chest is clear.", html);
@@ -160,7 +160,7 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             Assert.DoesNotContain("Listen to the visit into this draft", await forwarded.Client.GetStringAsync(draft, Cancel));
 
             var html = await forwarded.Client.GetStringAsync(d.ReviewUrl, Cancel);
-            Assert.Contains("Read-only here:", html);
+            Assert.Contains("Read-only here.</span>", html);
             Assert.DoesNotContain("What brings you in today?", html);
             Assert.DoesNotContain("data-review-complete", html);
             using var decided = await Decide(forwarded.Client, Token(html), d.ReviewUrl, objective, d.Version, "accepted");
@@ -260,7 +260,7 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var editor = await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/notes/drafts/{draft}", Cancel);
         Assert.Contains("Resume dictation review", editor);
         var html = await l.Session.Client.GetStringAsync(url, Cancel);
-        Assert.Matches(@"A visit recorded at \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC hasn't been drafted yet\. If its voices were named a moment ago, wait a minute and choose Retrieve\. Otherwise discard it to dictate or listen again\.", WebUtility.HtmlDecode(html));
+        Assert.Matches(@"Not drafted yet\.</span> A visit was recorded at \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\. If you named its voices a moment ago, wait a minute, then retrieve its draft\. Otherwise, discard it and dictate or listen again\.", WebUtility.HtmlDecode(html));
 
         using (var retrieved = await Post(l.Session.Client, l.Token, $"{Ehr.Web.Api.Dictation.DictationApi.Path}/review/{l.Review}/stage", new { version = l.Version }))
         {

@@ -346,7 +346,8 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var html = await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel);
         var said = RefillRequestTests.Said(html);
         Assert.Contains("Proposed orders and allergies", said);
-        Assert.Contains("Dictation proposes these from what you said and places or saves none of them. Each shows what you said after it.", said);
+        Assert.Contains("Proposed from what you said. Dictation doesn't place or save any of them.", said);
+        Assert.Contains("Each shows what you said after it, in case you corrected it.", said);
         Assert.Contains($"Order Awaiting review As heard: Chest is clear. {DictationSidecarStub.OrderSaid}. Heard after it: {DictationSidecarStub.AllergySaid}. Open in the order form", said);
         Assert.Equal(1, CountOf(html, "data-chart-proposal-heard-after"));
         Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
@@ -396,7 +397,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         var editor = await client.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel);
         Assert.NotEmpty(LinkTo(editor, dictated.ReviewPath));
-        Assert.Contains("Awaiting review: 2 orders or allergies proposed from dictation. Review them.", RefillRequestTests.Said(editor));
+        Assert.Contains("Awaiting review. 2 orders or allergies proposed from dictation. Review them.", RefillRequestTests.Said(editor));
         var review = await client.GetStringAsync(dictated.ReviewPath, Cancel);
         Assert.NotEmpty(LinkTo(review.Replace("&amp;", "&", StringComparison.Ordinal), link));
         Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Order));

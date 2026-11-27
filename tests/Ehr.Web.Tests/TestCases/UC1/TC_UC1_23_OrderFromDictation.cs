@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   1. Open the form from the first proposal; choose Lab.
 //   2. Sign Lipid panel.
 //   3. From the second proposal, sign lisinopril 10 MG Oral Tablet without reasons, then with both.
-// Expected result: Step 1: "Proposed from dictation: check every field. Nothing here was filled in from it." with the
+// Expected result: Step 1: "Proposed from dictation. Check every field. Nothing here was filled in from it." with the
 //   words after "As heard:", marked after "Chest is clear.", and the allergy's sentence after "Heard after it:"; each type's link keeps the proposal; the item and the details are empty. Step 2:
 //   back on the review; one active lab order for Lipid panel, signed by Dr. Test, decides the proposal. Step 3: first 422, "Already ordered" and the safety reason asked for, nothing saved and the
 //   proposal waiting; then the order is signed, keeping both reasons, and decides the second proposal.
@@ -41,7 +41,7 @@ public class TC_UC1_23_OrderFromDictation(WebApps apps) : IClassFixture<WebApps>
         var dictated = await DictateAsync(apps);
         var html = await dictated.Session.Client.GetStringAsync(OrderFormPath(dictated.Patient, dictated.Order), Cancel);
         var said = Said(html);
-        Assert.Contains("Proposed from dictation: check every field. Nothing here was filled in from it.", said);
+        Assert.Contains("Proposed from dictation. Check every field. Nothing here was filled in from it.", said);
         Assert.Contains($"As heard: Chest is clear. {DictationSidecarStub.OrderSaid}. Heard after it: {DictationSidecarStub.AllergySaid}.", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
         Assert.Contains("Choose the type of order.", said);
@@ -77,7 +77,7 @@ public class TC_UC1_23_OrderFromDictation(WebApps apps) : IClassFixture<WebApps>
             var words = Said(await refused.Content.ReadAsStringAsync(Cancel));
             Assert.Contains("Already ordered An active order for Lisinopril 10 mg tablet was signed", words);
             Assert.Contains("Give a reason to sign this order despite the warnings, or cancel.", words);
-            Assert.Contains("Proposed from dictation:", words);
+            Assert.Contains("Proposed from dictation.", words);
         }
 
         Assert.Equal("pending|-|-", await StateAsync(apps, second.Order));
