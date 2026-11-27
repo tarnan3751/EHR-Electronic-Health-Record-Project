@@ -10,22 +10,22 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.History.Allergies, Model.OnPanel, Model.EmergencyUntil)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.Route(sensitive: Model.History.SensitiveShown)">Back to the chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.Route(sensitive: Model.History.SensitiveShown)">Back to chart</a></p>
 </div>
 <h1>History of allergies, medications and diagnoses: @patient.FamilyName, @patient.GivenName</h1>
 
 @if (Model.History.SensitiveShown)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="History" asp-all-route-data="Model.Route(sensitive: false)">Hide sensitive items</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown.</span> Your view is logged. <a asp-page="History" asp-all-route-data="Model.Route(sensitive: false)">Hide sensitive items</a></p>
 }
 else if (Model.History.SensitiveHidden > 0)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @Model.History.SensitiveHidden @(Model.History.SensitiveHidden == 1 ? "change is" : "changes are") not shown. <a asp-page="History" asp-all-route-data="Model.Route(sensitive: true)">Show sensitive items</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden.</span> @Model.History.SensitiveHidden @(Model.History.SensitiveHidden == 1 ? "change is" : "changes are") not shown. <a asp-page="History" asp-all-route-data="Model.Route(sensitive: true)">Show sensitive items</a></p>
 }
 
 @if (Model.History.Changes.Count == 0)
 {
-    <p class="sc-muted">No changes recorded.</p>
+    <p class="sc-muted">No changes.</p>
 }
 else
 {

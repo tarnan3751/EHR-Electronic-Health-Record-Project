@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Save the real diagnosis with each bad onset date; then with the status "deleted".
 //   3. Save a medication whose stop date is before its start date.
 //   4. Save the allergy with each bad severity, risk and reaction.
-// Expected result: Each is answered 422 with "Not saved:" and, in turn: "Enter the diagnosis."; "Choose a diagnosis
+// Expected result: Each is answered 422 with "Not saved." and, in turn: "Enter the diagnosis."; "Choose a diagnosis
 //   from the list."; "Enter a date that exists and isn't in the future, as year-month-day." (twice); "Choose a
 //   status."; "The stop date is before the start date."; "Choose a severity."; "Choose a risk."; "Shorten this to
 //   200 characters or fewer." The name typed is still in its field, marked invalid where it is the problem, and the
@@ -53,7 +53,7 @@ public class TC_UC4_09_EntryInvalidInput(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var html = await refused.Content.ReadAsStringAsync(Cancel);
             Assert.Contains(message, html);
-            Assert.Contains("Not saved:", html);
+            Assert.Contains("Not saved.", html);
             if (fields[0].Item2 is string { Length: > 0 } typed)
             {
                 Assert.Contains($"name=\"Name\" value=\"{typed}\"", html);
@@ -79,7 +79,7 @@ public class TC_UC4_09_EntryInvalidInput(WebApps apps) : IClassFixture<WebApps>
             using var refused = await SaveAsync(session.Client, patient, "allergies", null, ("Name", "Peanut"), ("Status", "active"), (field, value));
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var html = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Not saved:", html);
+            Assert.Contains("Not saved.", html);
             Assert.Contains(message, html);
             Assert.Matches($"<(?:input|select) id=\"{id}\"[^>]*aria-invalid=\"true\" aria-describedby=\"{id}-error\"", html);
             Assert.Contains("name=\"Name\" value=\"Peanut\"", html);

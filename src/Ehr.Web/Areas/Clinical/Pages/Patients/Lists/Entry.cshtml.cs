@@ -119,7 +119,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
     // Set when the post came from a clinician who no longer has the patient on their panel.
     public bool OffPanel { get; private set; }
 
-    // Set when the database refused the write: the "Not saved:" notice above the form, which keeps what was entered.
+    // Set when the database refused the write: the "Not saved." notice above the form, which keeps what was entered.
     public bool Refused { get; private set; }
 
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
@@ -338,7 +338,7 @@ public class EntryModel(PhiReader phi, PatientAssignments assignments, ChartList
             return NotSaved();
         }
 
-        // The chart confirms it ("Saved:"), from the entry as the database now holds it.
+        // The chart confirms it ("Saved."), from the entry as the database now holds it.
         var chart = Search.ChartRouteValues(id);
         chart["saved"] = entryId;
         chart["savedList"] = List;

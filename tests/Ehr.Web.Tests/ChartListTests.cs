@@ -121,7 +121,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Show sensitive items</a>", chart);
         var history = await session.Client.GetStringAsync($"/patients/{patient}/chart-history", Cancel);
         Assert.DoesNotContain("anxiety", history, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 2 changes are not shown.", Words(history));
+        Assert.Contains("Sensitive items hidden. 2 changes are not shown.", Words(history));
         Assert.Equal(shownBefore, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
 
         var shown = await session.Client.GetStringAsync($"/patients/{patient}?sensitive=true", Cancel);
@@ -169,7 +169,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("anxiety", history, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("lisinopril", history);
         // The sertraline's two changes and the diagnosis's one.
-        Assert.Contains("Sensitive items hidden: 3 changes are not shown.", Words(history));
+        Assert.Contains("Sensitive items hidden. 3 changes are not shown.", Words(history));
         Assert.Equal(before, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
         var shown = Words(await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel));
         Assert.Contains("Sensitive: no → yes", shown);
@@ -256,7 +256,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(HttpStatusCode.Conflict, posted.StatusCode);
         var page = await posted.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Not saved: this patient isn't on your panel, so nothing was changed. What you entered is below, to copy.", Words(page));
+        Assert.Contains("Not saved. This isn't one of your patients. What you entered is below, to copy.", Words(page));
         Assert.Contains("Essential (primary) hypertension</textarea>", page);
         Assert.DoesNotContain("Left the panel", page);
         Assert.DoesNotContain("sc-banner", page);
@@ -351,7 +351,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 
         var byCode = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", anxietyId), Cancel);
         Assert.Contains(fixedBox, byCode);
-        Assert.Contains("Sensitive by its code.", Words(byCode));
+        Assert.Contains("Sensitive because of its code.", Words(byCode));
         var other = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", hypertensionId), Cancel);
         Assert.DoesNotContain("disabled", other);
         Assert.Contains("name=\"Sensitive\" value=\"true\"", other);
@@ -424,7 +424,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         using var crossed = await session.Client.PostAsync(EntryPath(other, "allergies"),
             Form(("__RequestVerificationToken", token), ("NewEntryId", newId), ("Name", "Penicillin G"), ("Status", "active")), Cancel);
         Assert.Equal(HttpStatusCode.Conflict, crossed.StatusCode);
-        Assert.Contains("Not saved: the database refused the change", Words(await crossed.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. The entry may have changed, or this patient may no longer be one of your patients.", Words(await crossed.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal([$"{newId} Peanut Rash"], await RowsAsync(apps, "allergy_intolerances", patient, "concat_ws(' ', id, display, reaction)"));
         Assert.Empty(await RowsAsync(apps, "allergy_intolerances", other, "display"));
     }
@@ -443,9 +443,9 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"href=\"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true\"", shown);
         Assert.Contains($"href=\"{EntryPath(patient, "medications")}?showSensitive=true\"", shown);
         var history = await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel);
-        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to the chart", history);
+        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to chart", history);
         var form = await session.Client.GetStringAsync($"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true", Cancel);
-        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to the chart", form);
+        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to chart", form);
 
         var path = $"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true";
         using var saved = await PostFormAsync(session.Client, path, path, ("Name", "Generalized anxiety disorder"), ("Status", "active"), ("Onset", "2024-01-02"));
