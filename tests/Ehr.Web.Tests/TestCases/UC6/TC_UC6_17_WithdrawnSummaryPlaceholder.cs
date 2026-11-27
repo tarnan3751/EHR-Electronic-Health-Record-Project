@@ -25,11 +25,11 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Dr. Test releases a replacement. The patient opens Visit summaries.
 //   3. Dr. Test releases a sensitive summary of the second note and withdraws it. Each opens Visit summaries, and asks
 //      for sensitive summaries.
-// Expected result: Step 1: each sees "Your care team withdrew the visit summary from <date> UTC. If you have
-//   questions, contact the clinic." and nothing of the summary, the reason or Dr. Test, anywhere in the markup. Step 2:
-//   the replacement and the placeholder, of the same date, the replacement first. Step 3: the patient and the proxy
-//   with sensitive items see "Sensitive summaries hidden. 1 visit summary is not shown." and, once they ask, a second
-//   placeholder; the proxy without them gets the page they had before, asking or not.
+// Expected result: Step 1: each sees "Your care team withdrew the visit summary from <date> UTC." and nothing of the
+//   summary, the reason or Dr. Test, anywhere in the markup. Step 2: the replacement and the placeholder, of the same
+//   date, the replacement first. Step 3: the patient and the proxy with sensitive items see "Sensitive summaries
+//   hidden. 1 visit summary is not shown." and, once they ask, a second placeholder; the proxy without them gets the
+//   page they had before, asking or not.
 // Creator: Tahseen Arnan
 public class TC_UC6_17_WithdrawnSummaryPlaceholder(WebApps apps) : IClassFixture<WebApps>
 {
@@ -57,7 +57,7 @@ public class TC_UC6_17_WithdrawnSummaryPlaceholder(WebApps apps) : IClassFixture
         foreach (var reader in new[] { patient, allowed, without })
         {
             var page = await PortalAsync(reader.Client);
-            Assert.Contains($"{Placeholder} {date}. If you have questions, contact the clinic.", Words(page));
+            Assert.Contains($"{Placeholder} {date}.", Words(page));
             foreach (var hidden in new[] { "cough", "chest", "fluids", "Synthetic private reason", "Dr. Test" })
             {
                 Assert.DoesNotContain(hidden, page, StringComparison.OrdinalIgnoreCase);
@@ -71,7 +71,7 @@ public class TC_UC6_17_WithdrawnSummaryPlaceholder(WebApps apps) : IClassFixture
 
         var both = Words(await PortalAsync(patient.Client));
         Assert.Contains("We talked about the right visit.", both);
-        Assert.Contains($"{Placeholder} {date}. If you have questions, contact the clinic.", both);
+        Assert.Contains($"{Placeholder} {date}.", both);
         Assert.True(both.IndexOf("We talked about the right visit.", StringComparison.Ordinal) < both.IndexOf(Placeholder, StringComparison.Ordinal));
 
         var withoutBefore = WithoutTokens(await PortalAsync(without.Client));

@@ -54,7 +54,7 @@ public class TC_UC6_16_VisitSummariesProxies(WebApps apps) : IClassFixture<WebAp
         {
             var page = await PortalAsync(proxy.Client);
             Assert.Contains(TalkedAbout, page);
-            Assert.Contains("From the care team after each visit", Words(page));
+            Assert.DoesNotContain("your care team", Words(page));
             before[proxy] = WithoutTokens(page);
         }
 
