@@ -445,7 +445,7 @@ async function loadPanel() {
     el('li', {}, button(`${patient.name} · MRN ${patient.mrn}`, () => openChart(patient.id), 'sc-btn sc-btn--quiet')),
   ));
   if (panel.length === 0) {
-    list.append(el('li', { className: 'sc-muted', textContent: 'No charts downloaded. Add patients to your panel in the web app, then download here.' }));
+    list.append(el('li', { className: 'sc-muted', textContent: 'No charts downloaded. Add patients to My patients in the web app, then download them here.' }));
   }
   if (selectedPatient && !panel.some((patient) => patient.id === selectedPatient)) clearChart();
 }
@@ -454,7 +454,7 @@ async function loadPanel() {
 // them, so this says how old the copy is; charts downloaded by a build that didn't record it say so.
 function chartsUpdatedText(updated) {
   if (updated) return `Offline charts last updated ${clinicStamp(new Date(updated.at).toISOString(), updated.clinicTimeZone)}.`;
-  return panelSize ? 'When these charts were downloaded isn\'t recorded: download them again to record it.' : '';
+  return panelSize ? 'When these charts were downloaded isn\'t recorded. Download them again to record it.' : '';
 }
 
 function renderChartsUpdated() {
@@ -499,9 +499,9 @@ function signedNotes(notes, zone) {
       ...part('Assessment', note.assessment), ...part('Plan', note.plan),
       ...note.addenda.flatMap((addendum) => part(`${addendum.notNoteAuthor ? `Addendum by ${addendum.author}, not the note's author` : `Addendum · ${addendum.author}`} · ${stamp(addendum.signedAt)}`, addendum.text)),
       ...(note.sensitiveAddendaNotKept
-        ? [el('p', { className: 'sc-muted', textContent: `Sensitive addenda not kept offline: ${note.sensitiveAddendaNotKept}. Open the note on the clinic's site to see them.` })]
+        ? [el('p', { className: 'sc-muted', textContent: `${note.sensitiveAddendaNotKept} sensitive ${note.sensitiveAddendaNotKept === 1 ? 'addendum is' : 'addenda are'} not kept offline. Open the note on the clinic's site to see them.` })]
         : []),
-    )) : [el('p', { className: 'sc-muted', textContent: 'None signed.' })]));
+    )) : [el('p', { className: 'sc-muted', textContent: 'No signed notes.' })]));
 }
 
 async function openChart(patient, reset = true) {
@@ -521,10 +521,10 @@ async function openChart(patient, reset = true) {
     chartSection('Allergies', chart.allergies.map((a) => details(a.display, a.reaction, a.criticality)),
       chart.allergyStatus === 'none-known' ? 'No known allergies.' : 'No allergy information recorded.'),
     chartSection('Medications', chart.medications.map((m) => details(m.display, m.dosage))),
-    chartSection('Conditions', chart.conditions.map((c) => details(c.display, c.onsetDate))),
+    chartSection('Diagnoses', chart.conditions.map((c) => details(c.display, c.onsetDate))),
     // Sensitive diagnoses and medications are never kept on this device: say so, rather than look complete.
     ...(chart.sensitiveNotKept
-      ? [el('p', { className: 'sc-muted', textContent: `Sensitive items not kept offline: ${chart.sensitiveNotKept}. Open the chart on the clinic's site to see them.` })]
+      ? [el('p', { className: 'sc-muted', textContent: `${chart.sensitiveNotKept} sensitive ${chart.sensitiveNotKept === 1 ? 'item is' : 'items are'} not kept offline. Open the chart on the clinic's site to see them.` })]
       : []),
     chartSection('Recent visits', chart.visits.map((v) => details(clinicStamp(v.periodStart, chart.clinicTimeZone, false), v.reason,
       v.systolicMmHg != null && v.diastolicMmHg != null ? `${v.systolicMmHg}/${v.diastolicMmHg} mmHg` : '',
@@ -544,7 +544,7 @@ downloadPanel.addEventListener('click', async () => {
   try {
     const answer = await call('download_panel');
     if (!offlineAvailable) return;
-    byId('offline-message').textContent = answer === undefined ? 'Download failed.' : 'Downloaded charts updated.';
+    byId('offline-message').textContent = answer === undefined ? 'Download failed.' : 'Offline charts updated.';
     if (answer !== undefined) await loadPanel();
   } finally {
     downloadPanel.disabled = false;

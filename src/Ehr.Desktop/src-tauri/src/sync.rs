@@ -306,7 +306,7 @@ impl Sync {
             if sign_in_ended(&response) {
                 self.ended(Ending::SignIn);
                 return Err(
-                    "Sign in again to download charts: a sign-in lasts at most 12 hours."
+                    "Sign in again to download charts. A sign-in lasts at most 12 hours."
                         .to_owned(),
                 );
             }
@@ -319,14 +319,13 @@ impl Sync {
         }
         if !response.status().is_success() {
             return Err(format!(
-                "Couldn't download charts: the server answered {}.",
+                "Couldn't download charts. The server answered {}.",
                 response.status()
             ));
         }
-        let panel = response
-            .json()
-            .await
-            .map_err(|_| "The server's chart response wasn't understood.".to_owned())?;
+        let panel = response.json().await.map_err(|_| {
+            "Couldn't download charts. The server's answer wasn't understood.".to_owned()
+        })?;
         Ok((token, panel))
     }
 
@@ -704,7 +703,7 @@ impl Sync {
             {
                 let db = store::lock(store);
                 self.with_clinician(Some(token), |_| db.reject_recording(owner, &recording,
-                    "This recording's patient is no longer on your panel. The audio was kept on this device.").map_err(Into::into))
+                    "This recording's patient is no longer one of your patients. The audio was kept on this device.").map_err(Into::into))
                     .map_err(Failure::Problem)?;
                 return Ok(());
             }
