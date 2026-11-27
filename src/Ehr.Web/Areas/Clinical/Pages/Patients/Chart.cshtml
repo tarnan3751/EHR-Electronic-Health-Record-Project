@@ -237,7 +237,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
             <ul class="sc-list">
                 @foreach (var draft in Model.Drafts)
                 {
-                    <li><a asp-page="Notes/Edit" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@draft.Id">Open draft</a> · version @draft.Version · unsigned</li>
+                    <li><a asp-page="Notes/Edit" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@draft.Id">Open draft</a> · unsigned</li>
                 }
             </ul>
         }

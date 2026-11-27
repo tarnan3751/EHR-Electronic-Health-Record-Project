@@ -66,6 +66,9 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<p id=\"note-save-status\" class=\"sc-status\" role=\"status\" aria-live=\"polite\"></p>", html);
         var chart = await page.Session.Client.GetStringAsync($"/patients/{page.Patient}", Cancel);
         Assert.Contains(page.Path, chart);
+        // The chart lists the draft without its internal version counter.
+        Assert.Contains("Open draft · unsigned", Words(chart));
+        Assert.DoesNotContain("· version", Words(chart));
         Assert.DoesNotContain("htmx.min.js", chart);
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, patientId: page.Patient) > 0);
     }
