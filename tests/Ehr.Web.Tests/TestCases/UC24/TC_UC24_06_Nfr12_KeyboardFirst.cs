@@ -47,7 +47,7 @@ public class TC_UC24_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync($"**/admin/emergency-access/{access.Id}");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('input[name=Outcome][value=appropriate]')"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('input[name=Outcome][value=appropriate]') === true");
 
         // 2.
         await page.Keyboard.PressAsync("Space");
