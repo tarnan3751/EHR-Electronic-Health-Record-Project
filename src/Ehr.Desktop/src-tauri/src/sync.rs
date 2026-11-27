@@ -1812,7 +1812,7 @@ mod tests {
         let cant = FakeServer::start(|_| {
             (
                 503,
-                "Not saved: the on-prem server can't be reached.".to_owned(),
+                "Not saved. The clinic's server can't be reached.".to_owned(),
             )
         });
         let client = |server: &str| client_with(&[server], &credentials(None));
