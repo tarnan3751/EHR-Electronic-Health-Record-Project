@@ -75,7 +75,7 @@ public class TC_UC6_50_Nfr12_WhoViewedSmallScreen(WebApps apps) : IClassFixture<
         Assert.True(await page.EvaluateAsync<bool>(fits), "The page scrolls sideways at 360 pixels.");
         Assert.Contains("Emergency access.", await page.Locator("[data-emergency=explained]").TextContentAsync());
         Assert.Contains("Featherstonehaugh", await page.Locator("main").TextContentAsync());
-        Assert.Contains("Your chart, with its sensitive items and the list of your visit notes", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Your chart, with the list of your visit notes, including sensitive items", await page.Locator("main").TextContentAsync());
         Assert.Contains(proxy.Email, await page.Locator("main").TextContentAsync());
 
         // Step 2.

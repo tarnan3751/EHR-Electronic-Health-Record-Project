@@ -496,8 +496,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
     // The parts are one list wherever they are kept: the code's (AuditParts), the database's check, the cloud app's
     // allow-list and the portal's words, none with a part the others don't have, in either direction; the words also
-    // name every part a view recorded without one is named by, and say "with its sensitive items" for every part the
-    // allow-list takes on a read of them.
+    // name every part a view recorded without one is named by, and say "including sensitive items" (or "with the
+    // sensitive ones") for every part the allow-list takes on a read of them.
     [Fact]
     public async Task The_parts_are_one_list_in_the_code_the_database_the_cloud_app_and_the_words()
     {

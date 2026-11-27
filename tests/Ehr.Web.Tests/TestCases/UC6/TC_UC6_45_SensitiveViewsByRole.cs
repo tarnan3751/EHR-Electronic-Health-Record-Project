@@ -6,7 +6,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 
 // Test Case ID: TC-UC6-45
 // Purpose / scenario: A view that showed the patient's sensitive items is listed for the patient, and for someone the
-//   patient allowed sensitive items, as "with its sensitive items"; for someone without them it isn't there at all: their
+//   patient allowed sensitive items, as "including sensitive items"; for someone without them it isn't there at all: their
 //   page after the view is their page before it, with only their own look at it added.
 // Type: Functional (invalid input: what a proxy without sensitive items is not shown)
 // Requirements: proposed FR-57, FR-19, proposed FR-39
@@ -21,8 +21,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. The proxy without sensitive items opens Who viewed this record.
 //   2. Dr. Test opens the chart with "Show sensitive items".
 //   3. The patient, the proxy with sensitive items, and the one without, open the page.
-// Expected result: Step 3: the patient's newest line from someone else is "Dr. Test, clinician", "Your chart, with its
-//   sensitive items and the list of your visit notes"; the proxy's with sensitive items, "The chart, with its sensitive items and the list of visit notes". The page of the proxy
+// Expected result: Step 3: the patient's newest line from someone else is "Dr. Test, clinician", "Your chart, with the
+//   list of your visit notes, including sensitive items"; the proxy's with sensitive items, "The chart, with the list of visit notes, including sensitive items". The page of the proxy
 //   without them is the page of step 1 with one line before it, their own "Who viewed the record", and nothing on it
 //   says "sensitive".
 // Creator: Tahseen Arnan
@@ -46,9 +46,9 @@ public class TC_UC6_45_SensitiveViewsByRole(WebApps apps) : IClassFixture<WebApp
         await session.Client.GetStringAsync(chart + "?sensitive=true", Cancel);
 
         // Step 3.
-        Assert.StartsWith("staff | Dr. Test, clinician | Your chart, with its sensitive items and the list of your visit notes | ",
+        Assert.StartsWith("staff | Dr. Test, clinician | Your chart, with the list of your visit notes, including sensitive items | ",
             Lines(await PageAsync(patient.Client)).First(line => !line.StartsWith("you", StringComparison.Ordinal)), StringComparison.Ordinal);
-        Assert.StartsWith("staff | Dr. Test, clinician | The chart, with its sensitive items and the list of visit notes | ",
+        Assert.StartsWith("staff | Dr. Test, clinician | The chart, with the list of visit notes, including sensitive items | ",
             Lines(await PageAsync(allowed.Client)).First(line => !line.StartsWith("you", StringComparison.Ordinal)), StringComparison.Ordinal);
         var html = await PageAsync(without.Client);
         var after = Lines(html);

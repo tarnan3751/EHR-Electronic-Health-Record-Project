@@ -23,8 +23,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test makes the views.
 //   2. Each proxy opens Who viewed this record.
-// Expected result: Each page is titled "Who viewed Synthetic Shapes's record", has Dr. Test's "The chart: the summary
-//   page, ..." (with its sensitive items, for a proxy who may see them) and the proxy's own views of the portal's home
+// Expected result: Each page is titled "Who viewed Synthetic Shapes's record", has Dr. Test's "The chart, with the list
+//   of visit notes" (including sensitive items, for a proxy who may see them) and the proxy's own views of the portal's home
 //   as "You", and no line of anyone else's. Sensitive items and messages: also "A visit note" and "The messages".
 //   Messages only: no line with sensitive items and no visit note. Sensitive items only: no conversation.
 // Creator: Tahseen Arnan
@@ -50,7 +50,7 @@ public class TC_UC6_44_WhoViewedAsAProxy(WebApps apps) : IClassFixture<WebApps>
         await session.Client.GetStringAsync($"{chart}/messages/{thread}", Cancel);
 
         // Step 2.
-        const string Sensitive = "with its sensitive items";
+        const string Sensitive = "including sensitive items";
         const string Note = "| A visit note";
         const string Conversation = "| The messages";
         foreach (var (proxy, sensitive, messages) in new[] { (full, true, true), (plain, false, true), (recordOnly, true, false) })

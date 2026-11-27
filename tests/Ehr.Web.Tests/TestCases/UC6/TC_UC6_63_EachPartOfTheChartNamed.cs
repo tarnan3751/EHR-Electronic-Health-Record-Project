@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test writes and signs a note, then opens each page.
 //   2. The patient opens Who viewed my record.
-// Expected result: Dr. Test's lines name, each once or more and nothing else: "A visit note, being written", "Your chart,
+// Expected result: Dr. Test's lines name, each once or more and nothing else: "A visit note in progress", "Your chart,
 //   with the list of your visit notes", "Your allergies, medications and diagnoses", "Your orders for tests
 //   and medicines", "Your vital signs", "Your appointments", "Your messages", "Who you share your record with"; no line
 //   is "A visit note" or counts visit notes. Dr. Count's are "Your vital signs, 3 times" and one "Your chart: ..." line.
@@ -59,7 +59,7 @@ public class TC_UC6_63_EachPartOfTheChartNamed(WebApps apps) : IClassFixture<Web
         Assert.Equal(
             new[]
             {
-                "A visit note, being written", Chart, "Your allergies, medications and diagnoses", "Your orders for tests and medicines", "Your vital signs",
+                "A visit note in progress", Chart, "Your allergies, medications and diagnoses", "Your orders for tests and medicines", "Your vital signs",
                 "Your appointments", "Your messages", "Who you share your record with",
             }.Order(StringComparer.Ordinal),
             Of("Dr. Test").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));

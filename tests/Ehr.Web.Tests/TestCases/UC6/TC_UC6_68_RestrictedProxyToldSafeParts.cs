@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. The patient opens Who viewed my record.
 //   2. The proxy opens Who viewed the record.
-// Expected result: Step 1: Dr. Test's lines are, newest first, "A visit note, being written", "Who you share your record
+// Expected result: Step 1: Dr. Test's lines are, newest first, "A visit note in progress", "Who you share your record
 //   with", "Your orders for tests and medicines", "Your allergies, medications and diagnoses", "Your vital signs", "Your
 //   chart, with the list of your visit notes". Step 2: "The record, 4 times", "The vital signs", "The chart, with
 //   the list of visit notes".
@@ -57,7 +57,7 @@ public class TC_UC6_68_RestrictedProxyToldSafeParts(WebApps apps) : IClassFixtur
         // Step 1.
         Assert.Equal(
             [
-                "A visit note, being written", "Who you share your record with", "Your orders for tests and medicines", "Your allergies, medications and diagnoses",
+                "A visit note in progress", "Who you share your record with", "Your orders for tests and medicines", "Your allergies, medications and diagnoses",
                 "Your vital signs", "Your chart, with the list of your visit notes",
             ],
             PartsOf(await PageAsync(patient.Client), "staff"));
