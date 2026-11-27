@@ -86,8 +86,7 @@
 
     // At the session's limit: the limit, and what happens next, said once.
     function atTheLimit() {
-        return `Listening stopped at its ${Math.round((state.session?.maxSeconds ?? 0) / 60)}-minute limit. Transcribing the `
-            + "visit and telling its voices apart. Then say who each voice is to draft the note.";
+        return `Listening stopped at its ${Math.round((state.session?.maxSeconds ?? 0) / 60)}-minute limit. Transcribing the visit.`;
     }
 
     function call(method, path, body, type) {
@@ -150,7 +149,7 @@
         }
 
         if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-            say("This browser can't record audio. Use a current version of Chrome, Edge, Firefox or Safari, or type the note.", true);
+            say("This browser can't record audio. Use a current version of Chrome, Edge, Firefox or Safari.", true);
             return;
         }
 
@@ -227,7 +226,7 @@
         }
     }
 
-    const hiddenMessage = "Paused while this page was out of sight, so nothing was recorded. Select Resume listening to carry on.";
+    const hiddenMessage = "Paused while this page was hidden. Nothing was recorded. Select Resume listening to continue.";
 
     function microphoneProblem(error) {
         switch (error?.name) {
@@ -280,7 +279,7 @@
                     state.retryMs = firstRetryMs;
                     if (state.retrying) {
                         state.retrying = false;
-                        say("Connected again. The audio recorded meanwhile has been sent.");
+                        say("Connected again.");
                     }
 
                     heard(body);
@@ -330,7 +329,7 @@
 
     function retryLater() {
         state.retrying = true;
-        say("Connection to the clinic's server lost. Still recording here. The audio is sent when it's back.", true);
+        say("Connection lost. Still recording here.", true);
         clearTimeout(state.retryTimer);
         state.retryTimer = setTimeout(pump, state.retryMs);
         state.retryMs = Math.min(state.retryMs * 2, mostRetryMs);
@@ -452,7 +451,7 @@
         clearInterval(state.clock);
         document.title = title;
         capture.hidden = true;
-        say(message || "Stopped. Transcribing the visit and telling its voices apart. This takes about a minute.");
+        say(message || "Stopped. Transcribing the visit. This takes about a minute.");
         if (state.recorder && state.recorder.state !== "inactive") {
             state.recorder.stop();
         } else {
@@ -479,18 +478,18 @@
             stuck(true);
         } else if (result.sorting !== "awaiting_speakers") {
             // Not transcribed and its voices told apart: nothing a visit can be drafted from.
-            say("This visit couldn't be transcribed and its voices told apart, so it can't be drafted. Nothing was added to the note. Discard the recording, and dictate or type the note.", true);
+            say("This visit couldn't be transcribed, so it can't be drafted. Discard the recording.", true);
             stuck(false);
         } else if ((result.speakers ?? []).length > mostVoices) {
-            say(`More voices were told apart than can be named (${mostVoices} at most), so this visit can't be drafted. Nothing was added to the note. Discard the recording, and dictate or type the note.`, true);
+            say(`More voices than can be named (${mostVoices} at most), so this visit can't be drafted. Discard the recording.`, true);
             stuck(false);
         } else {
             showVoices(result);
         }
     }
 
-    const beforeNaming = "The visit couldn't be fetched because the listening service isn't answering, so its voices can't be named yet. Nothing was added to the note. Try again in a moment, or discard the recording. The service keeps nothing for more than 10 minutes.";
-    const afterNaming = "The draft couldn't be fetched because the listening service isn't answering. Nothing was added to the note. Try again in a moment, or open the draft in a few minutes to retrieve or discard it. The service keeps nothing for more than 10 minutes.";
+    const beforeNaming = "The listening service isn't answering. Try again in a moment, or discard the recording.";
+    const afterNaming = "The listening service isn't answering. Try again in a moment, or open the draft in a few minutes to retrieve or discard it.";
 
     // Where the page waits when the visit can't be fetched or drafted, never a dead end. Before the voices are named:
     // try again (when it might work) or discard the recording, as leaving the page would. Once they have been handed
@@ -632,7 +631,7 @@
         busy("recording");
         draftButton.disabled = true;
         speakersArea.hidden = true;
-        say("Drafting the note. Keep this page open until it's ready. A long visit takes a few minutes.");
+        say("Drafting the note. Keep this page open until it's ready.");
         const named = await ask("speakers", JSON.stringify({ speakers: Object.fromEntries(chosenRoles()) }),
             "The voices couldn't be sent because the listening service isn't answering. Select Draft the note to try again, or discard the recording.");
         if (!named) {

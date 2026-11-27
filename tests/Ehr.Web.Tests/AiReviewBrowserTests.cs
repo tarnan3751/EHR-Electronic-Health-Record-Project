@@ -129,7 +129,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForFunctionAsync("typeof window.__heldUpload === 'function'");
         await TabToAsync(page, "[data-dictation-cancel]");
         await page.Keyboard.PressAsync("Enter");
-        const string Discarded = "Dictation discarded. The draft is kept, with nothing from the dictation in it.";
+        const string Discarded = "Dictation discarded.";
         await page.WaitForFunctionAsync("words => document.querySelector('[data-dictation-status]').textContent === words", Discarded);
         Assert.Contains(await AmbientBrowserTests.EventsAsync(page), e => e.StartsWith("DELETE ", StringComparison.Ordinal) && e.EndsWith(" 204", StringComparison.Ordinal));
 

@@ -274,7 +274,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         var page = await offSite.GetStringAsync($"/patients/{patient}/dictate", Cancel);
         using var start = await HtmxPostAsync(offSite, Ehr.Web.Api.Dictation.DictationApi.Path, Token(page));
 
-        Assert.Contains("Dictation needs the clinic's server", page);
+        Assert.Contains("Dictation unavailable.", page);
         Assert.Contains(QueuedReads(apps.CloudCutOff), e => e.TableName == "patients" && e.PatientId == patient && e.ActorId == clinician.Id);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, start.StatusCode);
     }

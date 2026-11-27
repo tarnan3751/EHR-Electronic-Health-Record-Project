@@ -177,12 +177,12 @@
     // UC 9 step 1: the microphone first, so nothing starts on the server when it can't be recorded.
     async function start() {
         if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-            say("This browser can't record audio. Use a current version of Chrome, Edge, Firefox or Safari, or type the note.", true);
+            say("This browser can't record audio. Use a current version of Chrome, Edge, Firefox or Safari.", true);
             return;
         }
 
         if (state.session) {
-            say("Discard this unfinished dictation before starting another. Its transcript is still displayed.", true);
+            say("Discard this unfinished dictation before starting another.", true);
             return;
         }
         // Reuse the request ID when start's acknowledgement was lost: the server returns its saved binding.
@@ -267,14 +267,14 @@
         switch (error?.name) {
             case "NotAllowedError":
             case "SecurityError":
-                return "The microphone is blocked. Allow it in the browser's settings for this site, then select Dictate again. You can still type the note.";
+                return "The microphone is blocked. Allow it in the browser's settings for this site, then select Dictate again.";
             case "NotFoundError":
             case "OverconstrainedError":
-                return "No microphone was found. Connect one, then select Dictate again. You can still type the note.";
+                return "No microphone was found. Connect one, then select Dictate again.";
             case "NotReadableError":
                 return "The microphone is in use by another app. Close it, then select Dictate again.";
             default:
-                return "The microphone couldn't be started. You can still type the note.";
+                return "The microphone couldn't be started.";
         }
     }
 
@@ -353,11 +353,10 @@
                         // notice isn't a live region: the status line says the limit once, as it says the transcript
                         // is being finished, which follows at once (finish()), rather than a moment before it.
                         state.limitWords = `The dictation stopped at its ${state.session.maxSeconds / 60}-minute limit.`;
-                        limitNotice.textContent = `${state.limitWords} What you recorded is kept and goes on to the review. `
-                            + "Start another dictation for the rest once you've reviewed it.";
+                        limitNotice.textContent = `${state.limitWords} Dictate the rest after reviewing this one.`;
                         limitNotice.hidden = false;
                     } else {
-                        say(body.message || "The dictation is over its time limit, so it has been stopped.", true);
+                        say(body.message || "Stopped at the time limit.", true);
                     }
 
                     if (state.recorder?.state === "recording") {
@@ -382,7 +381,7 @@
     function pauseAndRetry() {
         if (!state.paused) {
             state.paused = true;
-            say("Connection lost. Still recording on this device. The transcript catches up when the connection is back.", true);
+            say("Connection lost. Still recording on this device.", true);
         }
 
         clearTimeout(state.retryTimer);
@@ -394,7 +393,7 @@
         state.retryMs = firstRetryMs;
         if (state.paused) {
             state.paused = false;
-            say(state.stopRequested ? "Connection back. Sending the rest of the recording." : "Connection back. Still recording, and the transcript has caught up.");
+            say(state.stopRequested ? "Connection back. Sending the rest of the recording." : "Connection back. Still recording.");
         }
     }
 
@@ -448,7 +447,7 @@
             cancelAs("Discard");
             startable(false);
             say(result.sorting === "done"
-                ? "Done. Review each proposed field. Nothing goes into the note until you approve it."
+                ? "Done. Review each proposed field."
                 : "Done, but the fields couldn't be sorted. The transcript is kept as plain text.");
             await stageReview();
         }
@@ -465,13 +464,13 @@
             const body = await json(response);
             if (!response.ok || !body.url) {
                 if (Number.isSafeInteger(body.version)) state.session.version = body.version;
-                say(body.errors?.join(" ") || body.message || "Not saved for review. Your transcript is still here. Check the saved draft and try again, or write the note yourself.", true);
+                say(body.errors?.join(" ") || body.message || "Not saved for review. Check the saved draft and try again.", true);
                 return;
             }
             state.persisted = true;
             window.location.assign(body.url);
         } catch {
-            say("The server didn't confirm the save. Your transcript is still here. Try again. A save that went through isn't repeated.", true);
+            say("The server didn't confirm the save. Try again.", true);
         } finally {
             state.staging = false;
             reviewButton.disabled = false;
@@ -557,7 +556,7 @@
         }
 
         state = fresh();
-        say("Dictation discarded. The draft is kept, with nothing from the dictation in it.");
+        say("Dictation discarded.");
     }
 
     function endRecording() {
@@ -579,7 +578,7 @@
         transcriptArea.removeAttribute("lang");
         transcriptArea.replaceChildren(element("p", "Your words appear here as you speak.", "sc-transcript__placeholder"));
         unclearNotice.hidden = true;
-        sortMessage.textContent = "The fields are proposed once you stop.";
+        sortMessage.textContent = "";
         for (const name of fieldNames) {
             const field = root.querySelector(`[data-dictation-field="${name}"]`);
             const status = field.querySelector("[data-field-status]");

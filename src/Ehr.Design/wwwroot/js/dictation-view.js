@@ -162,8 +162,7 @@ window.SwiftChartDictationView = class {
             } else if (result.sorting === "unavailable") {
                 sortMessage.textContent = result.message || "The fields couldn't be sorted, so the transcript is kept as plain text.";
             } else {
-                sortMessage.textContent = wordsAtTheClinic ? "Each proposed field is awaiting your review."
-                    : "Each proposed field is awaiting your review. Select one to see the words it came from.";
+                sortMessage.textContent = "Each proposed field is awaiting your review.";
             }
 
             for (const name of fieldNames) {
@@ -232,8 +231,8 @@ window.SwiftChartDictationView = class {
                 setStatus(status, "Left empty");
                 const notDictated = (field.reasons ?? []).includes("not_dictated");
                 value.append(element("p", notDictated
-                    ? "Nothing was dictated for this field. Fill it in during review if it's needed."
-                    : "No suggestion. What was proposed didn't pass the automatic checks. Fill it in during review.", "sc-proposal__message"));
+                    ? "Nothing was dictated for this field."
+                    : "No suggestion. What was proposed didn't pass the automatic checks.", "sc-proposal__message"));
             } else if (sorting === "pending") {
                 setStatus(status, "Proposing…", "info");
             } else {
