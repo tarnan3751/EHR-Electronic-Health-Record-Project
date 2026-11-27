@@ -3097,6 +3097,91 @@
         }
     }
 
+    /* Test results (step 6) as rows of one card, each opening in place: the name and its flag on the left, the date
+       on the right; opened, under a hairline, the plain sentence, then the value beside its normal range on the
+       recessed surface, figures lined up. */
+    .sc-results:has(> li > details.sc-result) {
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-results > li:has(> details.sc-result) {
+        margin: 0;
+        border-top: 1px solid var(--line);
+    }
+
+    .sc-results > li:has(> details.sc-result):first-child {
+        border-top: 0;
+    }
+
+    details.sc-result {
+        margin: 0;
+        background: none;
+        border: 0;
+        border-radius: 0;
+    }
+
+    details.sc-result > summary::marker {
+        color: var(--ink-muted);
+    }
+
+    details.sc-result .sc-result__line {
+        width: calc(100% - var(--space-6));
+        max-width: none;
+    }
+
+    details.sc-result .sc-result__date {
+        order: 1;
+        margin-left: auto;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    details.sc-result[open] > summary {
+        border-bottom: 1px solid var(--line);
+    }
+
+    details.sc-result > .sc-result__body {
+        padding-top: var(--space-4);
+    }
+
+    .sc-result__body dl.record {
+        grid-auto-flow: column;
+        grid-template-rows: auto auto;
+        grid-template-columns: none;
+        grid-auto-columns: max-content;
+        gap: 0 var(--space-12);
+        padding: var(--space-4) var(--space-6);
+        background: var(--surface-subtle);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-result__body dl.record dt {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-result__body dl.record dd {
+        margin: 0;
+        font-size: 22px;
+        line-height: 28px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 40rem) {
+        details.sc-result .sc-result__date {
+            flex-basis: 100%;
+            margin-left: 0;
+        }
+
+        .sc-result__body dl.record {
+            gap: 0 var(--space-6);
+            padding: var(--space-3) var(--space-4);
+        }
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */
