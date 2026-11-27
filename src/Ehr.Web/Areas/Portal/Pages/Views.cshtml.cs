@@ -42,9 +42,6 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
     // Asked for a page past the views there are, such as from an old link: the page offers the newest instead.
     public bool PastTheEnd { get; private set; }
 
-    // Whose record this is, when it isn't the signed-in account's own (FR-19).
-    public string? ActingFor => subject.Acting?.PatientName;
-
     public bool Own => subject.Acting is null;
 
     // The patient always; a proxy only when the patient allowed them sensitive items. Only these are shown views from
@@ -101,7 +98,7 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
 
             var first = views[start];
             var sensitive = views.Skip(start).Take(i - start).Any(view => view.Sensitive);
-            lines.Add(new ViewLine(Who(first, own), Role(first.Role), PartWords(first.Part, own, i - start, sensitive), first.Emergency, first.OccurredAt, first.Who));
+            lines.Add(new ViewLine(Who(first, own), Role(first.Role), PartWords(first.Part, i - start, sensitive), first.Emergency, first.OccurredAt, first.Who));
             start = i;
         }
 
@@ -133,86 +130,72 @@ public class ViewsModel(PortalSubject subject, PhiReader phi) : PageModel
         _ => "member of staff",
     };
 
-    // A part's words: the patient's and a proxy's for one view; for a counted part, the same with how many ("{0}"), for
-    // a line of several; and, for a part a view of which can show the patient's sensitive items, the words for a line
-    // that did. A proxy without sensitive items or messages is never given a part that would tell them of either: the
-    // database names such a view "record" (42-record-views.sql).
-    public sealed record Wording(string Own, string Proxy, string? OwnMany = null, string? ProxyMany = null, Wording? Sensitive = null)
+    // A part's words for one view, named as the page or list it was, the same for the patient and a proxy; for a counted
+    // part, the same with how many ("{0}"), for a line of several; and, for a part a view of which can show the patient's
+    // sensitive items, the words for a line that did. A proxy without sensitive items or messages is never given a part
+    // that would tell them of either: the database names such a view "record" (42-record-views.sql).
+    public sealed record Wording(string One, string? Many = null, Wording? Sensitive = null)
     {
-        public bool Counted => OwnMany is not null;
+        public bool Counted => Many is not null;
     }
 
     // Counted: the words, then how many times.
-    static Wording Counted(string own, string proxy, Wording? sensitive = null) => new(own, proxy, own + ", {0} times", proxy + ", {0} times", sensitive);
+    static Wording Counted(string words, Wording? sensitive = null) => new(words, words + ", {0} times", sensitive);
 
     // One line a minute, however many reads its page recorded.
-    static Wording Once(string own, string proxy, Wording? sensitive = null) => new(own, proxy, Sensitive: sensitive);
+    static Wording Once(string words, Wording? sensitive = null) => new(words, Sensitive: sensitive);
 
     // The words for each part the database names, in one place: the parts a read is recorded for (AuditParts, step 13c2),
     // and those a view recorded without its part is named by (RecordViewParts), which are as before that step. One the
     // page doesn't know, as from a database newer than the app during a deploy, is the record.
     internal static readonly Dictionary<string, Wording> Parts = new()
     {
-        [AuditParts.Chart] = Once("Your chart, with the list of your visit notes", "The chart, with the list of visit notes",
-            Once("Your chart, with the list of your visit notes, including sensitive items",
-                "The chart, with the list of visit notes, including sensitive items")),
-        [AuditParts.Lists] = Counted("Your allergies, medications and diagnoses", "The allergies, medications and diagnoses",
-            Counted("Your allergies, medications and diagnoses, with the sensitive ones", "The allergies, medications and diagnoses, with the sensitive ones")),
-        [AuditParts.Orders] = Counted("Your orders for tests and medicines", "The orders for tests and medicines"),
-        [AuditParts.Results] = Counted("Your test results", "The test results"),
-        [AuditParts.Vitals] = Counted("Your vital signs", "The vital signs"),
-        [AuditParts.Search] = Counted("Your name, in a patient search", "The patient's name, in a patient search"),
-        [AuditParts.Panel] = Counted("Your name, in their list of patients", "The patient's name, in their list of patients"),
-        [AuditParts.Schedule] = Counted("Your name, on their schedule", "The patient's name, on their schedule"),
-        [AuditParts.Inbox] = Counted("Your name, on their task list", "The patient's name, on their task list"),
-        [AuditParts.Appointments] = Counted("Your appointments", "The appointments"),
-        [AuditParts.Home] = Counted("Your portal home page, with your appointments", "The portal home page, with the appointments"),
-        [AuditParts.Conversations] = Counted("Your messages", "The messages"),
-        [AuditParts.Access] = Counted("Who you share your record with", "Who the record is shared with"),
-        [AuditParts.VisitNote] = Once("A visit note", "A visit note", Once("A visit note, including sensitive items", "A visit note, including sensitive items")),
-        [AuditParts.NoteDraft] = Once("A visit note in progress", "A visit note in progress"),
-        [AuditParts.Offline] = Once("Your chart, saved on a clinician's computer to use offline", "The chart, saved on a clinician's computer to use offline"),
-        [AuditParts.Fhir] = Counted("Your record, through the clinic's connection for health apps (FHIR)", "The record, through the clinic's connection for health apps (FHIR)",
-            Counted("Your record, including sensitive items, through the clinic's connection for health apps (FHIR)",
-                "The record, including sensitive items, through the clinic's connection for health apps (FHIR)")),
-        [AuditParts.Summaries] = Once("Your visit summaries", "The visit summaries", Once("Your visit summaries, with the sensitive ones", "The visit summaries, with the sensitive ones")),
-        [AuditParts.Printable] = Once("Your record, as a page to print", "The record, as a page to print",
-            Once("Your record, as a page to print, including sensitive items", "The record, as a page to print, including sensitive items")),
-        [AuditParts.Download] = new("Your record, downloaded", "The record, downloaded", "Your record, downloaded {0} times", "The record, downloaded {0} times",
-            new("Your record, including sensitive items, downloaded", "The record, including sensitive items, downloaded",
-                "Your record, including sensitive items, downloaded {0} times", "The record, including sensitive items, downloaded {0} times")),
-        [AuditParts.Views] = Counted("Who viewed your record", "Who viewed the record"),
-        [AuditParts.Refills] = Counted("Your refill requests", "The refill requests",
-            Counted("Your refill requests, with the sensitive ones", "The refill requests, with the sensitive ones")),
+        [AuditParts.Chart] = Once("Chart", Once("Chart, with sensitive items")),
+        [AuditParts.Lists] = Counted("Allergies, medications and diagnoses", Counted("Allergies, medications and diagnoses, with sensitive items")),
+        [AuditParts.Orders] = Counted("Test and medicine orders"),
+        [AuditParts.Results] = Counted("Test results"),
+        [AuditParts.Vitals] = Counted("Vital signs"),
+        [AuditParts.Search] = Counted("Name in a patient search"),
+        [AuditParts.Panel] = Counted("Name on a patient list"),
+        [AuditParts.Schedule] = Counted("Name on a schedule"),
+        [AuditParts.Inbox] = Counted("Name on a task list"),
+        [AuditParts.Appointments] = Counted("Appointments"),
+        [AuditParts.Home] = Counted("Home page"),
+        [AuditParts.Conversations] = Counted("Messages"),
+        [AuditParts.Access] = Counted("Sharing"),
+        [AuditParts.VisitNote] = Once("Visit note", Once("Visit note, with sensitive items")),
+        [AuditParts.NoteDraft] = Once("Draft visit note"),
+        [AuditParts.Offline] = Once("Chart, saved for offline use"),
+        [AuditParts.Fhir] = Counted("Record, through the health app connection (FHIR)", Counted("Record with sensitive items, through the health app connection (FHIR)")),
+        [AuditParts.Summaries] = Once("Visit summaries", Once("Visit summaries, with sensitive items")),
+        [AuditParts.Printable] = Once("Printable record", Once("Printable record, with sensitive items")),
+        [AuditParts.Download] = Counted("Record download", Counted("Record download, with sensitive items")),
+        [AuditParts.Views] = Counted("Who viewed the record"),
+        [AuditParts.Refills] = Counted("Refill requests", Counted("Refill requests, with sensitive items")),
         // Pre-visit forms (step 13e), always sensitive items. A view that showed them is a view of sensitive items; a
         // plain read is a forms page that showed none of them (the clinician's with them hidden, which shows how many,
         // or the portal's for a session that may not see them, which shows none), worded as that page. Counted as views,
         // never as forms. Nothing records a read of a form's own rows (they share this key, by their tables): if one
         // ever did as a plain read, it would be worded as the page with the forms hidden, since only a read of sensitive
         // items is marked sensitive (42-record-views.sql).
-        [AuditParts.Forms] = Counted("Your pre-visit forms list, without the forms", "The pre-visit forms list, without the forms",
-            Counted("Your pre-visit forms", "The pre-visit forms")),
-        [RecordViewParts.Record] = new("Your record", "The record", "Your record, {0} times", "The record, {0} times"),
-        [RecordViewParts.RecordSensitive] = new("Your record, including sensitive items", "The record, including sensitive items",
-            "Your record, including sensitive items, {0} times", "The record, including sensitive items, {0} times"),
-        [RecordViewParts.DownloadSensitive] = new("Your record, including sensitive items, downloaded", "The record, including sensitive items, downloaded",
-            "Your record, including sensitive items, downloaded {0} times", "The record, including sensitive items, downloaded {0} times"),
-        [RecordViewParts.Note] = new("A visit note", "A visit note", "{0} visit notes", "{0} visit notes"),
-        [RecordViewParts.Summary] = new("A visit summary", "A visit summary", "{0} visit summaries", "{0} visit summaries"),
-        [RecordViewParts.Messages] = new("A conversation in your messages", "A conversation in the messages",
-            "{0} conversations in your messages", "{0} conversations in the messages"),
-        [RecordViewParts.LabOrder] = new("A lab order, sent to the lab", "A lab order, sent to the lab", "{0} lab orders, sent to the lab", "{0} lab orders, sent to the lab"),
+        [AuditParts.Forms] = Counted("Pre-visit forms list, without the forms", Counted("Pre-visit forms")),
+        [RecordViewParts.Record] = Counted("Record"),
+        [RecordViewParts.RecordSensitive] = Counted("Record, with sensitive items"),
+        [RecordViewParts.DownloadSensitive] = Counted("Record download, with sensitive items"),
+        [RecordViewParts.Note] = new("Visit note", "{0} visit notes"),
+        [RecordViewParts.Summary] = new("Visit summary", "{0} visit summaries"),
+        [RecordViewParts.Messages] = new("Message conversation", "{0} message conversations"),
+        [RecordViewParts.LabOrder] = new("Lab order", "{0} lab orders"),
     };
 
     static Wording Words(string part) => Parts.GetValueOrDefault(part) ?? Parts[RecordViewParts.Record];
 
-    // The words for a line: a part's, the patient's or a proxy's, for how many views, and whether any showed the patient's
-    // sensitive items (said by the part's own name when it was recorded without one: "record-sensitive").
-    internal static string PartWords(string part, bool own, int count, bool sensitive)
+    // The words for a line: a part's, for how many views, and whether any showed the patient's sensitive items (said by
+    // the part's own name when it was recorded without one: "record-sensitive").
+    internal static string PartWords(string part, int count, bool sensitive)
     {
         var words = Words(part);
         words = sensitive && words.Sensitive is { } shown ? shown : words;
-        var many = own ? words.OwnMany : words.ProxyMany;
-        return count > 1 && many is not null ? string.Format(CultureInfo.InvariantCulture, many, count) : own ? words.Own : words.Proxy;
+        return count > 1 && words.Many is not null ? string.Format(CultureInfo.InvariantCulture, words.Many, count) : words.One;
     }
 }

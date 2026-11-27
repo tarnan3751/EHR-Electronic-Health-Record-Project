@@ -272,7 +272,7 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(["patients forms"], await ReadsAsync(visit.Patient, without.Account, since));
         var mine = RecordViewTests.Lines(await RecordViewTests.PageAsync(portal))
             .Where(line => line.StartsWith($"proxy | {without.Email} | ", StringComparison.Ordinal)).Select(line => string.Join(" | ", line.Split(" | ").Take(3)));
-        Assert.Equal([$"proxy | {without.Email} | Your pre-visit forms list, without the forms", $"proxy | {without.Email} | Your portal home page, with your appointments"], mine);
+        Assert.Equal([$"proxy | {without.Email} | Pre-visit forms list, without the forms", $"proxy | {without.Email} | Home page"], mine);
         Assert.DoesNotContain(RecordViewTests.Lines(await RecordViewTests.PageAsync(without.Client)), line => line.Contains("forms", StringComparison.Ordinal));
     }
 
@@ -301,7 +301,7 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         var minutes = (await PreVisitFormTests.QueryAsync(apps,
             "SELECT to_char(date_trunc('minute', occurred_at), 'HH24:MI') FROM ehr.audit_events WHERE actor_id = @twice AND patient_id = @patient ORDER BY occurred_at",
             ("twice", twice.Id), ("patient", visit.Patient))).Distinct().Count();
-        const string Page = "staff | Dr. Forms Twice, clinician | Your pre-visit forms list, without the forms";
+        const string Page = "staff | Dr. Forms Twice, clinician | Pre-visit forms list, without the forms";
         var lines = RecordViewTests.Lines(await RecordViewTests.PageAsync((await PreVisitFormTests.PortalAsync(apps, visit)).Client))
             .Where(line => line.Contains("Dr. Forms Twice", StringComparison.Ordinal)).Select(line => string.Join(" | ", line.Split(" | ").Take(3)));
         Assert.Equal(minutes == 1 ? [Page + ", 2 times"] : [Page, Page], lines);
@@ -347,8 +347,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, covering.Id));
         string[] Holder(string html) => [.. RecordViewTests.Lines(html).Where(line => line.Contains("Dr. Forms Holder", StringComparison.Ordinal))
             .Select(line => string.Join(" | ", line.Split(" | ").Take(3)))];
-        Assert.Equal(["staff | Dr. Forms Holder, clinician | Your pre-visit forms"], Holder(await RecordViewTests.PageAsync(portal)));
-        Assert.Equal(["staff | Dr. Forms Holder, clinician | The pre-visit forms"], Holder(await RecordViewTests.PageAsync(allowed.Client)));
+        Assert.Equal(["staff | Dr. Forms Holder, clinician | Pre-visit forms"], Holder(await RecordViewTests.PageAsync(portal)));
+        Assert.Equal(["staff | Dr. Forms Holder, clinician | Pre-visit forms"], Holder(await RecordViewTests.PageAsync(allowed.Client)));
         Assert.Empty(Holder(await RecordViewTests.PageAsync(without.Client)));
     }
 
@@ -494,8 +494,8 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 
     // The parts are one list wherever they are kept: the code's (AuditParts), the database's check, the cloud app's
     // allow-list and the portal's words, none with a part the others don't have, in either direction; the words also
-    // name every part a view recorded without one is named by, and say "including sensitive items" (or "with the
-    // sensitive ones") for every part the allow-list takes on a read of them.
+    // name every part a view recorded without one is named by, and say "with sensitive items" for every part the
+    // allow-list takes on a read of them.
     [Fact]
     public async Task The_parts_are_one_list_in_the_code_the_database_the_cloud_app_and_the_words()
     {
@@ -517,14 +517,10 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
         // Pre-visit forms, always sensitive items: a plain read is a forms page that showed none, a view of sensitive
         // items is the forms; counted as views, never as forms.
         Assert.Equal(
+            ["Pre-visit forms list, without the forms", "Pre-visit forms list, without the forms, 2 times", "Pre-visit forms", "Pre-visit forms, 3 times"],
             [
-                "Your pre-visit forms list, without the forms", "The pre-visit forms list, without the forms",
-                "Your pre-visit forms list, without the forms, 2 times", "Your pre-visit forms", "The pre-visit forms", "The pre-visit forms, 3 times",
-            ],
-            [
-                ViewsModel.PartWords(AuditParts.Forms, own: true, count: 1, sensitive: false), ViewsModel.PartWords(AuditParts.Forms, own: false, count: 1, sensitive: false),
-                ViewsModel.PartWords(AuditParts.Forms, own: true, count: 2, sensitive: false), ViewsModel.PartWords(AuditParts.Forms, own: true, count: 1, sensitive: true),
-                ViewsModel.PartWords(AuditParts.Forms, own: false, count: 1, sensitive: true), ViewsModel.PartWords(AuditParts.Forms, own: false, count: 3, sensitive: true),
+                ViewsModel.PartWords(AuditParts.Forms, count: 1, sensitive: false), ViewsModel.PartWords(AuditParts.Forms, count: 2, sensitive: false),
+                ViewsModel.PartWords(AuditParts.Forms, count: 1, sensitive: true), ViewsModel.PartWords(AuditParts.Forms, count: 3, sensitive: true),
             ]);
     }
 
@@ -533,9 +529,9 @@ public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
     [Fact]
     public void A_part_the_page_has_no_words_for_is_the_record()
     {
-        Assert.Equal("Your record", ViewsModel.PartWords("from-a-newer-database", own: true, count: 1, sensitive: false));
-        Assert.Equal("The record", ViewsModel.PartWords("from-a-newer-database", own: false, count: 1, sensitive: true));
-        Assert.Equal("Your record, 3 times", ViewsModel.PartWords("from-a-newer-database", own: true, count: 3, sensitive: false));
+        Assert.Equal("Record", ViewsModel.PartWords("from-a-newer-database", count: 1, sensitive: false));
+        Assert.Equal("Record", ViewsModel.PartWords("from-a-newer-database", count: 1, sensitive: true));
+        Assert.Equal("Record, 3 times", ViewsModel.PartWords("from-a-newer-database", count: 3, sensitive: false));
     }
 
     // A clinician's day and inbox name the patient: each a read of the patient, as part of that list.

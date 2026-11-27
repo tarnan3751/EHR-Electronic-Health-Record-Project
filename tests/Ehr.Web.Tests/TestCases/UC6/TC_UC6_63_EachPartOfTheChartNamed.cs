@@ -23,16 +23,15 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test writes and signs a note, then opens each page.
 //   2. The patient opens Who viewed my record.
-// Expected result: Dr. Test's lines name, each once or more and nothing else: "A visit note in progress", "Your chart,
-//   with the list of your visit notes", "Your allergies, medications and diagnoses", "Your orders for tests
-//   and medicines", "Your vital signs", "Your appointments", "Your messages", "Who you share your record with"; no line
-//   is "A visit note" or counts visit notes. Dr. Count's are "Your vital signs, 3 times" and one "Your chart: ..." line.
+// Expected result: Dr. Test's lines name, each once or more and nothing else: "Draft visit note", "Chart", "Allergies,
+//   medications and diagnoses", "Test and medicine orders", "Vital signs", "Appointments", "Messages", "Sharing"; no
+//   line is "Visit note" or counts visit notes. Dr. Count's are "Vital signs, 3 times" and one "Chart" line.
 // Creator: Tahseen Arnan
 public class TC_UC6_63_EachPartOfTheChartNamed(WebApps apps) : IClassFixture<WebApps>
 {
     static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
-    const string Chart = "Your chart, with the list of your visit notes";
+    const string Chart = "Chart";
 
     [Fact]
     public async Task Each_page_of_the_chart_is_named_and_the_chart_is_one_line()
@@ -59,12 +58,12 @@ public class TC_UC6_63_EachPartOfTheChartNamed(WebApps apps) : IClassFixture<Web
         Assert.Equal(
             new[]
             {
-                "A visit note in progress", Chart, "Your allergies, medications and diagnoses", "Your orders for tests and medicines", "Your vital signs",
-                "Your appointments", "Your messages", "Who you share your record with",
+                "Draft visit note", Chart, "Allergies, medications and diagnoses", "Test and medicine orders", "Vital signs",
+                "Appointments", "Messages", "Sharing",
             }.Order(StringComparer.Ordinal),
             Of("Dr. Test").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
-        Assert.DoesNotContain(lines, line => line.Contains("| A visit note |", StringComparison.Ordinal) || line.Contains("visit notes |", StringComparison.Ordinal)
+        Assert.DoesNotContain(lines, line => line.Contains("| Visit note |", StringComparison.Ordinal) || line.Contains("visit notes |", StringComparison.Ordinal)
             && !line.Contains(Chart, StringComparison.Ordinal));
-        Assert.Equal(["Your vital signs, 3 times", Chart], Of("Dr. Count"));
+        Assert.Equal(["Vital signs, 3 times", Chart], Of("Dr. Count"));
     }
 }

@@ -1,36 +1,27 @@
 @page "/portal/views"
 @model ViewsModel
 @{
-    ViewData["Title"] = Model.ActingFor is { } name ? $"Who viewed {name}'s record" : "Who viewed my record";
     var own = Model.Own;
+    ViewData["Title"] = own ? "Who viewed my record" : "Who viewed this record";
 }
 <div class="sc-pagehead"><a asp-page="/Index" class="sc-back">Back to home</a></div>
 <h1>@ViewData["Title"]</h1>
 @if (!Model.Available)
 {
-    <p class="sc-notice sc-notice--danger">@(own ? "Who viewed your record is" : "Who viewed the record is") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(own ? "Who viewed your record is" : "Who viewed the record is") not available right now.</p>
 }
 else
 {
-    @* What is listed, in the patient's words: every time the record or part of it was shown to someone, which the audit
-       log records, over the window the database looks at (db/policies/42-record-views.sql). A proxy is told whose views
-       they are shown in words that say nothing of anyone else: every staff member's when the patient allowed them
-       sensitive items, otherwise the care team's alone, the lab's and their own. *@
-    <p class="sc-muted">
-        @(own ? "Each time someone saw your record, or part of it,"
-            : Model.MaySeeSensitive ? "Each time the clinic's staff, the lab or you saw the record, or part of it,"
-            : "Each time the patient's care team, the lab or you saw the record, or part of it,")
-        in the last @ViewsModel.Months months, newest first. @(own ? "Your own views are listed too. " : "")This includes a clinician's search, list or schedule
-        that showed @(own ? "your" : "the patient's") name. A view from the last minute may not be listed yet.
-    </p>
+    @* The window the database looks at (db/policies/42-record-views.sql). *@
+    <p class="sc-muted">Last @ViewsModel.Months months.</p>
     @* Only to someone who may be shown a view through emergency access: the patient, and a proxy with sensitive items. *@
     @if (Model.MaySeeSensitive && Model.Lines.Any(line => line.Emergency))
     {
-        <p class="sc-notice sc-notice--warning" data-emergency="explained"><span class="sc-notice__state">Emergency access.</span> A clinician outside @(own ? "your" : "the patient's") care team opened the record and gave a reason. The clinic reviews each one.</p>
+        <p class="sc-notice sc-notice--warning" data-emergency="explained"><span class="sc-notice__state">Emergency access.</span> A clinician outside @(own ? "your" : "the patient's") care team opened the record. The clinic reviews each one.</p>
     }
     @if (Model.Lines.Count == 0)
     {
-        <p class="sc-empty">@(Model.PastTheEnd ? "No more views to show." : own ? "Nobody has viewed your record yet." : "Nobody has viewed the record yet.")</p>
+        <p class="sc-empty">@(Model.PastTheEnd ? "No more views." : "No views yet.")</p>
         @if (Model.PastTheEnd)
         {
             <p><a asp-page="/Views">Newest views</a></p>

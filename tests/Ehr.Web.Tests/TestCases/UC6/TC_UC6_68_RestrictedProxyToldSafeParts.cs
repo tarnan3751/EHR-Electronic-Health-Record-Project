@@ -8,9 +8,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test Case ID: TC-UC6-68
 // Purpose / scenario: Someone the patient shares their record with, without sensitive items, is told which part of the
 //   record a care-team member viewed only when that can't hint at a change or an item kept from them: the chart and the
-//   vital signs, but not the lists, orders, who the record is shared with, or a note being written, whose views are "The
-//   record" to them, as every view was before parts were recorded, and are one line with how many, as views of one
-//   part in one minute are. Which lines they see is unchanged.
+//   vital signs, but not the lists, orders, who the record is shared with, or a note being written, whose views are
+//   "Record" to them, as every view was before parts were recorded, and are one line with how many, as views of one part
+//   in one minute are. Which lines they see is unchanged.
 // Type: Functional (alternative flow: proxies)
 // Requirements: proposed FR-57, FR-19
 // Use case: UC 6, View my results and appointments in the portal
@@ -23,10 +23,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. The patient opens Who viewed my record.
 //   2. The proxy opens Who viewed the record.
-// Expected result: Step 1: Dr. Test's lines are, newest first, "A visit note in progress", "Who you share your record
-//   with", "Your orders for tests and medicines", "Your allergies, medications and diagnoses", "Your vital signs", "Your
-//   chart, with the list of your visit notes". Step 2: "The record, 4 times", "The vital signs", "The chart, with
-//   the list of visit notes".
+// Expected result: Step 1: Dr. Test's lines are, newest first, "Draft visit note", "Sharing", "Test and medicine
+//   orders", "Allergies, medications and diagnoses", "Vital signs", "Chart". Step 2: "Record, 4 times", "Vital signs",
+//   "Chart".
 // Creator: Tahseen Arnan
 public class TC_UC6_68_RestrictedProxyToldSafeParts(WebApps apps) : IClassFixture<WebApps>
 {
@@ -57,12 +56,12 @@ public class TC_UC6_68_RestrictedProxyToldSafeParts(WebApps apps) : IClassFixtur
         // Step 1.
         Assert.Equal(
             [
-                "A visit note in progress", "Who you share your record with", "Your orders for tests and medicines", "Your allergies, medications and diagnoses",
-                "Your vital signs", "Your chart, with the list of your visit notes",
+                "Draft visit note", "Sharing", "Test and medicine orders", "Allergies, medications and diagnoses",
+                "Vital signs", "Chart",
             ],
             PartsOf(await PageAsync(patient.Client), "staff"));
 
         // Step 2.
-        Assert.Equal(["The record, 4 times", "The vital signs", "The chart, with the list of visit notes"], PartsOf(await PageAsync(without.Client), "staff"));
+        Assert.Equal(["Record, 4 times", "Vital signs", "Chart"], PartsOf(await PageAsync(without.Client), "staff"));
     }
 }

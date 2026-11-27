@@ -6,7 +6,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test Case ID: TC-UC6-64
 // Purpose / scenario: A visit note's views are named as a note being written and a signed note, which shows the
 //   patient's sensitive items when the note is sensitive; a proxy without sensitive items is never told of either, and
-//   sees those pages' views of the record as "The record".
+//   sees those pages' views of the record as "Record".
 // Type: Functional (alternative flow: visit notes)
 // Requirements: proposed FR-57, FR-19
 // Use case: UC 6, View my results and appointments in the portal
@@ -19,9 +19,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test writes and signs the note, then opens it.
 //   2. The patient and each proxy open Who viewed the record.
-// Expected result: The patient's lines from Dr. Test include "A visit note in progress" and "A visit note, including
-//   sensitive items"; the proxy with sensitive items has the same, in their words; the proxy without has neither, nor
-//   any line saying "visit note" or "sensitive", and has "The record" for those pages instead.
+// Expected result: The patient's lines from Dr. Test include "Draft visit note" and "Visit note, with sensitive items";
+//   the proxy with sensitive items has the same; the proxy without has neither, nor any line saying "visit note" or
+//   "sensitive", and has "Record" for those pages instead.
 // Creator: Tahseen Arnan
 public class TC_UC6_64_VisitNotesNamed(WebApps apps) : IClassFixture<WebApps>
 {
@@ -40,13 +40,13 @@ public class TC_UC6_64_VisitNotesNamed(WebApps apps) : IClassFixture<WebApps>
 
         // Step 2.
         var own = PartsOf(await PageAsync(patient.Client), "staff");
-        Assert.Contains("A visit note in progress", own);
-        Assert.Contains("A visit note, including sensitive items", own);
+        Assert.Contains("Draft visit note", own);
+        Assert.Contains("Visit note, with sensitive items", own);
         var full = PartsOf(await PageAsync(allowed.Client), "staff");
-        Assert.Contains("A visit note in progress", full);
-        Assert.Contains("A visit note, including sensitive items", full);
+        Assert.Contains("Draft visit note", full);
+        Assert.Contains("Visit note, with sensitive items", full);
         var restricted = PartsOf(await PageAsync(without.Client), "staff");
-        Assert.Contains("The record", restricted.Select(Uncounted));
-        Assert.DoesNotContain(restricted, part => part.StartsWith("A visit note", StringComparison.Ordinal) || part.Contains("sensitive", StringComparison.Ordinal));
+        Assert.Contains("Record", restricted.Select(Uncounted));
+        Assert.DoesNotContain(restricted, part => part.Contains("visit note", StringComparison.OrdinalIgnoreCase) || part.Contains("sensitive", StringComparison.Ordinal));
     }
 }

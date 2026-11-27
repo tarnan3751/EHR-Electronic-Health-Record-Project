@@ -7,7 +7,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 
 // Test Case ID: TC-UC6-44
 // Purpose / scenario: Someone the patient shares their record with sees who viewed it as their access allows: the care
-//   team's views and their own, in words about "the record"; views of sensitive items and of visit notes only when the
+//   team's views and their own, each named by its page; views of sensitive items and of visit notes only when the
 //   patient allowed them sensitive items; views of a conversation only when their access includes messages; and never
 //   the patient's own views or another proxy's, not even as a line without a name.
 // Type: Functional (alternative flow: proxies)
@@ -23,9 +23,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test makes the views.
 //   2. Each proxy opens Who viewed this record.
-// Expected result: Each page is titled "Who viewed Synthetic Shapes's record", has Dr. Test's "The chart, with the list
-//   of visit notes" (including sensitive items, for a proxy who may see them) and the proxy's own views of the portal's home
-//   as "You", and no line of anyone else's. Sensitive items and messages: also "A visit note" and "The messages".
+// Expected result: Each page is titled "Who viewed this record", under the band naming Synthetic Shapes, has Dr. Test's
+//   "Chart" (with sensitive items, for a proxy who may see them) and the proxy's own views of the portal's home as "You",
+//   and no line of anyone else's. Sensitive items and messages: also "Visit note" and "Messages".
 //   Messages only: no line with sensitive items and no visit note. Sensitive items only: no conversation.
 // Creator: Tahseen Arnan
 public class TC_UC6_44_WhoViewedAsAProxy(WebApps apps) : IClassFixture<WebApps>
@@ -48,23 +48,23 @@ public class TC_UC6_44_WhoViewedAsAProxy(WebApps apps) : IClassFixture<WebApps>
         await session.Client.GetStringAsync($"{chart}/messages/{thread}", Cancel);
 
         // Step 2.
-        const string Sensitive = "including sensitive items";
-        const string Note = "| A visit note";
-        const string Conversation = "| The messages";
+        const string Sensitive = "with sensitive items";
+        const string Note = "| Visit note";
+        const string Conversation = "| Messages";
         foreach (var (proxy, sensitive, messages) in new[] { (full, true, true), (plain, false, true), (recordOnly, true, false) })
         {
             var html = await PageAsync(proxy.Client);
             var lines = Lines(html);
-            Assert.Contains("Who viewed Synthetic Shapes's record", Words(html));
+            Assert.Contains("You're viewing Synthetic Shapes's record", Words(html));
             // The chart, opened with and without sensitive items in the same minute: one line, with them for a proxy who may
             // see them.
-            Assert.Contains(lines, line => line.StartsWith("staff | Dr. Test, clinician | The chart", StringComparison.Ordinal));
-            Assert.Contains(lines, line => line.StartsWith("you | You | The portal home page", StringComparison.Ordinal));
+            Assert.Contains(lines, line => line.StartsWith("staff | Dr. Test, clinician | Chart", StringComparison.Ordinal));
+            Assert.Contains(lines, line => line.StartsWith("you | You | Home page", StringComparison.Ordinal));
             Assert.All(lines, line => Assert.Matches("^(staff|you) ", line));
             Assert.Equal(sensitive, lines.Any(line => line.Contains(Sensitive, StringComparison.Ordinal)));
             Assert.Equal(sensitive, lines.Any(line => line.Contains(Note, StringComparison.Ordinal)));
             Assert.Equal(messages, lines.Any(line => line.Contains(Conversation, StringComparison.Ordinal)));
-            Assert.DoesNotContain("Your record", html);
+            Assert.Contains("<h1>Who viewed this record</h1>", html);
         }
     }
 }

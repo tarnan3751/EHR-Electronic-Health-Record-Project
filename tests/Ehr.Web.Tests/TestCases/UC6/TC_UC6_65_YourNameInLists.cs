@@ -8,7 +8,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test Case ID: TC-UC6-65
 // Purpose / scenario: A clinician's list that named the patient is named as such: a search, their list of patients,
 //   their day's appointments, their list of tasks. A proxy without sensitive items is told of each but the list of
-//   tasks, which may hold an item about something kept from them, and reads it as "The record".
+//   tasks, which may hold an item about something kept from them, and reads it as "Record".
 // Type: Functional (alternative flow: lists that name the patient)
 // Requirements: proposed FR-57
 // Use case: UC 6, View my results and appointments in the portal
@@ -21,9 +21,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Lists opens their patients, searches for the patient, opens their day and their inbox.
 //   2. The patient and the proxy open Who viewed the record.
-// Expected result: The patient's lines from Dr. Lists are, each once or more: "Your name, in their list of patients",
-//   "Your name, in a patient search", "Your name, on their schedule", "Your name, on their list of
-//   tasks". The proxy's are "The patient's name, ..." for the first three and "The record" for the last.
+// Expected result: The patient's lines from Dr. Lists are, each once or more: "Name on a patient list", "Name in a
+//   patient search", "Name on a schedule", "Name on a task list". The proxy's are the same for the first three and
+//   "Record" for the last.
 // Creator: Tahseen Arnan
 public class TC_UC6_65_YourNameInLists(WebApps apps) : IClassFixture<WebApps>
 {
@@ -46,11 +46,11 @@ public class TC_UC6_65_YourNameInLists(WebApps apps) : IClassFixture<WebApps>
 
         // Step 2.
         Assert.Equal(
-            new[] { "Your name, in their list of patients", "Your name, in a patient search", "Your name, on their schedule", "Your name, on their task list" }
+            new[] { "Name on a patient list", "Name in a patient search", "Name on a schedule", "Name on a task list" }
                 .Order(StringComparer.Ordinal),
             PartsOf(await PageAsync(patient.Client), "staff").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
         Assert.Equal(
-            new[] { "The patient's name, in their list of patients", "The patient's name, in a patient search", "The patient's name, on their schedule", "The record" }
+            new[] { "Name on a patient list", "Name in a patient search", "Name on a schedule", "Record" }
                 .Order(StringComparer.Ordinal),
             PartsOf(await PageAsync(without.Client), "staff").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
     }
