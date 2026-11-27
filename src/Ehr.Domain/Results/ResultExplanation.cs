@@ -61,8 +61,8 @@ public static class ResultExplanation
         ResultFlag.High => $"Your result is above the normal range ({Range(result)}).",
         ResultFlag.Low => $"Your result is below the normal range ({Range(result)}).",
         ResultFlag.Normal => $"Your result is in the normal range ({Range(result)}).",
-        _ when result.Value is null => "This result has no number to compare. Read your care team's note, or ask them what it means for you.",
-        _ => "This test has no normal range to compare with. Your care team can tell you what it means for you.",
+        _ when result.Value is null => "This result has no number to compare. Ask your care team what it means.",
+        _ => "This test has no normal range to compare with. Ask your care team what it means.",
     };
 
     // Up to four decimal places, as stored, without trailing zeros: 6.9, not 6.9000.

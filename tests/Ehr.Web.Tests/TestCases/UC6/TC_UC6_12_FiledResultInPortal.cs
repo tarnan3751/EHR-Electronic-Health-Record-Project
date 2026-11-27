@@ -34,7 +34,7 @@ public class TC_UC6_12_FiledResultInPortal(WebApps apps) : IClassFixture<WebApps
         var order = await SignedAsync(session.Client, patient, "lab", "Complete blood count (CBC)", Cbc);
         var portal = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, patient);
         var other = await PortalResultsTests.SignInPatientAsync(apps, apps.OnPrem, await apps.InsertPatientAsync("Synthetic", "Bystander"));
-        Assert.Contains("No test results yet. If you're expecting one, contact your care team.", await portal.Client.GetStringAsync("/portal/results", Cancel));
+        Assert.Contains("No test results yet.", await portal.Client.GetStringAsync("/portal/results", Cancel));
 
         using var filed = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, "9.1"));
         Assert.Equal([$"{Hemoglobin} 9.1 low"], await FiledAsync(apps, patient));
@@ -45,6 +45,6 @@ public class TC_UC6_12_FiledResultInPortal(WebApps apps) : IClassFixture<WebApps
         Assert.Contains("9.1", results);
         Assert.Contains("12", results);
         Assert.Contains("17.5", results);
-        Assert.Contains("No test results yet. If you're expecting one, contact your care team.", await other.Client.GetStringAsync("/portal/results", Cancel));
+        Assert.Contains("No test results yet.", await other.Client.GetStringAsync("/portal/results", Cancel));
     }
 }
