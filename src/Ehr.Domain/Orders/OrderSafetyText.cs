@@ -9,10 +9,6 @@ namespace Ehr.Domain.Orders;
 // reference, and every warning says where it comes from so the clinician can look it up.
 public static class OrderSafetyText
 {
-    public const string Disclaimer =
-        "Decision support for this demonstration system, not a complete clinical reference. Only coded allergies and medications are checked, and only items with a drug code, "
-        + "and no warning doesn't mean a combination is safe.";
-
     // Where DDInter can be consulted when there is internet. Its download files don't give addresses for single pairs.
     public const string DdInterChecker = "https://ddinter2.scbdd.com/inter-checker/";
 
