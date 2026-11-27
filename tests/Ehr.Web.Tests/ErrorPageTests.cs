@@ -32,7 +32,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
             var html = await response.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
             Assert.Contains("The search couldn't be completed. Try again in a moment.", html);
-            Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+            Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
             AssertNothingAbout(html, "Ada", "1980-01-01");
         });
     }
@@ -54,7 +54,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
             var html = await response.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
             Assert.Contains("The chart couldn't be loaded. Try again in a moment.", html);
-            Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+            Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
             AssertNothingAbout(html, "Failing", patient.ToString());
         });
 
@@ -80,13 +80,13 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
             Assert.Contains("Something went wrong, and your change may not have been saved. Check before you try again.", html);
             Assert.DoesNotContain("loaded", html);
-            Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+            Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
             AssertNothingAbout(html, "Unsaved", patient.ToString());
         });
     }
 
-    // A chart that doesn't exist asks for a reason first, like any chart off the panel, and then says it couldn't be
-    // loaded. In Development too: only failures keep the developer exception page.
+    // A chart that doesn't exist asks for a reason first, like any chart off the panel, and then says nothing matches
+    // the address. In Development too: only failures keep the developer exception page.
     [Fact]
     public async Task A_chart_that_does_not_exist_says_it_could_not_be_loaded()
     {
@@ -97,8 +97,26 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await response.Content.ReadAsStringAsync(Cancel);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Contains("The chart couldn't be loaded: there is no patient with this ID.", html);
-        Assert.Contains("<a href=\"/patients\">Back to my patients</a>", html);
+        Assert.Contains("No patient, or nothing in their chart, matches this address.", html);
+        Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
+    }
+
+    // A note that doesn't exist, in a chart that does, gets the same page, which says nothing to suggest the patient is
+    // missing.
+    [Fact]
+    public async Task A_note_that_does_not_exist_in_a_real_chart_is_not_called_a_missing_patient()
+    {
+        var clinician = await apps.ClinicianAsync();
+        var patient = await apps.InsertPatientAsync("Synthetic", "Nonote");
+        await apps.AssignAsync(clinician, patient);
+        var session = await SignInAsync(apps.OnPrem, clinician);
+
+        using var response = await session.Client.GetAsync($"/patients/{patient}/notes/{Guid.CreateVersion7()}", Cancel);
+
+        var html = await response.Content.ReadAsStringAsync(Cancel);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("No patient, or nothing in their chart, matches this address.", html);
+        Assert.Contains("<a href=\"/patients\">Back to patients</a>", html);
     }
 
     // A form opened while one account was signed in and sent after another signed in, in this browser: its token is
@@ -118,7 +136,7 @@ public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Contains("<title>Not sent</title>", html);
         Assert.Contains("This form couldn't be sent, so nothing was changed. Open its page again and try once more.", html);
-        Assert.Contains("<a href=\"/\">Back to the start</a>", html);
+        Assert.Contains("<a href=\"/\">Back to home</a>", html);
         Assert.Empty(await apps.RowsAsync(shortcut));
 
         using var htmx = new HttpRequestMessage(HttpMethod.Post, $"{QuickTexts}?handler=Add")

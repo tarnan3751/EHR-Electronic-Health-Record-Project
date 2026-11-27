@@ -44,8 +44,8 @@ public class NotFoundPageTests(WebApps apps) : IClassFixture<WebApps>
         }
 
         // Back to the clinician's patients; an admin, who has none, to the start, which is the staff page.
-        Assert.Contains("<a href=\"/patients\">Back to my patients</a>", await lost.Content.ReadAsStringAsync(Cancel));
-        Assert.Contains("<a href=\"/\">Back to the start</a>", await adminLost.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("<a href=\"/patients\">Back to patients</a>", await lost.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("<a href=\"/\">Back to home</a>", await adminLost.Content.ReadAsStringAsync(Cancel));
     }
 
     [Theory]
@@ -63,7 +63,7 @@ public class NotFoundPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<title>Page not found</title>", html);
         Assert.Contains("There's nothing to show at this address.", Words(html));
         Assert.Contains("sc-appbar--portal", html);
-        Assert.Contains("<a href=\"/portal\">Back to my record</a>", html);
+        Assert.Contains("<a href=\"/portal\">Back to home</a>", html);
     }
 
     // Another patient's message and a message that was never written answer the same, opened or replied to: the page
