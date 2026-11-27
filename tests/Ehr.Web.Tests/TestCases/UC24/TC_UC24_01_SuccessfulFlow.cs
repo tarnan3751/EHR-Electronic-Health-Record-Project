@@ -81,6 +81,7 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Synthetic words of a message", page);
         Assert.DoesNotContain("Synthetic subject", page);
         Assert.Contains("data-review-form", page);
+        Assert.Contains("It's kept with the review and can't be changed.", page);
 
         // 4.
         using (var reviewed = await ReviewAsync(reviewer.Client, access.Id, EmergencyAccessOutcomes.Appropriate, Note))
