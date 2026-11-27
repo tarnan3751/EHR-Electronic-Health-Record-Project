@@ -17,8 +17,6 @@ namespace Ehr.Domain.Phi;
 // record's own, and only when it may see sensitive items (db/policies/30-rls.sql).
 public sealed partial class PhiReader
 {
-    public const string FormRequestsTable = "questionnaire_requests";
-
     public const string FormResponsesTable = "questionnaire_responses";
 
     // The most forms a page lists: more than a patient has in years of visits.

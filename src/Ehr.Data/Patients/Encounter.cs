@@ -62,7 +62,5 @@ public static class EncounterClass
 
     public const string Home = "HH";
 
-    public const string Inpatient = "IMP";
-
     public const string Virtual = "VR";
 }

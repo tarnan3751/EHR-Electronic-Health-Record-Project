@@ -12,8 +12,6 @@ namespace Ehr.Domain.Patients;
 // refuses an ID that is no patient. Issuing one is an audit event.
 public sealed class PatientEnrollments(EhrDbContext db, AuditRecorder audit, CodeHasher hasher)
 {
-    public static readonly TimeSpan Validity = TimeSpan.FromDays(14);
-
     public async Task<string> IssueAsync(Guid patientId, CancellationToken cancellationToken)
     {
         var code = EnrollmentCodes.Generate();

@@ -68,7 +68,7 @@ src/
   Ehr.Web/          ASP.NET Core Razor Pages host: Areas/Clinical, Areas/Portal, Api/Sync, Api/Dictation, Api/Fhir, Api/Lab, Fhir (the FHIR mapping)
   Ehr.Domain/       services, authorization policies, PHI reader, FHIR-shaped models
   Ehr.Data/         EF Core + Dapper on Npgsql: read and write contexts, RLS interceptor
-  Ehr.Design/       Razor class library: the SwiftChart tokens, shared CSS, fonts and logos (wwwroot), shared partials, htmx, Alpine.js
+  Ehr.Design/       Razor class library: the SwiftChart tokens, shared CSS, fonts and logos (wwwroot), shared partials, htmx
   Ehr.Desktop/      Tauri 2 app: src-tauri (Rust shell, SQLCipher, sync) + frontend (with its copy of the shared CSS, fonts and logos)
   Ehr.Lab.Simulator/ the simulated lab: asks the on-prem app for lab orders and files synthetic results, over HTTP only
   Ehr.Dictation/    setup_models.py (downloads both models) and its tests; sidecar (Python: MedASR, K2 Horizon, the checks), schema (note schema and prompt), contract (the sidecar's answers, pinned), llama-server config
@@ -154,7 +154,7 @@ Then run it:
 dotnet run --project src/Ehr.Web
 ```
 
-and open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Receiver uses. It runs as the on-prem app. The first build needs internet access to download htmx and Alpine.js.
+and open http://localhost:5080. It avoids port 5000, which macOS's AirPlay Receiver uses. It runs as the on-prem app. The first build needs internet access to download htmx.
 
 To sign in, the app needs an admin account. Give it the settings the stack gets from `.env`, once, the same way:
 
@@ -395,7 +395,7 @@ There is no `latest` tag: a deployment names the exact commit it runs.
 |---|---|
 | .NET package versions | `Directory.Packages.props` |
 | .NET tools (`dotnet-ef`) | `.config/dotnet-tools.json`; run `dotnet tool restore` once |
-| htmx, Alpine.js (CSP build) | `src/Ehr.Design/libman.json`, restored into `wwwroot/lib` at build and served from our own origin |
+| htmx | `src/Ehr.Design/libman.json`, restored into `wwwroot/lib` at build and served from our own origin |
 | Fonts (Sora, IBM Plex Sans, IBM Plex Mono) and logos | Committed in `src/Ehr.Design/wwwroot/fonts` (WOFF2, with their SIL Open Font Licenses) and `wwwroot/img`, served from our own origin; the brand guide and tokens are in `docs/brand` |
 | Desktop | `src/Ehr.Desktop/src-tauri/Cargo.toml` |
 | Dictation sidecar | `src/Ehr.Dictation/sidecar/pyproject.toml`, locked in its `uv.lock` |

@@ -37,21 +37,11 @@ REVOKE ALL ON FUNCTION ehr.issue_patient_enrollment(uuid, uuid, text) FROM PUBLI
 GRANT EXECUTE ON FUNCTION ehr.issue_patient_enrollment(uuid, uuid, text) TO ehr_app;
 
 -- The one enrollment a code opens, while it is unused and unexpired: its ID and its patient. `legacy` is the hash
--- codes had before they were keyed; such rows are at most fourteen days old and then none is left.
-CREATE OR REPLACE FUNCTION ehr.find_patient_enrollment(hash text, legacy text) RETURNS TABLE (id uuid, patient_id uuid)
-    LANGUAGE sql
-    STABLE
-    SECURITY DEFINER
-    SET search_path = pg_catalog, pg_temp
-AS $$
-    SELECT e.id, e.patient_id FROM ehr.patient_enrollments e
-    WHERE e.code_hash IN (hash, legacy) AND e.redeemed_at IS NULL AND e.expires_at > now()
-    LIMIT 1
-$$;
-REVOKE ALL ON FUNCTION ehr.find_patient_enrollment(text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION ehr.find_patient_enrollment(text, text) TO ehr_app, ehr_read;
+-- codes had before they were keyed; such rows are at most fourteen days old and then none is left. A function of
+-- its own found it without using it up, and the apps never called it: it goes, from a database that has it too.
+DROP FUNCTION IF EXISTS ehr.find_patient_enrollment(text, text);
 
--- Uses that enrollment up: it is marked redeemed, once, and answers as find does. Nothing for a code that is
+-- Uses that enrollment up: it is marked redeemed, once, and answers with its ID and its patient. Nothing for a code that is
 -- unknown, used or expired; of two calls with the same code, the second waits on the row and then gets nothing.
 CREATE OR REPLACE FUNCTION ehr.redeem_patient_enrollment(hash text, legacy text) RETURNS TABLE (id uuid, patient_id uuid)
     LANGUAGE sql

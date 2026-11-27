@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <!-- Razor class library: shared partials plus static assets (tokens, CSS, sprite sheet, htmx, Alpine.js). -->
+    <!-- Razor class library: shared partials plus static assets (tokens, CSS, sprite sheet, htmx). -->
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 

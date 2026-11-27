@@ -19,7 +19,7 @@
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
   </ItemGroup>
 
-  <ItemGroup Label="Restores pinned htmx and Alpine.js at build (see src/Ehr.Design/libman.json)">
+  <ItemGroup Label="Restores pinned htmx at build (see src/Ehr.Design/libman.json)">
     <PackageVersion Include="Microsoft.Web.LibraryManager.Build" Version="3.0.114" />
   </ItemGroup>
 

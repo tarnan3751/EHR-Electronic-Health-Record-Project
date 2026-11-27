@@ -13,11 +13,6 @@ public static class CodeStore
     public static Task IssueEnrollmentAsync(EhrDbContext db, Guid id, Guid patient, string hash, CancellationToken cancellationToken) =>
         ExecuteAsync(db, "SELECT ehr.issue_patient_enrollment(@id, @patient, @hash)", cancellationToken, ("id", id), ("patient", patient), ("hash", hash));
 
-    // The patient an unused, unexpired enrollment code is for, or null.
-    public static Task<(Guid Id, Guid PatientId)?> FindEnrollmentAsync(EhrDbContext db, string hash, string legacy, CancellationToken cancellationToken) =>
-        OneAsync(db, "SELECT id, patient_id FROM ehr.find_patient_enrollment(@hash, @legacy)", reader => (reader.GetGuid(0), reader.GetGuid(1)), cancellationToken,
-            ("hash", hash), ("legacy", legacy));
-
     // Uses the code up; null when it was unknown, expired, or used a moment ago.
     public static Task<(Guid Id, Guid PatientId)?> RedeemEnrollmentAsync(EhrDbContext db, string hash, string legacy, CancellationToken cancellationToken) =>
         OneAsync(db, "SELECT id, patient_id FROM ehr.redeem_patient_enrollment(@hash, @legacy)", reader => (reader.GetGuid(0), reader.GetGuid(1)), cancellationToken,
