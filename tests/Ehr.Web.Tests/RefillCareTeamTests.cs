@@ -36,7 +36,7 @@ public class RefillCareTeamTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([$"{clinician.Id} true"], await ItemsAsync(apps, patient.Patient, request));
         Assert.DoesNotContain($"href=\"{ReviewPath(patient.Patient, request)}\"", await session.Client.GetStringAsync("/inbox", Cancel));
         // On the patient's page nothing changes: the request waits.
-        Assert.Contains("Waiting for the care team to answer.", Said(await patient.Client.GetStringAsync(PortalPath, Cancel)));
+        Assert.Contains("<span class=\"sc-tag\">Waiting</span>", await patient.Client.GetStringAsync(PortalPath, Cancel));
 
         // Another clinician opens the chart, giving the reason it asks of someone off the panel, and puts the patient on
         // their panel from it.
@@ -108,7 +108,7 @@ public class RefillCareTeamTests(WebApps apps) : IClassFixture<WebApps>
         // Lisinopril waits, older than the 51 answers: it isn't offered again, and its request is listed.
         Assert.DoesNotContain($"<span>{Lisinopril}", html);
         Assert.Contains("<span>amlodipine 5 MG Oral Tablet", html);
-        Assert.Contains("Waiting for the care team to answer.", Said(html));
+        Assert.Contains("<span class=\"sc-tag\">Waiting</span>", html);
     }
 
     async Task LockAsync(Guid staff, string until)

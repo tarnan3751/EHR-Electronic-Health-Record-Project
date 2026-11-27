@@ -88,7 +88,7 @@ public class RefillsModel(PortalSubject subject, PhiReader phi, RefillRequests r
         Chosen = Unprotect(Medication);
         if (Chosen is not { } medication)
         {
-            errors["Medication"] = "Choose a medication from the list.";
+            errors["Medication"] = "Choose a medication.";
         }
         else
         {
@@ -98,17 +98,17 @@ public class RefillsModel(PortalSubject subject, PhiReader phi, RefillRequests r
                     // Back to the page as it was, sensitive items shown if they were.
                     return RedirectToPage(new { sent = true, sensitive = Sensitive && MaySeeSensitive ? true : (bool?)null });
                 case RefillAsked.AlreadyAsked:
-                    errors["Medication"] = "You've already asked for a refill of this medication. Your care team hasn't answered yet.";
+                    errors["Medication"] = "A request for this medication is already waiting.";
                     break;
                 case RefillAsked.NoCareTeam:
-                    errors["Medication"] = "This record has no care team yet. To ask for a refill, call the clinic.";
+                    errors["Medication"] = "This record has no care team yet.";
                     break;
                 case RefillAsked.TooLong:
-                    errors["Note"] = $"Shorten the note to {RefillRequests.MaxNoteLength} characters or fewer.";
+                    errors["Note"] = $"Note must be {RefillRequests.MaxNoteLength} characters or fewer.";
                     break;
                 default:
                     Chosen = null;
-                    errors["Medication"] = "That medication can't be refilled here any more. Choose one from the list.";
+                    errors["Medication"] = "That medication can no longer be refilled here.";
                     break;
             }
         }

@@ -12,13 +12,13 @@
 <h1>Ask for a refill</h1>
 @if (Model.Refills is not { } refills)
 {
-    <p class="sc-notice sc-notice--danger">@(own ? "Your medications are" : "Medications are") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(own ? "Your medications are" : "Medications are") not available right now.</p>
 }
 else
 {
     @if (Model.Sent)
     {
-        <p class="sc-notice sc-notice--success" role="status" data-refill-sent><span class="sc-notice__state">Sent.</span> @(own ? "Your care team will answer here." : "The care team will answer here.")</p>
+        <p class="sc-notice sc-notice--success" role="status" data-refill-sent><span class="sc-notice__state">Sent.</span></p>
     }
     @if (Model.MaySeeSensitive && refills.SensitiveHidden > 0)
     {
@@ -48,7 +48,7 @@ else
         else if (refills.Medications.Count == 0)
         {
             @* Just after a request, the medication asked about is no longer offered: say so as what's left, not as a refusal. *@
-            <p class="sc-muted" data-refill-form="none">@(Model.Sent ? "No other medications can be refilled here right now." : own ? "None of your medications can be refilled here right now." : "None of the medications can be refilled here right now.")</p>
+            <p class="sc-muted" data-refill-form="none">@(Model.Sent ? "No other medications can be refilled here." : "No medications can be refilled here.")</p>
         }
         else
         {
@@ -75,7 +75,7 @@ else
                     }
                 </fieldset>
                 <div class="sc-field">
-                    <label for="refill-note">Anything the care team should know <span>(optional)</span></label>
+                    <label for="refill-note">Note <span>(optional)</span></label>
                     <textarea id="refill-note" class="sc-field__input" name="Note" rows="3" maxlength="@RefillRequests.MaxNoteLength"
                               aria-invalid="@(noteError is null ? null : "true")" aria-describedby="@(noteError is null ? null : "refill-note-error")">@Model.Note</textarea>
                     @if (noteError is not null)
@@ -88,7 +88,7 @@ else
                 </div>
             </form>
         }
-        <p class="sc-muted">If a medication isn't listed, call the clinic. Requests are read during clinic hours. For an emergency, call your local emergency number.</p>
+        <p class="sc-muted">For an emergency, call your local emergency number.</p>
     </section>
 
     <section aria-labelledby="refills-requests">
@@ -137,10 +137,6 @@ else
                         {
                             <p data-refill-answer>Declined @Clinic.Format(request.DecidedAt!.Value, "MMM d, yyyy"). Your care team says:</p>
                             <p class="sc-note__text" data-refill-message>@request.DeclineMessage</p>
-                        }
-                        else
-                        {
-                            <p class="sc-muted">Waiting for the care team to answer.</p>
                         }
                     </li>
                 }
