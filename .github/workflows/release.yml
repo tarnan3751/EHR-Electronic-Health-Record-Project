@@ -1,0 +1,206 @@
+# Releases SwiftChart, from a tag vX.Y.Z pushed on a commit on main, or started by hand with the tag to release. It
+# checks the tag names the desktop app's version (Cargo.toml) and has its notes (docs/release-notes/<tag>.md), builds
+# the desktop installers on macOS, Windows and Linux (desktop.yml), builds and pushes the four server images as the
+# version and `latest` (images.yml), and makes one GitHub release with the installers, SHA256SUMS.txt and the notes.
+# A dry run builds all of it, keeps the installers, the checksums and the notes as the run's artifacts for 7 days, and
+# pushes no image and makes no tag or release; ci.yml's release_dry_run input runs one from any branch. No update is
+# signed here: the updater's key never reaches CI (docs/desktop-install.md, "Making a release").
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag to release, such as v1.0.0; made on this run's commit if it doesn't exist (empty in a dry run for Cargo.toml's version)
+        type: string
+        default: ""
+      dry_run:
+        description: Build everything and keep the installers for 7 days, but push no image and make no tag or release
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      tag:
+        description: The tag to release, such as v1.0.0 (empty in a dry run for Cargo.toml's version)
+        type: string
+        default: ""
+      dry_run:
+        description: Build everything and keep the installers for 7 days, but push no image and make no tag or release
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.tag.outputs.version }}
+      dry_run: ${{ steps.tag.outputs.dry_run }}
+    steps:
+      # Every branch and tag, to find the tag and main.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # A pushed tag is the run's own ref; by hand or from ci.yml it's the input. A real release must be of a commit on
+      # main, and of the tag's own commit if the tag exists already: start the run from the tag.
+      - name: The tag names this commit's version, on main
+        id: tag
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run == true }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' src/Ehr.Desktop/src-tauri/Cargo.toml | head -n 1)
+          if [ "$EVENT" = push ]; then tag=$REF_NAME; else tag=$INPUT_TAG; fi
+          if [ -z "$tag" ] && [ "$DRY_RUN" = true ]; then tag=v$version; fi
+          echo "Tag $tag; the desktop app's version $version; commit $GITHUB_SHA; dry run: $DRY_RUN"
+          if ! printf '%s\n' "$tag" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::\"$tag\" isn't a release tag, such as v1.0.0"
+            exit 1
+          fi
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::The tag $tag doesn't name the desktop app's version, $version (src/Ehr.Desktop/src-tauri/Cargo.toml)"
+            exit 1
+          fi
+          if [ ! -f "docs/release-notes/$tag.md" ]; then
+            echo "::error::The release has no notes: docs/release-notes/$tag.md"
+            exit 1
+          fi
+          if target=$(git rev-parse -q --verify "refs/tags/$tag^{commit}"); then
+            if [ "$target" != "$GITHUB_SHA" ] && [ "$DRY_RUN" = true ]; then
+              echo "::warning::$tag names $target, not this run's commit: a release would be refused"
+            elif [ "$target" != "$GITHUB_SHA" ]; then
+              echo "::error::$tag names $target, not this run's commit: start the run from the tag"
+              exit 1
+            fi
+          fi
+          if [ "$DRY_RUN" != true ] && ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error::$GITHUB_SHA isn't on main: only a commit on main is released"
+            exit 1
+          fi
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "dry_run=$DRY_RUN"
+          } >> "$GITHUB_OUTPUT"
+
+  desktop:
+    name: Desktop
+    needs: check
+    uses: ./.github/workflows/desktop.yml
+    with:
+      keep: true
+      artifact: SwiftChart-${{ needs.check.outputs.version }}
+
+  # After the installers, so no image is pushed under the version unless the release's installers were built.
+  images:
+    name: Images
+    needs: [check, desktop]
+    permissions:
+      contents: read # checkout
+      packages: write # push the images to ghcr.io
+    uses: ./.github/workflows/images.yml
+    with:
+      tags: ${{ needs.check.outputs.version }} latest
+      version: ${{ needs.check.outputs.version }}
+      push: ${{ needs.check.outputs.dry_run != 'true' }}
+
+  # The release's files and notes, in a dry run too: every installer, SHA256SUMS.txt, and the notes, from the committed
+  # template with the commit they were built from.
+  assemble:
+    name: Assemble the release
+    needs: [check, desktop, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: SwiftChart-${{ needs.check.outputs.version }}-*
+          path: ${{ runner.temp }}/installers
+          merge-multiple: true
+
+      - name: Write the checksums and the notes
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          find "$RUNNER_TEMP/installers" -type f \( -name '*.dmg' -o -name '*-setup.exe' -o -name '*.deb' -o -name '*.AppImage' \) \
+            -exec mv {} "$RUNNER_TEMP/release/" \;
+          cd "$RUNNER_TEMP/release"
+          for pattern in '*_aarch64.dmg' '*_x64-setup.exe' '*_amd64.deb' '*_amd64.AppImage'; do
+            count=$(find . -maxdepth 1 -type f -name "$pattern" | wc -l)
+            if [ "$count" != 1 ]; then
+              echo "::error::Expected one installer named $pattern, found $count"
+              ls -l
+              exit 1
+            fi
+          done
+          sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS.txt"
+          mv "$RUNNER_TEMP/SHA256SUMS.txt" .
+          { cat "$GITHUB_WORKSPACE/docs/release-notes/$TAG.md"; echo; echo "Built from commit $GITHUB_SHA."; } > "$RUNNER_TEMP/notes.md"
+          { echo "## SwiftChart $VERSION"; echo; echo '```'; cat SHA256SUMS.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          ls -l
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: SwiftChart-${{ needs.check.outputs.version }}-release-notes
+          path: |
+            ${{ runner.temp }}/release/SHA256SUMS.txt
+            ${{ runner.temp }}/notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish the release
+    needs: [check, assemble]
+    if: needs.check.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # make the tag and the release
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Again here, where the release is made: only a commit on main is released.
+      - name: The commit is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: SwiftChart-${{ needs.check.outputs.version }}-*
+          path: ${{ runner.temp }}/downloaded
+          merge-multiple: true
+
+      # The installers as they were checksummed, then one release: the tag is made on this commit if it doesn't exist.
+      - name: Make the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          find "$RUNNER_TEMP/downloaded" -type f -exec mv {} "$RUNNER_TEMP/release/" \;
+          cd "$RUNNER_TEMP/release"
+          sha256sum --check --strict SHA256SUMS.txt
+          mapfile -t files < <(awk '{ print $2 }' SHA256SUMS.txt)
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "SwiftChart $VERSION" --notes-file notes.md -- "${files[@]}" SHA256SUMS.txt

@@ -20,6 +20,10 @@ on:
         description: Build the desktop installers as this version (such as 1.0.1, to test an update), not Cargo.toml's
         type: string
         default: ""
+      release_dry_run:
+        description: Also rehearse the release (release.yml) as a dry run, keeping its installers for 7 days; nothing is pushed or released
+        type: boolean
+        default: false
 
 # Every job gets a read-only token unless it asks for more.
 permissions:
@@ -462,3 +466,17 @@ jobs:
       tags: ${{ github.sha }} edge
       version: ${{ github.sha }}
       push: true
+
+  # A run started by hand with release_dry_run rehearses the release from this branch, which release.yml can't be
+  # started from until it is on main: everything built, nothing pushed, tagged or released (release.yml).
+  release-dry-run:
+    name: Release (dry run)
+    if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run
+    # GitHub checks a called workflow's permissions before it runs: these are the most release.yml's jobs ask for. A
+    # dry run skips the jobs that would use them.
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/release.yml
+    with:
+      dry_run: true
