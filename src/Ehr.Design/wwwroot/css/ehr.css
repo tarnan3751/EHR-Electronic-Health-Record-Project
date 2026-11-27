@@ -3801,6 +3801,12 @@
         }
     }
 
+    /* Who viewed the record (step 13c): its views as rows, and the way to newer and older ones on the list's left
+       edge. */
+    .sc-app--portal nav.sc-actions > a:not(.sc-btn):first-child {
+        padding-left: 0;
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */
