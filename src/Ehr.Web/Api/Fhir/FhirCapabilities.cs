@@ -32,7 +32,7 @@ internal static class FhirCapabilities
                 + "two values are not Observations of their own.",
                 new RestSecurity(false,
                     "Sign in to the clinical app as a clinician (its cookie, with the second factor). A patient's records are served only while the "
-                    + "patient is on your panel or under emergency access you started in the clinical app; each read is recorded as the pages' are."),
+                    + "patient is one of your patients or under emergency access you started in the clinical app; each read is recorded as the pages' are."),
                 [.. FhirApi.Types.Select(type => new RestResource(
                     type.Key,
                     type.Key == "Observation" ? [.. FhirObservations.Profiles] : null,

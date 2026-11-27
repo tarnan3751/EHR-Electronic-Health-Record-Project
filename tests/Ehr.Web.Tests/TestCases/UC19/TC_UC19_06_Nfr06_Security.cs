@@ -99,7 +99,7 @@ public class TC_UC19_06_Nfr06_Security(WebApps apps) : IClassFixture<WebApps>
         foreach (var path in aboutThePatient.Where(path => !path.Contains("identifier=", StringComparison.Ordinal)))
         {
             var refused = await GetAsync(elsewhere.Client, path, ("Origin", "https://elsewhere.example"));
-            Assert.StartsWith("This patient isn't on your panel.", Refused(refused, HttpStatusCode.Forbidden, "forbidden").Issue.Single().Diagnostics);
+            Assert.StartsWith("This patient isn't one of your patients.", Refused(refused, HttpStatusCode.Forbidden, "forbidden").Issue.Single().Diagnostics);
             NothingOfThePatient(refused);
         }
 
