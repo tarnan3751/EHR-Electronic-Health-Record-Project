@@ -20,12 +20,11 @@ someone committed instead:
    word for word) has been accepted by the owner in eval/known-limitations.toml, as an [[accepted_proposal]] entry
    naming its recording (variant), its kind and the words shown, as the results list them (shown); a warning doesn't
    excuse one. Each accepted there still occurs, so the list stays true. The gate doesn't take the results' word for
-   what was proposed: it scores the proposals again from the stored recordings (each transcript rebuilt from its
-   passages, the checks run over it, against this commit's gold; no model needed), fails results whose proposals
-   blocks, against the rule-following gold and against the clinical gold (proposals, proposals_clinical), say
-   anything else in any of their measures, and reports only the numbers it scored again. What is false or misheard is
-   judged against the rule-following gold, which every clinical one is in. The two gates above on orders and allergy
-   changes in the note's fields are unchanged beside it.
+   what was proposed: it scores the proposals again from the stored recordings (_proposals_again()), fails results
+   whose proposals blocks, against the rule-following gold and against the clinical gold (proposals,
+   proposals_clinical), say anything else in any of their measures, and reports only the numbers it scored again. What
+   is false or misheard is judged against the rule-following gold, which every clinical one is in. The two gates above
+   on orders and allergy changes in the note's fields are unchanged beside it.
 5. If an accepted baseline exists (eval/results/baseline.json, recorded by the owner on the server machine), the latest
    run is from the same machine, has every metric the baseline has, and scores no lower on any of these: word error
    rate, note-field F1 against the rule-following gold (fields.content.f1; the F1 against the clinical gold,
@@ -51,8 +50,7 @@ and voices.toml's [variants_es] define (variant_ids(): each script's recordings,
 and each script's display text), none missing, none extra, and every one sorted or failed: one that timed out is a
 failure in every measure, never skipped; and each said to be sorted says how long it took, within the sidecar's
 limit to sort. Then, as for proposals above, the gate doesn't take the results' word for any measure: it scores the
-stored answers again (run_es.rescore(): each transcript rebuilt from its passages as heard, the checks and the scoring
-run again against this commit's gold; no model needed), fails results
+stored answers again (run_es.rescore()), fails results
 that lack a measure or state one differently, and judges only what it scored: every recording and text sorted; no
 instruction to order something or change the allergy list in any offered value, the wrong-language recordings
 included (FR-14); every mistranslation shown without a warning (a number, unit, drug, frequency, date, duration, route,
@@ -70,11 +68,8 @@ this commit's English prompt, sidecar code and scoring, scoring its stored answe
 eval/results/baseline-es.json on the server machine, from that machine and no worse on the Spanish word error rate, the English field F1 from Spanish, and drug and
 date accuracy. The English checks above are unchanged.
 
-The review's wrong translations (eval/wrong-translations.toml; step 17), checked again by this commit's Spanish checks
-with no model (wrong_translations.py; check_wrong_translations()): the file is the one WRONG_TRANSLATIONS_SHA256
-records, every wrong pair marked as reversing the meaning that passes without a warning is one the owner has accepted
-by its id in known-limitations.toml ([[accepted_wrong_translation]]), and each accepted one still passes, and no more
-pass than most_wrong_translations there, which is their number (the owner's cap of 2026-11-25).
+The review's wrong translations (eval/wrong-translations.toml; step 17) are checked again by this commit's Spanish
+checks, with no model and against the owner's acceptances and cap: check_wrong_translations().
 
 The visits' results (eval/results/ambient-latest.json, listening to a visit) are checked here too, by ambient_gate.py,
 in the same way. Other results files (such as compare-low256.json, a comparison run) aren't checked.
@@ -98,6 +93,7 @@ from ehr_dictation.settings import Settings
 from ehr_dictation.transcript import Segment, assemble
 
 from . import ambient_gate, run_a_en, run_es, scoring, scoring_es, tricks, wrong_translations
+from .ambient_gate import _get
 from .run_a import SORTED, incomplete
 from .scoring import WARNING_CODES
 from .scripts import (EVAL_DIR, gold_es_sha256, gold_sha256, load_all, pipeline_sha256, recordings_es_sha256,
@@ -370,15 +366,6 @@ def _trick_sentences(eval_dir: Path, sha256: str) -> list[str]:
         for said in scores.missed
     ]
     return problems
-
-
-def _get(metrics: dict, path: tuple[str, ...]) -> float | None:
-    value = metrics
-    for key in path:
-        if not isinstance(value, dict):
-            return None
-        value = value.get(key)
-    return value if isinstance(value, (int, float)) else None
 
 
 RUN_IT_ES = (
