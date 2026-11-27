@@ -19,8 +19,8 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, order.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
-    <p><a asp-page="/Inbox/Index">Back to inbox</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
+    <p><a asp-page="/Inbox/Index" class="sc-back">Back to inbox</a></p>
 </div>
 <h1>Results: @order.Display</h1>
 <p class="sc-muted">Ordered by @order.SignedBy, @Clinic.Format(order.SignedAt).</p>
@@ -39,7 +39,7 @@ else if (Model.Done is "acknowledged")
 
 @if (filed.Count == 0)
 {
-    <p class="sc-muted">@(order.Status == OrderStatus.Revoked ? "This order was discontinued. It has no results." : "No results yet.")</p>
+    <p class="sc-empty">@(order.Status == OrderStatus.Revoked ? "This order was discontinued. It has no results." : "No results yet.")</p>
 }
 else
 {
@@ -50,7 +50,7 @@ else
     <div class="sc-table-wrap">
         <table class="sc-table">
             <thead>
-                <tr><th scope="col">Test</th><th scope="col">Result</th><th scope="col">Flag</th><th scope="col">Reference range</th><th scope="col">Collected</th></tr>
+                <tr><th scope="col">Test</th><th scope="col" class="sc-table__fit">Result</th><th scope="col" class="sc-table__fit">Flag</th><th scope="col" class="sc-table__fit">Reference range</th><th scope="col" class="sc-table__fit">Collected</th></tr>
             </thead>
             <tbody>
                 @foreach (var test in filed)
@@ -84,6 +84,7 @@ else
         </div>
     }
 
+    <div class="sc-sheet">
     <h2>Acknowledgment</h2>
     @if (order.AcknowledgedAt is { } when)
     {
@@ -105,10 +106,12 @@ else
     {
         <p class="sc-muted">Not acknowledged. Results can't be acknowledged until the clinic's server is back.</p>
     }
+    </div>
 }
 
 @if (order.OpenToResults)
 {
+    <div class="sc-sheet">
     <h2>@(filed.Count == 0 ? "Enter results" : "Enter the remaining results")</h2>
     @if (Model.LabConnected)
     {
@@ -161,6 +164,7 @@ else
             </div>
         </form>
     }
+    </div>
 }
 else if (order.Type == OrderType.Lab && order.Tests.Count == 0)
 {

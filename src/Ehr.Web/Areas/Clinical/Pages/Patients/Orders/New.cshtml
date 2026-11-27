@@ -21,7 +21,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Form.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
 <h1>@heading: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Proposed is { } proposed)
@@ -29,6 +29,8 @@
     <partial name="~/Areas/Clinical/Pages/Patients/Notes/_ProposedFromDictation.cshtml" model="proposed" />
 }
 
+@* The form in a card at reading width, its types as tabs across the card's top. *@
+<div class="sc-formcard sc-formcard--wide sc-tabcard">
 @if (replaced is null && Model.Form.Refill is null)
 {
 <nav aria-label="Type of order">
@@ -54,7 +56,7 @@
 }
 else
 {
-    <form method="post" class="sc-form" data-order-form>
+    <form method="post" class="sc-form sc-formgrid" data-order-form>
         @if (Model.Gone)
         {
             <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active. Someone discontinued or changed it first.</p>
@@ -210,6 +212,7 @@ else
         </div>
     </form>
 }
+</div>
 
 @functions {
     // Keyboard first (NFR-12): the page opens with the cursor in the first field to fix, or in the item when there is

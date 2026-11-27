@@ -3171,6 +3171,37 @@
         margin: 0 0 0 var(--space-2);
     }
 
+    /* A form whose kinds are tabs (a new order: lab, imaging, medication, referral): the tabs across the card's top,
+       their rule from edge to edge. */
+    .sc-tabcard > nav > .sc-tabs {
+        margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-6)) var(--space-5);
+        padding: 0 var(--space-6);
+    }
+
+    /* The order form's note on what the safety checks cover, in the hints' size. */
+    .sc-formgrid > [data-safety-disclaimer] {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    /* A results table's row names: on the row's ground, not the header's. */
+    .sc-table tr[data-result] > th {
+        background: var(--surface-raised);
+    }
+
+    .sc-table tbody tr[data-result]:not(.sc-table__flagged):hover > th {
+        background: var(--surface-subtle);
+    }
+
+    /* A results table: a flagged row's own name is tinted with the rest of the row. */
+    .sc-table tr.sc-table__flagged[data-result] > th {
+        background: var(--row-flagged);
+    }
+
+    .sc-table tr[data-result]:last-child > th {
+        border-bottom: 0;
+    }
+
     /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
        comment; anything two areas share belongs in the components layer.
        ---- */

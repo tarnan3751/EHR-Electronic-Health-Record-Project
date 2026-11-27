@@ -16,11 +16,11 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Form.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
 <h1>Discontinue order: @patient.FamilyName, @patient.GivenName</h1>
 
-<form method="post" class="sc-form" data-order-form>
+<form method="post" class="sc-form sc-formcard" data-order-form>
     @if (Model.Gone)
     {
         <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active. Someone discontinued or changed it first.</p>
