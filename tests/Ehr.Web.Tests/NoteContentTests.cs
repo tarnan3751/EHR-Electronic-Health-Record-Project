@@ -26,7 +26,7 @@ public class NoteContentTests
         Assert.Contains("Shorten Objective", Assert.Single(new NoteContent("Subjective", new string('a', 16001), "Assessment", "Plan").Validate(true)));
         Assert.Contains("null character", Assert.Single(new NoteContent("Subjective", "Objective\0", "Assessment", "Plan").Validate(true)));
         var unicode = new NoteContent(new string('界', 16000), new string('界', 16000), "Assessment", "Plan");
-        Assert.Contains("over the size limit", Assert.Single(unicode.Validate(true)));
+        Assert.Contains("over the 64 KB size limit", Assert.Single(unicode.Validate(true)));
     }
 
     // The draft's Body, which the desktop app keeps and shows as plain text (UC 8): each section under its heading.
@@ -97,7 +97,7 @@ public class NoteContentTests
     public void An_earlier_draft_over_the_limit_only_by_the_four_headings_is_told_so()
     {
         const string AtLimit = "This draft is at the size limit. Shorten it by a few words to save it in four sections.";
-        const string Shorten = "Shorten the note. It is over the size limit.";
+        const string Shorten = "Not saved. The note is over the 64 KB size limit. Shorten it and try again.";
         // 65,508 bytes of text: under History, Assessment and Plan, with their 28 bytes of headings, exactly 64 KiB.
         var history = new NoteContent(new string('界', 16_000), "", new string('界', 5_836), "");
         Assert.Equal(65_551, Encoding.UTF8.GetByteCount(history.Body));

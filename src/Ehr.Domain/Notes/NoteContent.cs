@@ -92,7 +92,7 @@ public sealed record NoteContent(string Subjective, string Objective, string Ass
             };
             problems.Add(bytes - fourHeadings + savedHeadings <= MaximumBodyBytes
                 ? "This draft is at the size limit. Shorten it by a few words to save it in four sections."
-                : "Shorten the note. It is over the size limit.");
+                : $"Not saved. The note is over the {MaximumBodyBytes / 1024} KB size limit. Shorten it and try again.");
         }
 
         return problems;
