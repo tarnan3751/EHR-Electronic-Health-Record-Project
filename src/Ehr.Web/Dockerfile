@@ -21,6 +21,12 @@ RUN dotnet publish src/Ehr.Web/Ehr.Web.csproj --configuration Release --no-resto
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
+# Npgsql looks for the Kerberos library when it first connects, and without it the app prints "Cannot load library
+# libgssapi_krb5.so.2" once at start-up. The stack signs in to PostgreSQL with a password over TLS, so the library is
+# here only to keep that line out of the log.
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends libgssapi-krb5-2 \
+ && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app .
 # Where the cloud app keeps its audit events until the on-prem app has them (Ehr:CloudAudit:Directory). Made here, owned
 # by the app's user, so a new volume mounted on it starts out writable by that user.
