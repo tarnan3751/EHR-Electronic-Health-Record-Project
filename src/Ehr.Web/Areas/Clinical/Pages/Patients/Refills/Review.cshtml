@@ -12,26 +12,26 @@
     var status = refill.Medication.Status;
     var statusSaid = char.ToUpperInvariant(status[0]) + status[1..].Replace('-', ' ');
 }
-@* Step 13d. Keyboard first (NFR-12): the page opens on "Approve: write the order", or on the message when only a decline
-   is possible; Tab reaches the message and "Decline request". *@
+@* Step 13d. Keyboard first (NFR-12): the page opens on "Approve request…", or on the message when only a decline is
+   possible; Tab reaches the message and "Decline request". *@
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, refill.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Inbox/Index">Back to the inbox</a> · <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Open the chart</a></p>
+    <p><a asp-page="/Inbox/Index">Back to inbox</a> · <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Open the chart</a></p>
 </div>
 <h1>Refill request: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Answered == "approved" && refill.Status == RefillRequestStatus.Completed)
 {
-    <p class="sc-notice sc-notice--success" role="status" data-refill-answered><span class="sc-notice__state">Approved:</span> the order is signed, and the patient sees what was ordered.</p>
+    <p class="sc-notice sc-notice--success" role="status" data-refill-answered><span class="sc-notice__state">Approved.</span> The order is signed, and the patient can see what was ordered.</p>
 }
 else if (Model.Answered == "declined" && refill.Status == RefillRequestStatus.Rejected)
 {
-    <p class="sc-notice sc-notice--success" role="status" data-refill-answered><span class="sc-notice__state">Declined:</span> the patient reads your message in the portal.</p>
+    <p class="sc-notice sc-notice--success" role="status" data-refill-answered><span class="sc-notice__state">Declined.</span> The patient can read your message in the portal.</p>
 }
 @if (Model.AlreadyAnswered)
 {
-    <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> someone answered this request first. Nothing changed.</p>
+    <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> Someone answered this request first.</p>
 }
 <dl class="record" data-refill-request>
     <dt>Asked for</dt>
@@ -45,7 +45,7 @@ else if (Model.Answered == "declined" && refill.Status == RefillRequestStatus.Re
 </dl>
 @if (refill.Status == RefillRequestStatus.Completed)
 {
-    <p data-refill-answer>Approved by @refill.DecidedBy, @Clinic.Format(refill.DecidedAt!.Value): ordered @refill.OrderedDisplay. The order is on the chart.</p>
+    <p data-refill-answer>Approved by @refill.DecidedBy, @Clinic.Format(refill.DecidedAt!.Value). Ordered @refill.OrderedDisplay.</p>
 }
 else if (refill.Status == RefillRequestStatus.Rejected)
 {
@@ -61,28 +61,28 @@ else
     @if (refill.Renewable)
     {
         @* The cursor starts here, unless a decline came back to be fixed: then it is in the message (below). *@
-        <p><a class="sc-btn sc-btn--primary" asp-page="/Patients/Orders/New" asp-route-id="@patient.Id" asp-route-type="medication" asp-route-refill="@refill.Id" autofocus="@(Model.Error is null)" data-refill-approve>Approve: write the order</a></p>
-        <p class="sc-muted">The order form opens with the same medication, @refill.CatalogItem, and checks it as any order. Signing it approves the request. To order another strength, form or drug, decline the request with a message and write a new order from the chart.</p>
+        <p><a class="sc-btn sc-btn--primary" asp-page="/Patients/Orders/New" asp-route-id="@patient.Id" asp-route-type="medication" asp-route-refill="@refill.Id" autofocus="@(Model.Error is null)" data-refill-approve>Approve request…</a></p>
+        <p class="sc-muted">Opens the order form with @refill.CatalogItem. Signing the order approves the request. For another strength, form or drug, decline this request and write a new order from the chart.</p>
     }
     else if (status != MedicationStatementStatus.Active)
     {
-        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication is no longer active on the chart (@statusSaid). Decline the request with a message, so the patient knows.</p>
+        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved.</span> The medication is no longer active on the chart (@statusSaid). Decline the request with a message to the patient.</p>
     }
     else if (refill.Changed)
     {
-        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication on the chart has changed since this was asked. Decline the request with a message, so the patient knows, and write a new order from the chart.</p>
+        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved.</span> The medication on the chart has changed since this was asked. Decline the request with a message to the patient, then write a new order from the chart.</p>
     }
     else
     {
-        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved:</span> the medication on the chart isn't coded as a product the clinic orders. Decline the request with a message, so the patient knows, and write a new order from the chart.</p>
+        <p class="sc-notice sc-notice--warning" data-refill-not-renewable><span class="sc-notice__state">Can't be approved.</span> The medication on the chart isn't coded as a product the clinic orders. Decline the request with a message to the patient, then write a new order from the chart.</p>
     }
     <form method="post" asp-page-handler="Decline" class="sc-form" data-refill-decline>
         @if (Model.Error is not null)
         {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> fix the highlighted field and decline again.</p>
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> Fix the highlighted field and try again.</p>
         }
         <div class="sc-field">
-            <label for="refill-message">Message to the patient, to decline <span>(required)</span></label>
+            <label for="refill-message">Message to the patient <span>(required)</span></label>
             <textarea id="refill-message" class="sc-field__input" name="Message" rows="4" maxlength="@RefillRequests.MaxDeclineLength" required
                       autofocus="@(!refill.Renewable || Model.Error is not null)" aria-invalid="@(Model.Error is null ? null : "true")"
                       aria-describedby="@(Model.Error is null ? "refill-message-help" : "refill-message-error refill-message-help")">@Model.Message</textarea>
@@ -90,7 +90,7 @@ else
             {
                 <p class="sc-field__error" id="refill-message-error">@Model.Error</p>
             }
-            <p class="sc-muted" id="refill-message-help">The patient reads it in the portal, under the request. Their email says only that there is something new.</p>
+            <p class="sc-muted" id="refill-message-help">Sent when you decline, which can't be undone. The patient reads it in the portal, not in their email.</p>
         </div>
         <div class="sc-actions">
             <button type="submit" class="sc-btn sc-btn--danger">Decline request</button>

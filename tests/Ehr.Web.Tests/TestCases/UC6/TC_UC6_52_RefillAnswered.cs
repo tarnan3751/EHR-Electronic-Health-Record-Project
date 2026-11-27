@@ -55,12 +55,12 @@ public class TC_UC6_52_RefillAnswered(WebApps apps) : IClassFixture<WebApps>
 
         using (var approved = await ApproveAsync(session.Client, patient.Patient, lisinopril))
         {
-            Assert.Contains("Approved:", Words(await ReadAsync(approved)));
+            Assert.Contains("Approved.", Words(await ReadAsync(approved)));
         }
 
         using (var declined = await DeclineAsync(session.Client, patient.Patient, amlodipine, "Synthetic: we need to check your blood pressure first.\nPlease book a visit."))
         {
-            Assert.Contains("Declined:", Words(await ReadAsync(declined)));
+            Assert.Contains("Declined.", Words(await ReadAsync(declined)));
         }
 
         var words = Words(await patient.Client.GetStringAsync(PortalPath, Cancel));

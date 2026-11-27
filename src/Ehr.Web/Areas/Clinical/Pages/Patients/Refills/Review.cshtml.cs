@@ -12,7 +12,7 @@ namespace Ehr.Web.Areas.Clinical.Pages.Patients.Refills;
 
 // A refill request (the expansion plan's step 13d), from the inbox of a clinician with the patient on their panel: the
 // patient's banner with their allergies, the medication asked for as the chart has it now, who asked, when and with
-// what note, and the two answers. "Approve: write the order" opens the order form for it, every check of an order with
+// what note, and the two answers. "Approve request…" opens the order form for it, every check of an order with
 // it; "Decline request" needs a message for the patient. Once answered, the page says how, by whom and when. One
 // recorded read of the patient through the PHI reader, a view of their sensitive items when the request is sensitive;
 // HEAD is refused before anything is read.
@@ -76,7 +76,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, RefillRe
                 Error = $"Shorten the message to {RefillRequests.MaxDeclineLength:N0} characters or fewer.";
                 break;
             default:
-                Error = "Write a message for the patient: it is what they read in the portal.";
+                Error = "Write a message for the patient.";
                 break;
         }
 

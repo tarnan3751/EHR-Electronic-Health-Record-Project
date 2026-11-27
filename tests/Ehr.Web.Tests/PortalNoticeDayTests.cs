@@ -42,7 +42,7 @@ public class PortalNoticeDayTests(WebApps apps) : IClassFixture<WebApps>
 
             var request = await RequestIdAsync(apps, patient.Patient);
             using var declined = await DeclineAsync(session.Client, patient.Patient, request);
-            Assert.Contains("Declined:", Said(await ReadAsync(declined)));
+            Assert.Contains("Declined.", Said(await ReadAsync(declined)));
             return request;
         }
 

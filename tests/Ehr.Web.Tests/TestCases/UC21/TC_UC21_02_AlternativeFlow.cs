@@ -32,7 +32,7 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 // Expected result: Step 1: 422, the form says Lisinopril 10 mg tablet is already ordered and that there are warnings
 //   to check, and asks for both reasons; nothing is saved and the request still waits. Step 2: the request is approved; its order
 //   keeps both reasons and the allergy warning. Step 3: the approval is refused (422, "This order renews the same medication,
-//   amlodipine 5 MG Oral Tablet.") with nothing saved; the page then says "Declined:" and shows the message under Dr.
+//   amlodipine 5 MG Oral Tablet.") with nothing saved; the page then says "Declined." and shows the message under Dr.
 //   Test's name; the request is declined with the message; the new order is an ordinary one, answering no request; every
 //   item for both requests is done.
 // Creator: Tahseen Arnan
@@ -80,7 +80,7 @@ public class TC_UC21_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         using (var approved = await ApproveAsync(session.Client, patient.Patient, lisinopril,
             safetyReason: "Synthetic: tolerated for years.", duplicateReason: "Synthetic: renewal of the current prescription."))
         {
-            Assert.Contains("Approved:", Said(await ReadAsync(approved)));
+            Assert.Contains("Approved.", Said(await ReadAsync(approved)));
         }
 
         Assert.Equal(["Synthetic: renewal of the current prescription.|Synthetic: tolerated for years.|allergy"], await ProxyTests.QueryAsync(apps,
@@ -102,7 +102,7 @@ public class TC_UC21_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         using (var declined = await DeclineAsync(session.Client, patient.Patient, amlodipine, Raised))
         {
             var words = Said(await ReadAsync(declined));
-            Assert.Contains("Declined: the patient reads your message in the portal.", words);
+            Assert.Contains("Declined. The patient can read your message in the portal.", words);
             Assert.Contains("Declined by Dr. Test", words);
             Assert.Contains(Raised, words);
             Assert.DoesNotContain("Decline request", words);

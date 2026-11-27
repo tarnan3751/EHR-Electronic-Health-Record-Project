@@ -75,7 +75,7 @@ public class TC_UC1_22_OrderFromRefill(WebApps apps) : IClassFixture<WebApps>
 
         using (var approved = await ApproveAsync(session.Client, patient.Patient, lisinopril))
         {
-            Assert.Contains("Approved:", Said(await ReadAsync(approved)));
+            Assert.Contains("Approved.", Said(await ReadAsync(approved)));
         }
 
         var order = (await ProxyTests.QueryAsync(apps,

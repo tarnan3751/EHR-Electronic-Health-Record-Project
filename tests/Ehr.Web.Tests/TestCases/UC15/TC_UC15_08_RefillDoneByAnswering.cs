@@ -60,7 +60,7 @@ public class TC_UC15_08_RefillDoneByAnswering(WebApps apps) : IClassFixture<WebA
 
         using (var declined = await DeclineAsync(session.Client, patient.Patient, request))
         {
-            Assert.Contains("Declined:", Said(await ReadAsync(declined)));
+            Assert.Contains("Declined.", Said(await ReadAsync(declined)));
         }
 
         Assert.Contains("Nothing needs your action.", Said(await session.Client.GetStringAsync("/inbox", Cancel)));

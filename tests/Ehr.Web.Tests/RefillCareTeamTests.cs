@@ -60,7 +60,7 @@ public class RefillCareTeamTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"href=\"{ReviewPath(patient.Patient, request)}\"", inbox);
         using (var declined = await DeclineAsync(joined.Client, patient.Patient, request, "Synthetic: I'm your new doctor; please book a visit."))
         {
-            Assert.Contains("Declined:", Said(await ReadAsync(declined)));
+            Assert.Contains("Declined.", Said(await ReadAsync(declined)));
         }
 
         Assert.All(await ItemsAsync(apps, patient.Patient, request), item => Assert.EndsWith(" true", item));
