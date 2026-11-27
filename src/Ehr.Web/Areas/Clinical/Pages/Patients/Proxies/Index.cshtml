@@ -90,7 +90,7 @@ else
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> Fix the highlighted fields and try again.</p>
         }
         <div class="sc-field">
-            <label for="proxy-email">Their email <span>(required)</span></label>
+            <label for="proxy-email">Email <span>(required)</span></label>
             <input id="proxy-email" class="sc-field__input" type="email" name="Email" value="@Model.Email" maxlength="@ProxyGrantConfiguration.MaximumEmail" autocomplete="off" required autofocus="@(Model.Done is null)"
                    aria-invalid="@(Model.Errors.ContainsKey("Email") ? "true" : null)" aria-describedby="@(Model.Errors.ContainsKey("Email") ? "proxy-email-error" : null)">
             @if (Model.Errors.TryGetValue("Email", out var emailError))

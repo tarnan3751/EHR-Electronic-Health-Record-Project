@@ -31,8 +31,8 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   allergies (recorded <date> by Dr. Allergy Status)" and the banner "No known allergies"; the button is gone, the
 //   offline copy says "none-known" with no allergies, and the write audit has an insert by the clinician. Step 3: the
 //   list and, separately, the banner show Peanut, "No known allergies" is gone and its row is inactive, and the
-//   offline copy says "listed" with Peanut only; posting "Record no known allergies" again is answered "Not saved: an
-//   allergy is recorded for this patient, …" and changes nothing. Step 4: the second clinician is offered no button,
+//   offline copy says "listed" with Peanut only; posting "Record no known allergies" again is answered "Not saved. This
+//   patient has an allergy on record, …" and changes nothing. Step 4: the second clinician is offered no button,
 //   and their post changes nothing.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_13_AllergyStatus(WebApps apps) : IClassFixture<WebApps>
