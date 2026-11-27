@@ -23,9 +23,9 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   3. Make the first 1,000 patients of the synthetic clinic.
 //   4. Make an address with the test fixture.
 // Expected result: Step 1 finds addresses, and every one is at example.com, a domain reserved for examples. Step 2
-//   finds MRNs, and every one starts SYN. In step 3 every MRN starts SYN and every given and family name carries a
-//   number, as no real name does. Step 4's address is at example.test, a reserved test domain. The check against the
-//   running stack's database is the manual part, TC_UC11_06_Nfr13_SyntheticData.md in this folder.
+//   finds MRNs, and every one starts SYN. In step 3 every MRN starts SYN and every given and family name is one from
+//   the synthetic clinic's own lists. Step 4's address is at example.test, a reserved test domain. The check against
+//   the running stack's database is the manual part, TC_UC11_06_Nfr13_SyntheticData.md in this folder.
 // Creator: Luke Garcia
 public partial class TC_UC11_06_Nfr13_SyntheticData
 {
@@ -59,8 +59,8 @@ public partial class TC_UC11_06_Nfr13_SyntheticData
         foreach (var chart in new SyntheticClinic(1_000).Charts())
         {
             Assert.StartsWith("SYN", chart.Patient.Mrn);
-            Assert.Matches("[0-9]", chart.Patient.GivenName);
-            Assert.Matches("[0-9]", chart.Patient.FamilyName);
+            Assert.Contains(chart.Patient.GivenName, SyntheticClinic.GivenNames(chart.Patient.Gender));
+            Assert.Contains(chart.Patient.FamilyName, SyntheticClinic.FamilyNames);
         }
     }
 

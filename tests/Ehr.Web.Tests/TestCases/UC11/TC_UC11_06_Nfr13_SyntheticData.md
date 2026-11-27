@@ -23,7 +23,7 @@ synthetic clinic and the tests' own accounts) is `TC_UC11_06_Nfr13_SyntheticData
 2. Portal accounts at a real domain, or for a patient who isn't synthetic:
    `docker compose exec -u postgres onprem-db psql -d ehr -c "select u.email, p.mrn from ehr.patient_users u join ehr.patients p on p.id = u.patient_id where u.email not like '%@example.com' or p.mrn not like 'SYN%'"`
 3. Patients who aren't synthetic:
-   `docker compose exec -u postgres onprem-db psql -d ehr -c "select count(*) from ehr.patients where mrn not like 'SYN%' or given_name !~ '[0-9]' or family_name !~ '[0-9]'"`
+   `docker compose exec -u postgres onprem-db psql -d ehr -c "select count(*) from ehr.patients where mrn not like 'SYN%'"`
 4. Open `infra/compose/test-accounts.json` and read the addresses in it.
 
 ## Results

@@ -315,7 +315,7 @@ Tests fail if the model has changes no migration covers, if `schema.sql` is out 
 
 ## Synthetic data and the benchmark
 
-`bench/` holds a synthetic clinic: patients with allergies, medications, diagnoses, visits and test results, the same every time, and obviously synthetic (every name carries a number, every MRN starts `SYN`). It is clinically coherent and coded from the reference data: a patient's conditions bring the medications that treat them and the results that follow them, so someone with type 2 diabetes is on metformin and has raised hemoglobin A1c results.
+`bench/` holds a synthetic clinic: patients with allergies, medications, diagnoses, visits and test results, the same every time, and made up: ordinary names drawn from the seed's own lists, and every MRN starting `SYN`. It is clinically coherent and coded from the reference data: a patient's conditions bring the medications that treat them and the results that follow them, so someone with type 2 diabetes is on metformin and has raised hemoglobin A1c results.
 
 To fill the local stack's primary with 50,000 of them, start the stack, then, from the repository folder, point `EHR_SEED_CONNECTION` at the primary as `ehr_owner`, with the `EHR_OWNER_PASSWORD` from `infra/compose/.env`, and run the seed:
 

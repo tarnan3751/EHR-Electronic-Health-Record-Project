@@ -23,8 +23,8 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 //   3. Make the first 1,000 patients of the synthetic clinic.
 // Expected result: Step 1 finds MRNs, and every one starts SYN. Step 2's reason says what it is for (a test, on the
 //   local stack) and holds no MRN, email address, phone number or date. In step 3 every MRN starts SYN and every given
-//   and family name carries a number, as no real name does. The check of the grants and reasons stored in the running
-//   stack's database is the manual part, TC_UC12_06_Nfr13_SyntheticData.md in this folder.
+//   and family name is one from the synthetic clinic's own lists. The check of the grants and reasons stored in the
+//   running stack's database is the manual part, TC_UC12_06_Nfr13_SyntheticData.md in this folder.
 // Creator: Luke Garcia
 public partial class TC_UC12_06_Nfr13_SyntheticData
 {
@@ -57,8 +57,8 @@ public partial class TC_UC12_06_Nfr13_SyntheticData
         foreach (var chart in new SyntheticClinic(1_000).Charts())
         {
             Assert.StartsWith("SYN", chart.Patient.Mrn);
-            Assert.Matches("[0-9]", chart.Patient.GivenName);
-            Assert.Matches("[0-9]", chart.Patient.FamilyName);
+            Assert.Contains(chart.Patient.GivenName, SyntheticClinic.GivenNames(chart.Patient.Gender));
+            Assert.Contains(chart.Patient.FamilyName, SyntheticClinic.FamilyNames);
         }
     }
 
