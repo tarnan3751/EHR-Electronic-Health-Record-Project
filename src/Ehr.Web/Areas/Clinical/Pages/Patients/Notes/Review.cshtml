@@ -34,7 +34,7 @@
     };
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id" class="sc-back">Back to chart</a></p>
 </div>
 <h1>@(Model.Ambient ? "Review the note drafted from the visit" : "Review dictated fields")</h1>
 <p class="sc-prose">Check each proposal against @(Model.Ambient ? "what was said" : "your own words"). Nothing goes into the note until you finish the review. This review never places orders or changes allergies.</p>
@@ -116,7 +116,7 @@
                 <ul data-dictation-not-carried-list></ul>
             </section>
         </section>
-        <section>
+        <section class="sc-sheet">
             <h2>Proposed fields</h2>
             <dl class="sc-proposals">
                 @foreach (var field in Model.FieldNames)
@@ -273,7 +273,7 @@
     }
     @if (Model.Review.State == AiReviewStates.Pending && !Model.Signed && !Model.DecideAtTheClinic)
     {
-        <form method="post" asp-page-handler="Complete" class="sc-form sc-form--wide" data-review-submit data-review-complete>
+        <form method="post" asp-page-handler="Complete" class="sc-form sc-form--wide sc-formcard sc-formcard--wide" data-review-submit data-review-complete>
             <input type="hidden" name="Version" value="@Model.Draft.Version" />
             <label class="sc-check"><input type="checkbox" name="Append" value="true" /> Keep text already in a field and add the approved value after it.</label>
             <button class="sc-btn sc-btn--primary" disabled="@(Model.Proposals.Any(p => p.State == AiProposalStates.Pending))">Add approved fields and continue to note</button>

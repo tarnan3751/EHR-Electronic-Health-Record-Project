@@ -2911,6 +2911,11 @@
         margin-top: 0;
     }
 
+    /* The columns' tops level: the first frame in each starts on the same line. */
+    .sc-review > * > :first-child {
+        margin-top: 0;
+    }
+
     /* Filters (the schedule, the audit log): a toolbar above the table, its fields as wide as they need and the
        button on their line. */
     .sc-filters {
@@ -3504,6 +3509,12 @@
 
     .sc-sheet > .sc-proposals > .sc-proposal:last-child {
         border-bottom: 0;
+    }
+
+    /* Reviewing them: the rows straight under the panel's head, its hairline their first. */
+    .sc-sheet > h2:first-child + .sc-proposals {
+        margin-top: calc(-1 * var(--space-4));
+        border-top: 0;
     }
 
     /* Quick text: adding a phrase is a panel, and the phrases a framed list under it, shown once there is one. Not
