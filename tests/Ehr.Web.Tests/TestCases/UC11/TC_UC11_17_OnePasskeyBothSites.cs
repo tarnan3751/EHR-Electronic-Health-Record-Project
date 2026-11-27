@@ -43,7 +43,7 @@ public class TC_UC11_17_OnePasskeyBothSites(WebApps apps) : IClassFixture<WebApp
         // 1.
         using (var added = await AddAsync((await SignInAsync(apps.OnPrem, clinician)).Client, clinician, authenticator))
         {
-            Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
         }
 
         // 2.

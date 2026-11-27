@@ -6,7 +6,8 @@
 @if (Model.RecoveryCodes is { } codes)
 {
     <h1>Your recovery codes</h1>
-    <p>Your authenticator is set up and you are signed in. If you ever lose your phone, one of these codes signs you in instead. Each works once. Save them somewhere safe now: they are not shown again.</p>
+    <p>Your authenticator is set up, and you're signed in. If you lose your phone, sign in with one of these codes instead. Each works once.</p>
+    <p><strong>Save them somewhere safe now.</strong> They aren't shown again.</p>
     <ul class="sc-codes">
         @foreach (var code in codes)
         {

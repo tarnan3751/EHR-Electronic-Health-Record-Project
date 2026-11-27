@@ -11,8 +11,8 @@
         && typeof PublicKeyCredential.parseCreationOptionsFromJSON === "function"
         && typeof PublicKeyCredential.parseRequestOptionsFromJSON === "function";
 
-    // A notice that starts with its state word ("Not saved: ..."), marked up as the notice's leading words (docs/brand:
-    // Notice), and shown; or hidden, with no message.
+    // A notice that starts with its state, a sentence of its own ("Not saved. ..."), marked up as the notice's leading
+    // words (docs/brand: Notice), and shown; or hidden, with no message.
     function say(area, message) {
         if (!message) {
             area.hidden = true;
@@ -20,12 +20,12 @@
             return;
         }
 
-        const colon = message.indexOf(": ");
-        if (colon > 0) {
+        const stop = message.indexOf(". ");
+        if (stop > 0) {
             const state = document.createElement("span");
             state.className = "sc-notice__state";
-            state.textContent = message.slice(0, colon + 1);
-            area.replaceChildren(state, message.slice(colon + 1));
+            state.textContent = message.slice(0, stop + 1);
+            area.replaceChildren(state, message.slice(stop + 1));
         } else {
             area.textContent = message;
         }
@@ -69,7 +69,7 @@
             try {
                 const answer = await post(add);
                 if (!answer) {
-                    say(problem, "Not saved: the clinic's server couldn't be reached. Try again in a moment.");
+                    say(problem, "Not saved. The clinic's server couldn't be reached. Try again in a moment.");
                     return;
                 }
 
@@ -88,7 +88,7 @@
                 try {
                     credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(answer.body.options) });
                 } catch {
-                    say(problem, "Not saved: no passkey was made. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again.");
+                    say(problem, "Not saved. No passkey was made. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again.");
                     return;
                 }
 
@@ -117,7 +117,7 @@
             try {
                 const answer = await post(use);
                 if (!answer) {
-                    say(problem, "Not signed in: the clinic's server couldn't be reached. Try again in a moment.");
+                    say(problem, "Not signed in. The clinic's server couldn't be reached. Try again in a moment.");
                     return;
                 }
 
@@ -130,7 +130,7 @@
                 try {
                     credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(answer.body.options) });
                 } catch {
-                    say(problem, "Not signed in: the passkey wasn't used. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again, or enter a code below.");
+                    say(problem, "Not signed in. The passkey wasn't used. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again, or enter a code below.");
                     return;
                 }
 

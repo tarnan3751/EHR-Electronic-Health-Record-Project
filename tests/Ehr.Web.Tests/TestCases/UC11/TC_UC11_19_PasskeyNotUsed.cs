@@ -30,7 +30,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   1. Give the password; press Enter on "Use a passkey".
 //   2. Tab to the code, type it, press Enter.
 //   3. Off-site, cut off, after the password, post for a passkey's options.
-// Expected result: Step 1: still on /sign-in/code, a notice in an alert: "Not signed in: the passkey wasn't used. It may
+// Expected result: Step 1: still on /sign-in/code, a notice in an alert: "Not signed in. The passkey wasn't used. It may
 //   have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again, or enter a code
 //   below."; the focus on "Use a passkey"; nothing reached the server, so no failed sign-in is recorded. Step 2: signed
 //   in, to the clinician's patients. Step 3: 503, not JSON, which the script reads as the server unreachable.
@@ -68,7 +68,7 @@ public class TC_UC11_19_PasskeyNotUsed(WebApps apps) : IClassFixture<WebApps>
         var notice = page.Locator("[data-passkey-use] [role=alert]");
         await notice.WaitForAsync();
         Assert.Equal(
-            "Not signed in: the passkey wasn't used. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again, or enter a code below.",
+            "Not signed in. The passkey wasn't used. It may have been cancelled, or this device couldn't check your PIN, fingerprint or face. Try again, or enter a code below.",
             (await notice.InnerTextAsync()).Trim());
         Assert.EndsWith(CodePage, new Uri(page.Url).AbsolutePath);
         Assert.Equal("Use a passkey", await page.EvaluateAsync<string>("document.activeElement.textContent.trim()"));

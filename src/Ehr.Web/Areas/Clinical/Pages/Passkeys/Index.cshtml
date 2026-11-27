@@ -8,9 +8,10 @@
     <script src="~/_content/Ehr.Design/js/passkeys.js" defer></script>
 }
 <h1>Passkeys</h1>
-<p class="sc-lede">A passkey signs you in instead of the code from your authenticator app, after your password, at the clinic and off-site. Each time, it asks for your PIN, fingerprint or face. Your authenticator app stays set up, and its code always works too.</p>
+<p class="sc-lede">After your password, a passkey signs you in instead of your authenticator app's code, at the clinic and off-site. It asks for your PIN, fingerprint or face each time. Your authenticator's code still works too.</p>
 
-@* Each notice starts with its state ("Passkey added:", "Not saved:"), marked up as the guide's notices have it. *@
+@* Each notice starts with its state, a sentence of its own ("Passkey added.", "Not saved."), marked up as the guide's
+   notices have it. *@
 @if (Model.Message is { } message)
 {
     <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">@IndexModel.State(message)</span>@IndexModel.Rest(message)</p>
@@ -48,7 +49,7 @@ else
             </tbody>
         </table>
     </div>
-    <p class="sc-muted">Removing a passkey doesn't sign out a session already signed in with it. If you lose a device, ask an administrator to reset your authenticator: that signs out every session.</p>
+    <p class="sc-muted">Removing a passkey doesn't sign out a session already signed in with it. If you lose a device, ask an administrator to reset your authenticator. That signs out every session.</p>
 }
 
 <h2>Add a passkey</h2>
@@ -76,7 +77,7 @@ else
             <input id="passkey-code" name="code" class="sc-field__input sc-field__input--mono" inputmode="numeric" autocomplete="one-time-code" required>
         </div>
         <p class="sc-notice sc-notice--danger" role="alert" data-passkey-problem hidden></p>
-        <button class="sc-btn sc-btn--primary">Add a passkey</button>
+        <button class="sc-btn sc-btn--primary">Add passkey</button>
     </form>
     @* The passkey the browser made, sent as a plain form, so the page that follows is the server's. *@
     <form method="post" asp-page-handler="Add" data-passkey-finish hidden>

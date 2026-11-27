@@ -120,7 +120,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
             using var authenticator = new TestAuthenticator();
             using (var added = await AddAsync((await SignInAsync(apps.OnPrem, account)).Client, account, authenticator))
             {
-                Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+                Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
             }
 
             var (client, codePage) = await PasswordAsync(apps.OnPrem, account);
@@ -152,7 +152,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         using var authenticator = new TestAuthenticator();
         using (var added = await AddAsync((await SignInAsync(apps.OnPrem, account)).Client, account, authenticator))
         {
-            Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
         }
 
         var (client, codePage) = await PasswordAsync(apps.OnPrem, account);
@@ -303,7 +303,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         if (factor == "passkey")
         {
             using var added = await AddAsync((await SignInAsync(apps.OnPrem, account)).Client, account, authenticator);
-            Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
         }
 
         var recovery = (await apps.RecoveryCodesAsync(account))[0];
@@ -830,7 +830,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         // The link is spent.
         using var again = await client.GetAsync(setupPath, Cancel);
-        Assert.Contains("is not valid or has already been used", await ReadAsync(again));
+        Assert.Contains("isn't valid or has already been used", await ReadAsync(again));
 
         using var enrollPage = await PostFormAsync(client, "/sign-in", afterSetup, ("Input.Email", email), ("Input.Password", password));
         Assert.Equal("/sign-in/enroll", PathOf(enrollPage));

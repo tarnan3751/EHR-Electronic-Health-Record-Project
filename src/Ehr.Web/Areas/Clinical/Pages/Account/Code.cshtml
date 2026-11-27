@@ -29,7 +29,7 @@
     <div class="sc-field">
         <label asp-for="Code" class="sc-field__label">Code</label>
         <input asp-for="Code" class="sc-field__input sc-field__input--mono" autocomplete="one-time-code" required autofocus aria-describedby="code-hint">
-        <p class="sc-field__hint" id="code-hint">From your authenticator app, or one of your recovery codes.</p>
+        <p class="sc-field__hint" id="code-hint">From your authenticator app, or one of your recovery codes. Five wrong codes lock the account for 15 minutes.</p>
         <span asp-validation-for="Code" class="sc-field__error"></span>
     </div>
     @* An alert, so a refused code or passkey is announced wherever the focus is (on "Use a passkey", for one). *@
