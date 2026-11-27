@@ -11,13 +11,12 @@ import argparse
 import asyncio
 import dataclasses
 import json
-import subprocess
 from pathlib import Path
 
 import httpx2
 import numpy as np
 import pytest
-from conftest import ScriptedRecognizer, english_results_to_cap_at
+from conftest import ScriptedRecognizer, english_results_to_cap_at, llama_transport, webm
 
 from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import load_scripts, runs
@@ -55,9 +54,7 @@ def audio(bursts: int) -> bytes:
     one = np.concatenate([0.1 * np.sin(2 * np.pi * 220 * np.arange(int(1.5 * SAMPLE_RATE)) / SAMPLE_RATE),
                           np.zeros(SAMPLE_RATE)])
     samples = np.tile(one, bursts).astype(np.float32)
-    return subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "1", "-i", "pipe:0",
-         "-c:a", "libopus", "-f", "webm", "pipe:1"], input=samples.tobytes(), capture_output=True, check=True).stdout
+    return webm(samples)
 
 
 class Whisper:
@@ -78,16 +75,11 @@ class Whisper:
 
 
 def llama(answer) -> LlamaServer:  # noqa: ANN001
-    async def handle(request: httpx2.Request) -> httpx2.Response:
-        if request.url.path == "/props":
-            return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
-                                              "default_generation_settings": {"n_ctx": 8192}})
-        if request.url.path == "/tokenize":
-            return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
+    def complete(request: httpx2.Request) -> httpx2.Response:
         sent = json.loads(request.content)["messages"][-1]["content"]
         return httpx2.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": answer(sent)}}]})
 
-    return LlamaServer("http://llama.test", "key", transport=httpx2.MockTransport(handle))
+    return LlamaServer("http://llama.test", "key", transport=llama_transport(complete, n_ctx=8192))
 
 
 def spanish_answer(asked: dict[str, int]):  # noqa: ANN201

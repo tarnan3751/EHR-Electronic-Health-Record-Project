@@ -7,8 +7,8 @@ import asyncio
 import dataclasses
 
 import pytest
-from conftest import ScriptedRecognizer, fake_structurer
-from test_run import speech, webm
+from conftest import ScriptedRecognizer, fake_structurer, webm
+from test_run import speech
 
 from ehr_dictation import prompt
 from ehr_eval import rescore, run, scoring

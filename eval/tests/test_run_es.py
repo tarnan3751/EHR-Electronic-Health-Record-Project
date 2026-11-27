@@ -10,8 +10,8 @@ import dataclasses
 import json
 
 import pytest
-from conftest import ScriptedRecognizer, fake_structurer
-from test_run import speech, webm
+from conftest import ScriptedRecognizer, fake_structurer, webm
+from test_run import speech
 
 from dictation_scripts import load_scripts as load_english
 from dictation_scripts_es import load_scripts

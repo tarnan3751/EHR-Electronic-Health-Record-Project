@@ -7,11 +7,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import subprocess
 
 import numpy as np
 import pytest
-from conftest import ScriptedRecognizer, fake_structurer
+from conftest import ScriptedRecognizer, fake_structurer, webm
 
 from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.provenance import Models
@@ -25,14 +24,6 @@ def speech(seconds: float) -> np.ndarray:
     tone = (0.1 * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
     tone[int(seconds * SAMPLE_RATE * 0.5) : int(seconds * SAMPLE_RATE * 0.5) + SAMPLE_RATE] = 0
     return tone
-
-
-def webm(samples: np.ndarray) -> bytes:
-    return subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "1", "-i", "pipe:0",
-         "-c:a", "libopus", "-f", "webm", "pipe:1"],
-        input=samples.tobytes(), capture_output=True, check=True,
-    ).stdout
 
 
 def test_a_recording_goes_through_the_pipeline_and_is_scored(tmp_path, scripts):
