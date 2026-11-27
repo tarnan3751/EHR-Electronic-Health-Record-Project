@@ -10,11 +10,13 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="Edit" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@Model.Draft.Id">Back to draft</a></p>
+    <p><a asp-page="Edit" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@Model.Draft.Id" class="sc-back">Back to draft</a></p>
 </div>
 <h1>Confirm signature</h1>
 <p class="sc-prose">Check the note below. Once signed, it can't be changed.</p>
-<partial name="_NoteContent" model="NoteSections.AsSaved(Model.Draft)" />
+<div class="sc-notedoc">
+    <partial name="_NoteContent" model="NoteSections.AsSaved(Model.Draft)" />
+</div>
 <div id="note-errors" class="sc-notice sc-notice--danger" role="alert" hidden="@(Model.Errors.Count == 0)">
     @foreach (var error in Model.Errors) { <p>@error</p> }
 </div>
@@ -25,7 +27,7 @@
 }
 else if (Model.Errors.Count == 0)
 {
-    <form method="post" class="sc-form sc-form--wide" data-note-sign>
+    <form method="post" class="sc-form sc-form--wide sc-formcard sc-formcard--wide" data-note-sign>
         <input type="hidden" asp-for="Version" />
         <label class="sc-check"><input asp-for="Confirmed" /> I have reviewed this note and sign it as @(User.FindFirst(EhrClaims.DisplayName)?.Value ?? User.Identity?.Name).</label>
         @* Step 10: a sensitive note is left out of the chart until asked for; its signer can unmark it later, with a reason (step 10b). *@

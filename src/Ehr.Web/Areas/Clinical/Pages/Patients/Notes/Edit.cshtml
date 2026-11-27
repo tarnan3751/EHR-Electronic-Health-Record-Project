@@ -12,7 +12,21 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@Model.Patient.Id" class="sc-back">Back to chart</a></p>
+    @* UC 13: dictate into this draft, on the right of the line above the title, while the draft can be changed and no
+       review of a dictation is waiting (the notice under the title goes back to that one instead). *@
+    @if (OnPrem.IsReachable && Model.ActiveReviewId is null)
+    {
+        <p class="sc-actions">
+            <a class="sc-btn" asp-page="/Patients/Dictate" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Dictate into this draft</a>
+            @* Step 16: listening to a visit into this draft, when the clinic has it switched on, at the clinic only, and not in
+               what the cloud app forwards here. *@
+            @if (Listening.Enabled && Ehr.Web.Forwarding.ClinicNetwork.AtTheClinic(HttpContext.Request, NoteWrites))
+            {
+                <a class="sc-btn" asp-page="/Patients/Listen" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Listen to the visit into this draft</a>
+            }
+        </p>
+    }
 </div>
 <h1 class="sc-title">Clinical note <span class="sc-tag sc-tag--warning">Draft · unsigned</span></h1>
 @if (!OnPrem.IsReachable)
@@ -24,20 +38,10 @@
 }
 else
 {
-    @* UC 13: dictate into this draft, or go back to a review that was saved. Only while the draft can be changed. *@
+    @* UC 13: go back to a review that was saved. Only while the draft can be changed. *@
     @if (Model.ActiveReviewId is { } reviewId)
     {
         <p class="sc-notice sc-notice--warning"><a asp-page="Review" asp-route-patientId="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])" asp-route-reviewId="@reviewId">Resume dictation review</a>. Review the dictated fields before signing.</p>
-    }
-    else
-    {
-        <p><a asp-page="/Patients/Dictate" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Dictate into this draft</a></p>
-        @* Step 16: listening to a visit into this draft, when the clinic has it switched on, at the clinic only, and not in
-           what the cloud app forwards here. *@
-        @if (Listening.Enabled && Ehr.Web.Forwarding.ClinicNetwork.AtTheClinic(HttpContext.Request, NoteWrites))
-        {
-            <p><a asp-page="/Patients/Listen" asp-route-id="@Model.Patient.Id" asp-route-draftId="@(RouteData.Values["draftId"])">Listen to the visit into this draft</a></p>
-        }
     }
     var waiting = (Guid.Parse(RouteData.Values["draftId"]!.ToString()!), Model.WaitingProposals, false);
     <partial name="_WaitingProposals" model="waiting" />
@@ -63,7 +67,7 @@ else
         <p id="note-definition-@item.ToLowerInvariant()" class="sc-field__hint">@NoteSections.Definitions[item]</p>
         <p id="note-prompt-@item.ToLowerInvariant()" class="sc-field__hint" data-note-prompt="@item.ToLowerInvariant()" hidden="@(chosen is null)">@(chosen is null ? "" : $"{chosen.Title}: {NoteSections.Prompt(chosen, item)}")</p>
     </text>;
-    <form method="post" asp-page-handler="Save" class="sc-form sc-form--wide" data-note-editor>
+    <form method="post" asp-page-handler="Save" class="sc-form sc-form--wide sc-editor" data-note-editor>
         <input type="hidden" asp-for="Version" />
         <p id="note-help" class="sc-field__hint">The draft saves as you type. Fill in all four sections to sign it.</p>
         <div class="sc-field">

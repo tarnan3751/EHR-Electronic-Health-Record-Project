@@ -10,9 +10,12 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="summary">Back to note</a></p>
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="summary" class="sc-back">Back to note</a></p>
 </div>
 <h1>Withdraw visit summary</h1>
+@* The form beside the summary it withdraws. *@
+<div class="sc-split">
+<div class="sc-formcard sc-formcard--wide">
 <p class="sc-prose">Released to the patient by <strong>@Model.Summary.ReleasedBy</strong>, @Clinic.Format(Model.Summary.ReleasedAt), from the note signed @Clinic.Format(Model.Note.SignedAt).</p>
 @* What withdrawing does: the one thing that changes for the patient first, then the rest as a short list. *@
 <div class="sc-prose">
@@ -53,6 +56,10 @@ else
         </div>
     </form>
 }
+</div>
 
-<h2>The summary</h2>
+<section class="sc-sheet" aria-labelledby="the-summary">
+<h2 id="the-summary">The summary</h2>
 <partial name="_SummaryContent" model="Model.Summary" />
+</section>
+</div>

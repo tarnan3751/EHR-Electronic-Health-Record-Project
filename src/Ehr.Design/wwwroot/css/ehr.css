@@ -2931,6 +2931,246 @@
         line-height: 24px;
     }
 
+    /* In a panel, a list of signed texts (addenda): who and when, then the text, then its own link. */
+    .sc-sheet .sc-list {
+        margin: 0 0 var(--space-4);
+    }
+
+    .sc-sheet .sc-list > li {
+        padding: var(--space-3) 0;
+    }
+
+    .sc-sheet .sc-list > li:first-child {
+        padding-top: 0;
+    }
+
+    .sc-sheet .sc-list > li > p {
+        margin: 0;
+    }
+
+    .sc-sheet .sc-list > li > p + p {
+        margin-top: var(--space-1);
+    }
+
+    .sc-sheet .sc-list > li > p:has(> a:only-child),
+    .sc-sheet [data-summary] > p:last-child {
+        font-size: 14px;
+        line-height: 20px;
+        font-weight: 600;
+    }
+
+    .sc-sheet [data-summary] > p:last-child a {
+        text-decoration: none;
+    }
+
+    .sc-sheet [data-summary] > p:last-child a:hover,
+    .sc-sheet [data-summary] > p:last-child a:focus-visible {
+        text-decoration: underline;
+    }
+
+    .sc-sheet [data-summary] {
+        margin: 0 0 var(--space-4);
+    }
+
+    .sc-sheet [data-summary] > p {
+        margin: 0;
+    }
+
+    .sc-sheet [data-summary] > p:first-child {
+        padding-bottom: var(--space-1);
+    }
+
+    .sc-sheet [data-summary]:last-child {
+        margin-bottom: 0;
+    }
+
+    /* A note's sections as one document: on a wide window each section's title on the left of its text, between
+       hairlines; the signer and the time first, the same way. In a panel (a visit summary's parts), no frame of its
+       own. */
+    .sc-notedoc {
+        margin: 0 0 var(--space-6);
+        padding: var(--space-1) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-sheet .sc-notedoc {
+        margin: 0 0 var(--space-3);
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .sc-notedoc .sc-note {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-notedoc .sc-note > :is(h2, h3) {
+        margin: 0;
+        padding-top: var(--space-4);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
+    .sc-notedoc .sc-note > .sc-note__text {
+        margin: 0;
+        padding: var(--space-1) 0 var(--space-4);
+    }
+
+    .sc-notedoc .sc-note > [data-note-format] {
+        margin: var(--space-4) 0 0;
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-notedoc > dl.record {
+        margin: 0;
+        padding: var(--space-3) 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-notedoc > p {
+        margin: 0;
+        padding: var(--space-3) 0;
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .sc-notedoc > p > a:only-child {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-notedoc > p > a:only-child:hover,
+    .sc-notedoc > p > a:only-child:focus-visible {
+        text-decoration: underline;
+    }
+
+    @media (min-width: 48rem) {
+        .sc-notedoc .sc-note,
+        .sc-notedoc > dl.record {
+            display: grid;
+            grid-template-columns: 12rem minmax(0, 1fr);
+            column-gap: 0;
+        }
+
+        .sc-notedoc > dl.record > dd {
+            padding-left: var(--space-6);
+        }
+
+        .sc-notedoc .sc-note > * {
+            grid-column: 1 / -1;
+        }
+
+        .sc-notedoc .sc-note > :is(h2, h3) {
+            grid-column: 1;
+            padding-bottom: var(--space-4);
+        }
+
+        .sc-notedoc .sc-note > .sc-note__text {
+            grid-column: 2;
+            padding-top: var(--space-4);
+            padding-left: var(--space-6);
+        }
+
+        .sc-notedoc .sc-note > :is(h2, h3) ~ :is(h2, h3),
+        .sc-notedoc .sc-note > :is(h2, h3) ~ :is(h2, h3) + .sc-note__text {
+            border-top: 1px solid var(--line);
+        }
+    }
+
+    /* A note or a summary for reference beside a form: each part's title above its text, small. */
+    .sc-sheet > .sc-note {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-sheet > .sc-note > :is(h2, h3) {
+        margin: var(--space-3) 0 var(--space-1);
+        font-family: var(--font-sans);
+        font-size: 14px;
+        line-height: 20px;
+        color: var(--ink-muted);
+    }
+
+    .sc-sheet > .sc-note > :is(h2, h3):first-child {
+        margin-top: 0;
+    }
+
+    .sc-sheet > .sc-note > .sc-note__text {
+        margin: 0;
+    }
+
+    /* The note editor: a card the page's width, each section a row: its name and what to cover in it on the left,
+       its box on the right; the buttons under the boxes. One column on a narrow window. */
+    .sc-editor {
+        max-width: none;
+        padding: var(--space-5) var(--space-6) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-editor > #note-help {
+        margin: 0;
+    }
+
+    @media (min-width: 56rem) {
+        .sc-editor {
+            gap: 0;
+        }
+
+        .sc-editor > .sc-field {
+            display: grid;
+            grid-template-columns: 15rem minmax(0, 1fr);
+            grid-template-rows: auto auto 1fr;
+            column-gap: var(--space-6);
+            row-gap: var(--space-1);
+            align-items: start;
+            max-width: none;
+            padding: var(--space-4) 0;
+            border-top: 1px solid var(--line);
+        }
+
+        .sc-editor > .sc-field > label,
+        .sc-editor > .sc-field > .sc-field__hint {
+            grid-column: 1;
+        }
+
+        .sc-editor > .sc-field > .sc-field__input {
+            grid-column: 2;
+            grid-row: 1 / span 3;
+        }
+
+        .sc-editor > .sc-field > :not(label, .sc-field__hint, .sc-field__input) {
+            grid-column: 2;
+        }
+
+        .sc-editor > .sc-field > select.sc-field__input {
+            max-width: var(--width-form);
+        }
+
+        .sc-editor > #note-help {
+            padding-bottom: var(--space-4);
+        }
+
+        .sc-editor > .sc-actions {
+            align-self: stretch;
+            margin: 0;
+            padding: var(--space-4) 0 0 calc(15rem + var(--space-6));
+            border-top: 1px solid var(--line);
+        }
+    }
+
+    .sc-editor .sc-actions .sc-status {
+        margin: 0 0 0 var(--space-2);
+    }
+
     /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
        comment; anything two areas share belongs in the components layer.
        ---- */

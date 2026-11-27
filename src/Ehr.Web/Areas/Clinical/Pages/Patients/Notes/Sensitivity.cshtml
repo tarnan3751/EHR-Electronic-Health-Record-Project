@@ -12,9 +12,11 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to note</a></p>
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" class="sc-back">Back to note</a></p>
 </div>
 <h1>@title</h1>
+@* What is marked, what marking does, then the reason: one task, in one card. *@
+<div class="sc-formcard sc-formcard--wide">
 @if (Model.Entry is { } entry)
 {
     <p class="sc-prose">The addendum by <strong>@entry.AuthorName</strong>, signed @Clinic.Format(entry.SignedAt), to the note signed @Clinic.Format(Model.Note.SignedAt).</p>
@@ -107,3 +109,4 @@ else
         </div>
     </form>
 }
+</div>

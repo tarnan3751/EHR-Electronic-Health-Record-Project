@@ -11,9 +11,12 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to note</a></p>
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" class="sc-back">Back to note</a></p>
 </div>
 <h1>Add addendum</h1>
+@* The form beside the note it follows. *@
+<div class="sc-split">
+<div class="sc-formcard sc-formcard--wide">
 <p class="sc-prose">The note, signed @Clinic.Format(Model.Note.SignedAt), can't be changed. An addendum is added after it, signed by you. It can't be edited or removed.</p>
 @if (!OnPrem.IsReachable)
 {
@@ -49,6 +52,10 @@ else
     </div>
 </form>
 }
+</div>
 
-<h2>The signed note</h2>
+<section class="sc-sheet" aria-labelledby="signed-note">
+<h2 id="signed-note">The signed note</h2>
 <partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
+</section>
+</div>
