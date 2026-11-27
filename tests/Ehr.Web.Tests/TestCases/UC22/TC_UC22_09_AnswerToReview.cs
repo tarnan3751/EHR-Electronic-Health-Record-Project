@@ -45,9 +45,9 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   one, as "Pre-visit form to review", "A pre-visit form has an answer that needs review", tagged "Needs review",
 //   linking to the answers. Step 3: both charts say "Needs review. A pre-visit form has an answer for you to review."
 //   Step 4: the clinician's chart no longer says so; the colleague's still does. Step 5 (after the colleague marks theirs
-//   done too): the covering clinician's inbox holds the item; its link shows the answers with "Not on your panel:
-//   Synthetic Booked is on the panel of Dr. Forms Colleague, Dr. Forms Nine, and the chart opens to you only under emergency access, which
-//   the chart asks you for." and "An answer needs review: question 9, "Thoughts that you would be better off dead or of
+//   done too): the covering clinician's inbox holds the item; its link shows the answers with "Not one of your
+//   patients. Synthetic Booked is a patient of Dr. Forms Colleague, Dr. Forms Nine. To open their chart, you'll need
+//   emergency access." and "Needs review. Question 9, "Thoughts that you would be better off dead or of
 //   hurting yourself in some way"."; one recorded view of sensitive items and no emergency access; the chart, the
 //   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander;
 //   the inbox says beside "Mark done": "After you mark this done, the answers open from the patient's chart, which needs
@@ -129,11 +129,11 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             var page = Text(await read.Content.ReadAsStringAsync(Cancel));
-            Assert.Contains("Not on your panel: Synthetic Booked is on the panel of Dr. Forms Colleague, Dr. Forms Nine, and the chart opens to you only "
-                + "under emergency access, which the chart asks you for.", page);
-            Assert.Contains("An answer needs review: question 9, \"Thoughts that you would be better off dead or of hurting yourself in some way\".", page);
+            Assert.Contains("Not one of your patients. Synthetic Booked is a patient of Dr. Forms Colleague, Dr. Forms Nine. To open their chart, "
+                + "you'll need emergency access.", page);
+            Assert.Contains("Needs review. Question 9, \"Thoughts that you would be better off dead or of hurting yourself in some way\".", page);
             Assert.Contains("Thoughts that you would be better off dead or of hurting yourself in some way Several days · score 1", page);
-            Assert.Contains("Back to the inbox", page);
+            Assert.Contains("Back to inbox", page);
         }
 
         Assert.Equal(views + 1, await apps.AuditEventsAsync(AuditActions.ReadSensitive, coveringAccount.Id, visit.Patient));

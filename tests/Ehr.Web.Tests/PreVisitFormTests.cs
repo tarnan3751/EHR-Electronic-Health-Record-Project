@@ -62,7 +62,7 @@ static class PreVisitFormTests
 
     public static string FormsPath(Guid patient) => $"/patients/{patient}/forms";
 
-    // "Ask the patient to fill it in", as the forms page posts it.
+    // "Ask for form", as the forms page posts it.
     public static Task<HttpResponseMessage> AskAsync(HttpClient client, Guid patient, Guid appointment, string questionnaire) =>
         PostFormAsync(client, FormsPath(patient) + "?handler=Ask", FormsPath(patient), ("AppointmentId", appointment), ("Questionnaire", questionnaire));
 

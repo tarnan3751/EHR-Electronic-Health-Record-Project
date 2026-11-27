@@ -16,7 +16,7 @@
 <div class="sc-pagehead">
     @if (Model.FromInbox)
     {
-        <p><a asp-page="/Inbox/Index">Back to the inbox</a></p>
+        <p><a asp-page="/Inbox/Index">Back to inbox</a></p>
     }
     else
     {
@@ -27,14 +27,14 @@
 @if (Model.Answers.CareTeam is { } team)
 {
     @* Opened from the reader's inbox, not their panel: whose patient this is, and the one way to the chart. *@
-    <p class="sc-notice sc-notice--info" data-form-not-on-panel><span class="sc-notice__state">Not on your panel:</span> @patient.GivenName @patient.FamilyName is @(team.Count == 0 ? "on no clinician's panel" : $"on the panel of {string.Join(", ", team)}"), and the chart opens to you only under emergency access, which <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">the chart</a> asks you for.</p>
+    <p class="sc-notice sc-notice--info" data-form-not-on-panel><span class="sc-notice__state">Not one of your patients.</span> @patient.GivenName @patient.FamilyName @(team.Count == 0 ? "has no care team" : $"is a patient of {string.Join(", ", team)}"). To open <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">their chart</a>, you'll need emergency access.</p>
 }
-<p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded.</p>
+<p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown.</span> Your view is logged.</p>
 @if (answered.Alert)
 {
     @foreach (var (number, item) in definition.NeedingReview(answered.Answers))
     {
-        <p class="sc-notice sc-notice--danger" data-form-alert><span class="sc-notice__state">An answer needs review:</span> question @number, "@item.Text".</p>
+        <p class="sc-notice sc-notice--danger" data-form-alert><span class="sc-notice__state">Needs review.</span> Question @number, "@item.Text".</p>
     }
 }
 <section class="sc-panel" aria-label="The form">
