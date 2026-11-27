@@ -712,7 +712,7 @@ async fn open_here(app: &App, password: String) -> Result<(), String> {
 }
 
 /// What every command answers once an administrator revoked the sign-in and the app deleted what it kept here.
-const DELETED: &str = "Deleted: an administrator revoked this computer's sign-in. Quit SwiftChart.";
+const DELETED: &str = "Deleted. An administrator revoked this computer's sign-in. Quit SwiftChart.";
 
 /// Whether the remote wipe's marker may delete what's kept here: only for a sign-in whose lock's record says it was made
 /// with the servers the app has, which are the ones that answered (adjustment c of the step's plan review).
@@ -744,7 +744,7 @@ fn restart_for_update(app: State<'_, App>, handle: AppHandle) -> Result<(), Stri
             return Err(LOCKED.to_owned());
         }
         if lock.recording_now(Moment::now()) {
-            return Err("Finish the recording first: restarting would stop it.".to_owned());
+            return Err("Finish the recording first. Restarting would stop it.".to_owned());
         }
     }
     app.updates.restart(&handle)

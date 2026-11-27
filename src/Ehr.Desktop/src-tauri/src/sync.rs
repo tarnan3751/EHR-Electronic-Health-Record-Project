@@ -1023,7 +1023,7 @@ fn revoked(response: &Response) -> bool {
 
 /// What a round or a download says when the server answers with the remote wipe's marker, until main.rs has deleted
 /// everything and the window says so.
-const REVOKED: &str = "Revoked: an administrator revoked this computer's sign-in.";
+const REVOKED: &str = "Revoked. An administrator revoked this computer's sign-in.";
 
 /// The innermost cause, which names what actually went wrong: "Connection refused", an untrusted certificate.
 fn reason(error: &reqwest::Error) -> String {

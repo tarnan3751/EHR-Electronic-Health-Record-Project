@@ -93,10 +93,10 @@ function renderStatus(status, waiting) {
 // An update (src-tauri/src/updates.rs), which the Rust side gives only while the window is unlocked and nothing is
 // recording: offered, being got ready, ready for a restart, or not installed. Each notice starts with its state word.
 const updateWords = {
-  offered: (update) => ['Update available:', ` SwiftChart ${update.version}. Get it ready, and it installs when you restart SwiftChart; nothing you've saved is affected.`],
-  downloading: (update) => ['Getting it ready:', ` SwiftChart ${update.version} is being downloaded and its signature checked.`],
-  ready: (update) => ['Ready:', ` SwiftChart ${update.version} is ready to install. Save what you're typing, then choose Restart now: restarting closes this window.`],
-  failed: (update) => ['Not installed:', ` ${update.problem}`],
+  offered: (update) => ['Update available.', ` Get SwiftChart ${update.version} ready, and it installs at the next restart. Nothing you've saved is affected.`],
+  downloading: (update) => ['Getting it ready.', ` Downloading SwiftChart ${update.version} and checking its signature.`],
+  ready: (update) => ['Ready.', ` SwiftChart ${update.version} is ready to install. Save what you're typing, then choose Restart now. Restarting closes this window.`],
+  failed: (update) => ['Not installed.', ` ${update.problem}`],
 };
 
 function renderUpdate(update) {
@@ -870,10 +870,10 @@ function showDeleted(problem) {
   byId('lock').hidden = true;
   byId('deleted-title').textContent = problem ? 'Not finished' : 'Deleted';
   byId('deleted-text').replaceChildren(
-    el('span', { className: 'sc-notice__state', textContent: problem ? 'Not finished:' : 'Deleted:' }),
+    el('span', { className: 'sc-notice__state', textContent: problem ? 'Not finished.' : 'Deleted.' }),
     problem
-      ? ` an administrator revoked this computer's sign-in, and SwiftChart couldn't delete everything it keeps here (${problem}). Quit SwiftChart and start it again to finish.`
-      : ' an administrator revoked this computer\'s sign-in, so SwiftChart deleted everything it kept here: the offline charts, drafts and recordings not yet sent, and its key. Quit SwiftChart; when it starts again it is empty, and you can sign in.',
+      ? ` An administrator revoked this computer's sign-in, and SwiftChart couldn't delete everything it keeps here (${problem}). Quit SwiftChart and start it again to finish.`
+      : ' An administrator revoked this computer\'s sign-in, so SwiftChart deleted the offline charts and everything else it kept here. Drafts and recordings not yet sent are lost. Quit SwiftChart. When it starts again, it\'s empty and you can sign in.',
   );
   byId('deleted').hidden = false;
   byId('quit').focus();

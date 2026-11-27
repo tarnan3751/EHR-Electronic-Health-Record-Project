@@ -165,10 +165,10 @@ In this order, so that a crash at any point leaves nothing readable and the next
    again, so nothing it showed or had typed in it stays in memory.
 4. The kept sign-in, last: until then a start after a crash presents it again and is told again.
 
-The window then shows only: "Deleted: an administrator revoked this computer's sign-in, so SwiftChart deleted
-everything it kept here: the offline charts, drafts and recordings not yet sent, and its key. Quit SwiftChart; when it
-starts again it is empty, and you can sign in.", with **Quit SwiftChart**; every command is refused. If something
-couldn't be deleted, it says "Not finished:" and what, and starting again finishes it. Drafts and recordings not yet
+The window then shows only: "Deleted. An administrator revoked this computer's sign-in, so SwiftChart deleted the
+offline charts and everything else it kept here. Drafts and recordings not yet sent are lost. Quit SwiftChart. When it
+starts again, it's empty and you can sign in.", with **Quit SwiftChart**; every command is refused. If something
+couldn't be deleted, it says "Not finished." and what, and starting again finishes it. Drafts and recordings not yet
 sent are lost, by design: the administrator is told before revoking. One way past it: a clinician who signs in again
 with the password and the code before the app's first round reaches a server replaces the revoked sign-in, so nothing
 is deleted; only the account's owner can, and for someone leaving the administrator disables the account too, before or
@@ -185,11 +185,11 @@ only: the page has no permission for the updater.
 - **What it takes:** only a release newer than this one, never an older, and only if its signature matches the key built
   into the app (`tauri.conf.json`, `plugins.updater.pubkey`) for the very version announced (`requireSignedVersion`), so
   nobody who can change what a server says can pair a new version number with an older release. The updater checks it
-  after downloading and again before installing; a signature that doesn't match installs nothing: "Not installed:
-  SwiftChart … couldn't be downloaded or installed, or its signature didn't match, so nothing was changed." An
+  after downloading and again before installing; a signature that doesn't match installs nothing: "Not installed.
+  SwiftChart … couldn't be downloaded or installed, or its signature didn't match. Nothing was changed." An
   interrupted download fails the same check. The signing key never reaches CI (`docs/desktop-install.md`).
-- **When:** it asks, and only while the window is unlocked and nothing is recording: "Update available: SwiftChart ….
-  Get it ready, and it installs when you restart SwiftChart; nothing you've saved is affected.", with **Get it ready**
+- **When:** it asks, and only while the window is unlocked and nothing is recording: "Update available. Get SwiftChart …
+  ready, and it installs at the next restart. Nothing you've saved is affected.", with **Get it ready**
   and **Not now**, which puts it away; a notice that it failed can be put away too. The daily check goes on all the
   same, and offers a release again unless it's the one put away; a check gives up after 30 seconds. Got ready, on macOS
   the checked app replaces this one on disk at once, swapped whole, and runs from the next start; on Windows its

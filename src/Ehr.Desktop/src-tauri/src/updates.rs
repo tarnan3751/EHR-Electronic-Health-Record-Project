@@ -188,8 +188,8 @@ impl Updates {
             }
             Err(error) => {
                 let problem = format!(
-                    "SwiftChart {version} couldn't be downloaded or installed, or its signature didn't match, so \
-                     nothing was changed ({error})."
+                    "SwiftChart {version} couldn't be downloaded or installed, or its signature didn't match. \
+                     Nothing was changed ({error})."
                 );
                 self.offer(Offer::Failed {
                     problem: problem.clone(),
