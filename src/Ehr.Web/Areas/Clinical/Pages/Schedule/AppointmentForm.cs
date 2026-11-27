@@ -14,11 +14,11 @@ public static class AppointmentForm
         DateTimeOffset? start = null;
         if (!DateOnly.TryParseExact(day?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
         {
-            errors["Day"] = "Enter the day, as year-month-day.";
+            errors["Day"] = "Day must be a date in the form year-month-day.";
         }
         else if (!TimeOnly.TryParseExact(time?.Trim(), "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var clock))
         {
-            errors["Time"] = "Enter the time, as hours and minutes on the 24-hour clock.";
+            errors["Time"] = "Time must be hours and minutes on the 24-hour clock.";
         }
         else
         {
@@ -30,26 +30,26 @@ public static class AppointmentForm
             }
             else if (start < DateTimeOffset.UtcNow.AddMinutes(-5))
             {
-                errors["Day"] = "Choose a time that hasn't passed.";
+                errors["Day"] = "Day and time must be in the future.";
             }
             else if (start > DateTimeOffset.UtcNow.AddYears(2))
             {
-                errors["Day"] = "Choose a day within the next two years.";
+                errors["Day"] = "Day must be within the next two years.";
             }
         }
 
         if (minutes is < AppointmentConfiguration.ShortestMinutes or > AppointmentConfiguration.LongestMinutes)
         {
-            errors["Minutes"] = "Choose a length.";
+            errors["Minutes"] = "Length is required.";
         }
 
         if (string.IsNullOrWhiteSpace(reason))
         {
-            errors["Reason"] = "Enter the reason for the visit.";
+            errors["Reason"] = "Reason is required.";
         }
         else if (reason.Trim().Length > Appointments.MaximumLength)
         {
-            errors["Reason"] = $"Shorten the reason to {Appointments.MaximumLength} characters or fewer.";
+            errors["Reason"] = $"Reason must be {Appointments.MaximumLength} characters or fewer.";
         }
 
         return errors.Count == 0 ? start : null;

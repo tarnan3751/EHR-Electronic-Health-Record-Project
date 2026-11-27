@@ -5,7 +5,7 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.Header.Patient;
-    ViewData["Title"] = $"Book appointment: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "Book appointment";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Header.Allergies)" />
@@ -13,7 +13,7 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink" class="sc-back">Back to chart</a></p>
 </div>
-<h1>Book appointment: @patient.FamilyName, @patient.GivenName</h1>
+<h1>Book appointment</h1>
 <form method="post" class="sc-form sc-formcard sc-formcard--wide sc-formgrid">
     @if (Model.Errors.Count > 0)
     {

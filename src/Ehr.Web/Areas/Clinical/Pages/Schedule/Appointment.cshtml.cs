@@ -76,7 +76,7 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
             var result = await appointments.RescheduleAsync(appointmentId, Version, start!.Value, Minutes, Reason!, HttpContext.RequestAborted);
             if (result == AppointmentResult.Overlap)
             {
-                errors["Time"] = "This clinician already has an appointment booked then. Choose another time.";
+                errors["Time"] = "This clinician is already booked at that time.";
                 Response.StatusCode = StatusCodes.Status409Conflict;
             }
             else
@@ -106,8 +106,8 @@ public class AppointmentModel(PhiReader phi, PatientAssignments assignments, Bre
             Errors = new Dictionary<string, string>
             {
                 ["CancelReason"] = string.IsNullOrEmpty(reason)
-                    ? "Enter the reason for cancelling."
-                    : $"Shorten the reason to {Appointments.MaximumReasonLength} characters or fewer.",
+                    ? "Reason for cancelling is required."
+                    : $"Reason for cancelling must be {Appointments.MaximumReasonLength} characters or fewer.",
             };
             Fill();
             Response.StatusCode = StatusCodes.Status422UnprocessableEntity;

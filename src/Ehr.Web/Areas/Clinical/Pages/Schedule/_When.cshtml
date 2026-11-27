@@ -31,12 +31,11 @@
     </select>
 </div>
 <div class="sc-field">
-    <label for="appointment-reason">Reason for the visit <span>(required)</span></label>
+    <label for="appointment-reason">Reason (shown to the patient) <span>(required)</span></label>
     <input id="appointment-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="@Appointments.MaximumLength" autocomplete="off" required
-           aria-invalid="@(Error("Reason") is null ? null : "true")" aria-describedby="@(Error("Reason") is null ? "appointment-reason-hint" : "appointment-reason-error appointment-reason-hint")">
+           aria-invalid="@(Error("Reason") is null ? null : "true")" aria-describedby="@(Error("Reason") is null ? null : "appointment-reason-error")">
     @if (Error("Reason") is { } reasonError)
     {
         <p class="sc-field__error" id="appointment-reason-error">@reasonError</p>
     }
-    <p class="sc-field__hint" id="appointment-reason-hint">The patient sees this in the portal.</p>
 </div>

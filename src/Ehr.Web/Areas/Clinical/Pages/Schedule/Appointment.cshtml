@@ -8,7 +8,7 @@
     ViewData["UseHtmx"] = false;
     var patient = Model.Detail.Patient;
     var appointment = Model.Detail.Appointment;
-    ViewData["Title"] = $"Appointment: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "Appointment";
     var saved = Model.Saved switch
     {
         "rescheduled" => "Appointment rescheduled.",
@@ -27,14 +27,14 @@
     @* Step 13e: the forms asked for before this visit, and asking for one, on the patient's pre-visit forms page. *@
     <p><a asp-page="/Patients/Forms/Index" asp-route-patientId="@patient.Id" asp-fragment="appointment-@appointment.Id" class="sc-btn" data-forms>Pre-visit forms</a></p>
 </div>
-<h1>Appointment: @patient.FamilyName, @patient.GivenName</h1>
+<h1>Appointment</h1>
 @if (Model.Gone)
 {
-    <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> This appointment changed while the page was open. Below is how it stands now.</p>
+    <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> This appointment changed while the page was open.</p>
 }
 else if (saved is not null && Model.Errors.Count == 0)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">@saved</span> @(Model.Saved == "checked-in" ? "The visit has started and is on the chart." : "The patient sees the change in the portal.")</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">@saved</span></p>
 }
 @* The appointment and what can be done with it, as panels two to a row. *@
 <div class="sc-split sc-split--even">
@@ -58,7 +58,7 @@ else if (saved is not null && Model.Errors.Count == 0)
             <form method="post" asp-page-handler="CheckIn"><input type="hidden" name="Version" value="@Model.Version"><button class="sc-btn sc-btn--primary" aria-describedby="appointment-arrival-note">Check in</button></form>
             <form method="post" asp-page-handler="NoShow"><input type="hidden" name="Version" value="@Model.Version"><button class="sc-btn" aria-describedby="appointment-arrival-note">Mark as a no-show</button></form>
         </div>
-        <p class="sc-muted" id="appointment-arrival-note">Checking in starts the patient's visit. Neither can be undone.</p>
+        <p class="sc-muted" id="appointment-arrival-note">This can't be undone.</p>
     </section>
     <section class="sc-panel sc-sheet" aria-labelledby="appointment-reschedule">
         <h2 class="sc-panel__title" id="appointment-reschedule">Reschedule</h2>
@@ -82,14 +82,14 @@ else if (saved is not null && Model.Errors.Count == 0)
                     <p class="sc-field__error" id="appointment-cancel-reason-error">@cancelError</p>
                 }
             </div>
-            <p class="sc-muted" id="appointment-cancel-note">This can't be undone. The patient sees the cancellation in the portal.</p>
+            <p class="sc-muted" id="appointment-cancel-note">This can't be undone.</p>
             <button type="submit" class="sc-btn sc-btn--danger" aria-describedby="appointment-cancel-note">Cancel appointment</button>
         </form>
     </section>
 }
 else if (appointment.Status == AppointmentStatus.Booked && !OnPrem.IsReachable)
 {
-    <p class="sc-muted">Changing an appointment needs the clinic's server. The schedule remains readable.</p>
+    <p class="sc-muted">Changing an appointment needs the clinic's server.</p>
 }
 else if (appointment.Status == AppointmentStatus.Booked)
 {

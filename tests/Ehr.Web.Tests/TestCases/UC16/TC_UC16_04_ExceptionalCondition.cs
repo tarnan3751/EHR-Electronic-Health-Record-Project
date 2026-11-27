@@ -32,8 +32,7 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 //   the appointment page shows the appointment and "To change this appointment, add this patient to My patients.",
 //   with no forms, and the post changes nothing. Step 2: the second post is answered 409 with "Not saved. This
 //   appointment changed while the page was open." Step 3: the chart says "Booking an appointment needs the clinic's
-//   server."; the day lists the appointment; its page says "Changing an appointment needs the clinic's server. The
-//   schedule remains readable."; the post is answered 503 and the appointment stays booked.
+//   server."; the day lists the appointment; its page says "Changing an appointment needs the clinic's server."; the post is answered 503 and the appointment stays booked.
 // Creator: Tahseen Arnan
 public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -91,7 +90,7 @@ public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("Booking an appointment needs the clinic's server.", await cutOff.GetStringAsync($"/patients/{patient}", Cancel));
         Assert.Contains("15:00 to 15:20 UTC", await cutOff.GetStringAsync($"/schedule?day={Day(4)}", Cancel));
         var page = await cutOff.GetStringAsync($"/appointments/{second}", Cancel);
-        Assert.Contains("Changing an appointment needs the clinic's server. The schedule remains readable.", page);
+        Assert.Contains("Changing an appointment needs the clinic's server.", page);
         Assert.DoesNotContain("Cancel appointment</button>", page);
         using var notSaved = await cutOff.PostAsync($"/appointments/{second}?handler=Cancel",
             Form(("__RequestVerificationToken", token), ("Version", "1"), ("CancelReason", "Synthetic: typed off-site")), Cancel);
