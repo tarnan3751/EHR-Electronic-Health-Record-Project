@@ -4,17 +4,21 @@
 @{
     ViewData["Title"] = "Messages";
 }
-<h1>Messages</h1>
 @if (!Model.Allowed)
 {
+    <h1>Messages</h1>
     <p class="sc-notice sc-notice--info">Your access to this record doesn't include messages.</p>
     return;
 }
-@if (OnPrem.IsReachable)
-{
-    <p><a asp-page="New" class="sc-btn sc-btn--primary">New message</a></p>
-}
-else
+@* The page's one action beside its title. *@
+<div class="sc-titlebar">
+    <h1>Messages</h1>
+    @if (OnPrem.IsReachable)
+    {
+        <a asp-page="New" class="sc-btn sc-btn--primary">New message</a>
+    }
+</div>
+@if (!OnPrem.IsReachable)
 {
     <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Messages can't be sent until the clinic's server is back. You can still read them.</p>
 }
@@ -25,16 +29,17 @@ else
 }
 else if (threads.Threads.Count == 0)
 {
-    <p class="sc-muted">No messages.</p>
+    <p class="sc-empty">No messages.</p>
 }
 else
 {
-    <ul class="sc-results">
+    @* One row a conversation: its subject, which opens it (the whole row does), and when it last had a message. *@
+    <ul class="sc-rows">
         @foreach (var thread in threads.Threads)
         {
-            <li class="sc-result" data-thread="@(thread.Unread > 0 ? "new" : "read")">
-                <h2><a asp-page="Thread" asp-route-threadId="@thread.Id">@thread.Subject</a></h2>
-                <p>
+            <li data-thread="@(thread.Unread > 0 ? "new" : "read")">
+                <h2><a asp-page="Thread" asp-route-threadId="@thread.Id" class="sc-rows__link">@thread.Subject</a></h2>
+                <p class="sc-rows__end">
                     @if (thread.Unread > 0)
                     {
                         <span class="sc-tag sc-tag--info">New</span>

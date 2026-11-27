@@ -3182,6 +3182,46 @@
         }
     }
 
+    /* Writing to the care team: the form on a card as wide as the conversation over it, its fields the card's width,
+       its button at its own width. */
+    .sc-composer {
+        margin: 0 0 var(--space-6);
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-composer > .sc-form {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-composer .sc-field {
+        max-width: none;
+    }
+
+    .sc-app--portal .sc-composer .sc-form > .sc-btn {
+        align-self: flex-start;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-composer {
+            padding: var(--space-4);
+        }
+    }
+
+    /* A conversation in the portal: the messages on the portal's cards, the reply under them. */
+    .sc-app--portal .sc-thread {
+        gap: var(--space-4);
+        margin-bottom: var(--space-6);
+    }
+
+    .sc-app--portal .sc-message {
+        padding: var(--space-4) var(--space-6);
+        border-radius: var(--radius-lg);
+    }
+
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */
