@@ -65,7 +65,7 @@ TC-UC2-05 runs only against a run of the render benchmark; `tests/Ehr.Web.Tests/
 
 ## Off-site render time (NFR-03)
 
-The benchmark (`bench/Ehr.Bench`, see "Synthetic data and the benchmark" in the README) now makes the same requests off-site after the on-site ones: to the cloud app reading as `ehr_read`, with its link to the on-site server down, as in this use case. The cloud app records reads in its audit queue rather than the database, so in the off-site rows the audit insert is 0 and the queue's write and flush to disk count as the commit: that is where the page waits for the disk, as an on-site page does at its commit. `--assert` gates the off-site rows as it does the on-site ones: p99 excluding the commit under 20 ms.
+The benchmark (`bench/Ehr.Bench`, see "Synthetic data and the benchmark" in `docs/development.md`) now makes the same requests off-site after the on-site ones: to the cloud app reading as `ehr_read`, with its link to the on-site server down, as in this use case. The cloud app records reads in its audit queue rather than the database, so in the off-site rows the audit insert is 0 and the queue's write and flush to disk count as the commit: that is where the page waits for the disk, as an on-site page does at its commit. `--assert` gates the off-site rows as it does the on-site ones: p99 excluding the commit under 20 ms.
 
 A run at 50,000 patients with `--assert`, durability on, nothing else running, on an Apple Silicon Mac (macOS 26.5.1, PostgreSQL 18.6), passed (exit 0). Milliseconds:
 

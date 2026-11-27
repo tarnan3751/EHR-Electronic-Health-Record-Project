@@ -18,8 +18,8 @@ SwiftChart is distributed unsigned (the expansion plan's standing decision for s
   AppImage carries no signature.
 - **What a build talks to is fixed when it is built:** the servers in `EHR_BUILD_SERVERS`, or by default the local
   server stack's, `https://ehr.example.com:8443` and `https://ehr-remote.example.com:9443`. The sign-in form names
-  them. A build for other servers is a build of its own (see the README's **Running the apps**). Its updates come from
-  the same servers.
+  them. A build for other servers is a build of its own (see [Running the apps](development.md#running-the-apps)).
+  Its updates come from the same servers.
 - **Updates are signed, by their own key:** the updater's key pair, made on the owner's Mac. The public half is built
   into every build (`plugins.updater.pubkey` in `tauri.conf.json`); the private half never leaves the owner's Mac, and
   never reaches CI.
@@ -44,7 +44,7 @@ Nothing is published: there is no GitHub release. Two ways:
   macOS or Windows, talking only to the local stack's servers (`ehr.example.com:8443` and
   `ehr-remote.example.com:9443`), with synthetic data. They are not a release, and no update is signed in CI.
 - **From source**, on the computer it's for, from the repository at the commit you want:
-  - **What must be installed:** what the README's **Setup** lists for the desktop app: Rust through rustup (the pinned
+  - **What must be installed:** what [Setup](development.md#setup) lists for the desktop app: Rust through rustup (the pinned
     version installs itself), and the Tauri CLI 2.x as it says; CI uses 2.12.0, the version these steps were checked
     with (`cargo install tauri-cli --version 2.12.0 --locked`). On Windows also Visual Studio Build Tools with "Desktop development
     with C++", and Strawberry Perl ahead of Git's Perl on `PATH` (the bundled OpenSSL's build refuses Git's). On
@@ -86,7 +86,7 @@ Control-click (right-click) then **Open** no longer gets past this since macOS 1
 asked once for the installed copy. If macOS says instead that SwiftChart "is damaged and can't be opened", the copy
 isn't the one that was built: get the installer again.
 
-Then, as with every build of SwiftChart (the README, **Running the apps**):
+Then, as with every build of SwiftChart ([Running the apps](development.md#running-the-apps)):
 
 - The Keychain asks whether SwiftChart may use its items: choose **Always Allow**. An ad-hoc seal is different for every
   build, so each new build asks again.

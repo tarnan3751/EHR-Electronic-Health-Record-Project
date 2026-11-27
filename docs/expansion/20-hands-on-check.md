@@ -149,7 +149,7 @@ in place of `com.example.ehr`, and remove `~/Library/WebKit/io.github.tarnan3751
   cargo tauri build --config '{"version":"0.2.1"}' -- --locked
   ```
 
-  (In PowerShell 7, as the README's setup has it; Windows PowerShell 5 would drop the JSON's quotes.)
+  (In PowerShell 7, as `docs/development.md`'s setup has it; Windows PowerShell 5 would drop the JSON's quotes.)
 
   A build made on the PC isn't marked as downloaded, so SmartScreen won't show for it: W1 then notes only that it
   installed.

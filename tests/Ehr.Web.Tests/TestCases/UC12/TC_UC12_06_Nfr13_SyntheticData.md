@@ -10,7 +10,7 @@ access and reason, and the synthetic clinic) is `TC_UC12_06_Nfr13_SyntheticData.
 | Type | Non-functional (data: synthetic only) |
 | Requirements | NFR-13, with FR-06 |
 | Use case | UC 12, Open a chart through emergency access |
-| Preconditions | The local stack is running (`infra/compose/README.md`), the synthetic clinic is seeded ("Synthetic data and the benchmark" in the root README), the example accounts exist (`dotnet run infra/compose/test-accounts.cs -- setup`), and the manual parts of TC-UC12-01 to TC-UC12-05 have been run. |
+| Preconditions | The local stack is running (`infra/compose/README.md`), the synthetic clinic is seeded ("Synthetic data and the benchmark" in `docs/development.md`), the example accounts exist (`dotnet run infra/compose/test-accounts.cs -- setup`), and the manual parts of TC-UC12-01 to TC-UC12-05 have been run. |
 | Inputs and system conditions | `psql` as the database superuser through `docker compose exec`, run from `infra/compose`, which sees every row whatever row-level security allows. |
 | Test data | The reasons from these test cases and from `test-accounts.cs` ("Setting up a test portal account on the local stack"). |
 | Expected result | Step 1 lists only patients whose MRN starts `SYN`, and step 2 finds every reason among the test texts. Steps 3 and 4 each return the count 0. |
