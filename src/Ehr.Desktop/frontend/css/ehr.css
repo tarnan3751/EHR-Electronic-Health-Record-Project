@@ -209,6 +209,11 @@
         color: var(--ink-muted);
     }
 
+    tbody th,
+    tfoot th {
+        background: transparent;
+    }
+
     td {
         padding: var(--space-3) var(--space-4);
         border-bottom: 1px solid var(--line);
@@ -706,6 +711,22 @@
         text-decoration: underline;
     }
 
+    /* Two ways back on the line: both breadcrumbs on its left, the page's own action on its right. A way on beside a
+       breadcrumb ("Open the chart") has a list link's weight. */
+    .sc-pagehead > p:has(> .sc-back) + p:has(> .sc-back) {
+        margin-right: auto;
+    }
+
+    .sc-pagehead p > .sc-back ~ a {
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-pagehead p > .sc-back ~ a:hover,
+    .sc-pagehead p > .sc-back ~ a:focus-visible {
+        text-decoration: underline;
+    }
+
     /* The way back above a portal page's title, at the portal's size: as tall as its controls, so a finger finds it. */
     .sc-app--portal .sc-pagehead {
         margin: calc(-1 * var(--space-4)) 0 var(--space-2);
@@ -832,6 +853,13 @@
         background: var(--surface-raised);
         border-color: var(--danger);
         color: var(--danger);
+    }
+
+    /* A destructive action among quiet ones, such as a table row's "Disable account": the quiet button in the danger
+       ink. */
+    .sc-btn--quiet.sc-btn--danger {
+        background: transparent;
+        border-color: transparent;
     }
 
     /* For a row of actions inside a table or a list, and the page's own actions on the line above its title. */
@@ -1321,7 +1349,15 @@
         max-width: none;
     }
 
-    /* The band that says a portal session is looking at someone else's record (FR-19), with the way back beside it. */
+    /* On a phone a band's words start where the app bar's and the page's do. */
+    @media (max-width: 40rem) {
+        .sc-notice--band {
+            padding-inline: var(--space-4);
+        }
+    }
+
+    /* The band that says a portal session is looking at someone else's record (FR-19), with the way back beside it,
+       a control-height button that keeps the band a band. */
     .sc-acting {
         display: flex;
         flex-wrap: wrap;
@@ -1332,6 +1368,12 @@
 
     .sc-acting p {
         margin: 0;
+    }
+
+    .sc-app--portal .sc-acting .sc-btn {
+        height: var(--control-height);
+        padding: 0 var(--space-4);
+        font-size: 14px;
     }
 
     /* A trend chart (step 9): one test or vital sign over time, drawn by the server as SVG. The reference range is a
@@ -1944,13 +1986,18 @@
     }
 
     .sc-table th {
-        position: sticky;
-        top: 0;
-        z-index: 1;
         white-space: nowrap;
     }
 
-    .sc-table tr:last-child td {
+    /* Only the columns' headers stay in view: a row's header, on its row's ground, scrolls with its row. */
+    .sc-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .sc-table tr:last-child > td,
+    .sc-table :is(tbody, tfoot) tr:last-child > th {
         border-bottom: 0;
     }
 
@@ -1961,8 +2008,8 @@
         white-space: nowrap;
     }
 
-    /* A row is one thing: it lights up under the pointer. */
-    .sc-table tbody tr:hover td {
+    /* A row is one thing, its header with it: it lights up under the pointer. */
+    .sc-table tbody tr:hover > :is(td, th) {
         background: var(--surface-subtle);
     }
 
@@ -2012,6 +2059,17 @@
         padding-right: 0;
     }
 
+    /* A quiet button among them (a form of one button each) is padded as the links are, so the gaps between the words
+       are even, and the last word ends on the column's edge. */
+    .sc-table__actions .sc-btn--quiet {
+        padding-inline: var(--space-2);
+    }
+
+    .sc-table__actions .sc-actions > :last-child > .sc-btn--quiet:only-child,
+    .sc-table__actions .sc-actions > .sc-btn--quiet:last-child {
+        padding-right: 0;
+    }
+
     .sc-table__actions p,
     .sc-table__actions > .sc-muted {
         display: block;
@@ -2037,7 +2095,7 @@
         margin-top: var(--space-1);
     }
 
-    .sc-table tr.sc-table__flagged td {
+    .sc-table tr.sc-table__flagged > :is(td, th) {
         background: var(--row-flagged);
     }
 
@@ -2046,11 +2104,11 @@
     }
 
     /* A row the keyboard is on, such as a search result: the accent bar and a soft tint beside the focus ring. */
-    .sc-table--pick tbody tr:focus-within td {
+    .sc-table--pick tbody tr:focus-within > :is(td, th) {
         background: var(--accent-soft);
     }
 
-    .sc-table--pick tbody tr:focus-within td:first-child {
+    .sc-table--pick tbody tr:focus-within > :first-child {
         box-shadow: inset 2px 0 0 var(--accent);
     }
 
@@ -2920,14 +2978,6 @@
         margin-bottom: 0;
     }
 
-    /* A panel's buttons, each in a paragraph of its own, share a line where the column has room. */
-    @media (min-width: 40rem) {
-        .sc-app--portal .sc-panel > p:has(> .sc-btn:only-child) {
-            display: inline-block;
-            margin-right: var(--space-3);
-        }
-    }
-
     /* A card inside a panel is set in on the recessed surface, not drawn as a second border. */
     .sc-panel .sc-result {
         background: var(--surface-subtle);
@@ -3360,24 +3410,6 @@
         line-height: 20px;
     }
 
-    /* A results table's row names: on the row's ground, not the header's. */
-    .sc-table tr[data-result] > th {
-        background: var(--surface-raised);
-    }
-
-    .sc-table tbody tr[data-result]:not(.sc-table__flagged):hover > th {
-        background: var(--surface-subtle);
-    }
-
-    /* A results table: a flagged row's own name is tinted with the rest of the row. */
-    .sc-table tr.sc-table__flagged[data-result] > th {
-        background: var(--row-flagged);
-    }
-
-    .sc-table tr[data-result]:last-child > th {
-        border-bottom: 0;
-    }
-
     /* Two columns of the same width: panels two to a row (an appointment and what can be done with it), or a request
        beside its answer. One column on a narrow window. */
     .sc-split--even {
@@ -3421,22 +3453,6 @@
 
     .sc-formgrid > .sc-field:has(#appointment-reason) {
         grid-column: 1 / -1;
-    }
-
-    /* Two ways back on the line above the title: both breadcrumbs on its left, the page's own action on its right. A
-       way on beside a breadcrumb ("Open the chart") has a list link's weight. */
-    .sc-pagehead > p:has(> .sc-back) + p:has(> .sc-back) {
-        margin-right: auto;
-    }
-
-    .sc-pagehead p > .sc-back ~ a {
-        font-weight: 600;
-        text-decoration: none;
-    }
-
-    .sc-pagehead p > .sc-back ~ a:hover,
-    .sc-pagehead p > .sc-back ~ a:focus-visible {
-        text-decoration: underline;
     }
 
     /* Panels and cards side by side keep only the columns' gap; a panel's fields take their cell's width, three to a
@@ -3616,15 +3632,14 @@
             margin: 0;
         }
 
-        /* As specific as the rule that sets a panel's lone button inline, so the column's buttons are one width. */
-        .sc-app--portal .sc-panel.sc-home__card > p.sc-home__actions,
+        .sc-home__card > .sc-home__actions,
         .sc-home__card > .sc-home__side {
             grid-column: 2;
             grid-row: 1 / -1;
             margin: 0;
         }
 
-        .sc-app--portal .sc-panel.sc-home__card > p.sc-home__actions,
+        .sc-home__card > .sc-home__actions,
         .sc-home__side > .sc-home__actions {
             display: flex;
             flex-direction: column;
@@ -3652,7 +3667,7 @@
             margin-top: var(--space-3);
         }
 
-        .sc-app--portal .sc-panel.sc-home__card--appointments > p.sc-home__actions {
+        .sc-home__card--appointments > .sc-home__actions {
             grid-row: auto;
             margin-top: var(--space-4);
         }
@@ -3917,22 +3932,7 @@
        under this comment; anything two areas share belongs in the components layer.
        ---- */
 
-    /* Staff: each row's actions on one line on the right, the setup link the one button with an edge. The quiet ones
-       get a link's padding, so the gaps between the words are even and the last word ends on the column's edge; the
-       one that disables an account is in the danger ink. */
-    .sc-staff .sc-actions > form > .sc-btn--quiet {
-        padding-inline: var(--space-2);
-    }
-
-    .sc-staff .sc-actions > form:last-child > .sc-btn--quiet {
-        padding-right: 0;
-    }
-
-    .sc-staff__disable {
-        color: var(--danger);
-    }
-
-    /* A status on one line, as its column's head is fitted to it (the cell itself is plain: tests read it). */
+    /* Staff. A status on one line, as its column's head is fitted to it (the cell itself is plain: tests read it). */
     .sc-staff td:nth-child(4) {
         white-space: nowrap;
     }
