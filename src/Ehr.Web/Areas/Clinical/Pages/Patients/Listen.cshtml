@@ -42,6 +42,12 @@
 }
 else
 {
+    @* Listening uses the dictation service: without its settings every visit is refused, so the page says so before the
+       consent, from what the app already holds. Nothing else changes. *@
+    @if (HttpContext.RequestServices.GetService(typeof(Ehr.Web.Api.Dictation.DictationSidecar)) is Ehr.Web.Api.Dictation.DictationSidecar { IsConfigured: false })
+    {
+        <p class="sc-notice sc-notice--warning" data-ambient-not-set-up><span class="sc-notice__state">Unavailable.</span> Listening isn't set up on this server. You can type the note.</p>
+    }
     <section data-ambient data-ambient-api="@Ehr.Web.Api.Dictation.DictationApi.AmbientPath" data-review-api="@Ehr.Web.Api.Dictation.DictationApi.Path" data-patient-id="@Model.Patient.Id" data-draft-id="@Model.DraftId" data-draft-version="@Model.DraftVersion">
         @Html.AntiForgeryToken()
         <noscript><p class="sc-notice sc-notice--danger">Listening to a visit needs JavaScript. You can still type the note.</p></noscript>
