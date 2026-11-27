@@ -58,7 +58,7 @@ public class NoteContentTests
         Assert.Equal(new NoteContent("Old subjective", "Old objective", "Old assessment", "Old plan"), NoteContent.From(draft));
         Assert.Empty(ClinicalNotes.SigningProblems(draft));
         draft.HasUnreviewedProposals = true;
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("AI proposal", StringComparison.Ordinal));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("Review every dictated field before signing.", StringComparison.Ordinal));
     }
 
     // Step 14: a draft written before notes had four sections opens with its History in Subjective, and nothing about the

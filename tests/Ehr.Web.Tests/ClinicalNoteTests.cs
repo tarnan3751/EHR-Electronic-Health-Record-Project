@@ -138,7 +138,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         await SqlAsync("UPDATE ehr.clinical_drafts SET has_unreviewed_proposals = true, version = version + 1, structured_version = version + 1 WHERE id = @id", page.Draft);
         using var sign = await PostAsync(page, "Sign", 3, extra: [("Confirmed", true), ("HasUnreviewedProposals", false), ("Reviewed", true)]);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, sign.StatusCode);
-        Assert.Contains("Review every associated AI proposal", await sign.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("Review every dictated field before signing.", await sign.Content.ReadAsStringAsync(Cancel));
         Assert.Equal(0, (await SignedAsync(page.Draft)).Count);
     }
 

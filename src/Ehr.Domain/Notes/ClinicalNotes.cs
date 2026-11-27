@@ -101,7 +101,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (draft.HasUnreviewedProposals)
         {
-            errors.Add("Review every associated AI proposal before signing. Open the saved AI review to resolve them.");
+            errors.Add("Review every dictated field before signing. Resume the dictation review to do it.");
         }
 
         return errors;
@@ -121,11 +121,11 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             if (review.State == AiReviewStates.Pending || pending.Count > 0)
             {
                 errors.Add(pending.Count > 0 ? $"Review the pending fields: {string.Join(", ", pending)}."
-                    : "Complete the saved AI review before signing.");
+                    : "Finish the dictation review before signing.");
             }
             if (review.State == AiReviewStates.Completed && (review.ImportedVersion is null || review.ImportedVersion > draft.Version))
             {
-                errors.Add("The saved AI review does not match this draft. Reopen the review before signing.");
+                errors.Add("The dictation review doesn't match this draft. Reopen it before signing.");
             }
         }
 
