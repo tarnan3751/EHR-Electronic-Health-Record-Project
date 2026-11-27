@@ -11,7 +11,7 @@
         }
 
         return status === 0 || status >= 500
-            ? "Not saved. The server is unavailable, but your changes are still on screen. Try again in a moment."
+            ? "Not saved. The server is unavailable. Try again in a moment."
             : "Not saved. Reload the page and try again.";
     }
 

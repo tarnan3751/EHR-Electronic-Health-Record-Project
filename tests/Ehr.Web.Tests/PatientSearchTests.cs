@@ -99,10 +99,10 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
             var html = await client.GetStringAsync("/patients?name=Q", Cancel);
             var typed = await TypedAsync(client, "name=Q");
 
-            Assert.Contains("Type at least 2 letters of the name.", html);
+            Assert.Contains("Name must be at least 2 letters.", html);
             Assert.DoesNotContain("Search results", html);
             Assert.DoesNotContain("My patients", html);
-            Assert.Contains("Type at least 2 letters of the name.", typed);
+            Assert.Contains("Name must be at least 2 letters.", typed);
             Assert.DoesNotContain("Search results", typed);
         }
 
@@ -113,10 +113,10 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Theory]
-    [InlineData("1980-02-30", "Enter the date of birth as a full date, such as 1980-05-02.")]
-    [InlineData("02/03/1980", "Enter the date of birth as a full date, such as 1980-05-02.")]
-    [InlineData("1980-02", "Enter the date of birth as a full date, such as 1980-05-02.")]
-    [InlineData("2999-01-01", "That date of birth is in the future. Check the year.")]
+    [InlineData("1980-02-30", "Date of birth must be a full date, such as 1980-05-02.")]
+    [InlineData("02/03/1980", "Date of birth must be a full date, such as 1980-05-02.")]
+    [InlineData("1980-02", "Date of birth must be a full date, such as 1980-05-02.")]
+    [InlineData("2999-01-01", "Date of birth must be in the past.")]
     public async Task A_bad_or_future_date_of_birth_asks_for_a_correction(string birthdate, string message)
     {
         var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
@@ -134,15 +134,15 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await session.Client.GetStringAsync($"/patients?mrn={new string('7', 21)}", Cancel);
 
-        Assert.Contains("An MRN has at most 20 characters.", html);
+        Assert.Contains("MRN must be 20 characters or fewer.", html);
         Assert.DoesNotContain("Search results", html);
     }
 
     // A NUL, which PostgreSQL refuses in text, or any other control character.
     [Theory]
-    [InlineData("name=ab%00cd", "The name has a control character in it. Type it again.")]
-    [InlineData("name=ab%09cd", "The name has a control character in it. Type it again.")]
-    [InlineData("mrn=12%0045", "The MRN has a control character in it. Type it again.")]
+    [InlineData("name=ab%00cd", "Name contains an unsupported character.")]
+    [InlineData("name=ab%09cd", "Name contains an unsupported character.")]
+    [InlineData("mrn=12%0045", "MRN contains an unsupported character.")]
     public async Task A_control_character_asks_for_a_correction(string query, string message)
     {
         var session = await SignInAsync(apps.OnPrem, await apps.ClinicianAsync());
@@ -313,7 +313,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 
         var listed = Listed(html);
         Assert.Equal(50, listed.Count);
-        Assert.Contains("More patients match than are shown. Add more of the name, or a date of birth, to narrow them.", html);
+        Assert.Contains("More patients match. Add more of the name, or a date of birth.", html);
         Assert.Equal(50, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
         foreach (var patient in patients)
         {
@@ -337,7 +337,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Restricted", RowOf(html, mine));
         Assert.Contains("Restricted", RowOf(html, notMine));
         Assert.DoesNotContain("Yours", RowOf(html, notMine));
-        Assert.Contains("Not one of your patients. Opening the chart asks for a reason first.", html);
+        Assert.Contains("Not one of your patients.", html);
     }
 
     [Fact]
@@ -439,7 +439,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 
         var listed = Listed(typed);
         Assert.Equal(Ehr.Web.Areas.Clinical.Pages.Patients.IndexModel.LiveLimit, listed.Count);
-        Assert.Contains("More patients match than are shown. Keep typing to narrow them, or press Enter to see more.", typed);
+        Assert.Contains("More patients match. Keep typing, or press Enter to see more.", typed);
         foreach (var patient in patients)
         {
             Assert.Equal(listed.Contains(patient) ? 1 : 0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
@@ -456,8 +456,8 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
         var shortName = await TypedAsync(session.Client, "name=Q");
         var badDate = await TypedAsync(session.Client, "name=Ada&birthdate=1980-02-30");
 
-        Assert.Contains("Type at least 2 letters of the name.", shortName);
-        Assert.Contains("Enter the date of birth as a full date, such as 1980-05-02.", badDate);
+        Assert.Contains("Name must be at least 2 letters.", shortName);
+        Assert.Contains("Date of birth must be a full date, such as 1980-05-02.", badDate);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
     }
 
@@ -475,7 +475,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 
         var emptied = await TypedAsync(session.Client, "name=&birthdate=&mrn=");
 
-        Assert.Contains("Type a name, a date of birth or an MRN to search, or press Clear to see your patients.", emptied);
+        Assert.Contains("Enter a name, date of birth or MRN.", emptied);
         Assert.Empty(Listed(emptied));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
     }
@@ -494,7 +494,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await session.Client.GetStringAsync("/patients?name=%20%20&birthdate=&mrn=", Cancel);
 
-        Assert.Matches("<ul class=\"sc-notice sc-notice--danger\" role=\"alert\">\\s*<li>Enter a name, date of birth, or MRN to search.</li>", html);
+        Assert.Matches("<ul class=\"sc-notice sc-notice--danger\" role=\"alert\">\\s*<li>Enter a name, date of birth or MRN.</li>", html);
         Assert.DoesNotContain("Search results", html);
         Assert.DoesNotContain("My patients", html);
         Assert.DoesNotContain($"/patients/{patient}", html);

@@ -18,7 +18,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   1. Insert the patient, and don't assign them.
 //   2. Sign in as a clinician.
 //   3. Open the patient's chart.
-// Expected result: The page doesn't contain "{family}, John"; it mentions emergency access, and asks for a reason or
+// Expected result: The page doesn't contain "{family}, John"; it says "Break the glass", and asks for a reason or
 //   says the chart is restricted.
 // Creator: Diego Valenzuela
 public class TC_UC4_03_AlternativeFlow(WebApps apps)
@@ -60,7 +60,7 @@ public class TC_UC4_03_AlternativeFlow(WebApps apps)
 
         // Verify that emergency access is offered.
         Assert.Contains(
-            "Emergency",
+            "Break the glass",
             html,
             StringComparison.OrdinalIgnoreCase);
 

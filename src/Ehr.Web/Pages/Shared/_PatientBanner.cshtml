@@ -26,7 +26,7 @@
         <div class="sc-banner__end">
             @if (Model.EmergencyUntil is { } until)
             {
-                <span class="sc-tag sc-tag--danger">Emergency access until @Clinic.Format(until)</span>
+                <span class="sc-tag sc-tag--danger">Break-the-glass access until @Clinic.Format(until)</span>
             }
             @if (Model.Known.Count > 0)
             {

@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 //   3. End the access; select "Review the access".
 //   4. Choose "Appropriate", write the note, and select "Mark reviewed".
 //   5. Open the audit page's emergency accesses for the patient.
-// Expected result: Step 2: one item, "Emergency access to review", the patient by ID and no name, "Review the access",
+// Expected result: Step 2: one item, "Break the glass to review", the patient by ID and no name, "Review the access",
 //   and no "Mark done". Step 3: the page names Dr. Covering, the patient's ID, the reason, and the events (the emergency
 //   access, reads, the inserts of the panel row and the message) with no name and no word of the message. Step 4:
 //   "Reviewed.", the outcome, Reviewer One and the note; every administrator's item, the bootstrap admin's included, is
@@ -59,7 +59,7 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         // 2.
         var reviewer = await SignInAsync(apps.OnPrem, one);
         var inbox = await reviewer.Client.GetStringAsync("/inbox", Cancel);
-        Assert.Contains("<span class=\"sc-tag\">Emergency access to review</span> A clinician used emergency access to a chart", inbox);
+        Assert.Contains("<span class=\"sc-tag\">Break the glass to review</span> A clinician used emergency access to a chart", inbox);
         Assert.Contains($"<td class=\"sc-table__id\">{access.Patient}</td>", inbox);
         Assert.Contains($"<a data-inbox-source href=\"/admin/emergency-access/{access.Id}\">Review the access</a>", inbox);
         Assert.DoesNotContain("Mark done", inbox);

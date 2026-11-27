@@ -53,7 +53,9 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
         using (var own = await direct.GetAsync($"/patients/{paneled}", Cancel))
         {
             Assert.Equal(HttpStatusCode.OK, own.StatusCode);
-            Assert.DoesNotContain("Emergency access", await own.Content.ReadAsStringAsync(Cancel));
+            var ownChart = await own.Content.ReadAsStringAsync(Cancel);
+            Assert.DoesNotContain("Emergency access", ownChart);
+            Assert.DoesNotContain("Break-the-glass access", ownChart);
         }
 
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, clinician.Id, paneled));
@@ -66,7 +68,8 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
         }
 
         var reasonHtml = await session.Client.GetStringAsync($"/patients/{patient}/reason", Cancel);
-        Assert.Contains("Not one of your patients. To open the chart, say why you need it", reasonHtml);
+        Assert.Contains("<h1>Break the glass</h1>", reasonHtml);
+        Assert.Contains("Not one of your patients.", reasonHtml);
         Assert.DoesNotContain("Offpanel", reasonHtml);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
 

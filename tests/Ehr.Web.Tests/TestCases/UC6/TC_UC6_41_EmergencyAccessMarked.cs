@@ -26,8 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Dr. Oak opens it, reads the reason page, gives the reason, and reads the chart.
 //   3. Dr. Oak puts the patient on their panel and opens the chart again.
 //   4. The patient, the proxy with sensitive items, and the proxy without, open Who viewed the record.
-// Expected result: Step 2: the reason page says "The patient, and anyone they share sensitive items with, can see in
-//   the portal that you used emergency access, and when. They never see your reason." Step 4: the patient's lines
+// Expected result: Step 2: the reason page says "The patient can see this access in the portal." Step 4: the patient's lines
 //   from the care team are, newest first: Dr. Oak (step 3), not marked; Dr. Oak (step 2), marked "Emergency access";
 //   Dr. Test, not marked. The notice "Emergency access. A clinician outside your care team opened the record and gave
 //   a reason. The clinic reviews each one." is shown. The proxy with sensitive items has the same three
@@ -55,7 +54,7 @@ public class TC_UC6_41_EmergencyAccessMarked(WebApps apps) : IClassFixture<WebAp
         // Step 2.
         var oak = await apps.CreateStaffAsync("Dr. Oak", StaffRoles.Clinician);
         var away = await SignInAsync(apps.OnPrem, oak);
-        Assert.Contains("The patient, and anyone they share sensitive items with, can see in the portal that you used emergency access, and when. They never see your reason.",
+        Assert.Contains("The patient can see this access in the portal.",
             Words(await away.Client.GetStringAsync(chart + "/reason", Cancel)));
         using (var opened = await PostFormAsync(away.Client, chart + "/reason", chart + "/reason", ("Reason", Reason)))
         {

@@ -21,9 +21,9 @@ public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) 
     public SearchQuery Search { get; set; } = SearchQuery.None;
 
     [BindProperty]
-    [Required(ErrorMessage = "Say why you need this chart, in 10 to 500 characters.")]
-    [MinLength(BreakGlass.MinimumReasonLength, ErrorMessage = "Too short. Use 10 to 500 characters.")]
-    [StringLength(BreakGlass.MaximumReasonLength, ErrorMessage = "Too long. Use 10 to 500 characters.")]
+    [Required(ErrorMessage = "Reason is required.")]
+    [MinLength(BreakGlass.MinimumReasonLength, ErrorMessage = "Reason must be 10 to 500 characters.")]
+    [StringLength(BreakGlass.MaximumReasonLength, ErrorMessage = "Reason must be 10 to 500 characters.")]
     public string? Reason { get; set => field = value?.Trim(); }
 
     public async Task<IActionResult> OnGetAsync(Guid id) =>
@@ -35,7 +35,7 @@ public class ReasonModel(BreakGlass breakGlass, PatientAssignments assignments) 
     {
         if (ModelState.IsValid && Reason!.Length < BreakGlass.MinimumReasonLength)
         {
-            ModelState.AddModelError(nameof(Reason), "Too short. Use 10 to 500 characters.");
+            ModelState.AddModelError(nameof(Reason), "Reason must be 10 to 500 characters.");
         }
 
         if (!ModelState.IsValid)

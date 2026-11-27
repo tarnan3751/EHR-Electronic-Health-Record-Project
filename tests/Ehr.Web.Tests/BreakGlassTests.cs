@@ -26,14 +26,14 @@ public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient));
 
         using var tooShort = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "ER"));
-        Assert.Contains("Too short. Use 10 to 500 characters.", await ReadAsync(tooShort));
+        Assert.Contains("Reason must be 10 to 500 characters.", await ReadAsync(tooShort));
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, actorId: clinician.Id, patientId: patient));
 
         using var opened = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));
         var html = await ReadAsync(opened);
         Assert.Equal($"/patients/{patient}", PathOf(opened));
         Assert.Contains("Emergency, Indy", html);
-        Assert.Contains("Emergency access", html);
+        Assert.Contains("Break-the-glass access until", html);
 
         // Open to them now without asking again, and every step is in the log: the grant with its reason, the trigger's
         // record of the grant row, and the two chart views. (Since step 18 the grant also writes each administrator's
@@ -57,7 +57,9 @@ public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
         using var chart = await Client(apps.OnPrem, session.Jar, followRedirects: false).GetAsync($"/patients/{patient}", Cancel);
 
         Assert.Equal(HttpStatusCode.OK, chart.StatusCode);
-        Assert.DoesNotContain("Emergency access", await chart.Content.ReadAsStringAsync(Cancel));
+        var ownChart = await chart.Content.ReadAsStringAsync(Cancel);
+        Assert.DoesNotContain("Emergency access", ownChart);
+        Assert.DoesNotContain("Break-the-glass access", ownChart);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, actorId: clinician.Id, patientId: patient));
     }
 
@@ -86,8 +88,8 @@ public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await ReadAsync(response);
         Assert.Equal($"/patients/{patient}/reason", PathOf(response));
-        Assert.Contains("Emergency access can't be granted until the clinic's server is back", html);
+        Assert.Contains("Breaking the glass needs the clinic's server.", html);
         Assert.DoesNotContain("<textarea", html);
-        Assert.DoesNotContain("Open the chart", html);
+        Assert.DoesNotContain(">Break the glass</button>", html);
     }
 }

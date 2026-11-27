@@ -22,6 +22,6 @@ public class FieldErrorTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Matches("<span [^>]*id=\"Reason-error\"[^>]*></span>", asked);
 
         Assert.Matches("<textarea [^>]*id=\"Reason\"[^>]*aria-invalid=\"true\"[^>]*aria-describedby=\"Reason-error\"", html);
-        Assert.Matches("<span [^>]*id=\"Reason-error\"[^>]*>Too short. Use 10 to 500 characters.</span>", html);
+        Assert.Matches("<span [^>]*id=\"Reason-error\"[^>]*>Reason must be 10 to 500 characters.</span>", html);
     }
 }

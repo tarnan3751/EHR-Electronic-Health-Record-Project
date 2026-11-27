@@ -468,7 +468,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         foreach (var path in new[] { $"/patients/{patient}/chart-history", $"/patients/{patient}/orders/discontinued" })
         {
             var page = Words(await covering.Client.GetStringAsync(path, Cancel));
-            Assert.Contains("Emergency access until", page);
+            Assert.Contains("Break-the-glass access until", page);
             Assert.Contains("High risk: Peanut: Hives", page);
         }
     }
