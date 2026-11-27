@@ -56,7 +56,7 @@
       </div>
     </section>
 
-    <form id="sign-in" class="sc-form" hidden>
+    <form id="sign-in" class="sc-form sc-card desktop-card" hidden>
       <h2>Sign in to sync</h2>
       <p>Use your clinic account and the code from your authenticator app, or one of your recovery codes.</p>
       <!-- Where the password goes: the servers this build was made for (src-tauri/src/sync.rs). -->
@@ -97,26 +97,33 @@
           <h3 id="chart-name" class="sc-banner__name"></h3>
           <p id="chart-demographics" class="sc-banner__meta"></p>
         </div>
-        <div id="chart-sections" class="sc-chart"></div>
-        <form id="clinical-draft" class="sc-form sc-form--wide">
-          <div class="sc-field sc-field--wide">
-            <label id="draft-label" class="sc-field__label" for="draft-body">New draft</label>
-            <textarea class="sc-field__input" id="draft-body" name="body" rows="5" required></textarea>
+        <div id="chart-sections" class="desktop-summary"></div>
+        <!-- What the clinician adds here: a draft and a recording on the left, what's saved on the right. -->
+        <div class="desktop-work">
+          <div>
+            <form id="clinical-draft" class="sc-form sc-form--wide">
+              <div class="sc-field sc-field--wide">
+                <label id="draft-label" class="sc-field__label" for="draft-body">New draft</label>
+                <textarea class="sc-field__input" id="draft-body" name="body" rows="5" required></textarea>
+              </div>
+              <div class="sc-actions">
+                <button class="sc-btn">Save draft</button>
+                <button type="button" id="cancel-draft-edit" class="sc-btn sc-btn--quiet" hidden>Cancel edit</button>
+              </div>
+            </form>
+            <h4>Dictation</h4>
+            <div class="sc-actions">
+              <button type="button" id="record-audio" class="sc-btn">Record audio</button>
+            </div>
+            <p class="sc-muted">Recordings are transcribed in English. To dictate in Spanish, use Dictate in the web app.</p>
+            <p id="recording-message" class="sc-status" role="status"></p>
+            <ul id="saved-recordings" class="sc-list"></ul>
           </div>
-          <div class="sc-actions">
-            <button class="sc-btn">Save draft</button>
-            <button type="button" id="cancel-draft-edit" class="sc-btn sc-btn--quiet" hidden>Cancel edit</button>
+          <div>
+            <h4>Saved drafts</h4>
+            <ul id="saved-drafts" class="sc-list"></ul>
           </div>
-        </form>
-        <h4>Dictation</h4>
-        <div class="sc-actions">
-          <button type="button" id="record-audio" class="sc-btn">Record audio</button>
         </div>
-        <p class="sc-muted">Recordings are transcribed in English. To dictate in Spanish, use Dictate in the web app.</p>
-        <p id="recording-message" class="sc-status" role="status"></p>
-        <ul id="saved-recordings" class="sc-list"></ul>
-        <h4>Saved drafts</h4>
-        <ul id="saved-drafts" class="sc-list"></ul>
       </section>
     </section>
     <p id="offline-sign-in" class="sc-notice sc-notice--info" hidden>Sign out and sign in on the updated server to use offline charts.</p>
@@ -126,30 +133,33 @@
       <ul id="conflict-list" class="sc-quicktexts"></ul>
     </section>
 
-    <form id="add-quick-text" class="sc-quicktext-form" hidden>
-      <div class="sc-field">
-        <label class="sc-field__label" for="add-shortcut">Shortcut</label>
-        <input class="sc-field__input sc-field__input--mono" id="add-shortcut" name="shortcut" autocomplete="off" placeholder=".nad" aria-describedby="add-shortcut-error">
-        <span class="sc-field__error" id="add-shortcut-error" data-for="shortcut"></span>
-      </div>
-      <div class="sc-field">
-        <label class="sc-field__label" for="add-body">Text</label>
-        <textarea class="sc-field__input" id="add-body" name="body" rows="2" aria-describedby="add-body-error"></textarea>
-        <span class="sc-field__error" id="add-body-error" data-for="body"></span>
-      </div>
-      <div class="sc-actions">
-        <button class="sc-btn sc-btn--primary">Add phrase</button>
-      </div>
-    </form>
+    <!-- The phrases, and the form that adds one while signed in, in one panel. -->
+    <div class="sc-panel desktop-phrases">
+      <form id="add-quick-text" class="sc-quicktext-form" hidden>
+        <div class="sc-field">
+          <label class="sc-field__label" for="add-shortcut">Shortcut</label>
+          <input class="sc-field__input sc-field__input--mono" id="add-shortcut" name="shortcut" autocomplete="off" placeholder=".nad" aria-describedby="add-shortcut-error">
+          <span class="sc-field__error" id="add-shortcut-error" data-for="shortcut"></span>
+        </div>
+        <div class="sc-field">
+          <label class="sc-field__label" for="add-body">Text</label>
+          <textarea class="sc-field__input" id="add-body" name="body" rows="2" aria-describedby="add-body-error"></textarea>
+          <span class="sc-field__error" id="add-body-error" data-for="body"></span>
+        </div>
+        <div class="sc-actions">
+          <button class="sc-btn sc-btn--primary">Add phrase</button>
+        </div>
+      </form>
 
-    <ul id="quick-texts" class="sc-quicktexts"></ul>
+      <ul id="quick-texts" class="sc-quicktexts"></ul>
+    </div>
   </main>
 
   <!-- The lock (the expansion plan's step 19a). While it's up the body has desktop-locked: the app bar and the page are
        inert and out of sight (app.js, app.css), kept exactly as they were, and this fills the window. Its words are set
        by app.js from what the Rust side says (src-tauri/src/lock.rs). -->
   <div id="lock" class="desktop-lock" role="dialog" aria-modal="true" aria-labelledby="lock-title" hidden>
-    <form id="lock-form" class="sc-form desktop-lock__form">
+    <form id="lock-form" class="sc-form sc-card desktop-card desktop-lock__form">
       <p class="sc-brandmark">
         <img class="sc-art--color" src="img/swiftchart-mark.svg" alt="SwiftChart" width="56" height="48">
         <img class="sc-art--reversed" src="img/swiftchart-mark-reversed.svg" alt="SwiftChart" width="56" height="48">
@@ -182,7 +192,7 @@
        plan's step 20; src-tauri/src/wipe.rs). The page was loaded again, so nothing it showed is kept; this fills the
        window as the lock does, and its words are set by app.js. -->
   <div id="deleted" class="desktop-lock" role="dialog" aria-modal="true" aria-labelledby="deleted-title" hidden>
-    <div class="sc-form desktop-lock__form">
+    <div class="sc-form sc-card desktop-card desktop-lock__form">
       <p class="sc-brandmark">
         <img class="sc-art--color" src="img/swiftchart-mark.svg" alt="SwiftChart" width="56" height="48">
         <img class="sc-art--reversed" src="img/swiftchart-mark-reversed.svg" alt="SwiftChart" width="56" height="48">

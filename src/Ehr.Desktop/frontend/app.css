@@ -9,13 +9,41 @@
   gap: var(--space-4);
 }
 
-/* The downloaded charts: one button per patient, in a column. */
+/* A form on its own, as the web's sign-in is: a card at the form's width (sc-card's padding outside it). */
+.desktop-card {
+  max-width: calc(var(--width-form) + 2 * var(--space-8));
+}
+
+#sign-in > .sc-btn {
+  align-self: stretch;
+}
+
+/* A notice with its buttons under it (an update, a sign-in needed), apart from what follows. */
+#update,
+#sign-in-needed {
+  margin: 0 0 var(--space-6);
+}
+
+#update > .sc-notice,
+#sign-in-needed > .sc-notice {
+  margin-bottom: var(--space-3);
+}
+
+/* The downloaded charts: one button per patient, in a column, framed. */
 .desktop-panel {
   max-width: var(--width-reading);
+  padding: var(--space-1) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
 }
 
 .desktop-panel > li {
   padding: var(--space-1) 0;
+}
+
+.desktop-panel > li > .sc-btn--quiet {
+  padding-inline: 0;
 }
 
 /* The open chart's patient: the banner's name and details, at the top of its panel. */
@@ -37,8 +65,113 @@
   margin: var(--space-4) 0 var(--space-8);
 }
 
-#chart-sections {
+/* The open chart's record: allergies, medications and diagnoses side by side, then the visits and signed notes
+   across the panel, each under a caption. */
+.desktop-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
   margin: 0 0 var(--space-6);
+}
+
+.desktop-summary > :nth-child(n + 4) {
+  grid-column: 1 / -1;
+}
+
+.desktop-summary h4 {
+  margin: 0 0 var(--space-1);
+  color: var(--ink-muted);
+}
+
+.desktop-summary .sc-list {
+  margin: 0;
+}
+
+.desktop-summary p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* A signed note: a recessed card, its parts under small captions. */
+.desktop-summary details {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.desktop-summary summary {
+  padding: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.desktop-summary h5 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.desktop-summary .sc-note__text {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+/* What the clinician adds to the open chart, under a hairline: the new draft and dictation, then what's saved. */
+.desktop-work {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+  align-items: start;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+
+.desktop-work .sc-form {
+  max-width: none;
+  margin: 0;
+}
+
+.desktop-work h4 {
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+.desktop-work > div > h4:first-child {
+  margin-top: 0;
+}
+
+.desktop-work .sc-actions + .sc-muted {
+  margin: var(--space-2) 0 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.desktop-work .sc-list {
+  margin: 0;
+}
+
+/* The phrases' panel: the form, then the list, with no rule above its first line. */
+.desktop-phrases {
+  max-width: var(--width-content);
+}
+
+.desktop-phrases > .sc-quicktexts {
+  margin: 0;
+  border-top: 0;
+}
+
+.desktop-phrases > .sc-quicktext-form:not([hidden]) + .sc-quicktexts {
+  border-top: 1px solid var(--line);
+}
+
+.desktop-phrases > .sc-quicktexts > li:last-child {
+  border-bottom: 0;
 }
 
 /* A saved draft: its state, its text as typed, and what can be done with it. */
@@ -69,8 +202,8 @@
   position: fixed;
   inset: 0;
   overflow-y: auto;
-  padding: var(--space-8) var(--space-4);
-  background: var(--surface);
+  padding: max(var(--space-12), 10vh) var(--space-4) var(--space-8);
+  background: var(--surface-page);
 }
 
 .desktop-lock[hidden] {
@@ -83,4 +216,24 @@
 
 .desktop-lock__form > * {
   margin: 0;
+}
+
+/* Its one way in takes the card's width, as the sign-in's does; who is signed in, and the way out, sit under a
+   hairline. */
+.desktop-lock__form > .sc-actions {
+  align-self: stretch;
+}
+
+#lock-submit,
+#quit {
+  flex: 1 1 auto;
+}
+
+#lock-sign-out {
+  padding-inline: 0;
+}
+
+.desktop-lock__form > p.sc-muted {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
 }
