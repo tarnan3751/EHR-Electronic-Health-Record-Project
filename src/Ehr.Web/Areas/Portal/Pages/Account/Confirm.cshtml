@@ -6,16 +6,16 @@
 <h1>Confirm your email address</h1>
 @if (Model.Confirmed == true)
 {
-    <p class="sc-notice sc-notice--success">Your address is confirmed. You can <a asp-page="SignIn">sign in</a> now.</p>
+    <p class="sc-notice sc-notice--success"><span class="sc-notice__state">Email address confirmed.</span> You can <a asp-page="SignIn">sign in</a> now.</p>
 }
 else if (Model.Confirmed == false)
 {
-    <p class="sc-notice sc-notice--danger">This link is not valid or has expired. <a asp-page="Resend">Send a new link</a>.</p>
+    <p class="sc-notice sc-notice--danger">This link isn't valid or has expired. <a asp-page="Resend">Send a new link</a>.</p>
 }
 else
 {
     <form method="post" class="sc-form" asp-route-user="@Model.UserId" asp-route-token="@Model.Token">
-        <p>Press the button to confirm that this address is yours.</p>
-        <button class="sc-btn sc-btn--primary">Confirm</button>
+        <p>Confirm that this email address is yours.</p>
+        <button class="sc-btn sc-btn--primary">Confirm email address</button>
     </form>
 }

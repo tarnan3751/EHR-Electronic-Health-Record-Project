@@ -28,8 +28,8 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 //   23:30 with the zone's abbreviation; it is stored at that moment, which in UTC is early the next day. Step 2: the
 //   day's schedule lists it as "23:30 to 23:50" with the abbreviation and says times are clinic time; the next day's
 //   doesn't list it. Step 3: the page shows the clinic's day and time, and the form to reschedule holds them. Step 4:
-//   the UTC clinic lists the same appointment on the next day at its UTC time. Step 5: 422, "That time doesn't exist
-//   on that day: the clocks go forward. Choose another.", and nothing is booked.
+//   the UTC clinic lists the same appointment on the next day at its UTC time. Step 5: 422, "The clocks go forward
+//   that day, so that time doesn't exist. Enter another time.", and nothing is booked.
 // Creator: Tahseen Arnan
 public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebApps>
 {
@@ -77,7 +77,7 @@ public class TC_UC16_07_ScheduleInClinicTime(WebApps apps) : IClassFixture<WebAp
         // The hour the clocks skip.
         using var skipped = await BookAsync(session.Client, patient, clinician.Id, "2027-03-14", "02:30", "Synthetic: spring forward");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, skipped.StatusCode);
-        Assert.Contains("That time doesn&#x27;t exist on that day: the clocks go forward. Choose another.", await skipped.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("The clocks go forward that day, so that time doesn&#x27;t exist. Enter another time.", await skipped.Content.ReadAsStringAsync(Cancel));
         Assert.Single(await RowsAsync(apps, patient));
     }
 }

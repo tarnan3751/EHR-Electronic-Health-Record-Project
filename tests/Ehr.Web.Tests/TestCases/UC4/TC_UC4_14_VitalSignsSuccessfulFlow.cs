@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   1. On the chart, follow "Flowsheet, trends and recording".
 //   2. Type the first set and choose "Record vital signs".
 //   3. Type the second set and choose "Record vital signs".
-// Expected result: Step 1: the page says "No vital signs recorded." and shows the form. Step 2: "Saved:"; the
+// Expected result: Step 1: the page says "No vital signs." and shows the form. Step 2: "Saved."; the
 //   flowsheet lists blood pressure 148/92 "High" (one reading, step 9c), heart rate 72, weight 81, height 180 and body
 //   mass index 25 "High", each with the clinic's own name and unit; no trend yet; the write is in the audit log under the
 //   clinician. Step 3: the flowsheet has two columns, newest first; "Trends" has a chart for systolic, diastolic and
@@ -48,16 +48,16 @@ public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<We
         Assert.DoesNotContain("data-latest-vitals", chart);
         Assert.Matches($"<a [^>]*href=\"{Path(patient)}\"[^>]*>Flowsheet, trends and recording</a>", chart);
         var empty = await session.Client.GetStringAsync(Path(patient), Cancel);
-        Assert.Contains("No vital signs recorded.", empty);
+        Assert.Contains("No vital signs.", empty);
         Assert.Contains("data-record-vitals", empty);
 
         using var first = await RecordAsync(apps, session.Client, patient, 24 * 60,
             (Systolic, "148"), (Diastolic, "92"), (HeartRate, "72"), (Weight, "81"), (Height, "180"));
         var page = await ReadAsync(first);
-        Assert.Contains("Saved:", page);
+        Assert.Contains("Saved.", page);
         Assert.Matches("(?s)Blood pressure <span class=\"sc-muted\">\\(mmHg\\)</span></th>\\s*<td class=\"sc-table__mono\">\\s*148/92\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", page);
         Assert.DoesNotContain("<th scope=\"row\">Systolic blood pressure", page);
-        Assert.Matches("(?s)Body mass index \\(BMI\\) \\[Ratio\\] <span class=\"sc-muted\">\\(kg/m&#xB2;\\)</span></th>\\s*<td class=\"sc-table__mono\">\\s*25\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", page);
+        Assert.Matches("(?s)Body mass index <span class=\"sc-muted\">\\(kg/m&#xB2;\\)</span></th>\\s*<td class=\"sc-table__mono\">\\s*25\\s*<span class=\"sc-tag sc-tag--warning\">High</span>", page);
         Assert.DoesNotContain("data-trend", page);
         Assert.Equal([$"{Weight} 81", $"{BodyMassIndex} 25", $"{Height} 180", $"{Diastolic} 92", $"{Systolic} 148", $"{HeartRate} 72"], await RecordedAsync(apps, patient));
         Assert.Equal(Enumerable.Repeat(clinician.Id.ToString(), 6), await ProxyTests.QueryAsync(apps,

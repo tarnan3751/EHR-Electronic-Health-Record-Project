@@ -57,10 +57,10 @@ public class TC_UC23_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("data-ambient-own-words", html);
         Assert.Contains("patients_own_words", html);
         // A visit's words, not a dictation's (looking at the pages): what was said, and this draft's.
-        Assert.Contains("Back to the chart</a>", html);
-        Assert.Contains("Compare every suggestion with what was said.", html);
+        Assert.Contains("Back to chart</a>", html);
+        Assert.Contains("Check each proposal against what was said.", html);
         Assert.Contains("This draft doesn't propose these.", html);
-        Assert.DoesNotContain("your original words", html);
+        Assert.DoesNotContain("your own words", html);
         Assert.Contains("\"speaker\":\"patient\"", html);
         const string Reads = "SELECT part || ' ' || count(*) FROM ehr.audit_events WHERE table_name = 'ambient_transcripts' AND action = 'read' AND row_id = @id GROUP BY part";
         Assert.Equal(["note-draft 1"], await RowsAsync(apps, Reads, l.Review));

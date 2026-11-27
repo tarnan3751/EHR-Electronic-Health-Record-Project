@@ -10,11 +10,19 @@
 @if (!OnPrem.IsReachable)
 {
     @* Off-site with the clinic's server down, the grant couldn't be saved (UC 2). *@
-    <p class="sc-prose">This patient is not on your panel. Emergency access can't be granted until the clinic's server is back, since the reason has to be recorded there first.</p>
+    <p class="sc-prose">Not one of your patients. Emergency access can't be granted until the clinic's server is back.</p>
 }
 else
 {
-    <p class="sc-prose">This patient is not on your panel. To open the chart, say why you need it, in @BreakGlass.MinimumReasonLength to @BreakGlass.MaximumReasonLength characters. Your access and the reason are recorded and reviewed, and the chart stays open to you for @BreakGlass.Duration.TotalHours hours. The patient, and anyone they share sensitive items with, can see in the portal that you used emergency access and when, but never the reason you give.</p>
+    @* The one thing to do first, then what follows from it as a short list. *@
+    <div class="sc-prose">
+        <p>Not one of your patients. To open the chart, say why you need it, in @BreakGlass.MinimumReasonLength to @BreakGlass.MaximumReasonLength characters.</p>
+        <ul>
+            <li>Your access and your reason are logged and reviewed.</li>
+            <li>The chart stays open to you for @BreakGlass.Duration.TotalHours hours.</li>
+            <li>The patient, and anyone they share sensitive items with, can see in the portal that you used emergency access, and when. They never see your reason.</li>
+        </ul>
+    </div>
     @* No action: the form posts to this page's own address, the search's criteria included. *@
     <form method="post" class="sc-form">
         <div class="sc-field">

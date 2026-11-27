@@ -22,11 +22,11 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   Tablet. With no code: "Albuterol inhaler". Coded as its ingredient: "Metformin, coded as an ingredient" (RxNorm
 //   6809). The note "Synthetic: I have three days left.".
 // Steps:
-//   1. Open the portal's home and follow "Renew a medication".
+//   1. Open the portal's home and follow "Ask for a refill".
 //   2. Choose lisinopril, type the note, and choose "Send request".
 // Expected result: Step 1: the page sends Cache-Control: no-store, offers lisinopril with its dosage and nothing else,
-//   and opening it is one recorded read of the patient by their own account. Step 2: the page says "Sent:", lists the
-//   request as Waiting, asked by the patient, with the note, and offers no medication; the database holds one request,
+//   and opening it is one recorded read of the patient by their own account. Step 2: the page says "Sent.", lists the
+//   request as Waiting, asked by the patient, with the note, and offers no other medication; the database holds one request,
 //   waiting, asked by the patient's account; Dr. Test and the colleague each have an item "A patient asked to renew a
 //   medication"; no email was sent to the patient.
 // Creator: Tahseen Arnan
@@ -48,7 +48,7 @@ public class TC_UC6_51_AskToRenew(WebApps apps) : IClassFixture<WebApps>
 
         var home = await patient.Client.GetStringAsync("/portal", Cancel);
         Assert.Contains("href=\"/portal/refills\"", home);
-        Assert.Contains("Renew a medication", Words(home));
+        Assert.Contains("Ask for a refill", Words(home));
         var readsBefore = await apps.AuditEventsAsync(AuditActions.Read, patient.Account, patient.Patient);
         using (var page = await patient.Client.GetAsync(PortalPath, Cancel))
         {
@@ -68,11 +68,12 @@ public class TC_UC6_51_AskToRenew(WebApps apps) : IClassFixture<WebApps>
         var words = Words(await ReadAsync(sent));
 
         Assert.Equal(PortalPath, PathOf(sent));
-        Assert.Contains("Sent: the care team will answer your request here.", words);
+        Assert.Contains("Sent. Your care team will answer here.", words);
         Assert.Contains("Waiting", words);
         Assert.Contains("by you", words);
         Assert.Contains("Synthetic: I have three days left.", words);
-        Assert.Contains("None of your medications can be renewed here right now.", words);
+        Assert.Contains("No other medications can be refilled here right now.", words);
+        Assert.DoesNotContain("None of your medications", words);
         Assert.Equal([$"requested|{Lisinopril}|Synthetic: I have three days left.|{patient.Account}|-|-|-"], await RequestsAsync(apps, patient.Patient));
         var request = await RequestIdAsync(apps, patient.Patient);
         Assert.Equal(

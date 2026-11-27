@@ -29,10 +29,10 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   3. Type a message; sign out on purpose; sign in again.
 //   4. Type in a note's Subjective; let it save; let 15 minutes pass; sign in again.
 //   5. Off-site, cut off: let 13 minutes pass, stay signed in; let 15 minutes pass.
-// Expected result: Step 1: the page is cleared with "Signed out: nothing was done here for 15 minutes…", no warning seen
+// Expected result: Step 1: the page is cleared with "Signed out. Nothing was done here for 15 minutes…", no warning seen
 //   first; after Dr. Other signs in, the browser is on Dr. Other's patients, and the message is nowhere. Step 2: the
-//   first tab says "Signed out: this sign-in has ended…", keeps the message, and has it back after signing in. Step 3:
-//   "Signed out: you signed out.", the message kept and back after signing in. Step 4: the draft on the server holds
+//   first tab says "Signed out. This sign-in has ended…", keeps the message, and has it back after signing in. Step 3:
+//   "Signed out. You signed out.", the message kept and back after signing in. Step 4: the draft on the server holds
 //   what was typed; after signing in the editor has it. Step 5: the warning opens and closes, and the page is cleared,
 //   with nothing forwarded to the clinic's server.
 // Creator: Tahseen Arnan
@@ -126,7 +126,7 @@ public class TC_UC11_11_EndWithoutWarning(WebApps apps) : IClassFixture<WebApps>
         // 3.
         await page.ClickAsync(".sc-appbar__signout");
         await page.WaitForSelectorAsync("[data-session-why='signed-out']");
-        Assert.Contains("Signed out: you signed out.", await SeenAsync(page));
+        Assert.Contains("Signed out. You signed out.", await SeenAsync(page));
         Assert.DoesNotContain(Body, await SeenAsync(page));
         Assert.True(await EndedAsync(page));
 

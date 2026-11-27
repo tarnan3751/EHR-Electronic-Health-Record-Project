@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Press Space (the cursor starts on the first reading, the blood pressure). Press Tab until the reason has the
 //      focus, type it, and press Enter.
 // Expected result: Step 1 opens the page with the first reading's box focused. Step 2 marks it: the vital signs page
-//   says "Marked:" and the blood pressure, both its numbers (step 9c), is entered in error in the record. Every
+//   says "Marked in error." and the blood pressure, both its numbers (step 9c), is entered in error in the record. Every
 //   focused control shows the focus ring, and the pages report no script errors.
 // Creator: Tahseen Arnan
 //
@@ -57,7 +57,7 @@ public class TC_UC4_22_Nfr12_VitalSignErrorKeyboardFirst(WebApps apps) : IClassF
         await page.Keyboard.TypeAsync("Typed 180 for 108.");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("marked=1", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("Marked:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Marked in error.", await page.Locator(".sc-notice--success").TextContentAsync());
 
         Assert.Equal([$"{Diastolic} 92 entered-in-error", $"{Systolic} 180 entered-in-error"], await StatesAsync(apps, patient));
         Assert.Empty(errors);

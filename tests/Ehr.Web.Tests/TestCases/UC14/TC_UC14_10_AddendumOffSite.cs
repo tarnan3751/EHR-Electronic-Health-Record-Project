@@ -19,7 +19,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Inputs and system conditions: GET the note and POST .../addendum on the off-site app, then on the one cut off.
 // Test data: "Synthetic addendum signed off-site."
 // Steps:
-//   1. Off-site, open the note, follow "Add an addendum" and sign the text.
+//   1. Off-site, open the note, follow "Add addendum" and sign the text.
 //   2. On the app that is cut off, open the note, and post an addendum to its addendum page.
 // Expected result: Step 1: the post is forwarded and the addendum is saved once, under the clinician. Step 2: the
 //   note and the addendum are shown, with "An addendum can't be signed until the clinic's server is back." and no

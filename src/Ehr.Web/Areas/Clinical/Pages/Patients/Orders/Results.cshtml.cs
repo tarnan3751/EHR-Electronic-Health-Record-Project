@@ -66,7 +66,7 @@ public class ResultsModel(PhiReader phi, PatientAssignments assignments, BreakGl
         if (collected is null && typed != default && errors.ContainsKey(nameof(CollectedAt)))
         {
             // A time was typed, and the clinic's clocks skip it that day.
-            errors[nameof(CollectedAt)] = "That time doesn't exist on that day: the clocks go forward. Enter the time on the clinic's clock.";
+            errors[nameof(CollectedAt)] = "The clocks go forward that day, so that time doesn't exist. Enter another time.";
         }
 
         if (errors.Count == 0)

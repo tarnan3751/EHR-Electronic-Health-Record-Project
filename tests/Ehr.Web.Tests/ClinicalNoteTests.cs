@@ -62,9 +62,13 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(Synthetic.Objective, html);
         Assert.Contains(Synthetic.Assessment, html);
         Assert.Contains(Synthetic.Plan, html);
-        Assert.Contains("Saved", html);
+        // Reopening saves nothing, so the status says nothing until the clinician types (note-editor.js says the rest).
+        Assert.Contains("<p id=\"note-save-status\" class=\"sc-status\" role=\"status\" aria-live=\"polite\"></p>", html);
         var chart = await page.Session.Client.GetStringAsync($"/patients/{page.Patient}", Cancel);
         Assert.Contains(page.Path, chart);
+        // The chart lists the draft without its internal version counter.
+        Assert.Contains("Open draft · unsigned", Words(chart));
+        Assert.DoesNotContain("· version", Words(chart));
         Assert.DoesNotContain("htmx.min.js", chart);
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, patientId: page.Patient) > 0);
     }
@@ -79,6 +83,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         var confirmUrl = (await JsonAsync(review)).GetProperty("url").GetString()!;
         var confirmation = await page.Session.Client.GetStringAsync(confirmUrl, Cancel);
         Assert.Contains("Confirm signature", confirmation);
+        Assert.Contains("I have reviewed this note and sign it as Dr. Test.", confirmation);
         Assert.DoesNotContain("htmx.min.js", confirmation);
         using var unconfirmed = await PostAsync(page, "Sign", 2);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unconfirmed.StatusCode);
@@ -92,7 +97,8 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(Synthetic.Plan, html);
         Assert.DoesNotContain("textarea", html);
         Assert.DoesNotContain("htmx.min.js", html);
-        Assert.Contains((await apps.ClinicianAsync()).Id.ToString(), html);
+        Assert.Contains("<dt>Signed by</dt><dd>Dr. Test</dd>", html);
+        Assert.DoesNotContain((await apps.ClinicianAsync()).Id.ToString(), html);
         var (count, signer, time) = await SignedAsync(page.Draft);
         Assert.Equal(1, count);
         Assert.Equal((await apps.ClinicianAsync()).Id, signer);
@@ -135,7 +141,7 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         await SqlAsync("UPDATE ehr.clinical_drafts SET has_unreviewed_proposals = true, version = version + 1, structured_version = version + 1 WHERE id = @id", page.Draft);
         using var sign = await PostAsync(page, "Sign", 3, extra: [("Confirmed", true), ("HasUnreviewedProposals", false), ("Reviewed", true)]);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, sign.StatusCode);
-        Assert.Contains("Review every associated AI proposal", await sign.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("Review every dictated field before signing.", await sign.Content.ReadAsStringAsync(Cancel));
         Assert.Equal(0, (await SignedAsync(page.Draft)).Count);
     }
 

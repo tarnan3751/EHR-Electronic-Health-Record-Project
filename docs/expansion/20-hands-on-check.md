@@ -69,16 +69,16 @@ Copy `target/release/bundle/macos/SwiftChart.app.tar.gz` into `infra/compose/des
 `infra/compose/desktop-updates/latest.json` as `infra/compose/README.md` shows, with `"version": "0.2.1"` and only the
 `darwin-aarch64` entry, its signature the contents of `SwiftChart.app.tar.gz.sig`. Then:
 
-- Open SwiftChart (the 0.2.0 in Applications) and unlock. Within a few seconds: "Update available: SwiftChart 0.2.1. …",
+- Open SwiftChart (the 0.2.0 in Applications) and unlock. Within a few seconds: "Update available. Get SwiftChart 0.2.1 ready, …",
   with **Get it ready** and **Not now**. Choose **Not now**: it goes. Quit and open it again, and unlock: it's back.
 - Lock it (**Lock now** from the idle warning, or wait): the offer isn't over the lock. Unlock.
-- **Get it ready**: "Getting it ready: …", then "Ready: SwiftChart 0.2.1 is ready to install. …" with **Restart now**.
+- **Get it ready**: "Getting it ready. …", then "Ready. SwiftChart 0.2.1 is ready to install. …" with **Restart now**.
   **Restart now**: SwiftChart opens again on the lock; unlock: "SwiftChart 0.2.1." in the status line, your charts
   and drafts as they were. Note any Gatekeeper, Keychain or microphone prompt after the update.
 
 **M5. What it won't take.** Edit `latest.json`'s `version` to `0.2.2`, leaving the 0.2.1 file and its signature: a
-release that says it's newer than what was signed. Quit, open and unlock SwiftChart: "Update available: SwiftChart
-0.2.2"; **Get it ready**: "Not installed: … its signature didn't match, so nothing was changed …", and the status line
+release that says it's newer than what was signed. Quit, open and unlock SwiftChart: "Update available. Get SwiftChart
+0.2.2 ready, …"; **Get it ready**: "Not installed. … its signature didn't match. Nothing was changed …", and the status line
 still says 0.2.1. Then, from `infra/compose`, restart the two apps with a minimum above it:
 
 ```
@@ -94,14 +94,15 @@ chart, type a sentence under **New draft** and **Save draft**: it waits on this 
 nothing is sent when the servers come back. `docker compose start onprem-app cloud-app`, and once they're up, in
 Safari as the administrator at https://ehr.example.com:8443: **Staff**, **Disable** the clinician; the page says that
 what SwiftChart keeps on their computers stays there until their desktop sign-ins are revoked, and to revoke them now.
-Open SwiftChart: it opens on the lock, and within a few seconds the lock reads "Signed out: the server ended this
-sign-in …", asking for the password and the code; nothing of the chart. Don't sign out (that would drop what the
+Open SwiftChart: it opens on the lock, and within a few seconds the lock reads "Signed out. The server ended this
+sign-in. …", asking for the password and the code; nothing of the chart. Don't sign out (that would drop what the
 revocation needs to reach this computer); quit it. In Safari, the clinician's **Desktop sign-ins**: note the count and
 both paragraphs; choose **Revoke and delete**: the staff page says their desktop sign-ins are revoked. (This is the
 order the final review found skipped the wipe; revoking first works the same.)
 
-**M7. The wipe.** Open SwiftChart. It opens on the lock; within a few seconds the window shows only "Deleted: an
-administrator revoked this computer's sign-in, so SwiftChart deleted everything it kept here: …", with **Quit
+**M7. The wipe.** Open SwiftChart. It opens on the lock; within a few seconds the window shows only "Deleted. An
+administrator revoked this computer's sign-in, so SwiftChart deleted the offline charts and everything else it kept
+here. …", with **Quit
 SwiftChart** and the focus on it; nothing of the chart, or of your draft, anywhere. Then, in Terminal:
 
 ```
@@ -176,13 +177,13 @@ warned at 13.
 
 **W4. An update.** Copy `SwiftChart_0.2.1_x64-setup.exe` and its `.sig` into `infra\compose\desktop-updates\`, and write
 `latest.json` there as `infra/compose/README.md` shows, with `"version": "0.2.1"` and only the `windows-x86_64` entry,
-its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock: "Update available: SwiftChart 0.2.1.
-…". **Get it ready**, then **Restart now**: the installer's progress shows, SwiftChart starts again on the lock, and
+its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock: "Update available. Get SwiftChart 0.2.1
+ready, …". **Get it ready**, then **Restart now**: the installer's progress shows, SwiftChart starts again on the lock, and
 after unlocking says "SwiftChart 0.2.1.", with the charts as they were. Note whether SmartScreen or anything else asked.
 
 **W5. Disabled, revoked, and the wipe.** As the Mac's M6 and M7, in Edge as the administrator: stop the two apps, save
-a draft, quit SwiftChart, start the apps, disable the clinician, open SwiftChart (it locks: "Signed out: …"), quit it
-without signing out, revoke, open SwiftChart again: "Deleted: …" within a few seconds. Then in PowerShell:
+a draft, quit SwiftChart, start the apps, disable the clinician, open SwiftChart (it locks: "Signed out. …"), quit it
+without signing out, revoke, open SwiftChart again: "Deleted. …" within a few seconds. Then in PowerShell:
 
 ```
 Test-Path "$env:APPDATA\io.github.tarnan3751.swiftchart\ehr.db"

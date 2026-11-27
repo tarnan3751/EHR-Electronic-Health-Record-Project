@@ -30,22 +30,22 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Test data: FhirRequests.ChartAsync's record.
 // Steps:
 //   1. Open Download my record at 360 pixels.
-//   2. Tab to "Include sensitive items" and press Space; Tab to "Download as a file (FHIR)" and press Enter.
-//   3. Tab to "Open a printable page" and press Enter.
+//   2. Tab to "Include sensitive items" and press Space; Tab to "Download file" and press Enter.
+//   3. Tab to "Open printable page" and press Enter.
 //   4. At 794 pixels, emulate print, light then dark; then screen, light then dark; then the printable page without
 //      sensitive items, on screen and printed.
 //   5. As the proxy, open each portal page and emulate print.
 //   6. As the clinician, open the patient's vital signs and emulate print; then the chart off-site, printed.
 // Expected result: Step 1: no sideways scroll. Step 2: the focus ring on each; a download named health-record-<date>.json
-//   whose file holds sertraline. Step 3: /portal/record/print?sensitive=true, with "Sensitive items shown:", no sideways
+//   whose file holds sertraline. Step 3: /portal/record/print?sensitive=true, with "Sensitive items shown.", no sideways
 //   scroll. Step 4: printed, the app bar, the sign-out button and "use your browser's Print command" aren't displayed;
 //   the body's text is rgb(14, 27, 44) on a transparent ground, in the light scheme, in both themes; a table row avoids a break; nothing
 //   overflows. On screen, the light theme's text is rgb(14, 27, 44) on white and the dark theme's rgb(232, 238, 243).
-//   Without sensitive items, "Sensitive items hidden:" is displayed on screen and not printed, and the paper says
-//   nothing of sensitive items. Step 5: each printout keeps the band "Viewing as a proxy: this is Synthetic Fhirchart's
+//   Without sensitive items, "Sensitive items hidden." is displayed on screen and not printed, and the paper says
+//   nothing of sensitive items. Step 5: each printout keeps the band "Shared record. You're viewing Synthetic Fhirchart's
 //   record, not your own.", without its button. Step 6: no app bar, the patient banner not stuck, the flowsheet's
-//   wrapper not clipping it; off-site, the band "Read-only: the clinic's server can't be reached." prints. No script
-//   errors.
+//   wrapper not clipping it; off-site, the band "Read-only. The clinic's server can't be reached, so nothing can be
+//   saved until it's back." prints. No script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -78,7 +78,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         await page.Keyboard.PressAsync("Space");
         Assert.True(await page.IsCheckedAsync("#record-sensitive"));
         await page.Keyboard.PressAsync("Tab");
-        Assert.Equal("Download as a file (FHIR)", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Equal("Download file", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         Assert.True(await page.EvaluateAsync<bool>(FocusRing));
         // The file is named by the UTC day of the request: the day read just before it, or after it if midnight came
         // between.
@@ -89,11 +89,11 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         Assert.Contains("sertraline", await System.IO.File.ReadAllTextAsync(await download.PathAsync(), TestContext.Current.CancellationToken));
 
         await page.Keyboard.PressAsync("Tab");
-        Assert.Equal("Open a printable page", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Equal("Open printable page", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         Assert.True(await page.EvaluateAsync<bool>(FocusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.EndsWith("/portal/record/print?sensitive=true", StringComparison.Ordinal));
-        Assert.Contains("Sensitive items shown:", await page.Locator("[data-sensitive=shown]").TextContentAsync());
+        Assert.Contains("Sensitive items shown.", await page.Locator("[data-sensitive=shown]").TextContentAsync());
         Assert.True(await page.EvaluateAsync<bool>(Fits), "The printable page scrolls sideways at 360 pixels.");
 
         // On paper, A4's width at 96 pixels an inch, in either theme.
@@ -140,7 +140,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
             await proxyPage.GotoAsync($"{server.Url}{path}");
             await proxyPage.EmulateMediaAsync(new() { Media = Media.Print });
             Assert.NotEqual("none", await DisplayAsync(proxyPage, "[data-acting]"));
-            Assert.Contains("Viewing as a proxy: this is Synthetic Fhirchart's record, not your own.", await proxyPage.Locator("[data-acting]").InnerTextAsync());
+            Assert.Contains("Shared record. You're viewing Synthetic Fhirchart's record, not your own.", await proxyPage.Locator("[data-acting]").InnerTextAsync());
             Assert.Equal("none", await DisplayAsync(proxyPage, "[data-acting] button"));
         }
 
@@ -164,7 +164,7 @@ public class TC_UC6_33_Nfr12_DownloadRecordSmallScreenAndPrint(WebApps apps) : I
         await chartOffSite.EmulateMediaAsync(new() { Media = Media.Print });
         Assert.Equal("none", await DisplayAsync(chartOffSite, ".sc-appbar"));
         Assert.NotEqual("none", await DisplayAsync(chartOffSite, "p.sc-notice--band"));
-        Assert.StartsWith("Read-only: the clinic's server can't be reached.", await chartOffSite.Locator("p.sc-notice--band").InnerTextAsync());
+        Assert.StartsWith("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back.", await chartOffSite.Locator("p.sc-notice--band").InnerTextAsync());
     }
 
     static Task<string> DisplayAsync(IPage page, string selector) =>

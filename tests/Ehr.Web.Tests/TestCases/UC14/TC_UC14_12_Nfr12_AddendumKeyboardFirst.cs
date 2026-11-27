@@ -17,10 +17,10 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Test data: "Synthetic keyboard addendum."
 // Steps:
 //   1. Open the chart. Press Tab until the signed note's link has the focus, and press Enter.
-//   2. Press Tab until "Add an addendum" has the focus, and press Enter.
+//   2. Press Tab until "Add addendum" has the focus, and press Enter.
 //   3. Type the text (the cursor starts in the field). Press Tab until "Sign addendum" has the focus, and press Enter.
 // Expected result: Step 1 opens the signed note. Step 2 opens the addendum page with the cursor in the text field.
-//   Step 3 signs it: the note's page says "Signed:" and lists the addendum. Every focused control shows the focus
+//   Step 3 signs it: the note's page says "Addendum signed." and lists the addendum. Every focused control shows the focus
 //   ring, and the pages report no script errors.
 // Creator: Tahseen Arnan
 //
@@ -60,7 +60,7 @@ public class TC_UC14_12_Nfr12_AddendumKeyboardFirst(WebApps apps) : IClassFixtur
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("done=addendum", StringComparison.Ordinal));
-        Assert.Contains("Signed:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Addendum signed.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Contains("Synthetic keyboard addendum.", await page.Locator("[data-addenda]").TextContentAsync());
 
         Assert.Single(await AddendaAsync(apps, patient));

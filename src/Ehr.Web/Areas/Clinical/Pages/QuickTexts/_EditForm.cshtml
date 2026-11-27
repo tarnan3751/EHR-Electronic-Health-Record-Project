@@ -15,7 +15,7 @@
             <span id="body-@Model.Id-error" asp-validation-for="Body" class="sc-field__error"></span>
         </div>
         <div class="sc-actions">
-            <button class="sc-btn">Save</button>
+            <button class="sc-btn">Save phrase</button>
             <button type="button" class="sc-btn sc-btn--quiet" hx-get="@Url.Page("Index", "Row", new { id = Model.Id })"
                     hx-target="closest li" hx-swap="outerHTML">Cancel</button>
         </div>

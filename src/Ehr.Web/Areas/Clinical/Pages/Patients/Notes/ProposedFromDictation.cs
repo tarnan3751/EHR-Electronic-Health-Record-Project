@@ -47,8 +47,8 @@ public sealed record ProposedFromDictation(
     };
 
     public static string WarningWords(WarningCode code) => code == WarningCode.PossibleCorrection
-        ? "you may have corrected this just after it:"
-        : "a passage beside it was hard to hear:";
+        ? "You may have corrected this just after it:"
+        : "A passage beside it was hard to hear:";
 
     // The stored result of a review, as the review page reads it.
     public static DictationResult? Result(AiNoteReview review) =>

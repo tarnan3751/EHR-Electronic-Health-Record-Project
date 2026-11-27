@@ -28,7 +28,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Press Tab until "Older views" has the focus, and press Enter.
 //   3. On the older page, press Tab until "Newer views" has the focus.
 // Expected result: Step 1: the page is no wider than the window, the address wrapping inside its line; the notice reads
-//   "Emergency access:". Step 2: the
+//   "Emergency access.". Step 2: the
 //   focused link shows the focus ring; Enter opens the older page, which is no wider than the window either. Step 3:
 //   the focused link shows the focus ring. No script errors.
 // Creator: Tahseen Arnan
@@ -73,9 +73,9 @@ public class TC_UC6_50_Nfr12_WhoViewedSmallScreen(WebApps apps) : IClassFixture<
         // Step 1.
         await page.GotoAsync($"{server.Url}{ViewsPath}");
         Assert.True(await page.EvaluateAsync<bool>(fits), "The page scrolls sideways at 360 pixels.");
-        Assert.Contains("Emergency access:", await page.Locator("[data-emergency=explained]").TextContentAsync());
+        Assert.Contains("Emergency access.", await page.Locator("[data-emergency=explained]").TextContentAsync());
         Assert.Contains("Featherstonehaugh", await page.Locator("main").TextContentAsync());
-        Assert.Contains("Your chart, with its sensitive items: the summary page, which lists your visit notes", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Your chart, with the list of your visit notes, including sensitive items", await page.Locator("main").TextContentAsync());
         Assert.Contains(proxy.Email, await page.Locator("main").TextContentAsync());
 
         // Step 2.

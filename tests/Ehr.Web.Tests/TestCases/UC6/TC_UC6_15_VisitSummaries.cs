@@ -38,13 +38,13 @@ public class TC_UC6_15_VisitSummaries(WebApps apps) : IClassFixture<WebApps>
         var first = await SignedNoteAsync(session.Client, patient.Patient, subjective: NoteSubjective);
         using (var released = await ReleaseAsync(session.Client, patient.Patient, first, "We talked about your blood pressure."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var second = await SignedNoteAsync(session.Client, patient.Patient, subjective: NoteSubjective);
         using (var released = await ReleaseAsync(session.Client, patient.Patient, second))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var home = await patient.Client.GetStringAsync("/portal", Cancel);

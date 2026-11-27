@@ -64,7 +64,7 @@ public class IndexModel(StaffPasskeys passkeys, UserManager<StaffUser> users, Pa
             return Page();
         }
 
-        Message = "Passkey added: use it at your next sign-in, after your password.";
+        Message = "Passkey added. Use it at your next sign-in, after your password.";
         return RedirectToPage();
     }
 
@@ -78,21 +78,21 @@ public class IndexModel(StaffPasskeys passkeys, UserManager<StaffUser> users, Pa
         var user = await CurrentAsync();
         if (id is null || !Base64Url.IsValid(id) || !await passkeys.RemoveAsync(user, Base64Url.DecodeFromChars(id), HttpContext.RequestAborted))
         {
-            Problem = "Not removed: that passkey isn't one of yours.";
+            Problem = "Not removed. That passkey isn't one of yours.";
             Passkeys = await passkeys.ListAsync(user);
             return Page();
         }
 
-        Message = "Passkey removed: it can't be used to sign in any more.";
+        Message = "Passkey removed. It can't be used to sign in any more.";
         return RedirectToPage();
     }
 
     public static string IdOf(UserPasskeyInfo passkey) => Base64Url.EncodeToString(passkey.CredentialId);
 
-    // A notice's state, its words up to the first colon and the colon, and the rest.
-    public static string State(string notice) => notice[..(notice.IndexOf(": ", StringComparison.Ordinal) + 1)];
+    // A notice's state, its first sentence and the full stop, and the rest.
+    public static string State(string notice) => notice[..(notice.IndexOf(". ", StringComparison.Ordinal) + 1)];
 
-    public static string Rest(string notice) => notice[(notice.IndexOf(": ", StringComparison.Ordinal) + 1)..];
+    public static string Rest(string notice) => notice[(notice.IndexOf(". ", StringComparison.Ordinal) + 1)..];
 
     async Task<StaffUser> CurrentAsync() => (await users.FindByIdAsync(User.FindFirstValue(ClaimTypes.NameIdentifier)!))!;
 }

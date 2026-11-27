@@ -358,7 +358,7 @@ public static class FhirApi
 
     const string UnknownType = "This server doesn't serve that resource type. The capability statement, at /fhir/metadata, lists those it does.";
 
-    const string OffPanel = "This patient isn't on your panel. Open their chart in the clinical app, where emergency access can be started.";
+    const string OffPanel = "This patient isn't one of your patients. Open their chart in the clinical app, where emergency access can be started.";
 
     static string BaseUrl(IOptions<SiteAddresses> addresses) => Ehr.Web.Accounts.Links.Build(addresses.Value.ClinicalBaseUrl, AccountSchemes.FhirPath);
 

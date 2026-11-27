@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   5. Download the offline copy.
 // Expected result: Step 1: the chart lists one signed note and says "1 signed note is not shown."; no view of
 //   sensitive items is recorded. Step 2: both notes are listed, the sensitive one tagged; the note's page says
-//   "Sensitive note: your view of it is recorded." and each view is in the audit log as a view of sensitive items; its
+//   "Sensitive note. Your view of it is logged." and each view is in the audit log as a view of sensitive items; its
 //   addendum is stored sensitive. Step 3: the ordinary note's page shows the ordinary addendum and says "1 addendum
 //   is not shown." Step 4: both are shown, the sensitive one tagged, and the view is recorded. Step 5: the copy has
 //   the ordinary note with only its ordinary addendum and "sensitiveAddendaNotKept": 1, nothing of the sensitive note
@@ -46,13 +46,13 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         // With only a sensitive note, the chart doesn't say there are none.
         var only = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
         Assert.Contains("No other signed notes.", only);
-        Assert.DoesNotContain("No signed notes recorded.", only);
+        Assert.DoesNotContain("No signed notes.", only);
         var ordinary = await SignedNoteAsync(session.Client, patient);
         Task<long> ViewsAsync() => apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient);
         var views = await ViewsAsync();
 
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Contains("Sensitive items hidden: 1 signed note is not shown.", Words(chart));
+        Assert.Contains("Sensitive items hidden. 1 signed note is not shown.", Words(chart));
         Assert.Contains(NotePath(patient, ordinary), chart);
         Assert.DoesNotContain(NotePath(patient, sensitive), chart);
         Assert.Equal(views, await ViewsAsync());
@@ -61,7 +61,7 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         Assert.Matches($"(?s)href=\"{NotePath(patient, sensitive)}\">Signed note[^<]*</a>\\s*<span class=\"sc-tag sc-tag--warning\">Sensitive</span>", chart);
         Assert.Equal(views + 1, await ViewsAsync());
         var page = await session.Client.GetStringAsync(NotePath(patient, sensitive), Cancel);
-        Assert.Contains("Sensitive note: your view of it is recorded.", Words(page));
+        Assert.Contains("Sensitive note. Your view of it is logged.", Words(page));
         Assert.Equal(views + 2, await ViewsAsync());
         var form = await session.Client.GetStringAsync(AddendumPath(patient, sensitive), Cancel);
         Assert.Contains("This note is sensitive, so its addenda are too.", form);
@@ -75,12 +75,12 @@ public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<W
         using var plain = await AddAsync(session.Client, patient, ordinary, "Synthetic ordinary addendum.");
         views = await ViewsAsync();
         page = await session.Client.GetStringAsync(NotePath(patient, ordinary), Cancel);
-        Assert.Contains("Sensitive addenda hidden: 1 addendum is not shown.", Words(page));
+        Assert.Contains("Sensitive addenda hidden. 1 addendum is not shown.", Words(page));
         Assert.Contains("Synthetic ordinary addendum.", page);
         Assert.DoesNotContain("Synthetic sensitive addendum.", page);
         Assert.Equal(views, await ViewsAsync());
         page = await session.Client.GetStringAsync(NotePath(patient, ordinary) + "?sensitive=true", Cancel);
-        Assert.Contains("Sensitive addenda shown: your view of them is recorded.", Words(page));
+        Assert.Contains("Sensitive addenda shown. Your view of them is logged.", Words(page));
         Assert.Matches("(?s)<span class=\"sc-tag sc-tag--warning\" data-addendum-sensitive=\"own\">Sensitive</span>\\s*</p>\\s*<p class=\"sc-note__text\">Synthetic sensitive addendum\\.", page);
         Assert.Equal(views + 1, await ViewsAsync());
         Assert.Equal(

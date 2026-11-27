@@ -49,7 +49,7 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
     public bool Sensitive { get; set; }
 
     // Set by the entry form's redirect after a save: the entry and its list (Lists/Entry's name for it), for the
-    // chart's "Saved:" notice, which is shown only when that entry is this patient's (PatientChart.Saved).
+    // chart's "Saved." notice, which is shown only when that entry is this patient's (PatientChart.Saved).
     [BindProperty(SupportsGet = true)]
     public Guid? Saved { get; set; }
 
@@ -89,7 +89,7 @@ public class ChartModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         return route;
     }
 
-    // The "Saved:" notice's sentence after the name, for an entry that is shown: where it is, or why it isn't listed.
+    // The "Saved." notice's sentence after the name, for an entry that is shown: where it is, or why it isn't listed.
     public static string SavedWhere(SavedEntry saved) => saved.Listed
         ? $" is listed under {ChartListWords.Lists[saved.Table].Heading}."
         : $" is now {ChartListWords.Status(saved.Table, saved.Status).ToLowerInvariant()}, so it is no longer listed.";

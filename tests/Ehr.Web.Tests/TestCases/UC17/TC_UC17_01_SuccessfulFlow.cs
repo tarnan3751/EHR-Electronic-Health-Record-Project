@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC17;
 // Expected result: Step 1: each inbox shows one "Message" item, "A patient sent a message", with the patient's name
 //   and a link to the conversation; the count in the app bar is 1. Step 2: the conversation shows the patient's banner
 //   and the message from the patient by name; opening it is a recorded read of the thread and marks the message read.
-//   Step 3: the page says "Sent:" and shows the reply under the first clinician's name; one email tells the patient,
+//   Step 3: the page says "Sent." and shows the reply under the first clinician's name; one email tells the patient,
 //   and a second reply before they have read the first sends no second email. Step 4: the second clinician's
 //   inbox is empty; the chart's Messages section lists the conversation, not marked new.
 // Creator: Tahseen Arnan
@@ -66,7 +66,7 @@ public class TC_UC17_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         using var reply = await PostFormAsync(staff.Client, $"/patients/{patient}/messages/{thread}", $"/patients/{patient}/messages/{thread}",
             ("Body", "Synthetic: yes, sent to your pharmacy."));
         var sent = await ReadAsync(reply);
-        Assert.Contains("Sent: the patient's email says only that there is a new message.", Words(sent));
+        Assert.Contains("Sent.", Words(sent));
         Assert.Contains("<strong>Dr. Care One</strong>", sent);
         Assert.Equal([$"staff {first.Id}"], await RowsAsync(apps, patient, "sender_kind || ' ' || sender_id", where: "sender_kind = 'staff'"));
 

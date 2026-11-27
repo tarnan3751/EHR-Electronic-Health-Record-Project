@@ -112,9 +112,9 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
         var html = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
 
         Assert.Contains("No allergy information recorded.", html);
-        Assert.Contains("No active medications recorded.", html);
-        Assert.Contains("No active diagnoses recorded.", html);
-        Assert.Contains("No visits recorded.", html);
+        Assert.Contains("No active medications.", html);
+        Assert.Contains("No active diagnoses.", html);
+        Assert.Contains("No visits.", html);
         Assert.DoesNotContain("Latest visit", html);
     }
 
@@ -178,7 +178,7 @@ public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
 
         var html = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
 
-        Assert.Matches("<a [^>]*href=\"/patients\"[^>]*>Back to my patients</a>", html);
+        Assert.Matches("<a [^>]*href=\"/patients\"[^>]*>Back to patients</a>", html);
     }
 
     // Off-site during an outage, the chart from the replica and its one queued read: TestCases/UC2/TC_UC2_01_SuccessfulFlow.cs.

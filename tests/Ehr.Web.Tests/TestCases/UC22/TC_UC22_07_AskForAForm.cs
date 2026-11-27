@@ -23,13 +23,13 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Test data: Clinician "Dr. Forms Seven"; patient Synthetic Booked; the PHQ-9 (44249-1) and the GAD-7 (69737-5).
 // Steps:
 //   1. Open the patient's pre-visit forms page.
-//   2. Choose the appointment and the PHQ-9, and choose "Ask the patient to fill it in".
+//   2. Choose the appointment and the PHQ-9, and choose "Ask for form".
 //   3. Ask for the PHQ-9 again, then the GAD-7.
 //   4. Open the page off-site with the clinic's server down, and as another clinician.
 // Expected result: Step 1: the appointment list starts with the cursor in it, offers the booked appointment and both
 //   questionnaires, and says forms aren't watched as they arrive; no form is listed and no count shown. Step 2: the
-//   page says "Form asked for:"; the request names the patient, the appointment's clinician, the clinician who asked
-//   and a copy of the PHQ-9's definition. Step 3: the second PHQ-9 is answered 422 "Not asked: That questionnaire is
+//   page says "Form asked for."; the request names the patient, the appointment's clinician, the clinician who asked
+//   and a copy of the PHQ-9's definition. Step 3: the second PHQ-9 is answered 422 "Not asked. That questionnaire is
 //   already asked for at that appointment." and nothing more is saved; the GAD-7 is saved. Step 4: off-site the page
 //   says "Asking for a pre-visit form needs the clinic's server." with no form to post; the other clinician is sent to
 //   the chart, which asks for a reason, before anything is read.
@@ -53,7 +53,7 @@ public class TC_UC22_07_AskForAForm(WebApps apps) : IClassFixture<WebApps>
 
         using var asked = await AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, Phq9);
         Assert.Equal(HttpStatusCode.OK, asked.StatusCode);
-        Assert.Contains("Form asked for: the patient can fill it in from 7 days before the appointment until it ends.", Words(await ReadAsync(asked)));
+        Assert.Contains("Form asked for. The patient can fill it in from 7 days before the appointment until it ends.", Words(await ReadAsync(asked)));
         Assert.Equal([$"{visit.Patient} {visit.Clinician.Id} {visit.Clinician.Id} true"], await QueryAsync(apps,
             """
             SELECT r.patient_id || ' ' || r.clinician_id || ' ' || r.requested_by || ' ' || (r.definition = q.definition)
@@ -62,7 +62,7 @@ public class TC_UC22_07_AskForAForm(WebApps apps) : IClassFixture<WebApps>
 
         using var again = await AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, Phq9);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, again.StatusCode);
-        Assert.Contains("Not asked: That questionnaire is already asked for at that appointment.", Words(await again.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not asked. That questionnaire is already asked for at that appointment.", Words(await again.Content.ReadAsStringAsync(Cancel)));
         using var anxiety = await AskAsync(visit.Session.Client, visit.Patient, visit.Appointment, Gad7);
         Assert.Equal(HttpStatusCode.OK, anxiety.StatusCode);
         Assert.Equal([Gad7, Phq9], await QueryAsync(apps,

@@ -28,10 +28,10 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. Off-site with the link down, open the chart as the first clinician.
 //   3. Post a new diagnosis with the form token read before the link went down.
 // Expected result: In step 1 the chart lists the diagnosis with no "Add" or "Change"; each form request is answered
-//   with a redirect to the chart, and each post with 409 and "Not saved: this patient isn't on your panel, so nothing
-//   was changed.", the typed name to copy and nothing about the patient; no new read is recorded and nothing changes. In step 2 the chart lists the
+//   with a redirect to the chart, and each post with 409 and "Not saved. This isn't one of your patients.", the
+//   typed name to copy and nothing about the patient; no new read is recorded and nothing changes. In step 2 the chart lists the
 //   diagnosis, offers no "Add" or "Change", and says "Changes to diagnoses need the clinic's server." In step 3 the
-//   post is answered 503 with "Nothing was saved, because the clinic's server can't be reached." and the typed name
+//   post is answered 503 with "Not saved. The clinic's server can't be reached." and the typed name
 //   shown again. The patient still has exactly one diagnosis.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_10_EntryExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
@@ -63,7 +63,7 @@ public class TC_UC4_10_EntryExceptionalCondition(WebApps apps) : IClassFixture<W
                 Form(("__RequestVerificationToken", Token(chart)), ("Name", "Unspecified asthma, uncomplicated"), ("Status", "resolved")), Cancel);
             Assert.Equal(HttpStatusCode.Conflict, post.StatusCode);
             var offPanel = await post.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Not saved: this patient isn't on your panel, so nothing was changed.", Words(offPanel));
+            Assert.Contains("Not saved. This isn't one of your patients.", Words(offPanel));
             Assert.Contains("Unspecified asthma, uncomplicated</textarea>", offPanel);
             Assert.DoesNotContain("Listed, Synthetic", offPanel);
         }
@@ -84,7 +84,7 @@ public class TC_UC4_10_EntryExceptionalCondition(WebApps apps) : IClassFixture<W
         using var posted = await cutOff.SendAsync(request, Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, posted.StatusCode);
         var notSaved = await posted.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Nothing was saved, because the clinic's server can't be reached.", notSaved);
+        Assert.Contains("Not saved.</span> The clinic's server can't be reached.", notSaved);
         Assert.Contains("Unspecified asthma, uncomplicated", notSaved);
 
         Assert.Equal(["Essential (primary) hypertension active"], await RowsAsync(apps, "conditions", patient, "concat_ws(' ', display, clinical_status)"));

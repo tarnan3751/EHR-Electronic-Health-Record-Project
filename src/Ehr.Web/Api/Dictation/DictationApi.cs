@@ -229,8 +229,8 @@ public static partial class DictationApi
         var minutes = (left.UntilLongest + 59) / 60;
         var ends = minutes <= 1 ? "in a minute" : $"in {minutes} minutes";
         return Refuse(StatusCodes.Status409Conflict, "sign_in_ending", ambient
-            ? $"Sign in again first: a sign-in lasts at most 12 hours, and this one ends {ends}, too soon for a visit, which can record for 20 minutes. Sign out, sign in again, then start listening."
-            : $"Sign in again first: a sign-in lasts at most 12 hours, and this one ends {ends}, too soon for a dictation, which can record for 3 minutes. Sign out, sign in again, then dictate.");
+            ? $"Sign in again first. Your sign-in ends {ends}, too soon for a visit of up to 20 minutes. Sign out, sign in again, then start listening."
+            : $"Sign in again first. Your sign-in ends {ends}, too soon for a dictation of up to 3 minutes. Sign out, sign in again, then dictate.");
     }
 
     static Task<IResult> SendAudioAsync(string id, string? seq, HttpContext context, DictationSidecar sidecar) =>
@@ -302,7 +302,7 @@ public static partial class DictationApi
         if (!sidecar.IsConfigured)
         {
             log.LogWarning("Dictation isn't configured: set Ehr:Dictation:Url and Ehr:Dictation:ApiKey.");
-            return Unavailable();
+            return Unavailable(ambient);
         }
 
         // The policy has just authenticated the clinician: the owner is whoever that is, whatever the request says.
@@ -328,7 +328,7 @@ public static partial class DictationApi
         {
             // A refused or timed-out connection, or one that dropped.
             log.LogWarning(exception, "The dictation service can't be reached.");
-            return Unavailable();
+            return Unavailable(ambient);
         }
         catch (Exception exception) when (exception is JsonException or NotSupportedException)
         {
@@ -349,7 +349,7 @@ public static partial class DictationApi
                 // A dictation started in a language the service doesn't take (the expansion plan's step 17).
                 return await ErrorBodyAsync(response, cancellationToken) is { Error: "bad_language" }
                     ? Refuse(StatusCodes.Status400BadRequest, "bad_language", "Choose English or Spanish for this dictation.")
-                    : Unexpected(response.StatusCode, operation, log);
+                    : Unexpected(response.StatusCode, operation, log, ambient);
             case HttpStatusCode.ServiceUnavailable:
                 // Spanish, on a server without Whisper (step 17), or a visit, on one without the speaker model (step 16); any
                 // other 503 is the service unavailable.
@@ -358,8 +358,8 @@ public static partial class DictationApi
                     { Error: "language_unavailable" } => Refuse(StatusCodes.Status503ServiceUnavailable, "language_unavailable",
                         "Spanish dictation isn't installed on this server."),
                     { Error: "listening_unavailable" } => Refuse(StatusCodes.Status503ServiceUnavailable, "listening_unavailable",
-                        "Listening to a visit isn't set up on the clinic's dictation server: it has no model to tell voices apart."),
-                    _ => Unexpected(response.StatusCode, operation, log),
+                        "Listening isn't set up on the clinic's dictation server. It has no model to tell voices apart."),
+                    _ => Unexpected(response.StatusCode, operation, log, ambient),
                 };
             case HttpStatusCode.NotFound:
                 return NotFound();
@@ -372,7 +372,7 @@ public static partial class DictationApi
                         ambient ? "This visit's recording has already been stopped." : "This dictation has stopped, so it takes no more audio."),
                     { Error: "not_stopped" } => Refuse(StatusCodes.Status409Conflict, "not_stopped", "Stop the dictation before asking for its result."),
                     { Error: "speakers_given" } => Refuse(StatusCodes.Status409Conflict, "speakers_given", "Who each voice is was already given for this visit."),
-                    _ => Unexpected(response.StatusCode, operation, log),
+                    _ => Unexpected(response.StatusCode, operation, log, ambient),
                 };
             case HttpStatusCode.RequestEntityTooLarge:
                 // Too long means stop and start another; too large, a smaller chunk.
@@ -393,9 +393,9 @@ public static partial class DictationApi
                 return Refuse(StatusCodes.Status429TooManyRequests, "busy", "Dictation is busy. Try again in a moment.");
             case HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden:
                 log.LogError("The dictation service refused the key: Ehr:Dictation:ApiKey doesn't match the service's.");
-                return Unavailable();
+                return Unavailable(ambient);
             default:
-                return Unexpected(response.StatusCode, operation, log);
+                return Unexpected(response.StatusCode, operation, log, ambient);
         }
     }
 
@@ -413,17 +413,19 @@ public static partial class DictationApi
     }
 
     // A status, or a 409 code, that isn't in the contract: 503 if the service says it's unavailable, otherwise 502.
-    static IResult Unexpected(HttpStatusCode status, string operation, ILogger log)
+    static IResult Unexpected(HttpStatusCode status, string operation, ILogger log, bool ambient)
     {
         log.LogWarning("The dictation service answered {Status} to {Operation}.", (int)status, operation);
-        return status == HttpStatusCode.ServiceUnavailable ? Unavailable() : BadAnswer();
+        return status == HttpStatusCode.ServiceUnavailable ? Unavailable(ambient) : BadAnswer();
     }
 
     static IResult NotFound() =>
         Refuse(StatusCodes.Status404NotFound, "not_found", "This dictation has ended, or can't be found.");
 
-    static IResult Unavailable() =>
-        Refuse(StatusCodes.Status503ServiceUnavailable, "unavailable", "Dictation isn't available right now.");
+    // In a visit's words for a visit's session, which the Listen page shows after Start.
+    static IResult Unavailable(bool ambient = false) =>
+        Refuse(StatusCodes.Status503ServiceUnavailable, "unavailable",
+            ambient ? "Listening isn't available right now. You can type the note." : "Dictation isn't available right now.");
 
     static IResult BadAnswer() =>
         Refuse(StatusCodes.Status502BadGateway, "bad_answer", "Dictation isn't working right now.");

@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. As the proxy viewing the patient's record, open "Messages", request the new-message form, and post a message.
 //   2. Post a made-up grant ID, and the ID of a grant the third patient gave to someone else, to /portal/acting.
-//   3. Still viewing the patient's record, post the "Give someone access" form.
+//   3. Still viewing the patient's record, post the "Share your record" form.
 //   4. Off-site with the clinic's server unreachable, go back to the own record, choose the patient's again, and open
 //      the home page.
 //   5. On-site, the patient removes the access. The proxy opens "Results".
@@ -31,8 +31,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   include messages." and shows no conversation; the form and the post lead back to that page and nothing is sent.
 //   Step 2: both are answered 404 and the proxy still sees the first record. Step 3: nothing is saved, and the page
 //   says to go back to their own record. Step 4: both switches work, and the patient's record is shown with the band.
-//   Step 5: the proxy lands on their own record with "Access ended: you can no longer view that record. This is your
-//   own."; "Records you can view" is then empty.
+//   Step 5: the proxy lands on their own record with "Access ended. You can no longer see that record. This is your
+//   own."; "Records shared with you" is then empty.
 // Creator: Tahseen Arnan
 public class TC_UC6_11_ProxyLimits(WebApps apps) : IClassFixture<WebApps>
 {
@@ -70,7 +70,7 @@ public class TC_UC6_11_ProxyLimits(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Synthetic Guarded&#x27;s record", await proxy.Client.GetStringAsync("/portal", Cancel));
 
         var passedOn = await GiveAsync(proxy, third.Email);
-        Assert.Contains("Go back to your own record to see or change who can view yours.", passedOn);
+        Assert.Contains("Go back to your own to see or change who can see yours.", passedOn);
         Assert.DoesNotContain("name=\"Email\"", passedOn);
         Assert.Single(await GrantsAsync(apps, patient.Patient));
         Assert.Empty(await GrantsAsync(apps, proxy.Patient));
@@ -83,16 +83,16 @@ public class TC_UC6_11_ProxyLimits(WebApps apps) : IClassFixture<WebApps>
         var offSite = await ReadAsync(again);
         Assert.Contains("Synthetic Guarded&#x27;s record", offSite);
         Assert.Contains("data-acting", offSite);
-        Assert.Contains("access can't be given or removed until the clinic's server is back.", Words(await Client(apps.CloudCutOff, patient.Jar).GetStringAsync("/portal/access", Cancel)));
+        Assert.Contains("Sharing can't be changed until the clinic's server is back.", Words(await Client(apps.CloudCutOff, patient.Jar).GetStringAsync("/portal/access", Cancel)));
 
         using var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", grant));
-        Assert.Contains("Removed:", await ReadAsync(removed));
+        Assert.Contains("Sharing removed.", await ReadAsync(removed));
         using var after = await proxy.Client.GetAsync("/portal/results", Cancel);
         Assert.Equal("/portal", PathOf(after));
         var ended = await ReadAsync(after);
-        Assert.Contains("Access ended: you can no longer view that record. This is your own.", Words(ended));
+        Assert.Contains("Access ended. You can no longer see that record. This is your own.", Words(ended));
         Assert.Contains("<dd>Synthetic Helper</dd>", ended);
         Assert.DoesNotContain("data-acting", ended);
-        Assert.Contains("Nobody has given you access to their record.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
+        Assert.Contains("Nobody has shared a record with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
     }
 }

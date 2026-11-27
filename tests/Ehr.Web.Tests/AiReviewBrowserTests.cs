@@ -132,7 +132,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForFunctionAsync("typeof window.__heldUpload === 'function'");
         await TabToAsync(page, "[data-dictation-cancel]");
         await page.Keyboard.PressAsync("Enter");
-        const string Discarded = "Temporary dictation discarded. The manual draft was kept; no AI text was approved.";
+        const string Discarded = "Dictation discarded. The draft is kept, with nothing from the dictation in it.";
         await page.WaitForFunctionAsync("words => document.querySelector('[data-dictation-status]').textContent === words", Discarded);
         Assert.Contains(await AmbientBrowserTests.EventsAsync(page), e => e.StartsWith("DELETE ", StringComparison.Ordinal) && e.EndsWith(" 204", StringComparison.Ordinal));
 
@@ -303,7 +303,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Locator("#edited-subjective").FillAsync("Synthetic corrected text retained after failure");
         await page.RouteAsync("**/*handler=Decide", route => route.AbortAsync("connectionrefused"));
         await page.Locator("[data-dictation-field=subjective] [value=edited]").PressAsync("Enter");
-        await page.WaitForFunctionAsync("document.getElementById('note-save-status').textContent === 'Save failed'");
+        await page.WaitForFunctionAsync("document.getElementById('note-save-status').textContent === 'Not saved'");
         Assert.Equal("Synthetic corrected text retained after failure", await page.Locator("#edited-subjective").InputValueAsync());
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.id === 'note-errors'"));
         Assert.Contains("0 of 3", await page.Locator("[data-review-progress]").TextContentAsync());
@@ -328,7 +328,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Alt+Shift+D");
         await page.WaitForFunctionAsync("document.querySelector('[data-dictation-transcript]').textContent.includes('Fluids and rest.')");
         await page.Keyboard.PressAsync("Alt+Shift+D");
-        await page.WaitForFunctionAsync("document.querySelector('[data-dictation-status]').textContent.includes('could not confirm')");
+        await page.WaitForFunctionAsync("document.querySelector('[data-dictation-status]').textContent.includes('confirm the save')");
         Assert.EndsWith("/dictate", page.Url);
         Assert.Contains("Cough for three days.", await page.Locator("[data-dictation-transcript]").TextContentAsync());
         Assert.False(await page.Locator("[data-dictation-manual]").IsHiddenAsync());
@@ -427,7 +427,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         // warns, and those whose fields don't.
         Assert.Equal(0, await page.Locator("[data-dictation-field=subjective] .sc-proposal__warning").CountAsync());
         Assert.Equal(await page.Locator(".sc-translation__pair").CountAsync(), await page.Locator(".sc-translation__pair > .sc-translation__check:first-child").CountAsync());
-        Assert.Equal(["Translated from Spanish: check it against the Spanish beside it"],
+        Assert.Equal(["Translated from Spanish. Check it against the Spanish beside it."],
             (await page.Locator(".sc-translation__check").AllTextContentsAsync()).Distinct());
         // The Spanish quoted in a warning is marked as Spanish; in the Spanish transcript, an unclear passage's English
         // explanation is on an English wrapper, and the passage itself stays Spanish.
@@ -453,7 +453,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForURLAsync("**/notes/*?signed=True");
 
         // The signed note's saved reviews: opened, and the review followed, with the keyboard.
-        for (var i = 0; i < 60 && await page.EvaluateAsync<string>("document.activeElement.textContent.trim()") != "Saved AI reviews"; i++)
+        for (var i = 0; i < 60 && await page.EvaluateAsync<string>("document.activeElement.textContent.trim()") != "Finished dictation reviews"; i++)
         {
             await page.Keyboard.PressAsync("Tab");
         }
@@ -464,7 +464,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**/review/*");
         var reopened = page.Url;
-        Assert.Contains("The review of its fields is read-only.", await page.Locator("main").TextContentAsync());
+        Assert.Contains("Signed. This review is read-only.", await page.Locator("main").TextContentAsync());
         await TabToAsync(page, "[data-dictation-field=plan] .sc-translation__pair");
         Assert.Equal(plan.Spanish, await HighlightedAsync(page));
         await TabToAsync(page, "[data-dictation-field=subjective] .sc-translation__pair:nth-child(2)");

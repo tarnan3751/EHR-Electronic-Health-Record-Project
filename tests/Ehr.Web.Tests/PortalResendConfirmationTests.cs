@@ -11,7 +11,7 @@ namespace Ehr.Web.Tests;
 // address. Through the cloud app, as patients come. Supporting tests for UC5, not numbered test cases in the SE document.
 public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture<WebApps>
 {
-    const string SentMessage = "If that address has a portal account waiting to be confirmed, we have sent it a new link.";
+    const string SentMessage = "If that address has a portal account waiting to be confirmed, we've sent it a new link.";
 
     [Fact]
     public async Task A_link_that_no_longer_works_offers_a_new_one()
@@ -25,7 +25,7 @@ public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture
         using var confirmed = await PostFormAsync(client, path, path);
 
         var html = await ReadAsync(confirmed);
-        Assert.Contains("This link is not valid or has expired.", html);
+        Assert.Contains("This link isn't valid or has expired.", html);
         Assert.Contains("href=\"/portal/resend\"", html);
         Assert.DoesNotContain(apps.Emails.Sent, m => m.To == email);
     }
@@ -46,7 +46,7 @@ public partial class PortalResendConfirmationTests(WebApps apps) : IClassFixture
         var confirmPath = new Uri(ConfirmLink().Match(message.Body).Value).PathAndQuery;
 
         using var confirmed = await PostFormAsync(client, confirmPath, confirmPath);
-        Assert.Contains("Your address is confirmed", await ReadAsync(confirmed));
+        Assert.Contains("Email address confirmed", await ReadAsync(confirmed));
         using var signedIn = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password));
         Assert.Equal("/portal", PathOf(signedIn));
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.ConfirmationResent, patientId: patient));

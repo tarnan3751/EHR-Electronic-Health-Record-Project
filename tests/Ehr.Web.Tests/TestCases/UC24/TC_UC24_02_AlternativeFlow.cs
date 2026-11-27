@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 //   2. End it; review it as "Not appropriate".
 //   3. Filter the audit page by "Not appropriate", then by "Waiting for review".
 //   4. Write Dr. Before's access with no items; run the policies; open the administrator's inbox.
-// Expected result: Step 1: "In force:", and no form. Step 2: saved, tagged "Not appropriate". Step 3: the first filter
+// Expected result: Step 1: "In force until …", and no form. Step 2: saved, tagged "Not appropriate". Step 3: the first filter
 //   lists Dr. Early's access and not Dr. Late's; the second lists Dr. Late's and not Dr. Early's. Step 4: the access is in
 //   the inbox, once, after the run, and not before.
 // Creator: Tahseen Arnan
@@ -43,7 +43,7 @@ public class TC_UC24_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 
         // 1.
         var inForce = await reviewer.Client.GetStringAsync($"/admin/emergency-access/{early.Id}", Cancel);
-        Assert.Contains("In force:</span> it can be marked reviewed once it ends", inForce);
+        Assert.Matches("In force until [0-9-]+ [0-9:]+ UTC\\.</span> It can be marked reviewed once it ends", inForce);
         Assert.DoesNotContain("data-review-form", inForce);
 
         // 2.

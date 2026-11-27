@@ -82,7 +82,7 @@ public class CodeModel(StaffSignIn signIn, StaffPasskeys passkeys, PasskeySettin
         var user = await HeldAsync();
         var ceremony = user is not null && await OfferAsync(user)
             ? await passkeys.BeginSignInAsync(HttpContext, user, await StaffSignIn.PendingAsync(HttpContext))
-            : PasskeyCeremony.Refused(null, "Not signed in: this sign-in took too long. Start again with your password.");
+            : PasskeyCeremony.Refused(null, "Not signed in. This sign-in took too long. Start again with your password.");
         return ceremony.Problem is { } problem
             ? new JsonResult(new { problem }) { StatusCode = StatusCodes.Status400BadRequest }
             : new JsonResult(new { options = JsonSerializer.Deserialize<JsonElement>(ceremony.Options!), state = ceremony.State });

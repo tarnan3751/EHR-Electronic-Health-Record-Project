@@ -122,6 +122,6 @@ public class TC_UC19_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         // 4. Cut off, a write is the cloud app's "Not saved", as for every API.
         using var notSaved = await offSite.PostAsync("/fhir/Patient", new StringContent("""{"resourceType":"Patient"}""", System.Text.Encoding.UTF8, "application/fhir+json"), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);
-        Assert.Equal("Not saved: the on-prem server can't be reached.", await notSaved.Content.ReadAsStringAsync(Cancel));
+        Assert.Equal("Not saved. The clinic's server can't be reached.", await notSaved.Content.ReadAsStringAsync(Cancel));
     }
 }

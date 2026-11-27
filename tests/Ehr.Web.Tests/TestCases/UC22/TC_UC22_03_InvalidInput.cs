@@ -25,11 +25,11 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   3. Send it again.
 //   4. Open and send the PHQ-9 ten days ahead, and the cancelled one's.
 //   5. Open and send the other patient's PHQ-9.
-// Expected result: Step 1: 422, "Not sent: answer every question to send the form.", "Choose an answer." beside the
+// Expected result: Step 1: 422, "Not sent. Answer the highlighted questions and try again.", "Choose an answer." beside the
 //   two questions, the cursor on the first of them, the other answers still chosen; nothing stored. Step 2: stored
 //   with the database's score of 27, Severe, needing follow-up. Step 3: the answers page; still one set of answers.
 //   Step 4: the first says when it can be filled in and has no form to send; the cancelled one says it can no longer be
-//   filled in; sending either is 409, "Not sent: your answers were not sent to your care team." with why ("This form
+//   filled in; sending either is 409, "Not sent." with why ("This form
 //   can't be filled in yet." and "This form can no longer be filled in."), and stores nothing. Step 5: 404 for both.
 // Creator: Tahseen Arnan
 public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
@@ -61,7 +61,7 @@ public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, missing.StatusCode);
             var html = await missing.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Not sent: answer every question to send the form.", Text(html));
+            Assert.Contains("Not sent. Answer the highlighted questions and try again.", Text(html));
             Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(html, "Choose an answer.").Count);
             Assert.Matches("id=\"question-44250-9-0\"[^>]*autofocus", html);
             Assert.Matches("value=\"LA6570-1\" checked=\"checked\"", html);
@@ -94,7 +94,7 @@ public class TC_UC22_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         {
             using var refused = await SendAsync(portal, shut, Answers(PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 0));
             Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-            Assert.Contains("Not sent: your answers were not sent to your care team. " + why, Text(await refused.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("Not sent. " + why, Text(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Empty(await QueryAsync(apps, "SELECT id::text FROM ehr.questionnaire_responses WHERE request_id IN (@a, @b)", ("a", notYet), ("b", closed)));

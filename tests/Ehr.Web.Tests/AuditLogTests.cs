@@ -28,14 +28,14 @@ public class AuditLogTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Dr. Reviewed", html);
         Assert.Contains("Consult requested by the attending", html);
         Assert.Contains("<tr class=\"sc-table__flagged\">", html);
-        Assert.Contains(">break_glass <span class=\"sc-tag sc-tag--danger\">Review</span>", html);
+        Assert.Contains(">Emergency access <span class=\"sc-tag sc-tag--danger\">Review</span>", html);
         Assert.Contains("<td>read</td>", html);
         // The patient by ID, not by name: an admin has no access to patient data, and the only patient values on this
         // page are the ones the write audit recorded as changed.
         Assert.Contains($"<td class=\"sc-table__id\">{patient}</td>", html);
 
         var flaggedOnly = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}&Flagged=true", Cancel);
-        Assert.Contains("break_glass", flaggedOnly);
+        Assert.Contains("<td>Emergency access <span", flaggedOnly);
         Assert.DoesNotContain("<td>read</td>", flaggedOnly);
 
         var someoneElse = await admin.Client.GetStringAsync($"/admin/audit?Patient={Guid.CreateVersion7()}", Cancel);
@@ -64,12 +64,12 @@ public class AuditLogTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Matches($"(?s)<td>read</td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td class=\"sc-table__id\">patients {patient}</td>\\s*<td class=\"sc-table__mono\">{part}</td>", html);
         }
 
-        Assert.Matches($"(?s)<td>break_glass <span[^>]*>Review</span> <a[^>]*>Open the review</a></td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td[^>]*>[^<]*</td>\\s*<td class=\"sc-table__muted\">—</td>", html);
+        Assert.Matches($"(?s)<td>Emergency access <span[^>]*>Review</span> <a[^>]*>Open the review</a></td>\\s*<td class=\"sc-table__id\">{patient}</td>\\s*<td[^>]*>[^<]*</td>\\s*<td class=\"sc-table__muted\">—</td>", html);
 
         var vitals = await admin.Client.GetStringAsync($"/admin/audit?Patient={patient}&Part={AuditParts.Vitals}", Cancel);
         Assert.Contains($"<td class=\"sc-table__mono\">{AuditParts.Vitals}</td>", vitals);
         Assert.DoesNotContain($">{AuditParts.Chart}</td>", vitals);
-        Assert.DoesNotContain("<td>break_glass", vitals);
+        Assert.DoesNotContain("<td>Emergency access", vitals);
     }
 
     [Fact]

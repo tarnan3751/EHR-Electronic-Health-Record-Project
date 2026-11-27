@@ -54,9 +54,10 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
     // shown a sentence at a time beside the Spanish it was translated from.
     public bool Translated => Result?.SpokenLanguage == SpokenLanguage.Spanish;
 
-    // What every translated sentence says, in the owner's words (2026-11-24): no translated sentence reads as checked
-    // because it has no warning. dictation-view.js says the same of the sentences it renders.
-    public const string TranslatedSentence = "Translated from Spanish: check it against the Spanish beside it";
+    // What every translated sentence says, in the owner's words (2026-11-24), its state a sentence of its own as the UI's
+    // notices have them: no translated sentence reads as checked because it has no warning. dictation-view.js says the
+    // same of the sentences it renders.
+    public const string TranslatedSentence = "Translated from Spanish. Check it against the Spanish beside it.";
 
     // A field's sentences, each with the Spanish words it was translated from, when the dictation was in Spanish.
     public IEnumerable<(string English, string Spanish)> Statements(string field)
@@ -123,7 +124,7 @@ public class ReviewModel(PhiReader phi, PatientAssignments assignments, BreakGla
             ? Task.FromResult(ReviewResult.Invalid(FinishAtTheClinic))
             : reviews.RejectAllAndFinishAsync(reviewId, Version, HttpContext.RequestAborted), complete: true);
 
-    public const string FinishAtTheClinic = "Finish this review at the clinic: the conversation can be read only at the clinic.";
+    public const string FinishAtTheClinic = "Finish this review at the clinic, where the conversation can be read.";
 
     // Finishing a visit's review deletes its transcript: at the clinic too, while it is kept.
     public Task<IActionResult> OnPostCompleteAsync(Guid patientId, Guid draftId, Guid reviewId) =>

@@ -346,12 +346,13 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var html = await dictated.Session.Client.GetStringAsync(dictated.ReviewPath, Cancel);
         var said = RefillRequestTests.Said(html);
         Assert.Contains("Proposed orders and allergies", said);
-        Assert.Contains("Dictation proposes these from what you said and places or saves none of them. Each shows what you said after it.", said);
+        Assert.Contains("Proposed from what you said. Dictation doesn't place or save any of them.", said);
+        Assert.Contains("Each shows what you said after it, in case you corrected it.", said);
         Assert.Contains($"Order Awaiting review As heard: Chest is clear. {DictationSidecarStub.OrderSaid}. Heard after it: {DictationSidecarStub.AllergySaid}. Open in the order form", said);
         Assert.Equal(1, CountOf(html, "data-chart-proposal-heard-after"));
         Assert.Contains($"Allergy to add Awaiting review As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.OrderSaid}</mark>", html);
-        Assert.Contains("Check: you may have corrected this just after it: “penicillin”", said);
+        Assert.Contains("Check. You may have corrected this just after it: “penicillin”", said);
         Assert.Contains($"href=\"{OrderFormPath(dictated.Patient, dictated.Order)}\"", html.Replace("&amp;", "&", StringComparison.Ordinal));
         Assert.Contains($"href=\"/patients/{dictated.Patient}/allergies?proposal={dictated.Allergy}\"", html);
         Assert.Contains("Open in the order form", said);
@@ -396,7 +397,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         var editor = await client.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel);
         Assert.NotEmpty(LinkTo(editor, dictated.ReviewPath));
-        Assert.Contains("Awaiting review: 2 orders or allergies proposed from dictation. Review them.", RefillRequestTests.Said(editor));
+        Assert.Contains("Awaiting review. 2 orders or allergies proposed from dictation. Review them.", RefillRequestTests.Said(editor));
         var review = await client.GetStringAsync(dictated.ReviewPath, Cancel);
         Assert.NotEmpty(LinkTo(review.Replace("&amp;", "&", StringComparison.Ordinal), link));
         Assert.Equal("pending|-|-", await StateAsync(apps, dictated.Order));
@@ -485,7 +486,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         using var refused = await DismissAsync(second, second.Order);
         Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-        Assert.Contains("Not saved: this proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
         Assert.StartsWith("ordered|", await StateAsync(apps, second.Order), StringComparison.Ordinal);
     }
 
@@ -502,7 +503,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
             var said = RefillRequestTests.Said(html);
             var allergy = (await StateAsync(apps, dictated.Allergy)).Split('|')[2];
             Assert.Contains("Allergy to add Allergy added", said);
-            Assert.DoesNotContain("Check: you may have corrected", said);
+            Assert.DoesNotContain("Check. You may have corrected", said);
             Assert.Contains("data-chart-proposal-made", LinkTo(html, $"/patients/{dictated.Patient}#allergy-{allergy}"));
             Assert.Contains("See the allergy on the chart", said);
         }
@@ -605,7 +606,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         var editor = RefillRequestTests.Said(await cutOff.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel));
 
-        Assert.Contains("This draft can't be changed or signed while the clinic's server can't be reached.", editor);
+        Assert.Contains("This draft can't be changed or signed until the clinic's server is back.", editor);
         Assert.DoesNotContain("proposed from dictation", editor);
         var queued = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue).Events
             .Where(e => e.PatientId == dictated.Patient).Select(e => e.TableName).ToList();
@@ -660,7 +661,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var responses = await Task.WhenAll(sent);
         Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], responses.Select(r => r.StatusCode).Order());
         var refused = responses.Single(r => r.StatusCode == HttpStatusCode.Conflict);
-        Assert.Contains("Not saved: this proposal was decided first, in another tab or window.", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This proposal was decided first, in another tab or window.", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
         var written = await QueryAsync(apps, $"SELECT id FROM ehr.{table} WHERE patient_id = @id", dictated.Patient);
         Assert.Single(written);
         Assert.Equal(kind == "order" ? $"ordered|{written[0]}|-" : $"recorded|-|{written[0]}", await StateAsync(apps, proposal));
@@ -706,7 +707,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var responses = await Task.WhenAll(sent);
         Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], responses.Select(r => r.StatusCode).Order());
         var refused = responses.Single(r => r.StatusCode == HttpStatusCode.Conflict);
-        Assert.Contains("Not saved: this proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
         Assert.StartsWith("dismissed|-|-", await StateAsync(apps, dictated.Order), StringComparison.Ordinal);
         Assert.Equal(["1"], await QueryAsync(apps,
             "SELECT count(*) FROM ehr.audit_events WHERE table_name = 'ai_chart_proposals' AND row_id = @id AND action = 'update'", dictated.Order));

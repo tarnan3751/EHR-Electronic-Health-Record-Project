@@ -24,10 +24,10 @@ namespace Ehr.Web.Tests.TestCases.UC17;
 //   2. As the patient, reply.
 //   3. As the second clinician, request the conversation; open the chart with a reason; open the conversation; post
 //      a reply; request the new-message form.
-// Expected result: Step 1: the conversation opens with "Sent:"; one email tells the patient there is a message; no
+// Expected result: Step 1: the conversation opens with "Sent."; one email tells the patient there is a message; no
 //   inbox item is created (staff started it). Step 2: the first clinician gets an inbox item. Step 3: before a
 //   reason, the request is answered with a redirect to the chart and no read is recorded; after, the conversation is
-//   shown with "Add this patient to your panel to reply." and no form, its opening is a recorded read of the thread,
+//   shown with "To reply, add this patient to My patients." and no form, its opening is a recorded read of the thread,
 //   the patient's reply stays unread for the care team, and the post and the form request are each redirected to
 //   the chart with nothing saved.
 // Creator: Tahseen Arnan
@@ -46,7 +46,7 @@ public class TC_UC17_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var emails = apps.Emails.Sent.Count;
         using var started = await PostFormAsync(staff.Client, $"/patients/{patient}/messages/new", $"/patients/{patient}/messages/new",
             ("Subject", "Synthetic: your lab results"), ("Body", "Synthetic: please book a follow-up."));
-        Assert.Contains("Sent:", Words(await ReadAsync(started)));
+        Assert.Contains("Sent.", Words(await ReadAsync(started)));
         var thread = Guid.Parse(started.RequestMessage!.RequestUri!.AbsolutePath.Split('/').Last());
         Assert.Equal(emails + 1, apps.Emails.Sent.Count);
         Assert.Empty(await OpenInboxAsync(apps, patient));
@@ -66,7 +66,7 @@ public class TC_UC17_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var reads = await apps.AuditEventsAsync(AuditActions.Read, covering.Id, patient);
         var page = await other.Client.GetStringAsync($"/patients/{patient}/messages/{thread}", Cancel);
         Assert.Contains("Synthetic: will do.", page);
-        Assert.Contains("Add this patient to your panel to reply.", page);
+        Assert.Contains("To reply, add this patient to My patients.", page);
         Assert.DoesNotContain("<textarea", page);
         Assert.Equal(reads + 1, await apps.AuditEventsAsync(AuditActions.Read, covering.Id, patient));
         Assert.Equal(["unread"], await RowsAsync(apps, patient, "CASE WHEN read_at IS NULL THEN 'unread' ELSE 'read' END", where: "sender_kind = 'patient'"));

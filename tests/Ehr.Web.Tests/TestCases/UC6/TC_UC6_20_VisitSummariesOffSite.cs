@@ -44,14 +44,14 @@ public class TC_UC6_20_VisitSummariesOffSite(WebApps apps) : IClassFixture<WebAp
         async Task<Guid> ReleaseOneAsync(Guid note, string talked = TalkedAbout)
         {
             using var released = await ReleaseAsync(session.Client, patient.Patient, note, talked);
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
             return await StandingAsync(apps, patient.Patient);
         }
 
         async Task WithdrawOneAsync(Guid note, Guid summary)
         {
             using var withdrawn = await WithdrawAsync(session.Client, patient.Patient, note, summary);
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         await WithdrawOneAsync(first, await ReleaseOneAsync(first, "We talked about the wrong visit."));
@@ -61,9 +61,9 @@ public class TC_UC6_20_VisitSummariesOffSite(WebApps apps) : IClassFixture<WebAp
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Words(await Client(apps.CloudCutOff, patient.Jar).GetStringAsync("/portal/summaries", Cancel));
         Assert.Contains(TalkedAbout, cutOff);
-        Assert.Contains("was withdrawn by your care team.", cutOff);
+        Assert.Contains("Your care team withdrew the visit summary from", cutOff);
         Assert.DoesNotContain("wrong visit", cutOff);
-        Assert.Contains("Read-only: the clinic's server can't be reached", cutOff);
+        Assert.Contains("Read-only. The clinic's server can't be reached", cutOff);
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
         Assert.Contains(queued, e => e.Action == AuditActions.Read && e.TableName == "visit_summaries" && e.RowId == standing);
         // Not shipped yet: the clinic doesn't know of the view, so the withdrawal emails nobody (the known limit).

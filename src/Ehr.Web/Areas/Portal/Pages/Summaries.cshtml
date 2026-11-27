@@ -18,19 +18,19 @@ else
     var items = summaries.Summaries.Select(s => (Date: s.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)s, Sensitive: s.Sensitive))
         .Concat(summaries.Withdrawn.Select(w => (Date: w.NoteSignedAt, Summary: (Ehr.Data.Patients.PortalVisitSummary?)null, Sensitive: w.Sensitive)))
         .OrderByDescending(item => item.Date.UtcDateTime.Date).ThenBy(item => item.Summary is null).ThenByDescending(item => item.Date).ToList();
-    <p class="sc-muted">@(own ? "Written for you by your care team after a visit" : "Written by the care team after a visit"), newest first. Each is dated the day the visit's notes were signed.</p>
+    <p class="sc-muted">@(own ? "From your care team after each visit" : "From the care team after each visit"), newest first. Each is dated the day the visit's notes were signed.</p>
     @if (Model.MaySeeSensitive && summaries.SensitiveHidden > 0)
     {
         @* Left out until asked for (docs/brand: sensitive items). Asking is a link, a read the cloud app answers too. *@
-        <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @summaries.SensitiveHidden @(summaries.SensitiveHidden == 1 ? "visit summary is" : "visit summaries are") not shown. <a asp-page="/Summaries" asp-route-sensitive="true">Show sensitive summaries</a></p>
+        <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive summaries hidden.</span> @summaries.SensitiveHidden @(summaries.SensitiveHidden == 1 ? "visit summary is not" : "visit summaries are not") shown. <a asp-page="/Summaries" asp-route-sensitive="true">Show sensitive summaries</a></p>
     }
     else if (Model.MaySeeSensitive && summaries.SensitiveShown && items.Any(item => item.Sensitive))
     {
-        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="/Summaries">Hide sensitive summaries</a></p>
+        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive summaries shown.</span> Your view is logged. <a asp-page="/Summaries">Hide sensitive summaries</a></p>
     }
     @if (items.Count == 0)
     {
-        <p>@(own ? "You have no visit summaries yet." : "There are no visit summaries yet.")</p>
+        <p>No visit summaries yet.</p>
     }
     else
     {
@@ -40,7 +40,7 @@ else
                 @if (item.Summary is { } summary)
                 {
                     <li class="sc-result sc-result--plain" data-summary="standing">
-                        <h2>@summary.NoteSignedAt.UtcDateTime.ToString("MMM d, yyyy") UTC</h2>
+                        <h2>@Clinic.Format(summary.NoteSignedAt, "MMM d, yyyy")</h2>
                         <p class="sc-muted">Written by @summary.ReleasedBy@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</p>
                         <h3>@parts[0]</h3>
                         <p class="sc-note__text">@summary.TalkedAbout</p>
@@ -61,4 +61,4 @@ else
         </ul>
     }
 }
-<p><a asp-page="/Index">@(own ? "Back to my record" : "Back to the record")</a></p>
+<p><a asp-page="/Index">Back to home</a></p>

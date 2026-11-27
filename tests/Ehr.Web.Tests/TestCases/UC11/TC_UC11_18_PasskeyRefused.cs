@@ -33,7 +33,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 //   4. Give the password, then five unverified passkeys, then the good one, then the code.
 // Expected result: Step 1: each stays on /sign-in/code with "That passkey didn't work. Try again, or enter the code from
 //   your authenticator app." and the code's field, and is a sign_in_failed, "passkey refused". Step 2: signed in.
-//   Step 3: 400, "Not signed in: this sign-in took too long. Start again with your password.", and no options. Step 4:
+//   Step 3: 400, "Not signed in. This sign-in took too long. Start again with your password.", and no options. Step 4:
 //   after the fifth the account is locked; the good passkey is refused with "This account is locked after too many
 //   failed attempts. Try again in 15 minutes." and a sign_in_failed, "locked out"; no sign_in.
 // Creator: Tahseen Arnan
@@ -104,7 +104,7 @@ public class TC_UC11_18_PasskeyRefused(WebApps apps) : IClassFixture<WebApps>
         using var noPasswordStep = await fresh.PostAsync($"{CodePage}?handler=Options", Form(("__RequestVerificationToken", Token(signInPage))), Cancel);
         Assert.Equal(HttpStatusCode.BadRequest, noPasswordStep.StatusCode);
         var answerWithout = JsonSerializer.Deserialize<JsonElement>(await noPasswordStep.Content.ReadAsStringAsync(Cancel));
-        Assert.Equal("Not signed in: this sign-in took too long. Start again with your password.", answerWithout.GetProperty("problem").GetString());
+        Assert.Equal("Not signed in. This sign-in took too long. Start again with your password.", answerWithout.GetProperty("problem").GetString());
         Assert.False(answerWithout.TryGetProperty("options", out _));
     }
 
@@ -142,7 +142,7 @@ public class TC_UC11_18_PasskeyRefused(WebApps apps) : IClassFixture<WebApps>
     async Task AddPasskeyAsync(StaffAccount account, TestAuthenticator authenticator)
     {
         using var added = await AddAsync((await SignInAsync(apps.OnPrem, account)).Client, account, authenticator);
-        Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+        Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
     }
 
     // How many of the account's failed sign-ins were for this reason.

@@ -22,7 +22,7 @@ public class AnsweredNoticeTests(WebApps apps) : IClassFixture<WebApps>
 
         using var filed = await FileAsync(apps, session.Client, patient, order, (Hemoglobin, "13.1"), (Platelets, "250"), (Hematocrit, "41"), (Leukocytes, "6.2"));
         var page = await ReadAsync(filed);
-        Assert.Matches("<p class=\"sc-notice sc-notice--success\" role=\"status\" tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Saved:</span>", page);
+        Assert.Matches("<p class=\"sc-notice sc-notice--success\" role=\"status\" tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Saved.</span>", page);
         Assert.Contains("data-acknowledge", page);
         Assert.DoesNotMatch("data-acknowledge[^>]*autofocus", page);
 
@@ -42,7 +42,7 @@ public class AnsweredNoticeTests(WebApps apps) : IClassFixture<WebApps>
         using var recorded = await PostFormAsync(session.Client, page, page, ("Email", $"synthetic-{Guid.NewGuid():N}@example.com"), ("Scope", "record"), ("Days", 90));
         var html = await ReadAsync(recorded);
         Assert.Contains("done=recorded", recorded.RequestMessage!.RequestUri!.Query);
-        Assert.Matches("tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Saved:</span>", html);
+        Assert.Matches("tabindex=\"-1\" data-focus-on-load><span class=\"sc-notice__state\">Access given.</span>", html);
         Assert.DoesNotMatch("<input id=\"proxy-email\"[^>]*autofocus", html);
     }
 
@@ -57,7 +57,7 @@ public class AnsweredNoticeTests(WebApps apps) : IClassFixture<WebApps>
 
         using var chosen = await PostFormAsync(session.Client, "/portal/acting", "/portal/choose", ("grantId", await GrantIdAsync(apps, patient.Patient)));
         var home = Words(await ReadAsync(chosen));
-        Assert.Contains("Viewing as a proxy: this is Synthetic Banded's record.", home);
+        Assert.Contains("Shared record. You're viewing Synthetic Banded's record.", home);
         Assert.DoesNotContain("not your own", home);
     }
 }

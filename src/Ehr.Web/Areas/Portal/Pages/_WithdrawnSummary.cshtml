@@ -1,4 +1,4 @@
 @model DateTimeOffset
 @* The one place for this sentence: the visit summaries page and the printable record both show it. Tahseen's decision of
    21 November 2026: the date and nothing else, not the text, the reason or who. *@
-<p>A visit summary from @Model.UtcDateTime.ToString("MMM d, yyyy") UTC was withdrawn by your care team. Contact the clinic if you have questions.</p>
+<p>Your care team withdrew the visit summary from @Clinic.Format(Model, "MMM d, yyyy"). If you have questions, contact the clinic.</p>

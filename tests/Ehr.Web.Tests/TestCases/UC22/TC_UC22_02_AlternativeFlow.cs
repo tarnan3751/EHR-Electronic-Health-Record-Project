@@ -33,8 +33,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Expected result: Step 1: both times, the page starts with "If you are thinking about hurting yourself, or feel you
 //   might act on these thoughts, call 911 or go to the nearest emergency room now. You can call or text 988 at any time,
 //   day or night, to talk with someone at the 988 Suicide & Crisis Lifeline. Your care team will read your answers
-//   before your visit, but not as soon as you send them.", before "Answers sent:". Step 2: no such sentence. Step 3: the
-//   form says "You are answering for Synthetic Booked." and "Not monitored: Synthetic Booked's care team reads this form
+//   before your visit, but not as soon as you send them.", before "Sent.". Step 2: no such sentence. Step 3: the
+//   form says "You are answering for Synthetic Booked." and "Not monitored. Synthetic Booked's care team reads this form
 //   before the visit, not when you send it. If Synthetic Booked needs help now, call 911. ..."; once sent, the page
 //   leads with "If Synthetic Booked is thinking about hurting themselves, or you think they might act on these thoughts,
 //   call 911 ...", then the 988 sentence, then "Synthetic Booked's care team will read these answers before the visit,
@@ -66,9 +66,9 @@ public class TC_UC22_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         using var sent = await SendAsync(portal, first, Answers(PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var page = Text(await ReadAsync(sent));
         Assert.Contains("If you are thinking about hurting yourself, or feel you might act on these thoughts, " + Help, page);
-        Assert.True(page.IndexOf("If you are thinking", StringComparison.Ordinal) < page.IndexOf("Answers sent:", StringComparison.Ordinal),
+        Assert.True(page.IndexOf("If you are thinking", StringComparison.Ordinal) < page.IndexOf("Sent. Your care team will go over your answers", StringComparison.Ordinal),
             "The help comes before the confirmation.");
-        Assert.DoesNotContain("better off dead", page[..page.IndexOf("Not monitored:", StringComparison.Ordinal)], StringComparison.Ordinal);
+        Assert.DoesNotContain("better off dead", page[..page.IndexOf("Not monitored.", StringComparison.Ordinal)], StringComparison.Ordinal);
         Assert.Contains("If you are thinking about hurting yourself", Text(await portal.GetStringAsync(FormPath(first), Cancel)));
 
         using var anxiety = await SendAsync(portal, await RequestAsync(apps, visit.Appointment, Gad7), Answers(GadItems, 3, 3, 3, 3, 3, 3, 3));
@@ -81,7 +81,7 @@ public class TC_UC22_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var second = await RequestAsync(apps, later, Phq9);
         var forProxy = Text(await proxy.Client.GetStringAsync(FormPath(second), Cancel));
         Assert.Contains("You are answering for Synthetic Booked. The questions ask how they have been.", forProxy);
-        Assert.Contains("Not monitored: Synthetic Booked's care team reads this form before the visit, not when you send it. If Synthetic Booked needs help now, "
+        Assert.Contains("Not monitored. Synthetic Booked's care team reads this form before the visit, not when you send it. If Synthetic Booked needs help now, "
             + "call 911. You can call or text 988 at any time to talk with someone at the 988 Suicide & Crisis Lifeline.", forProxy);
         using var byProxy = await SendAsync(proxy.Client, second, Answers(PhqItems, 0, 0, 0, 0, 0, 0, 0, 0, 1));
         var proxySent = Text(await ReadAsync(byProxy));

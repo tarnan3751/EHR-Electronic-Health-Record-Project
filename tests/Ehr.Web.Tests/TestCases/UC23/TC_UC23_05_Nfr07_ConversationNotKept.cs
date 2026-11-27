@@ -43,7 +43,7 @@ public class TC_UC23_05_Nfr07_ConversationNotKept(WebApps apps) : IClassFixture<
         var l = d.Listening;
         var consent = Browser.Words(await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/listen", TestContext.Current.CancellationToken));
         Assert.Contains("I check everything before it goes in your record. The text is deleted once I've checked it, or after a week at the latest, except what it suggested for the note.", consent);
-        Assert.Contains("The clinic's backups keep the database, this text included, for up to 7 days.", consent);
+        Assert.Contains("The clinic's backups keep the text for up to 7 days.", consent);
 
         Assert.Equal([""], await RowsAsync(apps, "SELECT result_json #>> '{transcript,text}' FROM ehr.ai_note_reviews WHERE id = @id", l.Review));
         // Nor the transcript's segments: the review keeps each proposal's sources, and the transcript its own segments.

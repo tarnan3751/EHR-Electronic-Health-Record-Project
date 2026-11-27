@@ -41,7 +41,8 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
     // The draft as it was last saved, for the page shown while the clinic's server can't be reached.
     public IReadOnlyList<NoteSection> Saved { get; private set; } = [];
 
-    public string SaveStatus { get; private set; } = "Saved";
+    // Nothing until a save without JavaScript has been tried: opening a draft saves nothing (note-editor.js says the rest).
+    public string SaveStatus { get; private set; } = "";
     public IReadOnlyList<string> Errors { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(Guid patientId, Guid draftId)
@@ -141,7 +142,7 @@ public class EditModel(PhiReader phi, PatientAssignments assignments, BreakGlass
         // Tag helpers prefer posted ModelState over updated properties.
         ModelState.Remove(nameof(Version));
         Errors = errors;
-        SaveStatus = result.Draft is null ? "Save failed" : "Saved";
+        SaveStatus = result.Draft is null ? "Not saved" : "Saved";
         Response.StatusCode = status;
         return Page();
     }

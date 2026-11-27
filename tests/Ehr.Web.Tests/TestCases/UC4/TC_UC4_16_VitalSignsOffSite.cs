@@ -36,7 +36,7 @@ public class TC_UC4_16_VitalSignsOffSite(WebApps apps) : IClassFixture<WebApps>
         var (clinician, patient, session) = await OnPanelAsync(apps);
         var cloud = Client(apps.Cloud, session.Jar);
 
-        Assert.Contains("No vital signs recorded.", await cloud.GetStringAsync(Path(patient), Cancel));
+        Assert.Contains("No vital signs.", await cloud.GetStringAsync(Path(patient), Cancel));
         Assert.True(await apps.Cloud.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         Assert.True(await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.Cloud) >= 1);
         using var first = await RecordAsync(apps, cloud, patient, 60, (HeartRate, "72"));

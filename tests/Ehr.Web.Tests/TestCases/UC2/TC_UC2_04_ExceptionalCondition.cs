@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 //   2. Read the cloud app's record of whether the on-site server can be reached.
 //   3. Open the quick texts page off-site as the clinician.
 // Expected result: The on-site app answers the POST 401. The cloud app still holds the on-site server as not
-//   reachable, and the page shows "Read-only: the clinic's server can't be reached".
+//   reachable, and the page shows "Read-only. The clinic's server can't be reached".
 // Creator: Tahseen Arnan
 public class TC_UC2_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -54,7 +54,7 @@ public class TC_UC2_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApp
             using var request = new HttpRequestMessage(HttpMethod.Get, QuickTexts);
             request.Headers.Add("Cookie", signedIn);
             using var page = await client.SendAsync(request, Cancel);
-            Assert.Contains("Read-only: the clinic's server can't be reached", Words(await ReadAsync(page)));
+            Assert.Contains("Read-only. The clinic's server can't be reached", Words(await ReadAsync(page)));
         }
         finally
         {

@@ -83,11 +83,11 @@ public class EmergencyAccessModel(EmergencyAccessReviews reviews) : PageModel
             default:
                 Problem = outcome switch
                 {
-                    ReviewOutcome.AlreadyReviewed => "someone reviewed this access first. Their review is below; nothing changed.",
-                    ReviewOutcome.NotEnded => "this access is still in force. Review it once it has ended, so the review covers everything done under it.",
-                    ReviewOutcome.OwnAccess => "this is your own emergency access. Another administrator reviews it.",
-                    ReviewOutcome.NoteLength => "the note needs 10 to 500 characters.",
-                    _ => "say whether the access was appropriate.",
+                    ReviewOutcome.AlreadyReviewed => "Someone reviewed this access first. Their review is below, and nothing changed.",
+                    ReviewOutcome.NotEnded => "This access is still in force. Review it once it has ended, so the review covers everything done under it.",
+                    ReviewOutcome.OwnAccess => "This is your own emergency access. Another administrator reviews it.",
+                    ReviewOutcome.NoteLength => "The note needs 10 to 500 characters.",
+                    _ => "Say whether the access was appropriate.",
                 };
                 Access = (await reviews.ReadAsync(id, HttpContext.RequestAborted))!;
                 return Page();

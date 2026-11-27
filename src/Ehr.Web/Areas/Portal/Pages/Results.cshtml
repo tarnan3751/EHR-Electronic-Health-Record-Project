@@ -12,7 +12,14 @@
 }
 else if (Model.Results.Count == 0)
 {
-    <p>@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "There are no test results yet. If one is expected, contact the care team." : "You have no test results yet. If you are waiting for one, contact your care team.")</p>
+    @if (HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null })
+    {
+        <p>No test results yet. If one is expected, contact the care team.</p>
+    }
+    else
+    {
+        <p>No test results yet. If you're expecting one, contact your care team.</p>
+    }
 }
 else
 {
@@ -23,12 +30,13 @@ else
         @foreach (var result in Model.Results)
         {
             var flag = ResultExplanation.Flag(result);
+            var name = ForPatients.Name(result.Code, result.Display);
             <li>
                 <details class="sc-result">
                     @* The flex layout is on a span inside the summary, so the summary keeps its open/close marker. *@
                     <summary><span class="sc-result__line">
-                        <strong>@result.Display</strong>
-                        <span class="sc-result__date">@result.EffectiveAt.UtcDateTime.ToString("MMM d, yyyy") UTC</span>
+                        <strong>@name</strong>
+                        <span class="sc-result__date">@Clinic.Format(result.EffectiveAt, "MMM d, yyyy")</span>
                         @if (flag == ResultFlag.High)
                         {
                             <span class="sc-tag sc-tag--warning">High</span>
@@ -58,6 +66,10 @@ else
                         {
                             <p>@measures</p>
                         }
+                        @if (name != result.Display)
+                        {
+                            <p class="sc-muted" data-full-name>Full name: @result.Display</p>
+                        }
                         @if (result.Note is { Length: > 0 } note)
                         {
                             <p><strong>@(Model.Acting ? "Note from the care team:" : "Note from your care team:")</strong> @note</p>
@@ -68,7 +80,7 @@ else
                         @if (OnPrem.IsReachable && Model.MayMessage)
                         {
                             <form method="post" asp-page="/Messages/New" asp-page-handler="About">
-                                <input type="hidden" name="Subject" value="@($"About {(Model.Acting ? "the" : "my")} {result.Display} result from {result.EffectiveAt.UtcDateTime:MMM d, yyyy}")">
+                                <input type="hidden" name="Subject" value="@($"About {(Model.Acting ? "the" : "my")} {name} result from {Clinic.Plain(result.EffectiveAt, "MMM d, yyyy")}")">
                                 <button type="submit" class="sc-btn">Ask about this result</button>
                             </form>
                         }
@@ -82,7 +94,7 @@ else
 {
     @* Step 9: how each test has moved, for a test with more than one result. One column on a phone. *@
     <h2>Over time</h2>
-    <p class="sc-muted">Tests you have had more than once. Each chart has its numbers in a table under it.</p>
+    <p class="sc-muted">Tests you've had more than once. Each chart's numbers are in a table under it.</p>
     <div class="sc-trends">
         @foreach (var trend in Model.ResultTrends)
         {
@@ -101,4 +113,4 @@ else
         }
     </div>
 }
-<p><a asp-page="/Index">@(HttpContext.Items[Ehr.Web.PortalSubjectFilter.Item] is Ehr.Web.PortalSubject { Acting: not null } ? "Back to the record" : "Back to my record")</a></p>
+<p><a asp-page="/Index">Back to home</a></p>

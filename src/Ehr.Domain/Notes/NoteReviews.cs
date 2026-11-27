@@ -184,7 +184,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         var approved = proposals.Where(p => p.ApprovedValue is not null).ToDictionary(p => p.Field, p => p.ApprovedValue!);
         var current = NoteContent.From(draft);
         if (!append && approved.Keys.Any(field => current.Sections[Section(field)].Text.Length > 0))
-            return ReviewResult.Invalid("The draft already contains text. Compare it below and explicitly allow appending approved values; existing text will be preserved.");
+            return ReviewResult.Invalid("The draft already has text. Compare it below, then choose to add the approved values after it. The existing text stays.");
         var merged = Merge(current, approved);
         if (merged.Validate(false, NoteContent.OriginOf(draft)) is { Count: > 0 } errors) return new(422, errors);
         merged.ApplyTo(draft);
@@ -246,7 +246,7 @@ public sealed class NoteReviews(EhrDbContext db, PhiReader phi, ClinicalNotes no
         if (review is null || draft is null) return ReviewResult.Missing;
         if (review.State == AiReviewStates.Cancelled) return new(200, [], review, draft.Version);
         if (review.State != AiReviewStates.Recording)
-            return ReviewResult.Invalid("Saved proposals must each be reviewed; they cannot be discarded as an unreviewed batch.");
+            return ReviewResult.Invalid("Each saved proposal needs its own review. They can't be discarded all at once.");
         review.State = AiReviewStates.Cancelled;
         await db.SaveChangesAsync(cancel);
         return new(200, [], review, draft.Version);
@@ -334,10 +334,10 @@ public sealed record TrustedReviewResult(string Json, IReadOnlyDictionary<string
 
 public sealed record ReviewResult(int Status, IReadOnlyList<string> Errors, AiNoteReview? Review = null, long? Version = null)
 {
-    public static ReviewResult Missing => new(404, ["This review is unavailable. Check your patient panel and draft ownership."]);
-    public static ReviewResult Offline => new(503, ["The clinic server must be available to save review decisions. Your displayed work is still here."]);
-    public static ReviewResult Signed => new(409, ["This note has been signed and cannot receive AI proposals."]);
-    public static ReviewResult Decided => new(409, ["Not saved: this proposal was already decided, in another tab or window. Nothing was changed."]);
+    public static ReviewResult Missing => new(404, ["This review isn't available. Check that the patient is in My patients and the draft is yours."]);
+    public static ReviewResult Offline => new(503, ["Saving review decisions needs the clinic's server. Your work is still here."]);
+    public static ReviewResult Signed => new(409, ["This note is signed, so it can't take new proposals."]);
+    public static ReviewResult Decided => new(409, ["Not saved. This proposal was already decided, in another tab or window. Nothing was changed."]);
     public static ReviewResult Invalid(string error) => new(422, [error]);
     public static ReviewResult Conflict(long version) => new(409,
         ["The draft or review changed elsewhere. Your displayed work is still here. Compare the current draft and reload the saved review before retrying."], Version: version);

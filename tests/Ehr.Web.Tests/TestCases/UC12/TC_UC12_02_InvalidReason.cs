@@ -23,10 +23,10 @@ namespace Ehr.Web.Tests.TestCases.UC12;
 //   1. Post each refused reason in turn.
 //   2. Open the chart.
 //   3. Post "  Ward round  ".
-// Expected result: Step 1: empty and ten spaces show "Say why you need this chart."; "ER", with or without the spaces,
-//   shows "Use at least 10 characters."; 501 x's show "Use 500 characters or fewer."; each stays on the reason page and
-//   no break_glass event is recorded. Step 2 is sent to the reason page again. Step 3 opens the chart, and the one
-//   break_glass event holds "Ward round".
+// Expected result: Step 1: empty and ten spaces show "Say why you need this chart, in 10 to 500 characters."; "ER", with
+//   or without the spaces, shows "Too short. Use 10 to 500 characters."; 501 x's show "Too long. Use 10 to 500
+//   characters."; each stays on the reason page and no break_glass event is recorded. Step 2 is sent to the reason
+//   page again. Step 3 opens the chart, and the one break_glass event holds "Ward round".
 // Creator: Luke Garcia
 public class TC_UC12_02_InvalidReason(WebApps apps) : IClassFixture<WebApps>
 {
@@ -34,11 +34,11 @@ public class TC_UC12_02_InvalidReason(WebApps apps) : IClassFixture<WebApps>
 
     public static TheoryData<string, string> Refused => new()
     {
-        { "", "Say why you need this chart." },
-        { new string(' ', 10), "Say why you need this chart." },
-        { "ER", "Use at least 10 characters." },
-        { "    ER        ", "Use at least 10 characters." },
-        { new string('x', 501), "Use 500 characters or fewer." },
+        { "", "Say why you need this chart, in 10 to 500 characters." },
+        { new string(' ', 10), "Say why you need this chart, in 10 to 500 characters." },
+        { "ER", "Too short. Use 10 to 500 characters." },
+        { "    ER        ", "Too short. Use 10 to 500 characters." },
+        { new string('x', 501), "Too long. Use 10 to 500 characters." },
     };
 
     [Theory]

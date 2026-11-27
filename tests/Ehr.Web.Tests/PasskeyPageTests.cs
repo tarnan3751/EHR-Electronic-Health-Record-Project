@@ -35,7 +35,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         using var added = await AddAsync(session.Client, account, authenticator, name: "This Mac");
 
         var page = Words(await ReadAsync(added));
-        Assert.Contains("Passkey added: use it at your next sign-in, after your password.", page);
+        Assert.Contains("Passkey added. Use it at your next sign-in, after your password.", page);
         Assert.Contains("This Mac", page);
         Assert.Contains("Removing a passkey doesn't sign out a session already signed in with it.", page);
         var stored = Assert.Single(await PasskeysAsync(account));
@@ -46,7 +46,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
 
         using var removed = await PostFormAsync(session.Client, $"{PasskeysPage}?handler=Remove", PasskeysPage, ("id", Base64Url.EncodeToString(authenticator.CredentialId)));
 
-        Assert.Contains("Passkey removed: it can't be used to sign in any more.", Words(await ReadAsync(removed)));
+        Assert.Contains("Passkey removed. It can't be used to sign in any more.", Words(await ReadAsync(removed)));
         Assert.Empty(await PasskeysAsync(account));
         Assert.Equal(new (string?, string?)[] { (null, $$"""{"passkey": "{{reference}}"}""") }, await EventsAsync(AuditActions.PasskeyRemoved, account));
         Assert.DoesNotContain(await AllDetailsAsync(account), details => details?.Contains("This Mac", StringComparison.Ordinal) == true);
@@ -71,7 +71,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var answer = JsonSerializer.Deserialize<JsonElement>(await refused.Content.ReadAsStringAsync(Cancel));
             Assert.Equal("Code", answer.GetProperty("field").GetString());
-            Assert.Equal("Not saved: that code did not match. Enter the current code from your authenticator app.", answer.GetProperty("problem").GetString());
+            Assert.Equal("Not saved. That code did not match. Enter the current code from your authenticator app.", answer.GetProperty("problem").GetString());
             Assert.False(answer.TryGetProperty("options", out _));
         }
 
@@ -91,7 +91,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             using var authenticator = new TestAuthenticator();
             using var refused = await AddAsync(session.Client, account, authenticator, origin: origin, verified: verified);
 
-            Assert.Contains("Not saved: the passkey wasn't accepted. A passkey has to ask for your PIN, fingerprint or face. Try again.", Words(await ReadAsync(refused)));
+            Assert.Contains("Not saved. The passkey wasn't accepted. A passkey has to ask for your PIN, fingerprint or face. Try again.", Words(await ReadAsync(refused)));
         }
 
         Assert.Empty(await PasskeysAsync(account));
@@ -116,17 +116,17 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         foreach (var client in new[] { second.Client, elsewhere.Client })
         {
             using var refused = await FinishAddAsync(client, credential, state);
-            Assert.Contains("Not saved: the passkey took too long, or this page was open too long. Try again.", Words(await ReadAsync(refused)));
+            Assert.Contains("Not saved. The passkey took too long, or this page was open too long. Try again.", Words(await ReadAsync(refused)));
         }
 
         using var tampered = await FinishAddAsync(first.Client, credential, state[..^4] + "AAAA");
-        Assert.Contains("Not saved: the passkey took too long", Words(await ReadAsync(tampered)));
+        Assert.Contains("Not saved. The passkey took too long", Words(await ReadAsync(tampered)));
         Assert.Empty(await PasskeysAsync(account));
         Assert.Empty(await PasskeysAsync(other));
 
         // The sign-in it was made for still takes it.
         using var added = await FinishAddAsync(first.Client, credential, state);
-        Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+        Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
     }
 
     [Fact]
@@ -146,15 +146,15 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         {
             using var authenticator = new TestAuthenticator();
             using var page = await AddAsync(session.Client, account, authenticator, name: $"Key {added}");
-            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
         }
 
         using var eleventh = await OptionsToAddAsync(session.Client, "One more", Totp.Code(account.AuthenticatorKey));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, eleventh.StatusCode);
-        Assert.Contains("an account can have at most 10 passkeys", await eleventh.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("An account can have at most 10 passkeys", await eleventh.Content.ReadAsStringAsync(Cancel));
         var full = Words(await session.Client.GetStringAsync(PasskeysPage, Cancel));
         Assert.Contains("You have 10 passkeys, the most an account can have. Remove one to add another.", full);
-        Assert.DoesNotContain("Add a passkey</button>", await session.Client.GetStringAsync(PasskeysPage, Cancel));
+        Assert.DoesNotContain("Add passkey</button>", await session.Client.GetStringAsync(PasskeysPage, Cancel));
     }
 
     [Fact]
@@ -165,13 +165,13 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         using var authenticator = new TestAuthenticator();
         using (var added = await AddAsync((await SignInAsync(apps.OnPrem, owner)).Client, owner, authenticator))
         {
-            Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
         }
 
         var session = await SignInAsync(apps.OnPrem, other);
         using var refused = await PostFormAsync(session.Client, $"{PasskeysPage}?handler=Remove", PasskeysPage, ("id", Base64Url.EncodeToString(authenticator.CredentialId)));
 
-        Assert.Contains("Not removed: that passkey isn't one of yours.", Words(await ReadAsync(refused)));
+        Assert.Contains("Not removed. That passkey isn't one of yours.", Words(await ReadAsync(refused)));
         Assert.Single(await PasskeysAsync(owner));
         Assert.Empty(await EventsAsync(AuditActions.PasskeyRemoved, other));
     }
@@ -185,7 +185,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
 
         using var added = await AddAsync(session.Client, account, authenticator, origin: WebApps.OffSiteOrigin);
 
-        Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+        Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
         Assert.Contains($"POST {PasskeysPage}?handler=Options", apps.Forwarded);
         Assert.Contains($"POST {PasskeysPage}?handler=Add", apps.Forwarded);
         Assert.Single(await PasskeysAsync(account));
@@ -213,7 +213,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         foreach (var (authenticator, name) in new[] { (laptop, "Grey laptop key"), (phone, "Blue phone key") })
         {
             using var added = await AddAsync(session.Client, account, authenticator, name);
-            Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
         }
 
         using var reset = await PostFormAsync(adminSession.Client, "/admin/staff?handler=ResetAuthenticator", "/admin/staff", ("id", account.Id));
@@ -245,17 +245,17 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         for (var attempt = 0; attempt < 5; attempt++)
         {
             using var wrong = await OptionsToAddAsync(session.Client, "This Mac", Totp.WrongCode(account.AuthenticatorKey));
-            Assert.Contains("that code did not match", await wrong.Content.ReadAsStringAsync(Cancel));
+            Assert.Contains("That code did not match", await wrong.Content.ReadAsStringAsync(Cancel));
         }
 
         using var refused = await OptionsToAddAsync(session.Client, "This Mac", Totp.Code(account.AuthenticatorKey));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
         var answer = JsonSerializer.Deserialize<JsonElement>(await refused.Content.ReadAsStringAsync(Cancel));
-        Assert.Equal("Not saved: this account is locked after too many failed attempts. Try again in 15 minutes.", answer.GetProperty("problem").GetString());
+        Assert.Equal("Not saved. This account is locked after too many failed attempts. Try again in 15 minutes.", answer.GetProperty("problem").GetString());
         Assert.False(answer.TryGetProperty("options", out _));
 
         using var finished = await FinishAddAsync(session.Client, authenticator.Create(options, WebApps.OnSiteOrigin), state);
-        Assert.Contains("Not saved: this account is locked after too many failed attempts.", Words(await ReadAsync(finished)));
+        Assert.Contains("Not saved. This account is locked after too many failed attempts.", Words(await ReadAsync(finished)));
         Assert.Empty(await PasskeysAsync(account));
         Assert.Equal(2, (await EventsAsync(AuditActions.PasskeyRefused, account)).Count(e => e.Reason == "locked out"));
     }
@@ -278,8 +278,8 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         }));
 
         Assert.All(answers, a => Assert.Equal(HttpStatusCode.UnprocessableEntity, a.StatusCode));
-        Assert.Equal(5, answers.Count(a => a.Body.Contains("that code did not match", StringComparison.Ordinal)));
-        Assert.Equal(Sent - 5, answers.Count(a => a.Body.Contains("this account is locked", StringComparison.Ordinal)));
+        Assert.Equal(5, answers.Count(a => a.Body.Contains("That code did not match", StringComparison.Ordinal)));
+        Assert.Equal(Sent - 5, answers.Count(a => a.Body.Contains("This account is locked", StringComparison.Ordinal)));
         var events = await EventsAsync(AuditActions.PasskeyRefused, account);
         Assert.Equal(5, events.Count(e => e.Reason == "wrong code"));
         Assert.Equal(Sent - 5, events.Count(e => e.Reason == "locked out"));
@@ -299,7 +299,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         {
             using var authenticator = new TestAuthenticator();
             using var page = await AddAsync(session.Client, account, authenticator, name: $"Key {added}");
-            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
         }
 
         using var first = new TestAuthenticator();
@@ -320,8 +320,8 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             return Words(await ReadAsync(response));
         }));
 
-        Assert.Single(pages, p => p.Contains("Passkey added:", StringComparison.Ordinal));
-        Assert.Single(pages, p => p.Contains("an account can have at most 10 passkeys", StringComparison.Ordinal));
+        Assert.Single(pages, p => p.Contains("Passkey added.", StringComparison.Ordinal));
+        Assert.Single(pages, p => p.Contains("An account can have at most 10 passkeys", StringComparison.Ordinal));
         Assert.Equal(StaffPasskeys.MostPerAccount, (await PasskeysAsync(account)).Count);
         Assert.Equal(StaffPasskeys.MostPerAccount, (await EventsAsync(AuditActions.PasskeyAdded, account)).Count);
     }
@@ -337,7 +337,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         using var removed = new TestAuthenticator();
         using (var page = await AddAsync(session.Client, account, removed, name: "Old key"))
         {
-            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
         }
 
         using var begun = await OptionsToAddAsync(session.Client, "New key", Totp.Code(account.AuthenticatorKey));
@@ -355,8 +355,8 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             post.Dispose();
         }
 
-        Assert.Contains("Passkey added:", pages[0]);
-        Assert.Contains("Passkey removed:", pages[1]);
+        Assert.Contains("Passkey added.", pages[0]);
+        Assert.Contains("Passkey removed.", pages[1]);
 
         var stored = Assert.Single(await PasskeysAsync(account));
         Assert.Equal(kept.CredentialId, stored.CredentialId);
@@ -370,7 +370,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
 
     const string ResetUrl = "/admin/staff?handler=ResetAuthenticator";
 
-    const string AccountChanged = "Not saved: your account's sign-in settings changed while this passkey was being added. Sign in again, then add it.";
+    const string AccountChanged = "Not saved. Your account's sign-in settings changed while this passkey was being added. Sign in again, then add it.";
 
     // Step 19.1, the final review's probe: an add finishing as an administrator resets the authenticator, the add holding
     // the account first. The reset waits for it, then finds the passkey it saved and removes it with the others, its
@@ -391,7 +391,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         if (before == 1)
         {
             using var page = await AddAsync(session.Client, account, old, name: "Old key");
-            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
         }
 
         using var begun = await OptionsToAddAsync(session.Client, "New key", Totp.Code(account.AuthenticatorKey));
@@ -413,7 +413,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         using var added = await adding;
         using var reset = await resetting;
 
-        Assert.Contains("Passkey added:", Words(await ReadAsync(added)));
+        Assert.Contains("Passkey added.", Words(await ReadAsync(added)));
         Assert.Contains(before == 1 ? "Their 2 passkeys were removed." : "Their passkey was removed.", Words(await ReadAsync(reset)));
         Assert.Empty(await PasskeysAsync(account));
         Assert.False((await AccountAsync(account)).TwoFactorEnabled);
@@ -438,7 +438,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         using var left = new TestAuthenticator();
         using (var page = await AddAsync(session.Client, account, old, name: "Old key"))
         {
-            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
         }
 
         using var begun = await OptionsToAddAsync(session.Client, "Begun before the reset", Totp.Code(account.AuthenticatorKey));
@@ -496,7 +496,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             using var fresh = new TestAuthenticator();
             using (var page = await AddAsync(session.Client, account, old, name: "Old key"))
             {
-                Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+                Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
             }
 
             using var begun = await OptionsToAddAsync(session.Client, "New key", Totp.Code(account.AuthenticatorKey));
@@ -517,7 +517,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             }
 
             Assert.True((await PasskeysAsync(account)).Count == 0, $"Run {run}: a passkey outlived the reset.");
-            var addedFirst = pages[0].Contains("Passkey added:", StringComparison.Ordinal);
+            var addedFirst = pages[0].Contains("Passkey added.", StringComparison.Ordinal);
             Assert.True(addedFirst || pages[0].Contains(AccountChanged, StringComparison.Ordinal), $"Run {run}: the add was neither saved nor refused for the reset.");
             Assert.Contains(addedFirst ? "Their 2 passkeys were removed." : "Their passkey was removed.", pages[1]);
             Assert.Equal(addedFirst ? 2 : 1, (await EventsAsync(AuditActions.PasskeyRemoved, account)).Count);
@@ -578,7 +578,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
                 using var authenticator = new TestAuthenticator();
                 using (var page = await AddAsync(session.Client, admin, authenticator, name: "Admin key"))
                 {
-                    Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+                    Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
                 }
 
                 sessions.Add(session);
@@ -657,8 +657,8 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
             var (add, acted) = (Words(await ReadAsync(posts[0])), Words(await ReadAsync(posts[1])));
             Array.ForEach(posts, p => p.Dispose());
             var user = await AccountAsync(account);
-            var added = add.Contains("Passkey added:", StringComparison.Ordinal);
-            Assert.True(added || add.Contains(action == "Disable" ? "this account is locked after too many failed attempts" : AccountChanged, StringComparison.Ordinal),
+            var added = add.Contains("Passkey added.", StringComparison.Ordinal);
+            Assert.True(added || add.Contains(action == "Disable" ? "This account is locked after too many failed attempts" : AccountChanged, StringComparison.Ordinal),
                 $"Run {run}: the add was neither saved nor refused for the {action.ToLowerInvariant()}.");
             Assert.Equal(added ? 1 : 0, (await PasskeysAsync(account)).Count);
             Assert.True(!addFirst || added, "The add held the account first, and should have been saved.");
@@ -703,7 +703,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
                 adminSession.Client.PostAsync("/admin/staff?handler=Enable", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel));
 
             Assert.True(posts.All(p => p.StatusCode == HttpStatusCode.OK), $"Run {run}: {string.Join(", ", posts.Select(p => (int)p.StatusCode))}.");
-            Assert.Contains("Not saved:", Words(await ReadAsync(posts[0])));
+            Assert.Contains("Not saved.", Words(await ReadAsync(posts[0])));
             Assert.Contains("can sign in again.", Words(await ReadAsync(posts[1])));
             Array.ForEach(posts, p => p.Dispose());
             Assert.Empty(await PasskeysAsync(account));
@@ -721,7 +721,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         using var authenticator = new TestAuthenticator();
         using (var page = await AddAsync(session.Client, account, authenticator, name: "This Mac"))
         {
-            Assert.Contains("Passkey added:", Words(await ReadAsync(page)));
+            Assert.Contains("Passkey added.", Words(await ReadAsync(page)));
         }
 
         var (client, codePage) = await PasswordAsync(apps.OnPrem, account);
@@ -734,7 +734,7 @@ public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
         using var asAdd = await FinishAddAsync(session.Client, another.Create(creationOptions, WebApps.OnSiteOrigin), signInState);
         using var asSignIn = await PasskeyAsync(client, codePage, authenticator.Get(requestOptions, WebApps.OnSiteOrigin), addState);
 
-        Assert.Contains("Not saved: the passkey took too long, or this page was open too long. Try again.", Words(await ReadAsync(asAdd)));
+        Assert.Contains("Not saved. The passkey took too long, or this page was open too long. Try again.", Words(await ReadAsync(asAdd)));
         Assert.Equal(CodePage, PathOf(asSignIn));
         Assert.Contains("That passkey didn't work.", Words(await ReadAsync(asSignIn)));
         Assert.Single(await PasskeysAsync(account));

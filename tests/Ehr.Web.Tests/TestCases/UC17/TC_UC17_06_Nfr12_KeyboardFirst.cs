@@ -18,7 +18,7 @@ namespace Ehr.Web.Tests.TestCases.UC17;
 //   1. Open the inbox. Press Tab until "Open the conversation" has the focus, and press Enter.
 //   2. Type the reply, press Tab, and press Enter on "Send reply".
 // Expected result: Step 1 opens the conversation with the cursor in the reply field. Step 2 sends the reply: the page
-//   says "Sent:" and shows it, and the app bar's inbox count is gone. Every focused control shows the focus ring, and
+//   says "Sent." and shows it, and the app bar's inbox count is gone. Every focused control shows the focus ring, and
 //   the page reports no script errors.
 // Creator: Tahseen Arnan
 //
@@ -53,7 +53,7 @@ public class TC_UC17_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('form.sc-form button[type=submit]')"));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("sent=", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("Sent:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Sent.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Contains("Synthetic: answered by keyboard", await page.Locator(".sc-thread").TextContentAsync());
         Assert.Equal(0, await page.Locator("[data-inbox-count]").CountAsync());
 

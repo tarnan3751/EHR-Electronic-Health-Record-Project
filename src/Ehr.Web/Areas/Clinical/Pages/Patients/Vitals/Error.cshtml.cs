@@ -77,7 +77,7 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
                 return RedirectToPage("Index", new { patientId, marked = ids.Count });
             }
 
-            errors[""] = "The readings couldn't be marked. Reload the page and try again.";
+            errors[""] = "Reload the page and try again.";
         }
 
         Errors = errors;

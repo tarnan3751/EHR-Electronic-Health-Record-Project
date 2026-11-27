@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   1. Open the forms page.
 //   2. Choose "Show sensitive items".
 //   3. Open the answers of the first PHQ-9, and the other patient's answers at this patient's address.
-// Expected result: Step 1: "Sensitive items hidden: 4 pre-visit forms are not shown." and no form's
+// Expected result: Step 1: "Sensitive items hidden. 4 pre-visit forms are not shown." and no form's
 //   score or band; one recorded read of the patient. Step 2: "Sensitive items shown"; one recorded view of sensitive
 //   items; each appointment's forms under it: "Score 12 of 27 · Moderate" with "Needs follow-up" and "Answered ... by
 //   Synthetic Proxy (proxy), not the patient", "Score 3 of 27 · Minimal", "Score 4 of 21 · Below mild", "Score 10 of 21 ·
@@ -74,7 +74,7 @@ public class TC_UC22_08_FormsForEachVisit(WebApps apps) : IClassFixture<WebApps>
         var reads = await apps.AuditEventsAsync(AuditActions.Read, visit.Clinician.Id, visit.Patient);
         var hiddenHtml = await visit.Session.Client.GetStringAsync(FormsPath(visit.Patient), Cancel);
         var hidden = Text(hiddenHtml);
-        Assert.Contains("Sensitive items hidden: 4 pre-visit forms are not shown. Show sensitive items", hidden);
+        Assert.Contains("Sensitive items hidden. 4 pre-visit forms are not shown. Show sensitive items", hidden);
         // The questionnaires are named only as what can be asked for: no form, score, band or answerer.
         foreach (var shownOnlyWhenAsked in new[] { "Score", "Moderate", "Minimal", "Below mild", "proxy", "Answered" })
         {
@@ -88,7 +88,7 @@ public class TC_UC22_08_FormsForEachVisit(WebApps apps) : IClassFixture<WebApps>
         var sensitiveReads = await apps.AuditEventsAsync(AuditActions.ReadSensitive, visit.Clinician.Id, visit.Patient);
         var shownHtml = await visit.Session.Client.GetStringAsync(FormsPath(visit.Patient) + "?sensitive=true", Cancel);
         var shown = Text(shownHtml);
-        Assert.Contains("Sensitive items shown: your view of them is recorded.", shown);
+        Assert.Contains("Sensitive items shown. Your view is logged.", shown);
         Assert.Contains("Score 12 of 27 · Moderate Needs follow-up", shown);
         Assert.Contains("by Synthetic Proxy (proxy), not the patient", shown);
         Assert.Contains("Score 4 of 21 · Below mild", shown);
@@ -97,7 +97,7 @@ public class TC_UC22_08_FormsForEachVisit(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(shownHtml, "data-form-visit").Count);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(shownHtml, "<figure class=\"sc-trend\"").Count);
         Assert.Contains("Needs follow-up at or above 10.", shown);
-        Assert.Contains("\"Below mild\" (under 5) is this clinic's wording", shown);
+        Assert.Contains("\"Below mild\" (under 5), which is this clinic's wording", shown);
         Assert.DoesNotContain("data-form-alert", shownHtml, StringComparison.Ordinal);
         Assert.DoesNotContain("27 of 27", shown, StringComparison.Ordinal);
         Assert.DoesNotContain("Severe", shown, StringComparison.Ordinal);

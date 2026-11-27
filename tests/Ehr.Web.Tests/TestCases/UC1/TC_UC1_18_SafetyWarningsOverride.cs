@@ -42,6 +42,8 @@ public class TC_UC1_18_SafetyWarningsOverride(WebApps apps) : IClassFixture<WebA
         await AllergyAsync(apps, allergic, "amoxicillin");
         var form = await session.Client.GetStringAsync(FormPath(allergic, "medication"), Cancel);
         Assert.Contains("Decision support for this demonstration system, not a complete clinical reference.", form);
+        // The one limit a clinician must know is beside the lead, not in the closed disclosure.
+        Assert.Matches("(?s)Allergies and medications without a code aren't checked\\.</p>\\s*<details>", form);
         Assert.DoesNotContain("data-order-safety", form);
 
         using var stopped = await SignAsync(session.Client, allergic, "Amoxicillin 500 mg capsule");

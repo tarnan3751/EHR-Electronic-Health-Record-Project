@@ -6,7 +6,7 @@
 // Nothing here opens or prefetches a chart by itself: each one opened is a recorded read, and one off the clinician's
 // panel asks for emergency access. It also keeps a submitted search from listing its patients twice. And, since it is
 // on every clinical page, it moves the focus to a notice marked data-focus-on-load (tabindex="-1"), such as the chart's
-// "Saved:" after a save, so the keyboard and a screen reader start from what just happened; unless something on the
+// "Saved." after a save, so the keyboard and a screen reader start from what just happened; unless something on the
 // page already took the focus (autofocus).
 "use strict";
 

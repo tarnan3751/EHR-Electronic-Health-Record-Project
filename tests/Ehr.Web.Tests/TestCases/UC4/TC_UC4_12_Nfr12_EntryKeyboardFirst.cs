@@ -7,7 +7,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Test Case ID: TC-UC4-12
 // Purpose / scenario: Adding a coded diagnosis is keyboard-first: from the chart to the saved entry with no mouse, in
 //   a real browser, with the code search answering as the clinician types; a name that isn't a code brings the form
-//   back with the cursor in that field; and after saving, the focus is on the chart's "Saved:" notice. (Picking a
+//   back with the cursor in that field; and after saving, the focus is on the chart's "Saved." notice. (Picking a
 //   suggestion with the arrow keys can't be automated: headless Chromium draws the browser's own list outside the
 //   page. It is checked by hand.)
 // Type: Non-functional (usability)
@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   matches.", and saving brings the form back with "Choose a diagnosis from the list." and the cursor in the
 //   diagnosis field, marked invalid. In step 3 the field's
 //   list offers "Essential (primary) hypertension". Step 4 saves and returns to the
-//   chart, which lists the diagnosis with its code I10, with the focus on "Saved: Essential (primary) hypertension is
+//   chart, which lists the diagnosis with its code I10, with the focus on "Saved. Essential (primary) hypertension is
 //   listed under Diagnoses." Every focused control shows the focus ring, and the page reports no script errors.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 //
@@ -92,7 +92,7 @@ public class TC_UC4_12_Nfr12_EntryKeyboardFirst(WebApps apps) : IClassFixture<We
         Assert.Contains("Essential (primary) hypertension", await page.Locator("#chart-diagnoses ~ ul").TextContentAsync());
         // The chart's notice has the focus, so the keyboard and a screen reader start from what was saved.
         await page.WaitForFunctionAsync("document.activeElement?.matches('[data-saved]') === true");
-        Assert.Contains("Saved: Essential (primary) hypertension is listed under Diagnoses.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
+        Assert.Contains("Saved. Essential (primary) hypertension is listed under Diagnoses.", await page.EvaluateAsync<string>("document.activeElement.textContent"));
 
         Assert.Equal(["Essential (primary) hypertension I10"], await RowsAsync(apps, "conditions", patient, "concat_ws(' ', display, code)"));
         Assert.Empty(errors);

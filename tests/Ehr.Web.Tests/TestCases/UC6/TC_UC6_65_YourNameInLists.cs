@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. Dr. Lists opens their patients, searches for the patient, opens their day and their inbox.
 //   2. The patient and the proxy open Who viewed the record.
 // Expected result: The patient's lines from Dr. Lists are, each once or more: "Your name, in their list of patients",
-//   "Your name, in a search for patients", "Your name, on their day's appointments", "Your name, on their list of
+//   "Your name, in a patient search", "Your name, on their schedule", "Your name, on their list of
 //   tasks". The proxy's are "The patient's name, ..." for the first three and "The record" for the last.
 // Creator: Tahseen Arnan
 public class TC_UC6_65_YourNameInLists(WebApps apps) : IClassFixture<WebApps>
@@ -48,11 +48,11 @@ public class TC_UC6_65_YourNameInLists(WebApps apps) : IClassFixture<WebApps>
 
         // Step 2.
         Assert.Equal(
-            new[] { "Your name, in their list of patients", "Your name, in a search for patients", "Your name, on their day's appointments", "Your name, on their list of tasks" }
+            new[] { "Your name, in their list of patients", "Your name, in a patient search", "Your name, on their schedule", "Your name, on their task list" }
                 .Order(StringComparer.Ordinal),
             PartsOf(await PageAsync(patient.Client), "staff").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
         Assert.Equal(
-            new[] { "The patient's name, in their list of patients", "The patient's name, in a search for patients", "The patient's name, on their day's appointments", "The record" }
+            new[] { "The patient's name, in their list of patients", "The patient's name, in a patient search", "The patient's name, on their schedule", "The record" }
                 .Order(StringComparer.Ordinal),
             PartsOf(await PageAsync(without.Client), "staff").Select(Uncounted).Distinct().Order(StringComparer.Ordinal));
     }

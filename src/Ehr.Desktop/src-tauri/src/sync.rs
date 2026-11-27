@@ -62,8 +62,8 @@ const BATCH: usize = 100;
 /// What an ended session's round asks for: changes since a watermark no transaction reaches, so nothing comes back.
 const PROBE: &str = "/api/sync/quick-texts?since=18446744073709551615";
 /// Said of an ended session: the window's lock asks for a full sign-in (main.rs).
-const ENDED: &str = "Signed out: the server ended this sign-in. Sign in again with your password and the code from \
-                     your authenticator app; nothing on this computer opens until you do.";
+const ENDED: &str = "Signed out. The server ended this sign-in. Sign in again with your password and the code from \
+                     your authenticator app. Nothing on this computer opens until you do.";
 
 pub struct Sync {
     http: Client,
@@ -306,7 +306,7 @@ impl Sync {
             if sign_in_ended(&response) {
                 self.ended(Ending::SignIn);
                 return Err(
-                    "Sign in again to download charts: a sign-in lasts at most 12 hours."
+                    "Sign in again to download charts. A sign-in lasts at most 12 hours."
                         .to_owned(),
                 );
             }
@@ -319,14 +319,13 @@ impl Sync {
         }
         if !response.status().is_success() {
             return Err(format!(
-                "Couldn't download charts: the server answered {}.",
+                "Couldn't download charts. The server answered {}.",
                 response.status()
             ));
         }
-        let panel = response
-            .json()
-            .await
-            .map_err(|_| "The server's chart response wasn't understood.".to_owned())?;
+        let panel = response.json().await.map_err(|_| {
+            "Couldn't download charts. The server's answer wasn't understood.".to_owned()
+        })?;
         Ok((token, panel))
     }
 
@@ -361,7 +360,7 @@ impl Sync {
         if !status.is_success() {
             let problem = match response.json::<Refusal>().await {
                 Ok(refusal) => refusal.problem,
-                Err(_) => format!("Couldn't sign in: the server answered {status}."),
+                Err(_) => format!("Couldn't sign in. The server answered {status}."),
             };
             return Err(if status.is_server_error() {
                 SignInFailure::Unreachable(problem)
@@ -371,7 +370,7 @@ impl Sync {
         }
         let session: Session = response.json().await.map_err(|error| {
             SignInFailure::Refused(format!(
-                "Couldn't sign in: the server's answer wasn't understood ({}).",
+                "Couldn't sign in. The server's answer wasn't understood ({}).",
                 reason(&error)
             ))
         })?;
@@ -420,7 +419,7 @@ impl Sync {
             }
             return Unlock::Refused(match response.json::<Refusal>().await {
                 Ok(refusal) => refusal.problem,
-                Err(_) => format!("Couldn't unlock: the server answered {status}."),
+                Err(_) => format!("Couldn't unlock. The server answered {status}."),
             });
         }
         Unlock::Unreachable
@@ -452,7 +451,7 @@ impl Sync {
             return Report {
                 server: None,
                 problem: Some(
-                    "Signed out: nothing is sent or brought back until you sign in.".to_owned(),
+                    "Signed out. Nothing is sent or brought back until you sign in.".to_owned(),
                 ),
             };
         };
@@ -477,7 +476,7 @@ impl Sync {
                     self.end(&token);
                     return Report {
                         server: Some(server.clone()),
-                        problem: Some("The session ended: sign in again to sync.".to_owned()),
+                        problem: Some("The session ended. Sign in again to sync.".to_owned()),
                     };
                 }
                 Err(Failure::Revoked) => {
@@ -493,8 +492,8 @@ impl Sync {
                     return Report {
                         server: Some(server.clone()),
                         problem: Some(
-                            "Sign in again: a sign-in lasts at most 12 hours. Nothing is sent or brought back until \
-                             you do, and what you save here waits on this computer."
+                            "Sign in again. A sign-in lasts at most 12 hours. Until you do, nothing is sent or \
+                             brought back. What you save waits on this computer."
                                 .to_owned(),
                         ),
                     };
@@ -529,7 +528,7 @@ impl Sync {
     ) -> Result<(), Failure> {
         let since = store::lock(store).watermark()?;
         let url = Url::parse_with_params(&format!("{server}{PATH}"), [("since", &since)]).map_err(
-            |error| Failure::Problem(format!("{server} isn't a server address: {error}")),
+            |error| Failure::Problem(format!("{server} isn't a server address ({error}).")),
         )?;
         let pull: PullResponse = answer(
             "get changes",
@@ -704,7 +703,7 @@ impl Sync {
             {
                 let db = store::lock(store);
                 self.with_clinician(Some(token), |_| db.reject_recording(owner, &recording,
-                    "This recording's patient is no longer on your panel. The audio was kept on this device.").map_err(Into::into))
+                    "This recording's patient is no longer one of your patients. The audio was kept on this device.").map_err(Into::into))
                     .map_err(Failure::Problem)?;
                 return Ok(());
             }
@@ -810,7 +809,7 @@ impl Sync {
                 let chunk: Chunk = answer("send offline audio", response).await?;
                 if chunk.received_seq != sequence {
                     return Err(Failure::Problem(
-                        "The server didn't confirm the audio chunk.".to_owned(),
+                        "The server didn't confirm part of the recording.".to_owned(),
                     ));
                 }
                 recording.next_seq += 1;
@@ -948,7 +947,7 @@ fn parse_servers(list: &str, https_only: bool) -> Result<Vec<String>, String> {
         .find(|server| https_only && !server.starts_with("https://"))
     {
         Some(server) => Err(format!(
-            "The servers' list names {server}: this app connects to HTTPS servers only."
+            "{server} isn't an HTTPS server. SwiftChart connects only to HTTPS servers."
         )),
         None => Ok(servers),
     }
@@ -987,12 +986,12 @@ async fn answer<T: DeserializeOwned>(
     }
     if !status.is_success() {
         return Err(Failure::Problem(format!(
-            "Couldn't {doing}: the server answered {status}."
+            "Couldn't {doing}. The server answered {status}."
         )));
     }
     response.json().await.map_err(|error| {
         Failure::Problem(format!(
-            "Couldn't {doing}: the server's answer wasn't understood ({}).",
+            "Couldn't {doing}. The server's answer wasn't understood ({}).",
             reason(&error)
         ))
     })
@@ -1002,7 +1001,7 @@ async fn answer<T: DeserializeOwned>(
 async fn refusal(response: Response) -> String {
     match response.json::<Refusal>().await {
         Ok(refusal) => refusal.problem,
-        Err(_) => "Update needed: the server syncs only with a newer SwiftChart.".to_owned(),
+        Err(_) => "Update needed. The server syncs only with a newer SwiftChart.".to_owned(),
     }
 }
 
@@ -1024,7 +1023,7 @@ fn revoked(response: &Response) -> bool {
 
 /// What a round or a download says when the server answers with the remote wipe's marker, until main.rs has deleted
 /// everything and the window says so.
-const REVOKED: &str = "Revoked: an administrator revoked this computer's sign-in.";
+const REVOKED: &str = "Revoked. An administrator revoked this computer's sign-in.";
 
 /// The innermost cause, which names what actually went wrong: "Connection refused", an untrusted certificate.
 fn reason(error: &reqwest::Error) -> String {
@@ -1331,7 +1330,7 @@ mod tests {
         assert_eq!(report.server.as_deref(), Some(server.url.as_str()));
         assert_eq!(
             report.problem.as_deref(),
-            Some("Couldn't send changes: the server answered 503 Service Unavailable.")
+            Some("Couldn't send changes. The server answered 503 Service Unavailable.")
         );
         let local = store::lock(&store);
         assert_eq!(local.pending(10).unwrap().len(), 1);
@@ -1401,7 +1400,7 @@ mod tests {
             Report {
                 server: None,
                 problem: Some(
-                    "Signed out: nothing is sent or brought back until you sign in.".to_owned()
+                    "Signed out. Nothing is sent or brought back until you sign in.".to_owned()
                 )
             }
         );
@@ -1428,7 +1427,7 @@ mod tests {
             report,
             Report {
                 server: Some(refuses.url.clone()),
-                problem: Some("The session ended: sign in again to sync.".to_owned())
+                problem: Some("The session ended. Sign in again to sync.".to_owned())
             }
         );
         assert!(
@@ -1529,7 +1528,7 @@ mod tests {
                     head.push_str(&line.to_ascii_lowercase());
                 }
                 seen.lock().unwrap().push(head);
-                let body = r#"{"problem":"Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later."}"#;
+                let body = r#"{"problem":"Update needed. The clinic's server syncs only with SwiftChart 0.3.0 or later."}"#;
                 write!(
                     stream,
                     "HTTP/1.1 426 Upgrade Required\r\nEhr-Desktop-Minimum: 0.3.0\r\nContent-Type: application/json\r\n\
@@ -1545,7 +1544,7 @@ mod tests {
 
         let report = client.round(&store).await;
         let problem =
-            "Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later.";
+            "Update needed. The clinic's server syncs only with SwiftChart 0.3.0 or later.";
         assert_eq!(report.problem.as_deref(), Some(problem));
         assert!(client.take_update_required());
         assert!(!client.take_update_required(), "once");
@@ -1716,7 +1715,7 @@ mod tests {
             report
                 .problem
                 .unwrap()
-                .starts_with("Sign in again: a sign-in lasts at most 12 hours.")
+                .starts_with("Sign in again. A sign-in lasts at most 12 hours.")
         );
         assert_eq!(client.take_ending(), Some(Ending::SignIn));
         assert_eq!(client.take_ending(), None, "once");
@@ -1813,7 +1812,7 @@ mod tests {
         let cant = FakeServer::start(|_| {
             (
                 503,
-                "Not saved: the on-prem server can't be reached.".to_owned(),
+                "Not saved. The clinic's server can't be reached.".to_owned(),
             )
         });
         let client = |server: &str| client_with(&[server], &credentials(None));
@@ -1894,7 +1893,7 @@ mod tests {
 
         assert_eq!(
             report.problem.as_deref(),
-            Some("Couldn't get changes: the server answered 403 Forbidden.")
+            Some("Couldn't get changes. The server answered 403 Forbidden.")
         );
         assert_eq!(client.account().as_deref(), Some("Dr. Example"));
         assert_eq!(saved(&credentials), Some(session()));

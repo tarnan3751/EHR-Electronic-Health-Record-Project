@@ -20,16 +20,16 @@ else
     var anyShown = record.Medications.Entries.Any(m => m.Sensitive) || record.Conditions.Entries.Any(c => c.Sensitive)
         || summaries.Summaries.Any(s => s.Sensitive) || summaries.Withdrawn.Any(w => w.Sensitive);
     <h1>Health record of @patient.GivenName @patient.FamilyName</h1>
-    <p class="sc-muted">A copy from the SwiftChart patient portal, as of @Model.At.UtcDateTime.ToString("MMM d, yyyy HH:mm") UTC.</p>
-    <p class="sc-muted sc-screen-only">To print it, or to save it as a PDF, use your browser's Print command.</p>
+    <p class="sc-muted">A copy from the SwiftChart patient portal, as of @Clinic.Format(Model.At, "MMM d, yyyy HH:mm").</p>
+    <p class="sc-muted sc-screen-only">To print it or save it as a PDF, use your browser's Print command.</p>
     @if (Model.MaySeeSensitive && hidden > 0)
     {
         @* Left out until asked for (docs/brand: sensitive items). On screen only: paper never says that anything was left out. *@
-        <p class="sc-notice sc-notice--info sc-screen-only" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @hidden @(hidden == 1 ? "diagnosis, medication or visit summary is" : "diagnoses, medications or visit summaries are") not shown. <a asp-page="/Record/Print" asp-route-sensitive="true">Show sensitive items</a></p>
+        <p class="sc-notice sc-notice--info sc-screen-only" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden.</span> @hidden @(hidden == 1 ? "diagnosis, medication or visit summary is not" : "diagnoses, medications or visit summaries are not") shown. <a asp-page="/Record/Print" asp-route-sensitive="true">Show sensitive items</a></p>
     }
     else if (Model.MaySeeSensitive && record.SensitiveShown && anyShown)
     {
-        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="/Record/Print" class="sc-screen-only">Hide sensitive items</a></p>
+        <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown.</span> Your view is logged. <a asp-page="/Record/Print" class="sc-screen-only">Hide sensitive items</a></p>
     }
 
     <section class="sc-panel" aria-labelledby="record-about">
@@ -80,7 +80,7 @@ else
         }
         @if (record.Medications.Entries.Count == 0)
         {
-            <p class="sc-muted">No medications recorded.</p>
+            <p class="sc-muted">No medications.</p>
         }
         else
         {
@@ -111,7 +111,7 @@ else
         }
         @if (record.Conditions.Entries.Count == 0)
         {
-            <p class="sc-muted">No diagnoses recorded.</p>
+            <p class="sc-muted">No diagnoses.</p>
         }
         else
         {
@@ -155,7 +155,7 @@ else
                             var flag = ResultExplanation.Flag(result);
                             <tr>
                                 <td>
-                                    @result.Display
+                                    @ForPatients.Name(result.Code, result.Display)
                                     @if (result.Note is { Length: > 0 } note)
                                     {
                                         <br><span class="sc-muted">Note from the care team: @note</span>
@@ -163,7 +163,7 @@ else
                                 </td>
                                 <td>@ResultExplanation.Value(result)@if (flag is ResultFlag.High or ResultFlag.Low) { <text> </text><span class="sc-tag sc-tag--warning">@(flag == ResultFlag.High ? "High" : "Low")</span> }</td>
                                 <td>@ResultExplanation.Range(result)</td>
-                                <td>@result.EffectiveAt.UtcDateTime.ToString("MMM d, yyyy") UTC</td>
+                                <td>@Clinic.Format(result.EffectiveAt, "MMM d, yyyy")</td>
                             </tr>
                         }
                     </tbody>
@@ -180,7 +180,7 @@ else
         }
         @if (record.VitalSigns.Entries.Count == 0)
         {
-            <p class="sc-muted">No vital signs recorded.</p>
+            <p class="sc-muted">No vital signs.</p>
         }
         else
         {
@@ -196,9 +196,9 @@ else
                                 ? new BloodPressure(sign, diastolic.Observation).Text
                                 : sign.Value?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
                             <tr>
-                                <td>@(entry.Diastolic is null ? VitalSigns.Name(sign.Code ?? "", sign.Display) : "Blood pressure")</td>
-                                <td>@value @Units.Shown(sign.Unit)</td>
-                                <td>@sign.EffectiveAt.UtcDateTime.ToString("MMM d, yyyy HH:mm") UTC</td>
+                                <td>@(entry.Diastolic is null ? ForPatients.Name(sign.Code, sign.Display) : "Blood pressure")</td>
+                                <td>@value @ForPatients.Unit(sign.Unit)</td>
+                                <td>@Clinic.Format(sign.EffectiveAt, "MMM d, yyyy HH:mm")</td>
                             </tr>
                         }
                     </tbody>
@@ -226,8 +226,8 @@ else
                         @foreach (var appointment in record.Appointments.Entries)
                         {
                             <tr>
-                                <td>@appointment.StartsAt.UtcDateTime.ToString("dddd, MMM d, yyyy")</td>
-                                <td>@appointment.StartsAt.UtcDateTime.ToString("HH:mm") UTC, @appointment.Minutes minutes</td>
+                                <td>@Clinic.Plain(appointment.StartsAt, "dddd, MMM d, yyyy")</td>
+                                <td>@Clinic.Format(appointment.StartsAt, "HH:mm"), @appointment.Minutes minutes</td>
                                 <td>@appointment.Clinician</td>
                                 <td>@appointment.Reason</td>
                                 <td>@PrintModel.AppointmentSaid(appointment.Status)</td>
@@ -268,7 +268,7 @@ else
                     {
                         var summary = summaries.Summaries.ElementAt(item.Index);
                         <li data-summary="standing">
-                            <h3>@summary.NoteSignedAt.UtcDateTime.ToString("MMM d, yyyy") UTC</h3>
+                            <h3>@Clinic.Format(summary.NoteSignedAt, "MMM d, yyyy")</h3>
                             <p class="sc-muted">Written by @summary.ReleasedBy@if (summary.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }</p>
                             <h4>@parts[0]</h4>
                             <p class="sc-note__text">@summary.TalkedAbout</p>
@@ -290,4 +290,4 @@ else
         }
     </section>
 }
-<p class="sc-screen-only"><a asp-page="/Record/Index">Back to Download @(own ? "my record" : "this record")</a></p>
+<p class="sc-screen-only"><a asp-page="/Record/Index">Back to download</a></p>

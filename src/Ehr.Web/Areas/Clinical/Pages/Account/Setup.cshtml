@@ -6,11 +6,11 @@
 <h1>Set up your account</h1>
 @if (!Model.LinkIsValid)
 {
-    <p class="sc-notice sc-notice--danger">This link is not valid or has already been used. Ask an administrator for a new one.</p>
+    <p class="sc-notice sc-notice--danger">This setup link isn't valid or has already been used. Ask an administrator for a new one.</p>
 }
 else
 {
-    <p>Welcome, @Model.DisplayName. Choose a password; at your first sign-in you'll also set up an authenticator app.</p>
+    <p>Welcome, @Model.DisplayName. Choose a password. When you first sign in, you'll also set up an authenticator app.</p>
     <form method="post" class="sc-form" asp-route-user="@Model.UserId" asp-route-token="@Model.Token">
         <div class="sc-field">
             <label asp-for="Input.Password" class="sc-field__label">Password</label>

@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Steps:
 //   1. Open the allergy form from the proposal.
 //   2. Save Penicillin G with the reaction Hives.
-// Expected result: Step 1: "Proposed from dictation: check every field. Nothing here was filled in from it." with the
+// Expected result: Step 1: "Proposed from dictation. Check every field. Nothing here was filled in from it." with the
 //   words after "As heard:", marked; the substance is empty; the only status offered is Active. Step 2: back on the review; the patient has
 //   Penicillin G (RxNorm 7980), active, with Hives, and "No known allergies" inactive; the proposal is decided with it.
 // Creator: Tahseen Arnan
@@ -40,7 +40,7 @@ public class TC_UC4_33_AllergyFromDictation(WebApps apps) : IClassFixture<WebApp
         var path = AllergyFormPath(dictated.Patient, dictated.Allergy);
         var html = await dictated.Session.Client.GetStringAsync(path, Cancel);
         var said = Said(html);
-        Assert.Contains("Proposed from dictation: check every field. Nothing here was filled in from it. It adds one allergy", said);
+        Assert.Contains("Proposed from dictation. Check every field. Nothing here was filled in from it. It adds one allergy", said);
         Assert.Contains($"<mark class=\"sc-transcript__source\">{DictationSidecarStub.AllergySaid}</mark>", html);
         Assert.Contains($"As heard: {DictationSidecarStub.OrderSaid}. {DictationSidecarStub.AllergySaid}.", said);
         Assert.DoesNotMatch("name=\"Name\" value=\"[^\"]", html);

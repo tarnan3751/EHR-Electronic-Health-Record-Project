@@ -29,7 +29,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   5. Read the order and its audit row from the database.
 // Expected result: The chart offers "Change" and "Discontinue…" for the order and a "Discontinued orders" link. The
 //   discontinue page shows the patient's banner with allergies and the order, with the cursor in a required reason
-//   field, and is one recorded read. After step 3 the chart says "Order discontinued:", naming the order, and "No
+//   field, and is one recorded read. After step 3 the chart says "Order discontinued.", naming the order, and "No
 //   active orders."; the discontinued orders list shows the order, "Dr. Test", and the reason. The order's row is revoked (FHIR's code for
 //   discontinued) with the reason, the clinician as discontinuer and the time of the change; no other column changed;
 //   one audit row for the update names the clinician.
@@ -66,7 +66,7 @@ public class TC_UC1_07_DiscontinueSuccessfulFlow(WebApps apps) : IClassFixture<W
         var url = System.Text.Json.JsonDocument.Parse(await discontinued.Content.ReadAsStringAsync(Cancel)).RootElement.GetProperty("url").GetString()!;
 
         var confirmed = await session.Client.GetStringAsync(url, Cancel);
-        Assert.Contains("Order discontinued: Complete blood count (CBC) is listed under this chart's discontinued orders.", Words(confirmed));
+        Assert.Contains("Order discontinued. Complete blood count (CBC) is under discontinued orders.", Words(confirmed));
         Assert.Contains("No active orders.", confirmed);
         Assert.DoesNotContain("data-discontinue-order", confirmed);
 

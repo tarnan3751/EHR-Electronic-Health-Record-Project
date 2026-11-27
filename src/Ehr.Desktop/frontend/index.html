@@ -58,7 +58,7 @@
 
     <form id="sign-in" class="sc-form" hidden>
       <h2>Sign in to sync</h2>
-      <p>With your clinic account, and the code from your authenticator app or one of your recovery codes.</p>
+      <p>Use your clinic account and the code from your authenticator app, or one of your recovery codes.</p>
       <!-- Where the password goes: the servers this build was made for (src-tauri/src/sync.rs). -->
       <p id="sign-in-servers" class="sc-muted"></p>
       <!-- Why the kept sign-in was forgotten as the app started, when it was (src-tauri/src/main.rs, starting_lock). -->
@@ -83,7 +83,7 @@
 
     <section id="offline-charts" hidden>
       <h2>Offline charts</h2>
-      <p class="sc-lede">Download up to 25 assigned charts while connected. Drafts and audio wait here until they can sync.</p>
+      <p class="sc-lede">Download up to 25 charts from My patients while you're connected. Drafts and recordings wait on this computer until they're sent.</p>
       <!-- When the charts were last downloaded: nothing refreshes them but Download my charts (the expansion plan's step 19a). -->
       <p id="charts-updated" class="sc-status"></p>
       <div class="sc-actions">
@@ -138,7 +138,7 @@
         <span class="sc-field__error" id="add-body-error" data-for="body"></span>
       </div>
       <div class="sc-actions">
-        <button class="sc-btn sc-btn--primary">Add</button>
+        <button class="sc-btn sc-btn--primary">Add phrase</button>
       </div>
     </form>
 
@@ -170,8 +170,8 @@
       <div class="sc-actions">
         <button id="lock-submit" class="sc-btn sc-btn--primary">Unlock</button>
       </div>
-      <p class="sc-muted">Signed in as <span id="lock-account"></span>. Someone else? Signing out closes the offline charts on
-        this computer, and anything typed here and not saved is lost.</p>
+      <p class="sc-muted">Signed in as <span id="lock-account"></span>. Someone else? Sign out. The offline charts close, and
+        anything typed here and not saved is lost.</p>
       <div class="sc-actions">
         <button type="button" id="lock-sign-out" class="sc-btn sc-btn--quiet">Sign out</button>
       </div>

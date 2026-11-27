@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 //   1. Open the inbox; press Tab until "Review the access" has the focus; press Enter.
 //   2. Press Space on "Appropriate", which has the focus; Tab to the note and type it; Tab to "Mark reviewed"; Enter.
 // Expected result: Step 1 opens the access's review page with the focus on "Appropriate". Step 2 saves the review: the
-//   page says "Reviewed:". Every focused control shows the focus ring, and the page reports no script errors.
+//   page says "Reviewed.". Every focused control shows the focus ring, and the page reports no script errors.
 // Creator: Tahseen Arnan
 [Collection(BrowserTests.Collection)]
 public class TC_UC24_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApps>
@@ -47,7 +47,7 @@ public class TC_UC24_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApp
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync($"**/admin/emergency-access/{access.Id}");
-        Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('input[name=Outcome][value=appropriate]')"));
+        await page.WaitForFunctionAsync("document.activeElement?.matches('input[name=Outcome][value=appropriate]') === true");
 
         // 2.
         await page.Keyboard.PressAsync("Space");

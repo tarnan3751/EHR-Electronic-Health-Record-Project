@@ -40,11 +40,11 @@ public class TC_UC6_30_DownloadRecordOffSite(WebApps apps) : IClassFixture<WebAp
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         var forwarded = apps.Forwarded.Count;
         var cutOff = Client(apps.CloudCutOff, patient.Jar);
-        Assert.Contains("Read-only: the clinic's server can't be reached", Words(await cutOff.GetStringAsync(PagePath, Cancel)));
+        Assert.Contains("Read-only. The clinic's server can't be reached", Words(await cutOff.GetStringAsync(PagePath, Cancel)));
         var file = Bundle(await DownloadAsync(cutOff));
         Assert.Equal(["lisinopril 10 MG Oral Tablet"], Entries<R4.MedicationStatement>(file).Select(m => (m.Medication as R4.CodeableConcept)?.Text));
         var page = Words(await PrintAsync(cutOff));
-        Assert.Contains("Read-only: the clinic's server can't be reached", page);
+        Assert.Contains("Read-only. The clinic's server can't be reached", page);
         Assert.Contains("Health record of Synthetic Fhirchart", page);
         Assert.Equal(forwarded, apps.Forwarded.Count);
 

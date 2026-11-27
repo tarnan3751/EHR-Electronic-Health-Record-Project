@@ -39,12 +39,12 @@ public class AmbientSwitchTests(WebApps apps) : IClassFixture<WebApps>
         using (var page = await session.Client.GetAsync($"/patients/{patient}/listen", Cancel))
         {
             // To a clinician whose patient this is, a plain page that says so, and the way back to the chart: never "no
-            // patient with this ID" (looking at the pages), and nothing about the patient read.
+            // patient, or nothing in their chart" (looking at the pages), and nothing about the patient read.
             Assert.Equal(HttpStatusCode.NotFound, page.StatusCode);
             var html = await page.Content.ReadAsStringAsync(Cancel);
             Assert.Contains("Listening to a visit is switched off at this clinic.", html);
             Assert.Contains($"href=\"/patients/{patient}\"", html);
-            Assert.DoesNotContain("there is no patient with this ID", html);
+            Assert.DoesNotContain("No patient, or nothing in their chart, matches this address", html);
             Assert.DoesNotContain("Synthetic", html);
         }
 

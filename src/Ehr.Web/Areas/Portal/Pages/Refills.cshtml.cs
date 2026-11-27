@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Ehr.Web.Areas.Portal.Pages;
 
-// Renew a medication (the expansion plan's step 13d): the patient, or someone they share their record with whose access
+// Ask for a refill (the expansion plan's step 13d): the patient, or someone they share their record with whose access
 // includes messages, asks the care team to renew one of the record's medications, with a short note if they like, and
 // sees what became of their requests: waiting, approved with what was ordered, or declined with the care team's
 // message. Which patient comes from the session, never from the request (AGENTS.md). A medication is named in the form
@@ -98,17 +98,17 @@ public class RefillsModel(PortalSubject subject, PhiReader phi, RefillRequests r
                     // Back to the page as it was, sensitive items shown if they were.
                     return RedirectToPage(new { sent = true, sensitive = Sensitive && MaySeeSensitive ? true : (bool?)null });
                 case RefillAsked.AlreadyAsked:
-                    errors["Medication"] = "You've already asked to renew this medication. Your care team hasn't answered yet.";
+                    errors["Medication"] = "You've already asked for a refill of this medication. Your care team hasn't answered yet.";
                     break;
                 case RefillAsked.NoCareTeam:
-                    errors["Medication"] = "This record has no care team at the clinic yet, so nobody would see the request. Call the clinic to renew a medication.";
+                    errors["Medication"] = "This record has no care team yet. To ask for a refill, call the clinic.";
                     break;
                 case RefillAsked.TooLong:
                     errors["Note"] = $"Shorten the note to {RefillRequests.MaxNoteLength} characters or fewer.";
                     break;
                 default:
                     Chosen = null;
-                    errors["Medication"] = "That medication can't be renewed here any more. Choose one from the list.";
+                    errors["Medication"] = "That medication can't be refilled here any more. Choose one from the list.";
                     break;
             }
         }

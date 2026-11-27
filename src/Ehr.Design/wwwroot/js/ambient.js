@@ -87,7 +87,7 @@
     // At the session's limit: the limit, and what happens next, said once.
     function atTheLimit() {
         return `Listening stopped at its ${Math.round((state.session?.maxSeconds ?? 0) / 60)}-minute limit. Transcribing the `
-            + "visit and telling its voices apart: then say who each voice is to draft the note.";
+            + "visit and telling its voices apart. Then say who each voice is to draft the note.";
     }
 
     function call(method, path, body, type) {
@@ -219,7 +219,7 @@
         consent.hidden = true;
         capture.hidden = false;
         showRecording();
-        say("Listening: the visit is being recorded.");
+        say("Listening. The visit is being recorded.");
         part("stop").focus();
         // Out of sight while listening started: paused at once, as it would be had it gone out of sight now.
         if (document.visibilityState === "hidden") {
@@ -227,7 +227,7 @@
         }
     }
 
-    const hiddenMessage = "Paused while this page was out of sight: nothing was recorded. Select Resume listening to carry on.";
+    const hiddenMessage = "Paused while this page was out of sight, so nothing was recorded. Select Resume listening to carry on.";
 
     function microphoneProblem(error) {
         switch (error?.name) {
@@ -280,7 +280,7 @@
                     state.retryMs = firstRetryMs;
                     if (state.retrying) {
                         state.retrying = false;
-                        say("Connected again: the audio recorded meanwhile has been sent.");
+                        say("Connected again. The audio recorded meanwhile has been sent.");
                     }
 
                     heard(body);
@@ -330,7 +330,7 @@
 
     function retryLater() {
         state.retrying = true;
-        say("The connection to the clinic's server dropped. Still recording here; the audio is sent when it's back.", true);
+        say("Connection to the clinic's server lost. Still recording here. The audio is sent when it's back.", true);
         clearTimeout(state.retryTimer);
         state.retryTimer = setTimeout(pump, state.retryMs);
         state.retryMs = Math.min(state.retryMs * 2, mostRetryMs);
@@ -340,13 +340,13 @@
     function heard(received) {
         const quiet = received.quietSeconds ?? 0;
         if (quiet >= quietSeconds) {
-            stopAndDraft("Stopped: nobody has spoken for 5 minutes. Say who each voice is to draft the note.");
+            stopAndDraft("Stopped. Nobody has spoken for 5 minutes. Say who each voice is to draft the note.");
         } else if (quiet >= warnQuietSeconds && !state.stopping && !state.warned) {
             state.warned = true;
-            say("Nobody has spoken for 4 minutes: listening stops in a minute unless someone speaks.", false, true);
+            say("Nobody has spoken for 4 minutes. Listening stops in a minute unless someone speaks.", false, true);
         } else if (quiet < warnQuietSeconds && state.warned) {
             state.warned = false;
-            say("Listening: someone spoke, so listening carries on.");
+            say("Someone spoke, so listening carries on.");
         }
     }
 
@@ -382,7 +382,7 @@
         state.clock = setInterval(showRecording, 1000);
         pauseButton.textContent = "Pause listening";
         showRecording();
-        say("Listening again: the visit is being recorded.");
+        say("Listening again. The visit is being recorded.");
         pump();
     }
 
@@ -435,7 +435,7 @@
     }
 
     async function discard(message) {
-        end(message || "Discarded: nothing recorded was kept.");
+        end(message || "Discarded. Nothing recorded was kept.");
         statusArea.classList.remove("sc-status--error");
         askAgain();
     }
@@ -452,7 +452,7 @@
         clearInterval(state.clock);
         document.title = title;
         capture.hidden = true;
-        say(message || "Stopped. Transcribing the visit and telling its voices apart: this takes about a minute.");
+        say(message || "Stopped. Transcribing the visit and telling its voices apart. This takes about a minute.");
         if (state.recorder && state.recorder.state !== "inactive") {
             state.recorder.stop();
         } else {
@@ -482,15 +482,15 @@
             say("This visit couldn't be transcribed and its voices told apart, so it can't be drafted. Nothing was added to the note. Discard the recording, and dictate or type the note.", true);
             stuck(false);
         } else if ((result.speakers ?? []).length > mostVoices) {
-            say(`The dictation service told apart more voices than can be named (${mostVoices} at most), so this visit can't be drafted. Nothing was added to the note. Discard the recording, and dictate or type the note.`, true);
+            say(`More voices were told apart than can be named (${mostVoices} at most), so this visit can't be drafted. Nothing was added to the note. Discard the recording, and dictate or type the note.`, true);
             stuck(false);
         } else {
             showVoices(result);
         }
     }
 
-    const beforeNaming = "The visit couldn't be fetched: the dictation service isn't answering, so its voices can't be named yet. Nothing was added to the note. Try again in a moment, or discard the recording; the service keeps nothing for more than 10 minutes.";
-    const afterNaming = "The draft couldn't be fetched: the dictation service isn't answering. Nothing was added to the note. Try again in a moment, or open the draft in a few minutes to retrieve it, or discard it there; the service keeps nothing for more than 10 minutes.";
+    const beforeNaming = "The visit couldn't be fetched because the listening service isn't answering, so its voices can't be named yet. Nothing was added to the note. Try again in a moment, or discard the recording. The service keeps nothing for more than 10 minutes.";
+    const afterNaming = "The draft couldn't be fetched because the listening service isn't answering. Nothing was added to the note. Try again in a moment, or open the draft in a few minutes to retrieve or discard it. The service keeps nothing for more than 10 minutes.";
 
     // Where the page waits when the visit can't be fetched or drafted, never a dead end. Before the voices are named:
     // try again (when it might work) or discard the recording, as leaving the page would. Once they have been handed
@@ -632,9 +632,9 @@
         busy("recording");
         draftButton.disabled = true;
         speakersArea.hidden = true;
-        say("Drafting the note. Keep this page open until it's ready: a few minutes for a long visit.");
+        say("Drafting the note. Keep this page open until it's ready. A long visit takes a few minutes.");
         const named = await ask("speakers", JSON.stringify({ speakers: Object.fromEntries(chosenRoles()) }),
-            "The voices couldn't be sent: the dictation service isn't answering. Select Draft the note to try again, or discard the recording.");
+            "The voices couldn't be sent because the listening service isn't answering. Select Draft the note to try again, or discard the recording.");
         if (!named) {
             if (!state.ended) {
                 state.drafting = false;
@@ -700,7 +700,7 @@
     }
 
     consent.addEventListener("submit", start);
-    pauseButton.addEventListener("click", () => (state.paused ? resume() : pause("Paused: nothing is being recorded. Select Resume listening to carry on.")));
+    pauseButton.addEventListener("click", () => (state.paused ? resume() : pause("Paused. Nothing is being recorded. Select Resume listening to carry on.")));
     part("stop").addEventListener("click", () => stopAndDraft());
     part("discard").addEventListener("click", () => discard());
     part("discard-recording").addEventListener("click", () => discard());
@@ -756,7 +756,7 @@
         if (state.handedOff) {
             say("Listening ended when you left this page while the note was being drafted. Open the draft to retrieve it.");
         } else {
-            say("Listening ended when you left this page: nothing recorded was kept.");
+            say("Listening ended when you left this page. Nothing recorded was kept.");
             askAgain();
         }
     });

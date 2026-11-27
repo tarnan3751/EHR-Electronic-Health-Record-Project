@@ -26,8 +26,8 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 //   3. Bring the on-site database back and let the cloud app's check run.
 //   4. Read the on-site audit log again.
 // Expected result: The chart shows "Outage, Hazel", "Penicillin" and "blood pressure 118/76 mmHg, heart rate
-//   64/min.", with the notice "Read-only: the clinic's server can't be reached. You can look at records, but the
-//   newest changes may not appear yet, and nothing can be saved until it's back." One read of the patient, by the
+//   64/min.", with the notice "Read-only. The clinic's server can't be reached, so nothing can be saved until it's
+//   back. The newest changes may not show yet." One read of the patient, by the
 //   clinician, on table patients, waits in the cloud app's queue, and the on-site audit log has none. After recovery
 //   the on-site audit log has that one read, with source "cloud".
 // Creator: Tahseen Arnan
@@ -58,7 +58,7 @@ public class TC_UC2_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
             Assert.Contains("Outage, Hazel", html);
             Assert.Contains("Penicillin", html);
             Assert.Contains("blood pressure 118/76 mmHg, heart rate 64/min.", html);
-            Assert.Contains("Read-only: the clinic's server can't be reached. You can look at records, but the newest changes may not appear yet, and nothing can be saved until it's back.", Words(html));
+            Assert.Contains("Read-only. The clinic's server can't be reached, so nothing can be saved until it's back. The newest changes may not show yet.", Words(html));
             var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
             var read = Assert.Single(queued, e => e.PatientId == patient);
             Assert.Equal(AuditActions.Read, read.Action);

@@ -42,7 +42,7 @@ public class PortalNoticeDayTests(WebApps apps) : IClassFixture<WebApps>
 
             var request = await RequestIdAsync(apps, patient.Patient);
             using var declined = await DeclineAsync(session.Client, patient.Patient, request);
-            Assert.Contains("Declined:", Said(await ReadAsync(declined)));
+            Assert.Contains("Declined.", Said(await ReadAsync(declined)));
             return request;
         }
 
@@ -67,7 +67,7 @@ public class PortalNoticeDayTests(WebApps apps) : IClassFixture<WebApps>
             var note = await SignedNoteAsync(session.Client, patient);
             using (var released = await ReleaseAsync(session.Client, patient, note, "We talked about your follow-up."))
             {
-                Assert.Contains("Released:", Words(await ReadAsync(released)));
+                Assert.Contains("Released.", Words(await ReadAsync(released)));
             }
 
             return await StandingAsync(apps, patient);

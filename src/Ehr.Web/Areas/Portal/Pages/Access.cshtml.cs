@@ -71,10 +71,10 @@ public class AccessModel(PhiReader phi, ProxyAccess access, ProxyInvitations inv
                     errors["Email"] = "That's your own email address. Enter the other person's.";
                     break;
                 case GiveResult.TooMany:
-                    errors["Email"] = "You've given access to as many people as the portal allows. Remove one first.";
+                    errors["Email"] = "You've shared your record with as many people as the portal allows. Stop sharing with one first.";
                     break;
                 default:
-                    errors["Email"] = "Access couldn't be given. Try again, or contact the clinic.";
+                    errors["Email"] = "Your record couldn't be shared. Try again, or contact the clinic.";
                     break;
             }
         }

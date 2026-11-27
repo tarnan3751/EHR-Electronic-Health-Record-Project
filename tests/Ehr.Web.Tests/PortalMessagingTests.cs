@@ -31,7 +31,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
             ("Body", "Synthetic: yes, nothing to worry about."));
         Assert.Equal(HttpStatusCode.OK, reply.StatusCode);
         var home = Words(await portal.Client.GetStringAsync("/portal", Cancel));
-        Assert.Contains("You have 1 new message from your care team.", home);
+        Assert.Contains("New 1 message from your care team.", home);
 
         await portal.Client.GetStringAsync($"/portal/messages/{thread}", Cancel);
         Assert.Contains("No new messages.", Words(await portal.Client.GetStringAsync("/portal", Cancel)));
@@ -59,7 +59,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotMatch("<input id=\"message-subject\"[^>]*autofocus", form);
         Assert.Matches("<form(?=[^>]*class=\"sc-form\")[^>]*action=\"/portal/messages/new\"", form);
         // Nothing was saved by filling the form in.
-        Assert.Contains("You have no messages.", await portal.Client.GetStringAsync("/portal/messages", Cancel));
+        Assert.Contains("No messages.", await portal.Client.GetStringAsync("/portal/messages", Cancel));
 
         var thread = await StartAsync(portal.Client, subject, "Synthetic: should I change anything?");
         Assert.Contains(WebUtility.HtmlEncode(subject), await portal.Client.GetStringAsync($"/portal/messages/{thread}", Cancel));
@@ -92,7 +92,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("href=\"/portal/refills", html);
         Assert.DoesNotContain("new message", home);
         Assert.DoesNotContain("No new messages.", home);
-        Assert.DoesNotContain("Renew a medication", home);
+        Assert.DoesNotContain("Ask for a refill", home);
         // The rest of the home is there, worded for someone else's record.
         Assert.Contains(">Test results</h2>", html);
         Assert.Contains("id=\"home-record\"", html);
@@ -122,7 +122,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         var home = Words(html);
         Assert.Contains("id=\"home-messages\"", html);
         Assert.Contains("Messages with the care team", home);
-        Assert.Contains("There is 1 new message from the care team.", home);
+        Assert.Contains("New 1 message from the care team.", home);
         Assert.DoesNotContain("your care team", home);
         Assert.Contains("Open messages", home);
 
@@ -168,7 +168,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         var page = $"/patients/{patient.Patient}/messages/new";
         using var sent = await PostFormAsync(staff.Client, page, page, ("Subject", "Synthetic: your results"), ("Body", "Synthetic: please read."));
         Assert.Equal(HttpStatusCode.OK, sent.StatusCode);
-        Assert.Contains("You have 1 new message from your care team.", Words(await patient.Client.GetStringAsync("/portal", Cancel)));
+        Assert.Contains("New 1 message from your care team.", Words(await patient.Client.GetStringAsync("/portal", Cancel)));
 
         await ProxyTests.GiveAsync(patient, proxy.Email, scope);
         await ProxyTests.ViewAsync(proxy, await ProxyTests.GrantIdAsync(apps, patient.Patient));

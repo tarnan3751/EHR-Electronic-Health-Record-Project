@@ -7,14 +7,14 @@
 <h1>Whose record?</h1>
 @if (Model.Ended)
 {
-    <p class="sc-notice sc-notice--warning" role="status"><span class="sc-notice__state">Access ended:</span> you can no longer view that record.</p>
+    <p class="sc-notice sc-notice--warning" role="status"><span class="sc-notice__state">Access ended.</span> You can no longer see that record.</p>
 }
 @if (!Model.HasOwnRecord && Model.Records.Count == 0)
 {
-    <p>Nobody is sharing a record with you at the moment. When someone gives you access, their record will be listed here.</p>
+    <p>Nobody is sharing a record with you. When someone does, it's listed here.</p>
     return;
 }
-<p class="sc-muted">Choose the record you want to look at. You can change it at any time under Access.</p>
+<p class="sc-muted">Choose a record. You can switch at any time under Sharing.</p>
 <ul class="sc-results">
     @if (Model.HasOwnRecord)
     {
@@ -29,7 +29,7 @@
     {
         <li class="sc-result" data-record="shared">
             <h2>@record.PatientName</h2>
-            <p>Shared with you. @ProxyAccess.ScopeLabel(record.Scope). Until @record.ExpiresAt.UtcDateTime.ToString("MMM d, yyyy").</p>
+            <p>Shared with you. @ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
             <form method="post" asp-page="/Acting">
                 <input type="hidden" name="grantId" value="@record.GrantId">
                 <button type="submit" class="sc-btn @(Model.HasOwnRecord ? null : "sc-btn--primary")">View this record</button>

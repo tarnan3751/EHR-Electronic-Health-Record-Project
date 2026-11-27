@@ -26,16 +26,16 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   fluids, and call us if the cough lasts more than two weeks."; the note's Subjective "Synthetic subjective: dry cough,
 //   quartzwing pattern, nocturnal.".
 // Steps:
-//   1. Open the first signed note, then "Write a summary for the patient".
-//   2. Type the three parts and select "Release to the patient", with a forged Host header.
+//   1. Open the first signed note, then "Write visit summary".
+//   2. Type the three parts and select "Release visit summary", with a forged Host header.
 //   3. Release a summary of the second note.
 //   4. A day passes. Release a summary of the third note.
-// Expected result: Step 1: the note's page says "Not written yet." and offers the link; the form's three fields are
+// Expected result: Step 1: the note's page says "None yet." and offers the link; the form's three fields are
 //   empty and the note's Subjective is under it; opening it is one recorded read of the note. Step 2: the note's page
-//   says "Released: the patient can read the summary in the portal." and shows the three parts, line breaks kept,
+//   says "Released. The patient can now read the summary in the portal." and shows the three parts, line breaks kept,
 //   "Released to the patient by Dr. Test" and the time labeled UTC, and no link to write another; the chart tags the
 //   note "Summary released"; the database has it as released by the clinician, standing, not sensitive, with a write
-//   audit event; the patient gets one email, "There is something new in your patient portal", whose text and button
+//   audit event; the patient gets one email, "Something new in your patient portal", whose text and button
 //   ("See what's new", https://localhost/portal/summaries) say nothing of the summary, the note, the clinician or the
 //   forged host. Step 3: no second email that day. Step 4: one more email.
 // Creator: Tahseen Arnan
@@ -53,7 +53,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         var third = await SignedNoteAsync(session.Client, patient, subjective: NoteSubjective);
 
         var notePage = await session.Client.GetStringAsync(NotePath(patient, note), Cancel);
-        Assert.Contains("Not written yet. The patient sees nothing of this note.", Words(notePage));
+        Assert.Contains("None yet. The patient can't see anything of this note.", Words(notePage));
         Assert.Contains("data-write-summary", notePage);
         var readsBefore = await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient);
         var form = await session.Client.GetStringAsync(SummaryPath(patient, note), Cancel);
@@ -80,7 +80,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         var released1 = await ReadAsync(released);
 
         Assert.Equal(NotePath(patient, note), PathOf(released));
-        Assert.Contains("Released: the patient can read the summary in the portal.", Words(released1));
+        Assert.Contains("Released. The patient can now read the summary in the portal.", Words(released1));
         Assert.Contains(TalkedAbout, released1);
         // Line breaks kept (written as entities in the markup).
         Assert.Contains("Your chest sounded clear.\nYour temperature was normal.", Words(released1));
@@ -95,7 +95,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         Assert.Contains("data-summary-released", await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
 
         var notice = Assert.Single(EmailsTo(apps, email));
-        Assert.Equal("There is something new in your patient portal", notice.Subject);
+        Assert.Equal("Something new in your patient portal", notice.Subject);
         Assert.Equal("Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.", notice.Body);
         var action = apps.Emails.Actions[notice.Body];
         Assert.Equal(("See what's new", Base + "portal/summaries"), (action.Label, action.Link));
@@ -107,7 +107,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         // A second summary the same day: no second email.
         using (var again = await ReleaseAsync(session.Client, patient, second, "We talked about your sleep."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(again)));
+            Assert.Contains("Released.", Words(await ReadAsync(again)));
         }
 
         Assert.Single(EmailsTo(apps, email));
@@ -124,7 +124,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
 
         using (var later = await ReleaseAsync(session.Client, patient, third, "We talked about your follow-up."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(later)));
+            Assert.Contains("Released.", Words(await ReadAsync(later)));
         }
 
         Assert.Equal(2, EmailsTo(apps, email).Count);

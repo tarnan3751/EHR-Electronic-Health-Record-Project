@@ -24,9 +24,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   3. Off-site with the clinic's server unreachable, open "Messages", the conversation, and "Write to your care
 //      team"; post a reply that was already on screen.
 //   4. Back on-site, start nine more conversations, then an eleventh.
-// Expected result: Step 1: each is answered 422 with "Not sent:" and "Enter a subject." / "Write your message."; no
+// Expected result: Step 1: each is answered 422 with "Not sent." and "Enter a subject." / "Write your message."; no
 //   message is added. Step 2: both are answered 404, and the list never shows the other conversation. Step 3: the
-//   pages are readable and say "Read-only: messages can't be sent until the clinic's server is back.", with no form;
+//   pages are readable and say "Read-only. Messages can't be sent until the clinic's server is back.", with no form;
 //   the post is answered 503 and no message is added. Step 4: the eleventh is answered 422 with "Please call the
 //   clinic, or try again later." and isn't saved.
 // Creator: Tahseen Arnan
@@ -45,7 +45,7 @@ public class TC_UC6_09_MessagesRefused(WebApps apps) : IClassFixture<WebApps>
         using var empty = await PostFormAsync(portal.Client, "/portal/messages/new", "/portal/messages/new", ("Subject", ""), ("Body", " "));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
         var form = await empty.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Not sent:", form);
+        Assert.Contains("Not sent.", form);
         Assert.Contains("Enter a subject.", form);
         Assert.Contains("Write your message.", form);
         using var blank = await PostFormAsync(portal.Client, $"/portal/messages/{mine}", $"/portal/messages/{mine}", ("Body", "   "));
@@ -64,7 +64,7 @@ public class TC_UC6_09_MessagesRefused(WebApps apps) : IClassFixture<WebApps>
         foreach (var path in new[] { "/portal/messages", $"/portal/messages/{mine}", "/portal/messages/new" })
         {
             var page = await cutOff.GetStringAsync(path, Cancel);
-            Assert.Contains("Read-only: messages can't be sent until the clinic's server is back.", Words(page));
+            Assert.Contains("Read-only. Messages can't be sent until the clinic's server is back.", Words(page));
             Assert.DoesNotContain("<textarea", page);
         }
 
@@ -80,7 +80,7 @@ public class TC_UC6_09_MessagesRefused(WebApps apps) : IClassFixture<WebApps>
 
         using var eleventh = await PostFormAsync(portal.Client, "/portal/messages/new", "/portal/messages/new", ("Subject", "Synthetic: one too many"), ("Body", "Synthetic: again"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, eleventh.StatusCode);
-        Assert.Contains("Please call the clinic, or try again later.", await eleventh.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("Call the clinic, or try again later.", await eleventh.Content.ReadAsStringAsync(Cancel));
         Assert.Equal(10, (await RowsAsync(apps, patient, "body")).Count);
     }
 }

@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 //   1. Book with no reason; with the day that doesn't exist; with yesterday; with the unknown clinician.
 //   2. Book at 09:10 on the booked day, with the same clinician.
 //   3. Cancel the booked appointment with no reason.
-// Expected result: Step 1: each is answered 422 with "Not saved:" and, in turn, "Enter the reason for the visit.",
+// Expected result: Step 1: each is answered 422 with "Not saved." and, in turn, "Enter the reason for the visit.",
 //   "Enter the day, as year-month-day.", "Choose a time that hasn't passed.", "Choose a clinician."; the reason typed
 //   is still in its field. Step 2: answered 409 with "This clinician already has an appointment booked then. Choose
 //   another time." Step 3: answered 422 with "Enter the reason for cancelling." The patient still has exactly one
@@ -52,7 +52,7 @@ public class TC_UC16_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var html = await refused.Content.ReadAsStringAsync(Cancel);
             Assert.Contains(message, html);
-            Assert.Contains("Not saved:", html);
+            Assert.Contains("Not saved.", html);
             if (reason.Length > 0)
             {
                 Assert.Contains($"name=\"Reason\" value=\"{reason}\"", html);

@@ -19,7 +19,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Steps:
 //   1. Dr. Test writes and signs the note, then opens it.
 //   2. The patient and each proxy open Who viewed the record.
-// Expected result: The patient's lines from Dr. Test include "A visit note, being written" and "A visit note, with
+// Expected result: The patient's lines from Dr. Test include "A visit note in progress" and "A visit note, including
 //   sensitive items"; the proxy with sensitive items has the same, in their words; the proxy without has neither, nor
 //   any line saying "visit note" or "sensitive", and has "The record" for those pages instead.
 // Creator: Tahseen Arnan
@@ -40,11 +40,11 @@ public class TC_UC6_64_VisitNotesNamed(WebApps apps) : IClassFixture<WebApps>
 
         // Step 2.
         var own = PartsOf(await PageAsync(patient.Client), "staff");
-        Assert.Contains("A visit note, being written", own);
-        Assert.Contains("A visit note, with sensitive items", own);
+        Assert.Contains("A visit note in progress", own);
+        Assert.Contains("A visit note, including sensitive items", own);
         var full = PartsOf(await PageAsync(allowed.Client), "staff");
-        Assert.Contains("A visit note, being written", full);
-        Assert.Contains("A visit note, with sensitive items", full);
+        Assert.Contains("A visit note in progress", full);
+        Assert.Contains("A visit note, including sensitive items", full);
         var restricted = PartsOf(await PageAsync(without.Client), "staff");
         Assert.Contains("The record", restricted.Select(Uncounted));
         Assert.DoesNotContain(restricted, part => part.StartsWith("A visit note", StringComparison.Ordinal) || part.Contains("sensitive", StringComparison.Ordinal));

@@ -133,7 +133,7 @@ public static partial class DictationApi
                     // A service too old to listen to a visit started a dictation instead: it is discarded as one.
                     await DeleteServiceSessionAsync(context, sidecar, session.SessionId, ambient: false);
                     return Refuse(StatusCodes.Status503ServiceUnavailable, "unavailable",
-                        "Listening to a visit isn't available: the dictation service doesn't support it yet.");
+                        "Listening isn't available. The dictation service doesn't support it yet.");
                 }
 
                 // Whatever stops the consent and the binding from being saved, a refusal or an exception (the panel ending

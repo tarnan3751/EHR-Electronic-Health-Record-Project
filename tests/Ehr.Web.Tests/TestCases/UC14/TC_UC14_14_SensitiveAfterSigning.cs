@@ -25,9 +25,9 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   3. As the second colleague, open the page to unmark it, and post a reason to it.
 //   4. As the signer, unmark it with "Marked the wrong note."
 //   5. As the signer, try to unmark the addendum; then, as the second colleague, mark it with "Mentions a family member."
-// Expected result: Step 1: without a reason, 422 "Say why, so the record shows it."; with one, "Saved: it is marked
-//   sensitive". Step 2: the chart leaves the note out and counts it; the note's page says "Sensitive note: your view of
-//   it is recorded." and shows the reason and time; the text is unchanged; its addendum is sensitive; the draft sync
+// Expected result: Step 1: without a reason, 422 "Say why, so the record shows it."; with one, "Saved. Marked
+//   sensitive". Step 2: the chart leaves the note out and counts it; the note's page says "Sensitive note. Your view of
+//   it is logged." and shows the reason and time; the text is unchanged; its addendum is sensitive; the draft sync
 //   withholds the draft's text; the offline copy has no note and counts one sensitive item. Step 3: the page says only
 //   the person who marked it, or the note's signer, can unmark it, with no form; the post is answered 403 and nothing
 //   changes. Step 4: unmarked, with the reason shown; the chart lists the note again; its addendum, sensitive only
@@ -75,11 +75,11 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         Assert.Matches($"<a [^>]*href=\"{SensitivityPath(patient, note)}\"[^>]*>Mark this note sensitive</a>", page);
         using var unexplained = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, null);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unexplained.StatusCode);
-        Assert.Contains("Not changed: Say why, so the record shows it.", Words(await unexplained.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. Say why, so the record shows it.", Words(await unexplained.Content.ReadAsStringAsync(Cancel)));
         using var marked = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, "Patient asked for it.");
         page = await ReadAsync(marked);
-        Assert.Contains("Saved: it is marked sensitive, with your reason.", Words(page));
-        Assert.Contains("Sensitive note: your view of it is recorded.", Words(page));
+        Assert.Contains("Saved. Marked sensitive, with your reason.", Words(page));
+        Assert.Contains("Sensitive note. Your view of it is logged.", Words(page));
         Assert.Matches("data-sensitivity-reason>Marked sensitive by Dr. First \\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2} UTC: Patient asked for it\\.", page);
 
         // The same form sent again (a double click, or Back and send): it asked to mark, the note is marked, and it
@@ -92,7 +92,7 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         Assert.Equal(text, await ProxyTests.QueryAsync(apps, "SELECT subjective || objective || assessment || plan || signer_id || signed_at FROM ehr.clinical_notes WHERE patient_id = @patient", patient));
 
         var chart = Words(await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
-        Assert.Contains("Sensitive items hidden: 1 signed note is not shown.", chart);
+        Assert.Contains("Sensitive items hidden. 1 signed note is not shown.", chart);
         // The desktop's next sync, from where it left off: the draft comes again, with no text, to be emptied there.
         var drafts = await PullAsync(watermark);
         Assert.Matches("\"body\":\"\",\"version\":\\d+,\"withheld\":true", drafts);
@@ -120,7 +120,7 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
 
         using var unmarked = await ChangeSensitivityAsync(session.Client, patient, note, mark: false, "Marked the wrong note.");
         page = await ReadAsync(unmarked);
-        Assert.Contains("Saved: it is no longer marked sensitive, with your reason.", Words(page));
+        Assert.Contains("Saved. No longer marked sensitive.", Words(page));
         Assert.Matches("data-sensitivity-reason>Unmarked as sensitive [^<]*UTC: Marked the wrong note\\.", page);
         // After unmarking, the desktop's sync sends the draft's text again.
         Assert.Contains("cough for two days", await PullAsync(System.Text.Json.JsonDocument.Parse(drafts).RootElement.GetProperty("watermark").GetString()!));
@@ -141,7 +141,7 @@ public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebA
         Assert.Equal($"addendum true {second.Id} Mentions a family member.", (await SensitivityAsync(apps, patient))[1]);
         page = await session.Client.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.DoesNotContain("Synthetic addendum: culture negative.", page);
-        Assert.Contains("Sensitive addenda hidden: 1 addendum is not shown.", Words(page));
+        Assert.Contains("Sensitive addenda hidden. 1 addendum is not shown.", Words(page));
 
         // Marking and unmarking the note leaves the addendum's own mark, and the colleague's name on it.
         using var noteAgain = await ChangeSensitivityAsync(marker.Client, patient, note, mark: true, "Patient asked for it.");

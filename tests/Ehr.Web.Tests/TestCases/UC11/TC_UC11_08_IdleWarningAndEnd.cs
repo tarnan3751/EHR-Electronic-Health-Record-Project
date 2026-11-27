@@ -33,7 +33,7 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Expected result: Step 2: the warning is open, "You'll be signed out soon", with the focus on "Stay signed in", the
 //   countdown under 2 minutes, and the sentence that what was typed stays. Step 3: it closes; the page wasn't
 //   reloaded, the typed text and the scroll position are as they were, and the server gives the session 15 minutes
-//   again. Step 4: the page says "Signed out: nothing was done here for 15 minutes…" and that what was typed is kept;
+//   again. Step 4: the page says "Signed out. Nothing was done here for 15 minutes…" and that what was typed is kept;
 //   neither the patient's name, in the page or its title, nor the typed text is on the page. Step 5: the page comes back
 //   as it was, the text in its fields. Step 6: the message is saved, as typed.
 // Creator: Tahseen Arnan
@@ -90,7 +90,7 @@ public class TC_UC11_08_IdleWarningAndEnd(WebApps apps) : IClassFixture<WebApps>
         await IdleAsync(apps, page, TimeSpan.FromMinutes(15) + TimeSpan.FromSeconds(5));
         await page.WaitForSelectorAsync("[data-session-why='idle']");
         var seen = await SeenAsync(page);
-        Assert.Contains("Signed out: nothing was done here for 15 minutes", seen);
+        Assert.Contains("Signed out. Nothing was done here for 15 minutes", seen);
         Assert.Contains("What you typed is kept in this tab", seen);
         Assert.DoesNotContain("Idlemessage", seen);
         Assert.DoesNotContain(Body, seen);

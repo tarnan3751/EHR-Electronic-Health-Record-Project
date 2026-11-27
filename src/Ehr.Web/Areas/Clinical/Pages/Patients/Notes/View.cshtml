@@ -17,27 +17,27 @@
 <h1 class="sc-title">Clinical note <span class="sc-tag sc-tag--success">Signed · read-only</span>@if (Model.Note.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning" data-note-sensitive>Sensitive</span> }</h1>
 @if (Model.Done == "addendum")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Signed:</span> the addendum is part of the record, after the note.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Addendum signed.</span> It's shown after the note.</p>
 }
 else if (Model.Done is "summary" or "withdrawn")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">@(Model.Done == "summary" ? "Released:" : "Withdrawn:")</span> @(Model.Done == "summary" ? "the patient can read the summary in the portal." : "the summary is no longer shown in the portal.")</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">@(Model.Done == "summary" ? "Released." : "Withdrawn.")</span> @(Model.Done == "summary" ? "The patient can now read the summary in the portal." : "The patient no longer sees the summary in the portal.")</p>
 }
 else if (Model.Done is "marked" or "unmarked")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> @(Model.Done == "marked" ? "it is marked sensitive, with your reason." : "it is no longer marked sensitive, with your reason.")</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved.</span> @(Model.Done == "marked" ? "Marked sensitive, with your reason." : "No longer marked sensitive.")</p>
 }
 else
 {
-    <p class="sc-notice sc-notice--success" role="status">This note is signed and permanently saved to the clinical record.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Signed.</span> Corrections go in an addendum.</p>
 }
 <partial name="_WaitingProposals" model="(Model.Note.DraftId, Model.WaitingProposals, true)" />
 @if (Model.Note.Sensitive)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive note:</span> your view of it is recorded.</p>
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive note.</span> Your view of it is logged.</p>
 }
 <dl class="record">
-    <dt>Signing clinician</dt><dd>@Model.SignerName <small class="mono-id">(@Model.Note.SignerId)</small></dd>
+    <dt>Signed by</dt><dd>@Model.SignerName</dd>
     <dt>Signed</dt><dd><time datetime="@Model.Note.SignedAt.ToString("O")">@Clinic.Format(Model.Note.SignedAt, "yyyy-MM-dd HH:mm:ss")</time></dd>
 </dl>
 <partial name="_NoteContent" model="NoteSections.Of(Model.Note)" />
@@ -55,11 +55,11 @@ else
 <h2 id="addenda">Addenda</h2>
 @if (Model.Addenda.SensitiveHidden > 0)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive addenda hidden:</span> @Model.Addenda.SensitiveHidden @(Model.Addenda.SensitiveHidden == 1 ? "addendum is" : "addenda are") not shown. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-sensitive="true" asp-fragment="addenda">Show sensitive addenda</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive addenda hidden.</span> @Model.Addenda.SensitiveHidden @(Model.Addenda.SensitiveHidden == 1 ? "addendum is" : "addenda are") not shown. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-sensitive="true" asp-fragment="addenda">Show sensitive addenda</a></p>
 }
 else if (Model.Addenda.SensitiveShown && !Model.Note.Sensitive && Model.Addenda.Shown.Any(a => a.Sensitive))
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive addenda shown:</span> your view of them is recorded. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="addenda">Hide sensitive addenda</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive addenda shown.</span> Your view of them is logged. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="addenda">Hide sensitive addenda</a></p>
 }
 @if (Model.Addenda.Shown.Count == 0)
 {
@@ -98,7 +98,7 @@ else
 @* The form is on a page of its own: this page stays read-only, with nothing to type into. *@
 @if (!Model.OnPanel)
 {
-    <p class="sc-muted">Add this patient to your panel to sign an addendum.</p>
+    <p class="sc-muted">To sign an addendum, add this patient to My patients.</p>
 }
 else if (!OnPrem.IsReachable)
 {
@@ -106,22 +106,22 @@ else if (!OnPrem.IsReachable)
 }
 else
 {
-    <p><a class="sc-btn" asp-page="Addendum" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-add-addendum>Add an addendum</a></p>
+    <p><a class="sc-btn" asp-page="Addendum" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-add-addendum>Add addendum</a></p>
 }
 
 @* Step 13a: what the patient reads of this note, written for them. The note itself never reaches the portal. *@
 <h2 id="summary">Visit summary for the patient</h2>
 @if (Model.Summaries.SensitiveHidden > 0)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="hidden-summaries"><span class="sc-notice__state">Sensitive summaries hidden:</span> @Model.Summaries.SensitiveHidden @(Model.Summaries.SensitiveHidden == 1 ? "visit summary is" : "visit summaries are") not shown. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-sensitive="true" asp-fragment="summary">Show sensitive summaries</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden-summaries"><span class="sc-notice__state">Sensitive summaries hidden.</span> @Model.Summaries.SensitiveHidden @(Model.Summaries.SensitiveHidden == 1 ? "visit summary is" : "visit summaries are") not shown. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-route-sensitive="true" asp-fragment="summary">Show sensitive summaries</a></p>
 }
 else if (Model.Summaries.SensitiveShown && !Model.Note.Sensitive && Model.Summaries.Shown.Any(s => s.Sensitive))
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="shown-summaries"><span class="sc-notice__state">Sensitive summaries shown:</span> your view of them is recorded. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="summary">Hide sensitive summaries</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="shown-summaries"><span class="sc-notice__state">Sensitive summaries shown.</span> Your view of them is logged. <a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" asp-fragment="summary">Hide sensitive summaries</a></p>
 }
 @if (!Model.Summaries.HasStanding)
 {
-    <p class="sc-muted" data-summary="none">Not written yet. The patient sees nothing of this note.</p>
+    <p class="sc-muted" data-summary="none">None yet. The patient can't see anything of this note.</p>
 }
 @foreach (var summary in Model.Summaries.Shown)
 {
@@ -157,7 +157,7 @@ else if (Model.Summaries.SensitiveShown && !Model.Note.Sensitive && Model.Summar
 }
 @if (!Model.OnPanel)
 {
-    <p class="sc-muted">Add this patient to your panel to write a summary for the patient.</p>
+    <p class="sc-muted">To write a visit summary, add this patient to My patients.</p>
 }
 else if (!OnPrem.IsReachable)
 {
@@ -165,7 +165,7 @@ else if (!OnPrem.IsReachable)
 }
 else if (!Model.Summaries.HasStanding)
 {
-    <p><a class="sc-btn" asp-page="Summary" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-write-summary>Write a summary for the patient</a></p>
+    <p><a class="sc-btn" asp-page="Summary" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id" data-write-summary>Write visit summary</a></p>
 }
 
 <partial name="_ReviewHistory" model="Model.CompletedReviews" />

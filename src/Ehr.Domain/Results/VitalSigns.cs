@@ -287,24 +287,24 @@ public sealed class Trend
     // What the chart shows, in a sentence, for a reader who can't see it.
     public string Summary => SummaryOn(at => at.UtcDateTime.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture));
 
-    // The same sentence with its two days as the clinic's calendar has them (step 10d), for clinician pages.
+    // The same sentence with its two days as the clinic's calendar has them (step 10d), for clinician pages and the portal.
     public string SummaryIn(Ehr.Domain.Time.ClinicTime clinic) => SummaryOn(at => clinic.Plain(at, "MMM d, yyyy"));
 
     string SummaryOn(Func<DateTimeOffset, string> day)
     {
         var (first, last) = (Points[0], Points[^1]);
         var change = last.Value == first.Value ? "the same as" : last.Value > first.Value ? "up from" : "down from";
-        return $"{Title}: {Points.Count} values from {day(first.At)} to {day(last.At)}. "
+        return $"{Title}, {Points.Count} values from {day(first.At)} to {day(last.At)}. "
             + $"Latest {last.Value:0.####}{(Unit is null ? "" : " " + Unit)}, {change} {first.Value:0.####}."
             + (HasRange ? IsScreening ? $" Needs follow-up at or above {High:0.####}{(Unit is null ? "" : " " + Unit)}." : $" Reference range {RangeText}." : "")
-            + (RangesDiffer ? " That range is for the latest reading; earlier ones are marked against the range for the patient's age then." : "");
+            + (RangesDiffer ? " That range is for the latest reading. Earlier ones are marked against the range for the patient's age then." : "");
     }
 
     // Always with a point for the decimal, whatever the server's language: these go into SVG attributes.
     public static string Number(decimal value) => decimal.Round(value, 1).ToString("0.#", CultureInfo.InvariantCulture);
 
-    // One trend for each test or vital sign with at least two numeric values, in the order given by `order` when
-    // there is one, by name otherwise.
+    // One trend for each test or vital sign with at least two numeric values, a vital sign titled as the flowsheet's
+    // row names it (VitalSigns.Name), in the order given by `order` when there is one, by name otherwise.
     public static IReadOnlyList<Trend> From(IEnumerable<Observation> observations, IReadOnlyList<string>? order = null)
     {
         // Never a value marked entered in error (step 9b), or one not finished.
@@ -315,7 +315,7 @@ public sealed class Trend
             {
                 var latest = group.OrderByDescending(o => o.EffectiveAt).ThenByDescending(o => o.IssuedAt).First();
                 // Two values of one moment stay in the order they were released (the chart's own sort keeps it).
-                return new Trend(group.Key, latest.Display, latest.Unit, latest.ReferenceLow, latest.ReferenceHigh,
+                return new Trend(group.Key, VitalSigns.Name(group.Key, latest.Display), latest.Unit, latest.ReferenceLow, latest.ReferenceHigh,
                     group.OrderBy(o => o.EffectiveAt).ThenBy(o => o.IssuedAt).ThenBy(o => o.Id)
                         .Select(o => new TrendPoint(o.EffectiveAt, o.Value!.Value, o.ReferenceLow, o.ReferenceHigh, o.ReferenceKind)), latest.ReferenceKind);
             });
@@ -337,6 +337,16 @@ public static class Units
         "kg/m2" => "kg/m²",
         "/min" => "per minute",
         _ => ucum,
+    };
+
+    // For patients (Tahseen's decision of 26 November 2026), in the portal's names, trends, results and printable record:
+    // UCUM's print form for the units whose code reads badly to a patient, and any other as Shown gives it.
+    public static string? ForPatients(string? ucum) => ucum switch
+    {
+        "10*3/uL" => "10³/µL",
+        "10*6/uL" => "10⁶/µL",
+        "m[IU]/L" => "mIU/L",
+        _ => Shown(ucum),
     };
 }
 

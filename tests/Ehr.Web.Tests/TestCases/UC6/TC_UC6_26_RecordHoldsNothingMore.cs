@@ -58,18 +58,18 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
             """, chart.Patient, ("clinician", chart.Clinician.Id));
         using (var released = await ReleaseAsync(client, chart.Patient, note, "We talked about the wrong visit."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var withdrawn = await WithdrawAsync(client, chart.Patient, note, await StandingAsync(apps, chart.Patient)))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         // And a summary that stands, of a second note.
         using (var released = await ReleaseAsync(client, chart.Patient, await SignedNoteAsync(client, chart.Patient)))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (await VitalTests.MarkAsync(apps, client, chart.Patient, chart.VitalsAt, "Synthetic: wrong cuff size", VitalSign.Systolic))
@@ -106,7 +106,7 @@ public class TC_UC6_26_RecordHoldsNothingMore(WebApps apps) : IClassFixture<WebA
         Assert.DoesNotContain(observations, o => o.Code?.Coding.Any(c => c.Code is "85354-9" or "8480-6" or "8462-4") == true);
         Assert.Contains(observations, o => o.Code?.Coding.Any(c => c.Code == VitalSign.HeartRate) == true);
         Assert.DoesNotContain("128/82", Words(page));
-        Assert.Contains("was withdrawn by your care team.", Words(page));
+        Assert.Contains("Your care team withdrew the visit summary from", Words(page));
 
         // The printable page's summaries and placeholders are the summaries page's: the same items, in the same order,
         // with the same words, so the two can't drift apart.

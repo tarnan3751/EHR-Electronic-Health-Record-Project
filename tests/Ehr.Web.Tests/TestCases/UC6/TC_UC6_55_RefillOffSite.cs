@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Open the page on the clinic's server, then, cut off, send a request for amlodipine with the note.
 //   3. Cut off, open the page.
 // Expected result: Step 1: the post is forwarded and the request saved. Step 2: 503, the "Not saved" page with the note
-//   to copy; no request for amlodipine. Step 3: the requests are listed, with "Read-only: requests can't be sent until
+//   to copy; no request for amlodipine. Step 3: the requests are listed, with "Read-only. Requests can't be sent until
 //   the clinic's server is back." and no form; the page's read waits in the cloud app's queue.
 // Creator: Tahseen Arnan
 public class TC_UC6_55_RefillOffSite(WebApps apps) : IClassFixture<WebApps>
@@ -59,7 +59,7 @@ public class TC_UC6_55_RefillOffSite(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
             var notSaved = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Nothing was saved, because the clinic's server can't be reached.", notSaved);
+            Assert.Contains("Not saved.</span> The clinic's server can't be reached.", notSaved);
             Assert.Contains("Synthetic &lt;note&gt; off-site.", notSaved);
         }
 
@@ -67,7 +67,7 @@ public class TC_UC6_55_RefillOffSite(WebApps apps) : IClassFixture<WebApps>
 
         var page = await cutOff.GetStringAsync(PortalPath, Cancel);
         var words = Words(page);
-        Assert.Contains("Read-only: requests can't be sent until the clinic's server is back.", words);
+        Assert.Contains("Read-only. Requests can't be sent until the clinic's server is back.", words);
         Assert.Contains(Lisinopril, words);
         Assert.Contains("Waiting", words);
         Assert.DoesNotContain("name=\"Medication\"", page);

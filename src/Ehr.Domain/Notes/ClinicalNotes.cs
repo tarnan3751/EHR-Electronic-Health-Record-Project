@@ -51,7 +51,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to save or sign. Your work is still displayed."]);
+            return new(503, ["Saving or signing needs the clinic's server. Your work is still here."]);
         }
 
         var draft = await phi.ReadDraftAsync(id, patient, cancel);
@@ -91,7 +91,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         var errors = NoteContent.From(draft).Validate(signing: true).ToList();
         if (draft.StructuredVersion != draft.Version)
         {
-            errors.Add("This draft changed in another client. Reopen it, check all four sections, and save before signing.");
+            errors.Add("This draft changed in another window or app. Reopen it, check all four sections, and save before signing.");
         }
         else if (draft.History is not null)
         {
@@ -101,7 +101,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (draft.HasUnreviewedProposals)
         {
-            errors.Add("Review every associated AI proposal before signing. Open the saved AI review to resolve them.");
+            errors.Add("Review every dictated field before signing. Resume the dictation review to do it.");
         }
 
         return errors;
@@ -121,11 +121,11 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
             if (review.State == AiReviewStates.Pending || pending.Count > 0)
             {
                 errors.Add(pending.Count > 0 ? $"Review the pending fields: {string.Join(", ", pending)}."
-                    : "Complete the saved AI review before signing.");
+                    : "Finish the dictation review before signing.");
             }
             if (review.State == AiReviewStates.Completed && (review.ImportedVersion is null || review.ImportedVersion > draft.Version))
             {
-                errors.Add("The saved AI review does not match this draft. Reopen the review before signing.");
+                errors.Add("The dictation review doesn't match this draft. Reopen it before signing.");
             }
         }
 
@@ -138,7 +138,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         // ReadDraft enforces ownership AND current panel assignment through RLS, even for a retried signature.
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to save or sign. Your work is still displayed."]);
+            return new(503, ["Saving or signing needs the clinic's server. Your work is still here."]);
         }
 
         var draft = await phi.ReadDraftAsync(id, patient, cancel);
@@ -159,7 +159,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
                 // A retry that ticks or clears "Sensitive" can't change a note that was already signed (step 10).
                 return new(409, [existing.Sensitive
                     ? "This note was already signed, as sensitive. Open the signed note from the chart."
-                    : "This note was already signed, and not as sensitive. A signed note can't be changed: open it from the chart."]);
+                    : "This note was already signed, and not as sensitive. A signed note can't be changed. Open it from the chart."]);
             }
 
             return existing.DraftVersion == version
@@ -205,7 +205,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to change this. Your reason is still displayed."]);
+            return new(503, ["This change needs the clinic's server. Your reason is still here."]);
         }
 
         reason = reason?.Trim();
@@ -221,7 +221,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (!await phi.IsAssignedAsync(patient, cancel))
         {
-            return new(403, ["Add this patient to your panel to change this."]);
+            return new(403, ["To change this, add this patient to My patients."]);
         }
 
         // Only the two columns the apps may update; the row is found by its ID, under row-level security.
@@ -259,8 +259,8 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
                 ? new(403, ["Only the person who marked it sensitive, or the note's signer, can unmark it."])
                 : new(409, [(addendum, summary, sensitive) switch
                 {
-                    (not null, _, false) => "This can't be unmarked: an addendum to a sensitive note is sensitive, or it has already been unmarked.",
-                    (_, not null, false) => "This can't be unmarked: a summary of a sensitive note or addendum is sensitive, or it has already been unmarked.",
+                    (not null, _, false) => "This can't be unmarked. An addendum to a sensitive note is sensitive too, or it was already unmarked.",
+                    (_, not null, false) => "This can't be unmarked. A summary of a sensitive note or addendum is sensitive too, or it was already unmarked.",
                     _ => "This has already been changed. Open the note again.",
                 }]);
         }
@@ -284,7 +284,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to sign an addendum. Your text is still displayed."]);
+            return new(503, ["Signing an addendum needs the clinic's server. Your text is still here."]);
         }
 
         text = text?.ReplaceLineEndings("\n").Trim();
@@ -300,7 +300,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
 
         if (!await phi.IsAssignedAsync(patient, cancel))
         {
-            return new(403, ["Add this patient to your panel to sign an addendum."]);
+            return new(403, ["To sign an addendum, add this patient to My patients."]);
         }
 
         object addendum = new NoteAddendum { Id = Guid.CreateVersion7(), NoteId = note, PatientId = patient, AuthorId = user.UserId ?? Guid.Empty, Text = text, Sensitive = sensitive };
@@ -321,7 +321,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         {
             await transaction.RollbackToSavepointAsync(savepoint, cancel);
             return refusal.SqlState == PostgresErrorCodes.InsufficientPrivilege
-                ? new(403, ["Add this patient to your panel to sign an addendum."])
+                ? new(403, ["To sign an addendum, add this patient to My patients."])
                 : new(404, ["This note is unavailable."]);
         }
         finally
@@ -341,7 +341,7 @@ public sealed record AddendumResult(int Status, IReadOnlyList<string> Errors);
 
 public sealed record NoteResult(int Status, IReadOnlyList<string> Errors, ClinicalDraft? Draft = null, ClinicalNote? Note = null)
 {
-    public static NoteResult Missing => new(404, ["This draft is unavailable. Check your patient panel and draft ownership."]);
+    public static NoteResult Missing => new(404, ["This draft isn't available. Check that the patient is in My patients and the draft is yours."]);
     public static NoteResult Conflict => new(409, ["This draft changed elsewhere. Your text is still here. Open the saved draft in another tab and compare before saving again."]);
 }
 

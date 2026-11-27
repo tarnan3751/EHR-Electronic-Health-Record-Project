@@ -4,32 +4,32 @@
 @model Ehr.Web.Areas.Portal.Pages.AccessModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
-    ViewData["Title"] = "Access";
+    ViewData["Title"] = "Sharing";
     var inForce = Model.Grants.Where(g => g.InForce).ToList();
     var ended = Model.Grants.Where(g => !g.InForce).Take(10).ToList();
 }
-<h1>Access</h1>
+<h1>Sharing</h1>
 @if (Model.Done is "given")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> they can see your record when they sign in with that email address. We sent them an email that doesn't say whose record it is; if they don't have a portal account, it has a link to create one.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Shared.</span> They can see your record when they sign in with that email address. We've emailed them a link to sign in, or to create an account.</p>
 }
 else if (Model.Done is "removed")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Removed:</span> they can no longer see your record.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sharing removed.</span> They can no longer see your record.</p>
 }
 else if (Model.Done is "changed")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved:</span> what they can see has changed.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved.</span> What they can see has changed.</p>
 }
 
-<h2>Records you can view</h2>
+<h2>Records shared with you</h2>
 @if (Model.Acting)
 {
     <p class="sc-muted">You're looking at one of them now. Go back to your own record to choose another.</p>
 }
 else if (Model.Records.Count == 0)
 {
-    <p class="sc-muted">Nobody has given you access to their record.</p>
+    <p class="sc-muted">Nobody has shared a record with you.</p>
 }
 else
 {
@@ -38,10 +38,10 @@ else
         {
             <li class="sc-result" data-record>
                 <h3>@record.PatientName</h3>
-                <p>@ProxyAccess.ScopeLabel(record.Scope). Until @record.ExpiresAt.UtcDateTime.ToString("MMM d, yyyy").</p>
+                <p>@ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
                 <form method="post" asp-page="/Acting">
                     <input type="hidden" name="grantId" value="@record.GrantId">
-                    <button type="submit" class="sc-btn sc-btn--primary">View this record</button>
+                    <button type="submit" class="sc-btn">View this record</button>
                 </form>
             </li>
         }
@@ -53,16 +53,16 @@ else
     @* A proxy-only account (step 6b) has no record of its own, so nothing to share. *@
     return;
 }
-<h2>Who can view your record</h2>
+<h2>Who can see your record</h2>
 @if (Model.Acting)
 {
-    <p class="sc-muted">You're looking at someone else's record. Go back to your own record to see or change who can view yours.</p>
+    <p class="sc-muted">You're looking at someone else's record. Go back to your own to see or change who can see yours.</p>
 }
 else
 {
     @if (inForce.Count == 0)
     {
-        <p class="sc-muted">Nobody else can view your record.</p>
+        <p class="sc-muted">You haven't shared your record with anyone.</p>
     }
     else
     {
@@ -72,21 +72,21 @@ else
                 <li class="sc-result" data-grant>
                     <h3>@grant.Email</h3>
                     <p>
-                        @ProxyAccess.ScopeLabel(grant.Scope). Until @grant.ExpiresAt.UtcDateTime.ToString("MMM d, yyyy").
-                        @(grant.ByClinic ? "Recorded by your clinic." : "Given by you.")
+                        @ProxyAccess.ScopeLabel(grant.Scope). Until @Clinic.Plain(grant.ExpiresAt, "MMM d, yyyy").
+                        @(grant.ByClinic ? "Shared by your clinic." : "Shared by you.")
                     </p>
-                    <p>@(grant.IncludeSensitive ? "They can also see items your care team marked sensitive. They can also see and fill in your pre-visit forms." : "They can't see items your care team marked sensitive. They can't see your pre-visit forms.")</p>
+                    <p>@(grant.IncludeSensitive ? "They can also see sensitive items, and see and fill in your pre-visit forms." : "They can't see sensitive items or your pre-visit forms.")</p>
                     @if (OnPrem.IsReachable)
                     {
                         <div class="sc-actions">
                             <form method="post" asp-page-handler="Sensitive">
                                 <input type="hidden" name="grantId" value="@grant.Id">
                                 <input type="hidden" name="allow" value="@(grant.IncludeSensitive ? "false" : "true")">
-                                <button type="submit" class="sc-btn">@(grant.IncludeSensitive ? "Hide sensitive items" : "Show sensitive items")</button>
+                                <button type="submit" class="sc-btn">@(grant.IncludeSensitive ? "Stop sharing sensitive items" : "Share sensitive items too")</button>
                             </form>
                             <form method="post" asp-page-handler="Revoke">
                                 <input type="hidden" name="grantId" value="@grant.Id">
-                                <button type="submit" class="sc-btn sc-btn--danger">Remove access</button>
+                                <button type="submit" class="sc-btn sc-btn--danger">Stop sharing</button>
                             </form>
                         </div>
                     }
@@ -95,18 +95,25 @@ else
         </ul>
     }
 
-    <h2>Give someone access</h2>
+    <h2>Share your record</h2>
     @if (!OnPrem.IsReachable)
     {
-        <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only:</span> access can't be given or removed until the clinic's server is back.</p>
+        <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Sharing can't be changed until the clinic's server is back.</p>
     }
     else
     {
-        <p class="sc-muted">For a family member or carer who helps with your care. They sign in with their own portal account and their own password, never yours; if they don't have an account, the email we send them has a link to create one. Access ends on the date you choose, and you can remove it at any time.</p>
+        <div class="sc-prose sc-muted">
+            <p>For a family member or carer who helps with your care.</p>
+            <ul>
+                <li>They sign in with their own portal account, never yours.</li>
+                <li>We email them a link to sign in, or to create an account. The email doesn't say whose record it is.</li>
+                <li>Sharing ends after the time you choose, and you can stop it at any time.</li>
+            </ul>
+        </div>
         <form method="post" class="sc-form">
             @if (Model.Errors.Count > 0)
             {
-                <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved:</span> fix what is marked below and try again.</p>
+                <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> Fix the highlighted fields and try again.</p>
             }
             <div class="sc-field">
                 <label for="access-email">Their email address</label>
@@ -132,9 +139,9 @@ else
                 }
             </div>
             <div class="sc-field">
-                <label class="sc-check" for="access-sensitive"><input type="checkbox" id="access-sensitive" name="IncludeSensitive" value="true" checked="@Model.IncludeSensitive" aria-describedby="access-sensitive-hint"> Also show them items my care team marked sensitive</label>
+                <label class="sc-check" for="access-sensitive"><input type="checkbox" id="access-sensitive" name="IncludeSensitive" value="true" checked="@Model.IncludeSensitive" aria-describedby="access-sensitive-hint"> Also share sensitive items</label>
                 @* Step 13e: pre-visit forms are sensitive items, and a proxy allowed them can answer them too. *@
-                <p class="sc-field__hint" id="access-sensitive-hint">These include your pre-visit forms: with this, they can also see and fill in your forms.</p>
+                <p class="sc-field__hint" id="access-sensitive-hint">Items your care team marked sensitive, and your pre-visit forms, which they can then fill in.</p>
             </div>
             <div class="sc-field">
                 <label for="access-days">For how long</label>
@@ -151,18 +158,18 @@ else
                 }
             </div>
             <div class="sc-actions">
-                <button type="submit" class="sc-btn sc-btn--primary">Give access</button>
+                <button type="submit" class="sc-btn sc-btn--primary">Share record</button>
             </div>
         </form>
     }
 
     @if (ended.Count > 0)
     {
-        <h2>Access that has ended</h2>
+        <h2>Sharing that has ended</h2>
         <ul class="sc-list">
             @foreach (var grant in ended)
             {
-                <li>@grant.Email <span class="sc-muted">· @(grant.RevokedAt is { } revoked ? $"removed {revoked.UtcDateTime:MMM d, yyyy}" : $"expired {grant.ExpiresAt.UtcDateTime:MMM d, yyyy}")</span></li>
+                <li>@grant.Email <span class="sc-muted">· @(grant.RevokedAt is { } revoked ? $"stopped {Clinic.Plain(revoked, "MMM d, yyyy")}" : $"ended {Clinic.Plain(grant.ExpiresAt, "MMM d, yyyy")}")</span></li>
             }
         </ul>
     }

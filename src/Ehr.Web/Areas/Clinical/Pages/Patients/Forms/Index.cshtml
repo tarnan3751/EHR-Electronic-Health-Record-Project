@@ -14,27 +14,27 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to the chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
 </div>
 <h1>Pre-visit forms: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Asked)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Form asked for:</span> the patient can fill it in from @PreVisitForms.OpenDays days before the appointment until it ends. An answer that needs review reaches your inbox.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Form asked for.</span> The patient can fill it in from @PreVisitForms.OpenDays days before the appointment until it ends. An answer that needs review comes to your inbox.</p>
 }
 @if (Model.Forms.SensitiveShown)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown:</span> your view of them is recorded. <a asp-page="Index" asp-route-patientId="@patient.Id">Hide sensitive items</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown.</span> Your view is logged. <a asp-page="Index" asp-route-patientId="@patient.Id">Hide sensitive items</a></p>
 }
 else if (Model.Forms.Hidden > 0)
 {
-    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden:</span> @Model.Forms.Hidden pre-visit @(Model.Forms.Hidden == 1 ? "form is" : "forms are") not shown. <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true">Show sensitive items</a></p>
+    <p class="sc-notice sc-notice--info" data-sensitive="hidden"><span class="sc-notice__state">Sensitive items hidden.</span> @Model.Forms.Hidden pre-visit @(Model.Forms.Hidden == 1 ? "form is" : "forms are") not shown. <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true">Show sensitive items</a></p>
 }
 
 @* Asking comes first: the cursor starts in it (NFR-12). *@
 <h2>Ask for a form</h2>
 @if (!Model.OnPanel)
 {
-    <p class="sc-muted">Add this patient to your panel to ask for a pre-visit form.</p>
+    <p class="sc-muted">To ask for a pre-visit form, add this patient to My patients.</p>
 }
 else if (!OnPrem.IsReachable)
 {
@@ -42,16 +42,16 @@ else if (!OnPrem.IsReachable)
 }
 else if (Model.Forms.Upcoming.Count == 0)
 {
-    <p class="sc-muted">No booked appointment to ask for a form before. Book one from the chart first.</p>
+    <p class="sc-muted">No upcoming appointments. To ask for a form, book one from the chart first.</p>
 }
 else
 {
     <form method="post" asp-page-handler="Ask" asp-route-patientId="@patient.Id" asp-route-sensitive="@(Model.Sensitive ? "true" : null)" class="sc-form">
         @if (Model.Error is { } error)
         {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not asked:</span> @error</p>
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not asked.</span> @error</p>
         }
-        <p class="sc-muted">The patient fills it in from @PreVisitForms.OpenDays days before the appointment until it ends. Forms aren't watched as they arrive: an answer that needs review reaches the inbox of the appointment's clinician and the patient's care team.</p>
+        <p class="sc-muted">The patient can fill it in from @PreVisitForms.OpenDays days before the appointment until it ends. Forms aren't watched as they arrive. An answer that needs review goes to the inbox of the appointment's clinician and the patient's care team.</p>
         <div class="sc-field">
             <label for="form-appointment">Appointment</label>
             <select id="form-appointment" class="sc-field__input" name="AppointmentId" required autofocus>
@@ -70,7 +70,7 @@ else
                 }
             </select>
         </div>
-        <div class="sc-actions"><button class="sc-btn sc-btn--primary">Ask the patient to fill it in</button></div>
+        <div class="sc-actions"><button class="sc-btn sc-btn--primary">Ask for form</button></div>
     </form>
 }
 
@@ -90,7 +90,7 @@ else
     <h2>Forms by visit</h2>
     @if (Model.Forms.Forms.Count == 0)
     {
-        <p class="sc-muted">No pre-visit forms have been asked for.</p>
+        <p class="sc-muted">No pre-visit forms.</p>
     }
     @foreach (var visit in Model.Forms.Forms.GroupBy(form => form.AppointmentId))
     {
@@ -131,7 +131,7 @@ else
                         else
                         {
                             @* Checked in with the visit in progress: open until 12 hours after the scheduled end, or the visit's end. *@
-                            <br><span class="sc-muted">Not answered yet: open from @Clinic.Format(form.OpensAt) until @Clinic.Format(form.ClosesAt)@(form.VisitUnderWay ? ", while the visit is in progress" : "").</span>
+                            <br><span class="sc-muted">Not answered yet. Open from @Clinic.Format(form.OpensAt) until @Clinic.Format(form.ClosesAt)@(form.VisitUnderWay ? ", while the visit is in progress" : "").</span>
                         }
                         <br><span class="sc-muted">Asked by @form.RequestedBy, @Clinic.Format(form.RequestedAt)</span>
                     </li>
@@ -140,5 +140,5 @@ else
         </section>
     }
     @* Where each band comes from (docs/expansion/reference-data.md, "Pre-visit questionnaires"). *@
-    <p class="sc-muted" data-form-bands>PHQ-9 bands: Kroenke et al. 2001. GAD-7 bands: the authors' instruction manual; "Below mild" (under 5) is this clinic's wording, since the paper that names that band could not be read. Needs follow-up: 10 or more, from the authors' manual.</p>
+    <p class="sc-muted" data-form-bands>PHQ-9 bands: Kroenke et al. 2001. GAD-7 bands: the authors' instruction manual, except "Below mild" (under 5), which is this clinic's wording. Needs follow-up: 10 or more, from the authors' manual.</p>
 }

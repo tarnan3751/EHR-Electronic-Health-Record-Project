@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Steps:
 //   1. From the chart, reach "New note" and press Enter.
 //   2. Shift+Tab to "Visit type" and type "F" to choose "Follow-up visit".
-//   3. Type Subjective; Tab to Objective, then to "Vital signs for Objective…", and press Enter; press Enter on "Add to
+//   3. Type Subjective; Tab to Objective, then to "Add vital signs to Objective…", and press Enter; press Enter on "Add to
 //      Objective".
 //   4. Type Assessment and Plan, and at once press Ctrl+S (Cmd+S on a Mac).
 //   5. Reach "Sign note…", confirm and sign.
@@ -43,7 +43,7 @@ public class TC_UC14_33_Nfr12_FourSectionsKeyboardFirst(WebApps apps) : IClassFi
         var (_, patient, session) = await OnPanelAsync(apps);
         using (var recorded = await RecordAsync(apps, session.Client, patient, 1, (HeartRate, "72")))
         {
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         await using var server = await ClinicalBrowserHost.StartAsync(apps);

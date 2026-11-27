@@ -43,15 +43,15 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Expected result: Step 1: the GAD-7, though it scores 21, puts nothing in any inbox; the PHQ-9 puts one item in each
 //   of the two clinicians' inboxes and no one else's, and no email is sent. Step 2: the item is first, before the older
 //   one, as "Pre-visit form to review", "A pre-visit form has an answer that needs review", tagged "Needs review",
-//   linking to the answers. Step 3: both charts say "Needs review: a pre-visit form has an answer for you to review."
+//   linking to the answers. Step 3: both charts say "Needs review. A pre-visit form has an answer for you to review."
 //   Step 4: the clinician's chart no longer says so; the colleague's still does. Step 5 (after the colleague marks theirs
-//   done too): the covering clinician's inbox holds the item; its link shows the answers with "Not on your panel:
-//   Synthetic Booked is on the panel of Dr. Forms Colleague, Dr. Forms Nine, and the chart opens to you only under emergency access, which
-//   the chart asks you for." and "An answer needs review: question 9, "Thoughts that you would be better off dead or of
+//   done too): the covering clinician's inbox holds the item; its link shows the answers with "Not one of your
+//   patients. Synthetic Booked is a patient of Dr. Forms Colleague, Dr. Forms Nine. To open their chart, you'll need
+//   emergency access." and "Needs review. Question 9, "Thoughts that you would be better off dead or of
 //   hurting yourself in some way"."; one recorded view of sensitive items and no emergency access; the chart, the
 //   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander;
-//   the inbox says beside "Mark done": "After you mark this done, the answers open from the patient's chart, which needs
-//   the patient on your panel or emergency access."; once it is done, the link sends them to the reason page too, and
+//   the inbox says beside "Mark done": "Once it's done, the answers open only from the chart, which needs the patient
+//   in My patients or emergency access."; once it is done, the link sends them to the reason page too, and
 //   their Done tab keeps the item's line with no link to the answers and nothing more; the clinician's Done tab, the
 //   patient on their panel, says "Open from the patient's chart." as plain words, with no link to the answers. Step
 //   6: the staying clinician's inbox links to the answers again, with a new open item beside the done one; the
@@ -97,7 +97,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
             Assert.DoesNotContain(never, Text(inbox), StringComparison.Ordinal);
         }
 
-        const string Notice = "Needs review: a pre-visit form has an answer for you to review.";
+        const string Notice = "Needs review. A pre-visit form has an answer for you to review.";
         Assert.Contains(Notice, Text(await visit.Session.Client.GetStringAsync($"/patients/{visit.Patient}", Cancel)));
         Assert.Contains(Notice, Text(await colleague.Client.GetStringAsync($"/patients/{visit.Patient}", Cancel)));
 
@@ -129,11 +129,11 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         {
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             var page = Text(await read.Content.ReadAsStringAsync(Cancel));
-            Assert.Contains("Not on your panel: Synthetic Booked is on the panel of Dr. Forms Colleague, Dr. Forms Nine, and the chart opens to you only "
-                + "under emergency access, which the chart asks you for.", page);
-            Assert.Contains("An answer needs review: question 9, \"Thoughts that you would be better off dead or of hurting yourself in some way\".", page);
+            Assert.Contains("Not one of your patients. Synthetic Booked is a patient of Dr. Forms Colleague, Dr. Forms Nine. To open their chart, "
+                + "you'll need emergency access.", page);
+            Assert.Contains("Needs review. Question 9, \"Thoughts that you would be better off dead or of hurting yourself in some way\".", page);
             Assert.Contains("Thoughts that you would be better off dead or of hurting yourself in some way Several days · score 1", page);
-            Assert.Contains("Back to the inbox", page);
+            Assert.Contains("Back to inbox", page);
         }
 
         Assert.Equal(views + 1, await apps.AuditEventsAsync(AuditActions.ReadSensitive, coveringAccount.Id, visit.Patient));
@@ -158,7 +158,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
 
         // The inbox says, beside "Mark done", that the item is the way to the answers only while it is open; once the
         // covering clinician marks it done, they are sent to the chart's reason page like anyone else.
-        Assert.Contains("Mark done After you mark this done, the answers open from the patient's chart, which needs the patient on your panel or emergency access.",
+        Assert.Contains("Mark done Once it's done, the answers open only from the chart, which needs the patient in My patients or emergency access.",
             Text(await covering.Client.GetStringAsync("/inbox", Cancel)));
         var coveringItem = (await QueryAsync(apps, "SELECT id::text FROM ehr.inbox_items WHERE recipient_id = @covering AND kind = 'form-alert'",
             ("covering", coveringAccount.Id))).Single();
@@ -181,7 +181,10 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain(FromChart, Text(coveringDoneTab));
         var panelDoneTab = await visit.Session.Client.GetStringAsync("/inbox?done=true", Cancel);
         Assert.DoesNotContain($"href=\"{link}\"", panelDoneTab);
-        Assert.Contains($"A pre-visit form has an answer that needs review Needs review {FromChart}", Text(panelDoneTab));
+        // The note sits in the item's own row, where its link was.
+        var formRow = Text(System.Text.RegularExpressions.Regex.Match(panelDoneTab, "<tr data-inbox-item=\"form-alert\">.*?</tr>", System.Text.RegularExpressions.RegexOptions.Singleline).Value);
+        Assert.Contains("A pre-visit form has an answer that needs review Needs review", formRow);
+        Assert.Contains(FromChart, formRow);
         Assert.DoesNotMatch("<a[^>]*>Open from the patient", panelDoneTab);
     }
 

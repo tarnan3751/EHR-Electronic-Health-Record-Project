@@ -267,7 +267,7 @@
         switch (error?.name) {
             case "NotAllowedError":
             case "SecurityError":
-                return "The microphone is blocked. Allow it for this site in the browser's settings (the icon beside the address), then select Dictate again. You can still type the note.";
+                return "The microphone is blocked. Allow it in the browser's settings for this site, then select Dictate again. You can still type the note.";
             case "NotFoundError":
             case "OverconstrainedError":
                 return "No microphone was found. Connect one, then select Dictate again. You can still type the note.";
@@ -382,7 +382,7 @@
     function pauseAndRetry() {
         if (!state.paused) {
             state.paused = true;
-            say("The connection to the dictation service dropped. Still recording on this device; the transcript is paused and catches up when the connection returns.", true);
+            say("Connection lost. Still recording on this device. The transcript catches up when the connection is back.", true);
         }
 
         clearTimeout(state.retryTimer);
@@ -394,7 +394,7 @@
         state.retryMs = firstRetryMs;
         if (state.paused) {
             state.paused = false;
-            say(state.stopRequested ? "Connection back. Sending the rest of the recording." : "Connection back. Recording; the transcript has caught up.");
+            say(state.stopRequested ? "Connection back. Sending the rest of the recording." : "Connection back. Still recording, and the transcript has caught up.");
         }
     }
 
@@ -448,7 +448,7 @@
             cancelAs("Discard");
             startable(false);
             say(result.sorting === "done"
-                ? "Done. Review each proposed field; nothing is in the note until you approve it."
+                ? "Done. Review each proposed field. Nothing goes into the note until you approve it."
                 : "Done, but the fields couldn't be sorted. The transcript is kept as plain text.");
             await stageReview();
         }
@@ -465,13 +465,13 @@
             const body = await json(response);
             if (!response.ok || !body.url) {
                 if (Number.isSafeInteger(body.version)) state.session.version = body.version;
-                say(body.errors?.join(" ") || body.message || "The proposals were not saved for review. Your transcript is still here; compare the saved draft and retry, or continue manually.", true);
+                say(body.errors?.join(" ") || body.message || "Not saved for review. Your transcript is still here. Check the saved draft and try again, or write the note yourself.", true);
                 return;
             }
             state.persisted = true;
             window.location.assign(body.url);
         } catch {
-            say("The server could not confirm saving the proposals. Your transcript is still here. Retry saving them; a completed save will not be duplicated.", true);
+            say("The server didn't confirm the save. Your transcript is still here. Try again. A save that went through isn't repeated.", true);
         } finally {
             state.staging = false;
             reviewButton.disabled = false;
@@ -531,7 +531,7 @@
                 const response = await call("POST", `/review/${session.reviewId}/discard`);
                 if (!response.ok) {
                     const body = await json(response);
-                    throw new Error(body.errors?.join(" ") || body.message || "Discard was not confirmed.");
+                    throw new Error(body.errors?.join(" ") || body.message || "The discard wasn't confirmed.");
                 }
             } catch (error) {
                 state.cancelled = false;
@@ -557,7 +557,7 @@
         }
 
         state = fresh();
-        say("Temporary dictation discarded. The manual draft was kept; no AI text was approved.");
+        say("Dictation discarded. The draft is kept, with nothing from the dictation in it.");
     }
 
     function endRecording() {

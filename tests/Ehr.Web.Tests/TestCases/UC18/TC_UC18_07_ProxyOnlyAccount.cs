@@ -23,14 +23,14 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   1. As the patient, give access to the carer's address.
 //   2. Signed out, open the link from the email, enter a name and a password twice, and choose "Create account".
 //   3. Sign in as the carer. Request /portal and /portal/results.
-//   4. Choose "View this record". Open "Results" and "Access".
+//   4. Choose "View this record". Open "Results" and "Sharing".
 //   5. Send a message to the care team. As the clinician, open the conversation.
 // Expected result: Step 1: one email to the carer's address with a button "Create your portal account" to
-//   /portal/invitation with a code, and nobody's name. Step 2: the page says "Created:"; the account has no patient,
+//   /portal/invitation with a code, and nobody's name. Step 2: the page says "Account created."; the account has no patient,
 //   a confirmed address and the name typed; the creation is in the audit log under the new account. Step 3: sign-in
 //   lands on "Whose record?", which lists "Synthetic Cared" and no "My record"; the app bar has Access and no record
 //   links; /portal and /portal/results both lead back to "Whose record?". Step 4: the patient's record, with the band
-//   and "Choose another record"; Results opens; Access lists the record and has no "Who can view your record". Step 5:
+//   and "Choose another record"; Results opens; Access lists the record and has no "Who can see your record". Step 5:
 //   the clinician sees the message from "Synthetic Outside Carer (proxy)".
 // Creator: Tahseen Arnan
 public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
@@ -45,7 +45,7 @@ public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
         await apps.AssignAsync(clinician, patient.Patient);
         var carer = $"synthetic-carer-{Guid.NewGuid():N}@example.com";
 
-        Assert.Contains("Saved:", await GiveAsync(patient, carer, "record-and-messages"));
+        Assert.Contains("Shared.", await GiveAsync(patient, carer, "record-and-messages"));
         var email = apps.Emails.Sent.Last();
         Assert.Equal(carer, email.To, ignoreCase: true);
         Assert.Equal("Create your portal account", apps.Emails.Actions[email.Body].Label);
@@ -55,7 +55,7 @@ public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
         var form = await Client(apps.OnPrem, new System.Net.CookieContainer()).GetStringAsync(invitation, Cancel);
         Assert.Contains("name=\"Input.Name\"", form);
         Assert.DoesNotContain("Cared", form);
-        Assert.Contains("Created:", await AcceptAsync(apps, invitation, "Synthetic Outside Carer"));
+        Assert.Contains("Account created.", await AcceptAsync(apps, invitation, "Synthetic Outside Carer"));
         var account = await AccountIdAsync(apps, carer);
         Assert.Equal(["none true Synthetic Outside Carer"], await QueryAsync(apps,
             $"SELECT coalesce(patient_id::text, 'none') || ' ' || email_confirmed || ' ' || display_name FROM ehr.patient_users WHERE id = '{account}' AND @patient IS NOT NULL", patient.Patient));
@@ -84,8 +84,8 @@ public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("href=\"/portal/results\"", home);
         Assert.Contains("Test results", await session.Client.GetStringAsync("/portal/results", Cancel));
         var access = await session.Client.GetStringAsync("/portal/access", Cancel);
-        Assert.Contains("Records you can view", access);
-        Assert.DoesNotContain("Who can view your record", access);
+        Assert.Contains("Records shared with you", access);
+        Assert.DoesNotContain("Who can see your record", access);
         Assert.DoesNotContain("name=\"Email\"", access);
 
         var thread = await MessageTests.StartAsync(session.Client, "Synthetic: from a carer", "Synthetic: asking for my neighbour");

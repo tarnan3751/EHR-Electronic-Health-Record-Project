@@ -26,7 +26,7 @@ public class NoteContentTests
         Assert.Contains("Shorten Objective", Assert.Single(new NoteContent("Subjective", new string('a', 16001), "Assessment", "Plan").Validate(true)));
         Assert.Contains("null character", Assert.Single(new NoteContent("Subjective", "Objective\0", "Assessment", "Plan").Validate(true)));
         var unicode = new NoteContent(new string('界', 16000), new string('界', 16000), "Assessment", "Plan");
-        Assert.Contains("64 KiB", Assert.Single(unicode.Validate(true)));
+        Assert.Contains("over the 64 KB size limit", Assert.Single(unicode.Validate(true)));
     }
 
     // The draft's Body, which the desktop app keeps and shows as plain text (UC 8): each section under its heading.
@@ -53,12 +53,12 @@ public class NoteContentTests
         Assert.Equal(NoteOrigin.Body, NoteContent.OriginOf(draft));
         Assert.Equal(new NoteContent(draft.Body, "", "", ""), NoteContent.From(draft));
         Assert.Equal([new NoteSection(NoteSections.DraftText, draft.Body)], NoteSections.AsSaved(draft));
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("another client", StringComparison.Ordinal));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("another window or app", StringComparison.Ordinal));
         draft.StructuredVersion = 3;
         Assert.Equal(new NoteContent("Old subjective", "Old objective", "Old assessment", "Old plan"), NoteContent.From(draft));
         Assert.Empty(ClinicalNotes.SigningProblems(draft));
         draft.HasUnreviewedProposals = true;
-        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("AI proposal", StringComparison.Ordinal));
+        Assert.Contains(ClinicalNotes.SigningProblems(draft), p => p.Contains("Review every dictated field before signing.", StringComparison.Ordinal));
     }
 
     // Step 14: a draft written before notes had four sections opens with its History in Subjective, and nothing about the
@@ -96,8 +96,8 @@ public class NoteContentTests
     [Fact]
     public void An_earlier_draft_over_the_limit_only_by_the_four_headings_is_told_so()
     {
-        const string AtLimit = "This draft is at the size limit: shorten it by a few words to save it in four sections.";
-        const string Shorten = "Shorten the note to 64 KiB of UTF-8 text or less.";
+        const string AtLimit = "This draft is at the size limit. Shorten it by a few words to save it in four sections.";
+        const string Shorten = "Not saved. The note is over the 64 KB size limit. Shorten it and try again.";
         // 65,508 bytes of text: under History, Assessment and Plan, with their 28 bytes of headings, exactly 64 KiB.
         var history = new NoteContent(new string('界', 16_000), "", new string('界', 5_836), "");
         Assert.Equal(65_551, Encoding.UTF8.GetByteCount(history.Body));

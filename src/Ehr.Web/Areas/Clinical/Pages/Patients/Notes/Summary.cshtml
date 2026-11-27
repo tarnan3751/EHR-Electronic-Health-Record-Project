@@ -3,7 +3,7 @@
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.SummaryModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
-    ViewData["Title"] = "Write a summary for the patient";
+    ViewData["Title"] = "Write visit summary";
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     string[] fields = ["summary-talked-about", "summary-found", "summary-next-steps"];
@@ -14,13 +14,21 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to the signed note</a></p>
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to note</a></p>
 </div>
-<h1>Write a summary for the patient</h1>
-<p class="sc-prose">From the note signed @Clinic.Format(Model.Note.SignedAt). Write what the patient should know, in plain words. They read it in the portal as you write it, and so does anyone they share their record with. Leave out codes, record numbers and anything only the care team needs. Once released it can't be changed: a wrong summary is withdrawn and a new one written.</p>
+<h1>Write visit summary</h1>
+@* What the patient should be told first, then the rest as a short list. *@
+<div class="sc-prose">
+    <p>For the note signed @Clinic.Format(Model.Note.SignedAt). Write what the patient should know, in plain words.</p>
+    <ul>
+        <li>The patient reads it in the portal exactly as you write it, and so does anyone they share their record with.</li>
+        <li>Leave out codes, record numbers and anything only the care team needs.</li>
+        <li>Once released, it can't be changed. To correct it, withdraw it and write a new one.</li>
+    </ul>
+</div>
 @if (Model.SourcesSensitive)
 {
-    <p class="sc-notice sc-notice--info" data-summary-sensitive><span class="sc-notice__state">Sensitive note:</span> the note or an addendum to it is sensitive, so the summary is too. A proxy sees it only if the patient allows sensitive items.</p>
+    <p class="sc-notice sc-notice--info" data-summary-sensitive><span class="sc-notice__state">Sensitive note.</span> The note or one of its addenda is sensitive, so this summary is too. Someone the patient shares their record with sees it only if the patient allows sensitive items.</p>
 }
 @if (!OnPrem.IsReachable)
 {
@@ -32,10 +40,10 @@ else if (Model.Standing is not null)
     @if (Model.Errors.Count > 0)
     {
         <div class="sc-notice sc-notice--danger" role="alert" data-summary-errors>
-            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not released:</span> @error</p> }
+            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not released.</span> @error</p> }
         </div>
     }
-    <p class="sc-notice sc-notice--info" data-summary-standing><span class="sc-notice__state">Not offered:</span> a summary of this note was released by @Model.Standing.ReleasedBy, @Clinic.Format(Model.Standing.ReleasedAt). Withdraw it from the note's page to write another.</p>
+    <p class="sc-notice sc-notice--info" data-summary-standing><span class="sc-notice__state">Already released.</span> A summary of this note was released by @Model.Standing.ReleasedBy, @Clinic.Format(Model.Standing.ReleasedAt). To write another, withdraw it on the note's page.</p>
 }
 else
 {
@@ -43,7 +51,7 @@ else
     @if (Model.Errors.Count > 0)
     {
         <div class="sc-notice sc-notice--danger" role="alert" data-summary-errors>
-            @for (var e = 0; e < Model.Errors.Count; e++) { <p id="summary-error-@e"><span class="sc-notice__state">Not released:</span> @Model.Errors[e]</p> }
+            @for (var e = 0; e < Model.Errors.Count; e++) { <p id="summary-error-@e"><span class="sc-notice__state">Not released.</span> @Model.Errors[e]</p> }
         </div>
     }
     @for (var i = 0; i < VisitSummaries.Parts.Length; i++)
@@ -60,10 +68,10 @@ else
     @if (!Model.SourcesSensitive)
     {
         <label class="sc-check" for="summary-sensitive"><input type="checkbox" id="summary-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="summary-sensitive-hint"> Sensitive</label>
-        <p class="sc-field__hint" id="summary-sensitive-hint">A sensitive summary is shown in the portal to the patient, and to someone they share their record with only if the patient allows sensitive items. It is left out of the note's page until someone asks for it, and each view is recorded.</p>
+        <p class="sc-field__hint" id="summary-sensitive-hint">Hidden on the note's page unless someone chooses to show sensitive items. In the portal, the patient sees it when they choose to, and someone they share their record with only if the patient allows sensitive items. Views are logged.</p>
     }
     <div class="sc-actions">
-        <button type="submit" class="sc-btn sc-btn--primary" data-release-summary>Release to the patient</button>
+        <button type="submit" class="sc-btn sc-btn--primary" data-release-summary>Release visit summary</button>
         <a class="sc-btn" asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Cancel</a>
     </div>
 </form>

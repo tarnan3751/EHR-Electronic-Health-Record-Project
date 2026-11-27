@@ -8,9 +8,9 @@ namespace Ehr.Web;
 // loaded, or, for a form that changes something, the change may not have been saved, each with a way back (UC 3,
 // UC 4). A database error is the usual cause, often before the page's handler runs,
 // when its transaction can't start (DatabaseTransactionFilter), which is why this is middleware rather than part of the
-// pages. A chart that doesn't exist, a 404 from ChartModel or ReasonModel, says so too; any other page at an address
-// with nothing there gets the site's not-found page, in the site's layout; and a form refused before its
-// handler ran, a 400, says it wasn't sent. The pages are fixed text: nothing about the failure, the request or the
+// pages. A 404 under /patients/{id}, for a chart that doesn't exist or for anything in one that doesn't, says so too; any
+// other page at an address with nothing there gets the site's not-found page, in the site's layout; and a form refused
+// before its handler ran, a 400, says it wasn't sent. The pages are fixed text: nothing about the failure, the request or the
 // patient goes on them, and the exception is logged, as any unhandled one is.
 //
 // Only a browser's page requests get these. The APIs keep their bare statuses, which the desktop app and the cloud app's
@@ -35,7 +35,7 @@ public static class ErrorPages
                 return context.HttpContext.Response.StatusCode switch
                 {
                     StatusCodes.Status404NotFound when IsChart(request.Path) =>
-                        WritePageAsync(context.HttpContext, "Chart not loaded", "The chart couldn't be loaded: there is no patient with this ID.", "/patients", "Back to my patients"),
+                        WritePageAsync(context.HttpContext, "Not found", "No patient, or nothing in their chart, matches this address.", "/patients", "Back to patients"),
                     StatusCodes.Status404NotFound => ShowNotFoundAsync(context),
                     // A form refused before its handler ran, most often because its token was made for whoever was signed
                     // in when the page was opened, and someone else has signed in or out in this browser since.
@@ -81,9 +81,9 @@ public static class ErrorPages
 
     // Where a page that failed leads back to: the portal's home, the clinician's patients, or the clinic's start.
     static (string Link, string Text) Home(PathString path) =>
-        path.StartsWithSegments("/portal") ? ("/portal", "Back to the start")
-        : path.StartsWithSegments("/patients") ? ("/patients", "Back to my patients")
-        : ("/", "Back to the start");
+        path.StartsWithSegments("/portal") ? ("/portal", "Back to home")
+        : path.StartsWithSegments("/patients") ? ("/patients", "Back to patients")
+        : ("/", "Back to home");
 
     static Task WriteNotSentAsync(HttpContext context)
     {
@@ -103,9 +103,9 @@ public static class ErrorPages
         }
 
         return IsChart(path)
-            ? WritePageAsync(context, "Chart not loaded", "The chart couldn't be loaded. Try again in a moment.", "/patients", "Back to my patients")
+            ? WritePageAsync(context, "Chart not loaded", "The chart couldn't be loaded. Try again in a moment.", "/patients", "Back to patients")
             : path.StartsWithSegments("/patients")
-                ? WritePageAsync(context, "Search not completed", "The search couldn't be completed. Try again in a moment.", "/patients", "Back to my patients")
+                ? WritePageAsync(context, "Search not completed", "The search couldn't be completed. Try again in a moment.", "/patients", "Back to patients")
                 : WritePageAsync(context, "Page not loaded", "Something went wrong, and this page couldn't be loaded. Try again in a moment.", home, homeText);
     }
 

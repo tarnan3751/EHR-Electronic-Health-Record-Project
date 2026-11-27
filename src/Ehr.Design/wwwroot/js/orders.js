@@ -28,7 +28,7 @@
 
         sending = true;
         const message = form.querySelector("[data-order-message]");
-        let text = "Not saved: the clinic's server can't be reached. Your order is still here; sign it again once the server is back.";
+        let text = "Not saved. The clinic's server can't be reached. What you entered is still here, to try again once it's back.";
         try {
             const response = await fetch(form.action, {
                 method: "POST", body: new FormData(form), credentials: "same-origin", headers: { "HX-Request": "true" },

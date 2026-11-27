@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //      request", and press Enter.
 // Expected result: Step 1: the page is no wider than the window; the button is at least 44 pixels tall and the page's
 //   text 18 pixels. Step 2: the medication's radio button, the note and the button each show the focus ring; the page
-//   that follows is /portal/refills?sent=true, saying "Sent:", no wider than the window. No script errors.
+//   that follows is /portal/refills?sent=true, saying "Sent.", no wider than the window. No script errors.
 // Creator: Tahseen Arnan
 //
 // In the browser tests' collection, which doesn't run beside the others (AiReviewBrowserTests says why).
@@ -75,7 +75,7 @@ public class TC_UC6_57_Nfr12_RefillSmallScreen(WebApps apps) : IClassFixture<Web
             Assert.True(await page.EvaluateAsync<bool>(focusRing), "Send request shows no focus ring.");
             await page.Keyboard.PressAsync("Enter");
             await page.WaitForURLAsync(url => url.EndsWith("/portal/refills?sent=true", StringComparison.OrdinalIgnoreCase));
-            Assert.Contains("Sent:", await page.Locator("[data-refill-sent]").TextContentAsync());
+            Assert.Contains("Sent.", await page.Locator("[data-refill-sent]").TextContentAsync());
             Assert.True(await page.EvaluateAsync<bool>(fits), $"The page after sending scrolls sideways at 360 pixels in the {scheme} theme.");
         }
 

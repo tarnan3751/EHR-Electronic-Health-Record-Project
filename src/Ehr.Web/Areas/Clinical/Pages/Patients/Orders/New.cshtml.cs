@@ -195,7 +195,7 @@ public class NewModel(PhiReader phi, PatientAssignments assignments, ClinicalOrd
 
         if (Form.Refill is { } asked && !Form.RenewsRefill)
         {
-            errors["Item"] = $"It renews the same medication: {asked.CatalogItem}. To order another, decline the request with a message and write a new order from the chart.";
+            errors["Item"] = $"This order renews the same medication, {asked.CatalogItem}. To order another, decline the request and write a new order from the chart.";
         }
 
         if (errors.Count > 0)

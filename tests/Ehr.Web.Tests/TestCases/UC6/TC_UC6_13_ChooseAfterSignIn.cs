@@ -59,7 +59,7 @@ public class TC_UC6_13_ChooseAfterSignIn(WebApps apps) : IClassFixture<WebApps>
         var theirs = await ReadAsync(other);
         Assert.Contains("<dd>Synthetic Sharer</dd>", theirs);
         Assert.Contains("data-acting", theirs);
-        Assert.Contains("Back to my own record", theirs);
+        Assert.Contains("Back to my record", theirs);
 
         Assert.Contains("<h1>Whose record?</h1>", await session.Client.GetStringAsync("/portal/choose", Cancel));
         var back = await session.Client.GetStringAsync("/portal", Cancel);

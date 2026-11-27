@@ -95,7 +95,7 @@ public class TC_UC11_14_TwelveHourWarning(WebApps apps) : IClassFixture<WebApps>
         foreach (var page in new[] { message, other })
         {
             await page.WaitForSelectorAsync("[data-session-why='longest']");
-            Assert.Contains("a sign-in lasts at most 12 hours", await SeenAsync(page));
+            Assert.Contains("Signed out. A sign-in lasts at most 12 hours", await SeenAsync(page));
         }
 
         Assert.True(await message.IsVisibleAsync("[data-session-kept]"));

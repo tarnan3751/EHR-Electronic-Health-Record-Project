@@ -68,13 +68,13 @@ public class TC_UC6_53_RefillProxies(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal([$"requested|{Lisinopril}|-|{writer.Account}|-|-|-"], await RequestsAsync(apps, patient.Patient));
 
         var hidden = Words(await patient.Client.GetStringAsync(PortalPath, Cancel));
-        Assert.Contains("Sensitive items hidden: 1 item is not shown.", hidden);
+        Assert.Contains("Sensitive items hidden. 1 medication or request is not shown.", hidden);
         Assert.DoesNotContain("sertraline", hidden);
         Assert.Contains("by someone you share your record with", hidden);
         using (var sent = await AskAsync(patient.Client, "sertraline 50 MG Oral Tablet", sensitive: true))
         {
             var shown = Words(await ReadAsync(sent));
-            Assert.Contains("Sensitive items shown: your view of them is recorded.", shown);
+            Assert.Contains("Sensitive items shown. Your view is logged.", shown);
             Assert.Contains("sertraline 50 MG Oral Tablet", shown);
         }
 

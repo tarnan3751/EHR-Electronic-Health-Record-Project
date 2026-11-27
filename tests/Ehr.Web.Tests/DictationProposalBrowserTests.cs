@@ -32,7 +32,7 @@ public class DictationProposalBrowserTests(WebApps apps) : IClassFixture<WebApps
         Assert.Equal(DictationSidecarStub.OrderSaid, await page.Locator("[data-dictation-transcript] mark.sc-transcript__source").TextContentAsync());
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync($"**/orders/new?proposal={dictated.Order}");
-        Assert.Contains("Proposed from dictation: check every field.", await page.Locator("[data-proposed-from-dictation]").TextContentAsync());
+        Assert.Contains("Proposed from dictation. Check every field.", await page.Locator("[data-proposed-from-dictation]").TextContentAsync());
         await TabToAsync(page, "a[href*='type=lab']");
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync("**type=lab&proposal=*");

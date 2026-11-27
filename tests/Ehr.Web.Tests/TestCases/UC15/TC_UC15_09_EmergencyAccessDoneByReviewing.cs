@@ -23,7 +23,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 //   1. As Inbox Holder, open the inbox; send "Mark done" for the item anyway.
 //   2. As Inbox Reviewer, review the access.
 //   3. As Inbox Holder, open the inbox and its Done view.
-// Expected result: Step 1: the item, "Review the access" and no "Mark done"; the mark is refused, "Nothing to mark:", the
+// Expected result: Step 1: the item, "Review the access" and no "Mark done"; the mark is refused, "Nothing to mark.", the
 //   item still waiting. Step 2: saved. Step 3: "Nothing needs your action."; under Done, the item.
 // Creator: Tahseen Arnan
 public class TC_UC15_09_EmergencyAccessDoneByReviewing(WebApps apps) : IClassFixture<WebApps>
@@ -47,7 +47,7 @@ public class TC_UC15_09_EmergencyAccessDoneByReviewing(WebApps apps) : IClassFix
         Assert.DoesNotContain("Mark done", inbox);
         using (var refused = await MarkDoneAsync(holder.Client, item, Token(inbox)))
         {
-            Assert.Contains("Nothing to mark:", await ReadAsync(refused));
+            Assert.Contains("Nothing to mark.", await ReadAsync(refused));
         }
 
         Assert.False(await IsDoneAsync(apps, item));

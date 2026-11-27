@@ -117,18 +117,18 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Essential (primary) hypertension", chart);
         Assert.DoesNotContain("anxiety", chart, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sertraline", chart, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 2 diagnoses or medications are not shown.", Words(chart));
+        Assert.Contains("Sensitive items hidden. 2 diagnoses or medications are not shown.", Words(chart));
         Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Show sensitive items</a>", chart);
         var history = await session.Client.GetStringAsync($"/patients/{patient}/chart-history", Cancel);
         Assert.DoesNotContain("anxiety", history, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 2 changes are not shown.", Words(history));
+        Assert.Contains("Sensitive items hidden. 2 changes are not shown.", Words(history));
         Assert.Equal(shownBefore, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
 
         var shown = await session.Client.GetStringAsync($"/patients/{patient}?sensitive=true", Cancel);
         Assert.Contains("<strong>Generalized anxiety disorder</strong>", shown);
         Assert.Contains("<strong>sertraline 50 MG Oral Tablet</strong>", shown);
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(shown, "<span class=\"sc-tag sc-tag--warning\">Sensitive</span>").Count);
-        Assert.Contains("Sensitive items shown: your view of them is recorded.", Words(shown));
+        Assert.Contains("Sensitive items shown. Your view is logged.", Words(shown));
         Assert.Equal(shownBefore + 1, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
         Assert.Contains("Generalized anxiety disorder", await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel));
         Assert.Equal(shownBefore + 2, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
@@ -169,7 +169,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("anxiety", history, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("lisinopril", history);
         // The sertraline's two changes and the diagnosis's one.
-        Assert.Contains("Sensitive items hidden: 3 changes are not shown.", Words(history));
+        Assert.Contains("Sensitive items hidden. 3 changes are not shown.", Words(history));
         Assert.Equal(before, await apps.AuditEventsAsync(AuditActions.ReadSensitive, clinician.Id, patient));
         var shown = Words(await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel));
         Assert.Contains("Sensitive: no → yes", shown);
@@ -214,24 +214,24 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         using var added = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Essential (primary) hypertension"), ("Status", "active"));
         var chart = await ReadAsync(added);
         Assert.Equal($"/patients/{patient}", PathOf(added));
-        Assert.Contains("Saved: Essential (primary) hypertension is listed under Diagnoses.", Words(chart));
+        Assert.Contains("Saved. Essential (primary) hypertension is listed under Diagnoses.", Words(chart));
 
         using var medication = await SaveAsync(session.Client, patient, "medications", null, ("Name", "lisinopril 10 MG Oral Tablet"), ("Status", "active"));
         var entry = await IdAsync(apps, "medication_statements", patient);
         using var stopped = await SaveAsync(session.Client, patient, "medications", entry, ("Name", "lisinopril 10 MG Oral Tablet"), ("Status", "stopped"));
-        Assert.Contains("Saved: lisinopril 10 MG Oral Tablet is now stopped, so it is no longer listed.", Words(await ReadAsync(stopped)));
+        Assert.Contains("Saved. lisinopril 10 MG Oral Tablet is now stopped, so it is no longer listed.", Words(await ReadAsync(stopped)));
 
         using var anxiety = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Generalized anxiety disorder"), ("Status", "active"));
         var hidden = await ReadAsync(anxiety);
-        Assert.Contains("Saved: the diagnosis is sensitive, so it is kept with the sensitive items.", Words(hidden));
+        Assert.Contains("Saved. The diagnosis is sensitive, so it's hidden with the other sensitive items.", Words(hidden));
         Assert.DoesNotContain("anxiety", hidden, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 1 diagnosis or medication is not shown.", Words(hidden));
+        Assert.Contains("Sensitive items hidden. 1 diagnosis or medication is not shown.", Words(hidden));
 
         // An address naming another patient's entry, or none that exists, confirms nothing.
         var other = await apps.InsertPatientAsync("Synthetic", "Not confirmed");
         await apps.AssignAsync(await apps.ClinicianAsync(), other);
         var elsewhere = await session.Client.GetStringAsync($"/patients/{other}?saved={entry}&savedList=medications", Cancel);
-        Assert.DoesNotContain("Saved:", Words(elsewhere));
+        Assert.DoesNotContain("Saved.", Words(elsewhere));
         Assert.DoesNotContain("lisinopril", elsewhere);
     }
 
@@ -256,7 +256,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(HttpStatusCode.Conflict, posted.StatusCode);
         var page = await posted.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Not saved: this patient isn't on your panel, so nothing was changed. What you entered is below, to copy.", Words(page));
+        Assert.Contains("Not saved. This isn't one of your patients. What you entered is below, to copy.", Words(page));
         Assert.Contains("Essential (primary) hypertension</textarea>", page);
         Assert.DoesNotContain("Left the panel", page);
         Assert.DoesNotContain("sc-banner", page);
@@ -279,11 +279,11 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         using var refused = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", chart);
         var page = Words(await ReadAsync(refused));
 
-        Assert.Contains("Not saved: an allergy is recorded for this patient, so \"No known allergies\" wasn't recorded. Their allergies are listed below.", page);
+        Assert.Contains("Not saved. This patient has an allergy on record, listed below.", page);
         Assert.Equal(["Peanut active"], await RowsAsync(apps, "allergy_intolerances", patient, "display || ' ' || clinical_status"));
 
         // The notice can't be made to claim what isn't so: with an allergy listed, "saved" says nothing.
-        Assert.DoesNotContain("Saved:", Words(await session.Client.GetStringAsync($"/patients/{patient}?noKnownAllergies=saved", Cancel)));
+        Assert.DoesNotContain("Saved.", Words(await session.Client.GetStringAsync($"/patients/{patient}?noKnownAllergies=saved", Cancel)));
     }
 
     // "Record no known allergies" pressed twice, or from two tabs, records one: the second finds it recorded already,
@@ -298,7 +298,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         foreach (var _ in Enumerable.Range(0, 2))
         {
             using var posted = await session.Client.PostAsync($"/patients/{patient}?handler=NoKnownAllergies", Form(("__RequestVerificationToken", token)), Cancel);
-            Assert.Contains("Saved: no known allergies recorded for this patient.", Words(await ReadAsync(posted)));
+            Assert.Contains("Saved. This patient has no known allergies.", Words(await ReadAsync(posted)));
         }
 
         Assert.Equal(["no-known-allergy active"], await RowsAsync(apps, "allergy_intolerances", patient, "code || ' ' || clinical_status"));
@@ -329,7 +329,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         var (unasked, nothingRecorded) = await ChartAsync();
         Assert.Null(nothingRecorded.NoKnownAllergiesRecordedBy);
         using var recorded = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NoKnownAllergies", $"/patients/{patient}");
-        Assert.Contains("Saved: no known allergies recorded for this patient.", Words(await ReadAsync(recorded)));
+        Assert.Contains("Saved. This patient has no known allergies.", Words(await ReadAsync(recorded)));
 
         var (noneKnown, chart) = await ChartAsync();
 
@@ -351,7 +351,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 
         var byCode = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", anxietyId), Cancel);
         Assert.Contains(fixedBox, byCode);
-        Assert.Contains("Sensitive by its code.", Words(byCode));
+        Assert.Contains("Sensitive because of its code.", Words(byCode));
         var other = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", hypertensionId), Cancel);
         Assert.DoesNotContain("disabled", other);
         Assert.Contains("name=\"Sensitive\" value=\"true\"", other);
@@ -406,7 +406,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         using (var first = await PostAsync("Hives"))
         using (var second = await PostAsync("Rash"))
         {
-            Assert.Contains("Saved: Peanut is listed under Allergies.", Words(await ReadAsync(second)));
+            Assert.Contains("Saved. Peanut is listed under Allergies.", Words(await ReadAsync(second)));
         }
 
         Assert.Equal([$"{newId} Peanut Rash"], await RowsAsync(apps, "allergy_intolerances", patient, "concat_ws(' ', id, display, reaction)"));
@@ -424,7 +424,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         using var crossed = await session.Client.PostAsync(EntryPath(other, "allergies"),
             Form(("__RequestVerificationToken", token), ("NewEntryId", newId), ("Name", "Penicillin G"), ("Status", "active")), Cancel);
         Assert.Equal(HttpStatusCode.Conflict, crossed.StatusCode);
-        Assert.Contains("Not saved: the database refused the change", Words(await crossed.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. The entry may have changed, or this patient may no longer be one of your patients.", Words(await crossed.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal([$"{newId} Peanut Rash"], await RowsAsync(apps, "allergy_intolerances", patient, "concat_ws(' ', id, display, reaction)"));
         Assert.Empty(await RowsAsync(apps, "allergy_intolerances", other, "display"));
     }
@@ -443,16 +443,16 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"href=\"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true\"", shown);
         Assert.Contains($"href=\"{EntryPath(patient, "medications")}?showSensitive=true\"", shown);
         var history = await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel);
-        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to the chart", history);
+        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to chart", history);
         var form = await session.Client.GetStringAsync($"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true", Cancel);
-        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to the chart", form);
+        Assert.Contains($"href=\"/patients/{patient}?sensitive=true\">Back to chart", form);
 
         var path = $"{EntryPath(patient, "diagnoses", entry)}?showSensitive=true";
         using var saved = await PostFormAsync(session.Client, path, path, ("Name", "Generalized anxiety disorder"), ("Status", "active"), ("Onset", "2024-01-02"));
         Assert.Contains("sensitive=true", saved.RequestMessage!.RequestUri!.Query);
         var back = await ReadAsync(saved);
-        Assert.Contains("Saved: Generalized anxiety disorder is listed under Diagnoses.", Words(back));
-        Assert.Contains("Sensitive items shown:", Words(back));
+        Assert.Contains("Saved. Generalized anxiety disorder is listed under Diagnoses.", Words(back));
+        Assert.Contains("Sensitive items shown.", Words(back));
 
         // Hidden, nothing carries them.
         var hidden = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
@@ -496,7 +496,7 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 
         using var byCode = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", " i10 "), ("Status", "active"));
         using var noDot = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "e119"), ("Status", "active"));
-        Assert.Contains("Saved: Type 2 diabetes mellitus without complications is listed under Diagnoses.", Words(await ReadAsync(noDot)));
+        Assert.Contains("Saved. Type 2 diabetes mellitus without complications is listed under Diagnoses.", Words(await ReadAsync(noDot)));
         using var notACode = await SaveAsync(session.Client, patient, "diagnoses", null, ("Name", "Z99.999"), ("Status", "active"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, notACode.StatusCode);
         // Codes are for diagnoses only: a medication's isn't looked up that way.

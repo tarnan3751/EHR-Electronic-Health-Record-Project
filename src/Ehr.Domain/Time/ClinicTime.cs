@@ -3,8 +3,8 @@ using System.Globalization;
 namespace Ehr.Domain.Time;
 
 // The clinic's time zone (the expansion plan's step 10d, Tahseen's decision of 19 November 2026). Clinician pages and
-// the desktop app show times in it, labeled, and take times typed in it. Everything is still stored in UTC, the audit
-// log is still shown in UTC, and the portal's dates are as they were.
+// the desktop app show times in it, labeled, and take times typed in it; the portal shows them in it too (Tahseen's
+// decision of 26 November 2026). Everything is still stored in UTC, and the audit log is still shown in UTC.
 //
 // One zone, from configuration: Ehr:Clinic:TimeZone, an IANA name such as "America/Chicago". Without it, in
 // Development, the zone is UTC and the label "UTC", which is how every page read before this step. The label after a

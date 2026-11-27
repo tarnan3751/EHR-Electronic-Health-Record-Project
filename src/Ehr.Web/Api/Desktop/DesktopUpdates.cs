@@ -50,7 +50,7 @@ public sealed class DesktopVersionFilter(IOptionsMonitor<DesktopUpdateOptions> o
         {
             context.HttpContext.Response.Headers[MinimumHeader] = minimum.ToString(3);
             return Results.Json(
-                new Refusal($"Update needed: the clinic's server syncs only with SwiftChart {minimum.ToString(3)} or later. What you save waits on this computer, and the offline charts can still be read."),
+                new Refusal($"Update needed. The clinic's server syncs only with SwiftChart {minimum.ToString(3)} or later. What you save waits on this computer, and the offline charts can still be read."),
                 statusCode: StatusCodes.Status426UpgradeRequired);
         }
 

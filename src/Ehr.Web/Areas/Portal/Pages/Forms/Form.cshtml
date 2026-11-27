@@ -9,7 +9,7 @@
     var definition = form.Definition;
     var answered = form.Response;
     var now = DateTimeOffset.UtcNow;
-    static string When(DateTimeOffset moment) => $"{moment.UtcDateTime:MMM d, yyyy, HH:mm} UTC";
+    string When(DateTimeOffset moment) => Clinic.Format(moment, "MMM d, yyyy, HH:mm");
 }
 <h1>Pre-visit form</h1>
 @foreach (var help in Model.Help)
@@ -24,11 +24,11 @@
 @if (Model.NotSent)
 {
     @* Nothing was stored, so nobody at the clinic was told. *@
-    <p class="sc-notice sc-notice--danger" role="alert" data-form-not-sent><span class="sc-notice__state">Not sent:</span> @(own ? "your answers were not sent to your care team" : "these answers were not sent to the care team"). @(form.ClosedAt(now) ? "This form can no longer be filled in." : "This form can't be filled in yet.")</p>
+    <p class="sc-notice sc-notice--danger" role="alert" data-form-not-sent><span class="sc-notice__state">Not sent.</span> @(form.ClosedAt(now) ? "This form can no longer be filled in." : "This form can't be filled in yet.")</p>
 }
 @if (Model.Sent && answered is not null)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Answers sent:</span> @(own ? "your care team will go over them with you at your visit." : $"{Model.ActingFor}'s care team will go over them at the visit.")</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Sent.</span> @(own ? "Your care team will go over your answers with you at your visit." : $"{Model.ActingFor}'s care team will go over the answers at the visit.")</p>
 }
 <p class="sc-notice sc-notice--info" data-form-not-monitored><span class="sc-notice__state">@FormNotices.NotMonitoredState</span> @FormNotices.NotMonitored(Model.ActingFor)</p>
 <h2>@form.Title</h2>
@@ -57,7 +57,7 @@ else if (now < form.OpensAt)
 }
 else if (!OnPrem.IsReachable)
 {
-    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Not sent:</span> forms can't be sent until the clinic's server is back.</p>
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Forms can't be sent until the clinic's server is back.</p>
 }
 else
 {
@@ -68,9 +68,10 @@ else
     <form method="post" asp-route-requestId="@form.Id" class="sc-stack">
         @if (Model.Missing.Count > 0)
         {
-            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent:</span> answer every question to send the form. The ones without an answer say so.</p>
+            <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not sent.</span> Answer the highlighted questions and try again.</p>
         }
-        <p>@definition.Prompt Fill it in by @When(form.ClosesAt), in one go: nothing is kept until you send it.</p>
+        <p>@definition.Prompt</p>
+        <p>Fill it in by @When(form.ClosesAt), in one go. Nothing is saved until you send it.</p>
         @* The cursor goes to the first question left without an answer, when the form comes back; never on opening it, so
            the notices above stay in view. *@
         @{ var firstMissing = definition.Items.FirstOrDefault(item => Model.Missing.Contains(item.Code))?.Code; }
@@ -80,7 +81,7 @@ else
             var given = Model.Answers.GetValueOrDefault(item.Code);
             var id = $"question-{item.Code}";
             <fieldset class="sc-choice" aria-describedby="@(missing ? id + "-error" : null)" data-question="@item.Code">
-                <legend>@item.Text@(item.Optional ? " (you can leave this one)" : "")</legend>
+                <legend>@item.Text@(item.Optional ? " (optional)" : "")</legend>
                 @if (missing)
                 {
                     <p class="sc-field__error" id="@(id)-error">Choose an answer.</p>

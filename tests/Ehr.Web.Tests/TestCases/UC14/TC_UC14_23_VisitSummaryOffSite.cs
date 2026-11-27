@@ -44,20 +44,20 @@ public class TC_UC14_23_VisitSummaryOffSite(WebApps apps) : IClassFixture<WebApp
         Assert.Contains("data-write-summary", await cloud.GetStringAsync(NotePath(patient, note), Cancel));
         using (var released = await ReleaseAsync(cloud, patient, note, "We talked about it off-site."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         Assert.Contains($"POST {SummaryPath(patient, note)}", apps.Forwarded);
         var first = await StandingAsync(apps, patient);
         using (var withdrawn = await WithdrawAsync(cloud, patient, note, first))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         Assert.Contains($"POST {WithdrawPath(patient, note, first)}", apps.Forwarded);
         using (var again = await ReleaseAsync(cloud, patient, note))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(again)));
+            Assert.Contains("Released.", Words(await ReadAsync(again)));
         }
 
         Assert.Equal([$"{clinician.Id} false withdrawn We talked about it off-site.", $"{clinician.Id} false standing {TalkedAbout}"], await SummariesAsync(apps, patient));

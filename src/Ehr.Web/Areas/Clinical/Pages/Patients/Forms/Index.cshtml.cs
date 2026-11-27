@@ -63,7 +63,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
                     Error = "That questionnaire is already asked for at that appointment.";
                     break;
                 default:
-                    Error = "The form couldn't be asked for: the appointment may have changed. Reload the page and try again.";
+                    Error = "The appointment may have changed. Reload the page and try again.";
                     break;
             }
         }

@@ -55,7 +55,7 @@ public class TC_UC4_08_ChangeEntryAlternativeFlow(WebApps apps) : IClassFixture<
             ("Criticality", "high"), ("Severity", "moderate"));
 
         var after = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Contains("No active medications recorded.", after);
+        Assert.Contains("No active medications.", after);
         Assert.Contains("<strong>Sulfonamides</strong>: Rash", after);
         Assert.Equal(["metformin hydrochloride 500 MG Oral Tablet stopped 2026-10-01"],
             await RowsAsync(apps, "medication_statements", patient, "concat_ws(' ', display, status, effective_end)"));

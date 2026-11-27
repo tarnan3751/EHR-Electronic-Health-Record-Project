@@ -6,11 +6,11 @@
 <h1>Choose a new password</h1>
 @if (Model.Done)
 {
-    <p class="sc-notice sc-notice--success">Your password is changed. <a asp-page="SignIn">Sign in</a> with it.</p>
+    <p class="sc-notice sc-notice--success"><span class="sc-notice__state">Password changed.</span> <a asp-page="SignIn">Sign in</a> with your new password.</p>
 }
 else if (!Model.LinkIsValid)
 {
-    <p class="sc-notice sc-notice--danger">This link is not valid or has already been used. <a asp-page="Forgot">Ask for a new one</a>.</p>
+    <p class="sc-notice sc-notice--danger">This link isn't valid or has already been used. <a asp-page="Forgot">Ask for a new one</a>.</p>
 }
 else
 {

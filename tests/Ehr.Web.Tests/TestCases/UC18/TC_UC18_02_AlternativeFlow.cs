@@ -20,18 +20,18 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Test data: Clinicians "Dr. Records Proxy" and "Dr. Covering Proxy". Patient "Synthetic Minor", proxy "Synthetic
 //   Guardian". Scope with messages, for 1 year. Subject "Synthetic: from a guardian".
 // Steps:
-//   1. As the first clinician, follow the chart's "Who can use the portal for this patient", enter the proxy's email,
-//      choose the scope and "1 year", and choose "Record proxy".
+//   1. As the first clinician, follow the chart's "People who can see this record", enter the proxy's email,
+//      choose the scope and "1 year", and choose "Give access".
 //   2. As the proxy, choose the patient's record and send a message to the care team.
 //   3. As the first clinician, open the conversation.
 //   4. As the second clinician, after giving a reason on the chart, open the proxies page and post a removal.
-//   5. As the patient, open "Access". As the first clinician, choose "Remove".
-// Expected result: Step 1: "Saved:", and the table lists the email, the scope, "Hidden" for sensitive items, "By the
+//   5. As the patient, open "Sharing". As the first clinician, choose "Remove access".
+// Expected result: Step 1: "Access given.", and the table lists the email, the scope, "Hidden" for sensitive items, "By the
 //   clinic" and "In force"; the proxy is sent the same email as in TC-UC18-01. Step 2: the message is sent. Step 3: it
-//   is shown from "Synthetic Guardian (proxy)", not from the patient. Step 4: the page lists the proxy, says "Add this
-//   patient to your panel to record or remove a proxy." with no form, and the post is redirected to the chart with
-//   the proxy still in force; opening the page is a recorded read. Step 5: the patient sees "Recorded by your clinic."
-//   and can choose "Show sensitive items"; after the clinician's removal the table says "Removed".
+//   is shown from "Synthetic Guardian (proxy)", not from the patient. Step 4: the page lists the proxy, says "To give or
+//   remove access, add this patient to My patients." with no form, and the post is redirected to the chart with
+//   the proxy still in force; opening the page is a recorded read. Step 5: the patient sees "Shared by your clinic."
+//   and can choose "Share sensitive items too"; after the clinician's removal the table says "Removed".
 // Creator: Tahseen Arnan
 public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -47,19 +47,19 @@ public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var staff = await SignInAsync(apps.OnPrem, clinician);
         var page = $"/patients/{patient.Patient}/proxies";
 
-        Assert.Matches($"<a [^>]*href=\"{page}\"[^>]*>Who can use the portal for this patient</a>", await staff.Client.GetStringAsync($"/patients/{patient.Patient}", Cancel));
-        Assert.Contains("No proxies.", await staff.Client.GetStringAsync(page, Cancel));
+        Assert.Matches($"<a [^>]*href=\"{page}\"[^>]*>People who can see this record</a>", await staff.Client.GetStringAsync($"/patients/{patient.Patient}", Cancel));
+        Assert.Contains("No one else has access.", await staff.Client.GetStringAsync(page, Cancel));
         var emails = apps.Emails.Sent.Count;
         using var recorded = await PostFormAsync(staff.Client, page, page, ("Email", proxy.Email), ("Scope", "record-and-messages"), ("Days", 365));
         var table = await ReadAsync(recorded);
-        Assert.Contains("Saved:", table);
+        Assert.Contains("Access given.", table);
         Assert.Contains($"<td>{proxy.Email}</td>", table);
         Assert.Contains("<td>Hidden</td>", table);
         Assert.Contains("By the clinic", table);
         Assert.Contains("In force", table);
         Assert.Equal([$"{proxy.Email} record-and-messages false staff in-force"], await GrantsAsync(apps, patient.Patient));
         Assert.Equal(emails + 1, apps.Emails.Sent.Count);
-        Assert.Equal("You have been given access to a record", apps.Emails.Sent.Last().Subject);
+        Assert.Equal("Someone shared their record with you", apps.Emails.Sent.Last().Subject);
 
         var grant = await GrantIdAsync(apps, patient.Patient);
         await ViewAsync(proxy, grant);
@@ -76,7 +76,7 @@ public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var reads = await apps.AuditEventsAsync(AuditActions.Read, covering.Id, patient.Patient);
         var seen = await other.Client.GetStringAsync(page, Cancel);
         Assert.Contains(proxy.Email, seen);
-        Assert.Contains("Add this patient to your panel to record or remove a proxy.", seen);
+        Assert.Contains("To give or remove access, add this patient to My patients.", seen);
         Assert.DoesNotContain("name=\"Email\"", seen);
         Assert.DoesNotContain("handler=Revoke", seen);
         Assert.Equal(reads + 1, await apps.AuditEventsAsync(AuditActions.Read, covering.Id, patient.Patient));
@@ -86,11 +86,11 @@ public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.EndsWith("in-force", (await GrantsAsync(apps, patient.Patient)).Single());
 
         var own = await patient.Client.GetStringAsync("/portal/access", Cancel);
-        Assert.Contains("Recorded by your clinic.", own);
-        Assert.Contains("Show sensitive items", own);
+        Assert.Contains("Shared by your clinic.", own);
+        Assert.Contains("Share sensitive items too", own);
         using var removed = await PostFormAsync(staff.Client, $"{page}?handler=Revoke", page, ("grantId", grant));
         var after = await ReadAsync(removed);
-        Assert.Contains("Removed:", after);
+        Assert.Contains("Access removed.", after);
         Assert.Contains("<span class=\"sc-tag\">Removed</span>", after);
         Assert.EndsWith("revoked", (await GrantsAsync(apps, patient.Patient)).Single());
     }

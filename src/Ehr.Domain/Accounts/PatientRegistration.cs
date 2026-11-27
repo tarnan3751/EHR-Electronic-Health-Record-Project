@@ -79,7 +79,7 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
             {
                 await email.SendAsync(owner.Email!, "Your patient portal account",
                     $"""
-                    Someone tried to register a patient portal account with this address. If it was you, sign in at {signInLink} or reset your password at {forgotLink}. If it wasn't, you can ignore this message.
+                    Someone tried to register a patient portal account with this address. If it was you, sign in at {signInLink} or reset your password at {forgotLink}. If it wasn't, ignore this message.
                     """,
                     new EmailAction("Sign in", signInLink),
                     cancellationToken);
@@ -157,7 +157,7 @@ public sealed class PatientRegistration(UserManager<PatientUser> users, EhrDbCon
 
             {link}
 
-            If you didn't register, you can ignore this message.
+            If you didn't register, ignore this message.
             """,
             new EmailAction("Confirm your account", link),
             cancellationToken);

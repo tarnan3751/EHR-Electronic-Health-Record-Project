@@ -137,7 +137,7 @@ public class RefillApprovalTests(WebApps apps) : IClassFixture<WebApps>
             patient.Patient));
 
         var page = await session.Client.GetStringAsync(ReviewPath(patient.Patient, request), Cancel);
-        Assert.Contains("Can't be approved: the medication on the chart has changed since this was asked.", Said(page));
+        Assert.Contains("Can't be approved. The medication on the chart has changed since this was asked.", Said(page));
         Assert.DoesNotContain("data-refill-approve", page);
         using (var form = await session.Client.GetAsync(ApprovePath(patient.Patient, request), Cancel))
         {
@@ -150,13 +150,13 @@ public class RefillApprovalTests(WebApps apps) : IClassFixture<WebApps>
             ("Details[frequency]", "Once a day")), Cancel))
         {
             Assert.Equal(System.Net.HttpStatusCode.Conflict, refused.StatusCode);
-            Assert.Contains("this refill request can't be approved", Said(await refused.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("This refill request can't be approved.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Equal(["0"], await ProxyTests.QueryAsync(apps, "SELECT count(*)::text FROM ehr.orders WHERE patient_id = @patient", patient.Patient));
         using (var declined = await DeclineAsync(session.Client, patient.Patient, request, "Synthetic: your dose changed; please book a visit."))
         {
-            Assert.Contains("Declined:", Said(await ReadAsync(declined)));
+            Assert.Contains("Declined.", Said(await ReadAsync(declined)));
         }
 
         Assert.StartsWith("rejected|amlodipine 5 MG Oral Tablet|", (await RequestsAsync(apps, patient.Patient))[0], StringComparison.Ordinal);

@@ -7,6 +7,15 @@
     ViewData["UseHtmx"] = false;
     ViewData["Title"] = "Inbox";
     var clinician = User.IsInRole(StaffRoles.Clinician);
+
+    // An order's results are done by acknowledging them on their own page, which records who and when, an
+    // administrator's item for results no clinician could receive too (step 18a), a refill request by answering it
+    // (step 13d), and an emergency access by reviewing it (step 18). Anything else, a result item with no order behind
+    // it included, is marked done here.
+    bool MarkedHere(Ehr.Domain.Phi.InboxEntry item) =>
+        OnPrem.IsReachable && !((item.Kind is InboxItemKind.Result or InboxItemKind.UnroutedResult) && item.SourceTable == "orders")
+        && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests")
+        && !(item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses");
 }
 <h1>Inbox</h1>
 <nav aria-label="Inbox views">
@@ -17,7 +26,7 @@
 </nav>
 @if (Model.AlreadyDone)
 {
-    <p class="sc-notice sc-notice--info" role="status"><span class="sc-notice__state">Nothing to mark:</span> that item isn't waiting in your inbox. It may have been marked done before. Nothing changed.</p>
+    <p class="sc-notice sc-notice--info" role="status"><span class="sc-notice__state">Nothing to mark.</span> That item isn't waiting in your inbox. It may already be done.</p>
 }
 @if (!Model.Done && !OnPrem.IsReachable)
 {
@@ -29,6 +38,11 @@
 }
 else
 {
+    @if (!Model.Done && Model.Items.Items.Any(MarkedHere))
+    {
+        <p class="sc-muted" id="inbox-done-note">Marking an item done can't be undone.</p>
+    }
+    @* Each row: when, one line saying what it is, the patient, then what to do about it. *@
     <div class="sc-table-wrap">
         <table class="sc-table">
             <thead>
@@ -36,10 +50,7 @@ else
                     <th scope="col">@(Model.Done ? "Done" : "Received")</th>
                     <th scope="col">What</th>
                     <th scope="col">Patient</th>
-                    @if (!Model.Done)
-                    {
-                        <th scope="col"><span class="sc-visually-hidden">Actions</span></th>
-                    }
+                    <th scope="col"><span class="sc-visually-hidden">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -58,54 +69,6 @@ else
                             {
                                 @* Step 13e: a pre-visit form has an answer to review; these come before everything else. *@
                                 <span class="sc-tag sc-tag--danger" data-inbox-review>Needs review</span>
-                                @if (clinician && item.SourceTable == "questionnaire_responses" && item.PatientId is { } formPatient)
-                                {
-                                    if (item.DoneAt is null)
-                                    {
-                                        <a asp-page="/Patients/Forms/Response" asp-route-patientId="@formPatient" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
-                                    }
-                                    else if (Model.ChartOpens.Contains(formPatient))
-                                    {
-                                        @* Done: the item no longer opens the answers; the chart does, for a patient on the panel. *@
-                                        <span class="sc-muted" data-inbox-chart-note>Open from the patient's chart.</span>
-                                    }
-                                }
-                            }
-                            @if (clinician && item.Kind == InboxItemKind.Result && item.SourceTable == "orders" && item.PatientId is not null)
-                            {
-                                @* Where it gets acknowledged, which is what marks it done. *@
-                                <a asp-page="/Patients/Orders/Results" asp-route-patientId="@item.PatientId" asp-route-orderId="@item.SourceId" data-inbox-source>Open the results</a>
-                            }
-                            @if (clinician && item.Kind == InboxItemKind.Addendum && item.SourceTable == "clinical_notes" && item.PatientId is not null)
-                            {
-                                @* Step 10b: someone else added to a note this clinician signed. *@
-                                <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="addenda" data-inbox-source>Open the note</a>
-                            }
-                            @if (clinician && item.Kind == InboxItemKind.SummaryWithdrawn && item.SourceTable == "clinical_notes" && item.PatientId is not null)
-                            {
-                                @* Step 13a: someone else withdrew a visit summary this clinician released. *@
-                                <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="summary" data-inbox-source>Open the note</a>
-                            }
-                            @if (clinician && item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests" && item.PatientId is not null)
-                            {
-                                @* Step 13d: where it gets answered, which is what marks it done. *@
-                                <a asp-page="/Patients/Refills/Review" asp-route-patientId="@item.PatientId" asp-route-requestId="@item.SourceId" data-inbox-source>Review the request</a>
-                            }
-                            @if (item.Kind == InboxItemKind.UnroutedResult && item.SourceTable == "orders" && item.DoneAt is null)
-                            {
-                                @* Step 18a: what an administrator can do. Only a clinician adds a patient to their own patients, and
-                                   only a clinician with the patient on their panel acknowledges results; that marks this done. *@
-                                <p class="sc-muted" data-inbox-unrouted-note>Ask a clinician to add this patient to their patients and acknowledge the results. That marks this done for every administrator.</p>
-                            }
-                            @if (User.IsInRole(StaffRoles.Admin) && item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses")
-                            {
-                                @* Step 18: where it gets reviewed, which is what marks it done, for every administrator. *@
-                                <a asp-page="/Admin/EmergencyAccess" asp-route-id="@item.SourceId" data-inbox-source>Review the access</a>
-                            }
-                            @if (clinician && item.SourceTable == "message_threads" && item.PatientId is not null)
-                            {
-                                @* Where it came from: the conversation, which is where it gets answered. *@
-                                <a asp-page="/Patients/Messages/Thread" asp-route-patientId="@item.PatientId" asp-route-threadId="@item.SourceId" data-inbox-source>Open the conversation</a>
                             }
                         </td>
                         @if (item.PatientName is not null && clinician)
@@ -121,29 +84,68 @@ else
                         {
                             <td class="sc-table__muted">—</td>
                         }
-                        @if (!Model.Done)
-                        {
-                            <td>
-                                @* An order's results are done by acknowledging them on their own page, which records who and
-                                   when, an administrator's item for results no clinician could receive too (step 18a), a refill
-                                   request by answering it (step 13d), and an emergency access by reviewing it (step 18). Anything
-                                   else, a result item with no order behind it included, is marked done here. *@
-                                @if (OnPrem.IsReachable && !((item.Kind is InboxItemKind.Result or InboxItemKind.UnroutedResult) && item.SourceTable == "orders")
-                                     && !(item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests")
-                                     && !(item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses"))
+                        <td>
+                            <div class="sc-actions">
+                                @if (clinician && item.Kind == InboxItemKind.FormAlert && item.SourceTable == "questionnaire_responses" && item.PatientId is { } formPatient && item.DoneAt is null)
+                                {
+                                    <a asp-page="/Patients/Forms/Response" asp-route-patientId="@formPatient" asp-route-responseId="@item.SourceId" data-inbox-source>Open the answers</a>
+                                }
+                                @if (clinician && item.Kind == InboxItemKind.Result && item.SourceTable == "orders" && item.PatientId is not null)
+                                {
+                                    @* Where it gets acknowledged, which is what marks it done. *@
+                                    <a asp-page="/Patients/Orders/Results" asp-route-patientId="@item.PatientId" asp-route-orderId="@item.SourceId" data-inbox-source>Open the results</a>
+                                }
+                                @if (clinician && item.Kind == InboxItemKind.Addendum && item.SourceTable == "clinical_notes" && item.PatientId is not null)
+                                {
+                                    @* Step 10b: someone else added to a note this clinician signed. *@
+                                    <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="addenda" data-inbox-source>Open the note</a>
+                                }
+                                @if (clinician && item.Kind == InboxItemKind.SummaryWithdrawn && item.SourceTable == "clinical_notes" && item.PatientId is not null)
+                                {
+                                    @* Step 13a: someone else withdrew a visit summary this clinician released. *@
+                                    <a asp-page="/Patients/Notes/View" asp-route-patientId="@item.PatientId" asp-route-noteId="@item.SourceId" asp-fragment="summary" data-inbox-source>Open the note</a>
+                                }
+                                @if (clinician && item.Kind == InboxItemKind.RefillRequest && item.SourceTable == "refill_requests" && item.PatientId is not null)
+                                {
+                                    @* Step 13d: where it gets answered, which is what marks it done. *@
+                                    <a asp-page="/Patients/Refills/Review" asp-route-patientId="@item.PatientId" asp-route-requestId="@item.SourceId" data-inbox-source>Review the request</a>
+                                }
+                                @if (User.IsInRole(StaffRoles.Admin) && item.Kind == InboxItemKind.EmergencyAccessReview && item.SourceTable == "break_glass_accesses")
+                                {
+                                    @* Step 18: where it gets reviewed, which is what marks it done, for every administrator. *@
+                                    <a asp-page="/Admin/EmergencyAccess" asp-route-id="@item.SourceId" data-inbox-source>Review the access</a>
+                                }
+                                @if (clinician && item.SourceTable == "message_threads" && item.PatientId is not null)
+                                {
+                                    @* Where it came from: the conversation, which is where it gets answered. *@
+                                    <a asp-page="/Patients/Messages/Thread" asp-route-patientId="@item.PatientId" asp-route-threadId="@item.SourceId" data-inbox-source>Open the conversation</a>
+                                }
+                                @if (!Model.Done && MarkedHere(item))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
-                                        <button class="sc-btn sc-btn--compact" aria-label="Mark done: @item.Summary"
-                                                aria-describedby="@(item.Kind == InboxItemKind.FormAlert ? $"done-{item.Id}" : null)">Mark done</button>
+                                        <button class="sc-btn sc-btn--compact" aria-describedby="@(item.Kind == InboxItemKind.FormAlert ? $"inbox-done-note done-{item.Id}" : "inbox-done-note")"
+                                                aria-label="Mark done: @item.Summary">Mark done</button>
                                     </form>
-                                    @if (item.Kind == InboxItemKind.FormAlert)
-                                    {
-                                        @* Step 13e: the item is the way to the answers only while it is open (PhiReader.FormAnswersAsync). *@
-                                        <p class="sc-muted" id="done-@item.Id" data-inbox-done-note>After you mark this done, the answers open from the patient's chart, which needs the patient on your panel or emergency access.</p>
-                                    }
                                 }
-                            </td>
-                        }
+                            </div>
+                            @if (clinician && item.Kind == InboxItemKind.FormAlert && item.SourceTable == "questionnaire_responses" && item.PatientId is { } donePatient
+                                 && item.DoneAt is not null && Model.ChartOpens.Contains(donePatient))
+                            {
+                                @* Done: the item no longer opens the answers; the chart does, for a patient on the panel. *@
+                                <span class="sc-muted" data-inbox-chart-note>Open from the patient's chart.</span>
+                            }
+                            @if (!Model.Done && MarkedHere(item) && item.Kind == InboxItemKind.FormAlert)
+                            {
+                                @* Step 13e: the item is the way to the answers only while it is open (PhiReader.FormAnswersAsync). *@
+                                <p class="sc-muted" id="done-@item.Id" data-inbox-done-note>Once it's done, the answers open only from the chart, which needs the patient in My patients or emergency access.</p>
+                            }
+                            @if (item.Kind == InboxItemKind.UnroutedResult && item.SourceTable == "orders" && item.DoneAt is null)
+                            {
+                                @* Step 18a: what an administrator can do. Only a clinician adds a patient to their own patients, and
+                                   only a clinician with the patient on their panel acknowledges results; that marks this done. *@
+                                <p class="sc-muted" data-inbox-unrouted-note>Ask a clinician to add this patient to their patients and acknowledge the results. That marks this done for every administrator.</p>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>

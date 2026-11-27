@@ -37,7 +37,7 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   4. Signed out, open Pre-visit forms.
 // Expected result: Step 1: no "Pre-visit forms" link on either home page, but there for the proxy with sensitive items,
 //   with nothing to fill in; Pre-visit forms and Download my record are the
-//   same on both records, but for the antiforgery token, and the download page says "Neither holds the care team's
+//   same on both records, but for the antiforgery token, and the download page says "Neither includes the care team's
 //   notes, messages, pre-visit forms, or who has looked at the record." Step 2: every one is 404 with the same body.
 //   Step 3: nothing is returned, and the same number of statements, each the same, is sent for the three, the forms
 //   read asking for the record's own forms by its patient. Step 4: sent to the portal's sign-in.
@@ -98,7 +98,7 @@ public class TC_UC22_06_Nfr06_NoHintForAProxy(WebApps apps) : IClassFixture<WebA
         Assert.DoesNotContain("to fill in", readerHome);
         Assert.Equal(Steady(without.Forms), Steady(withForms.Forms));
         Assert.Equal(Steady(without.Record), Steady(withForms.Record));
-        Assert.Contains("Neither holds the care team's notes, messages, pre-visit forms, or who has looked at the record.", Text(withForms.Record));
+        Assert.Contains("Neither includes the care team's notes, messages, pre-visit forms, or who has looked at the record.", Text(withForms.Record));
 
         // On the record with forms: its own answered form, a made-up one and another patient's are all the same nothing.
         await ProxyTests.ViewAsync(proxy, onForms);

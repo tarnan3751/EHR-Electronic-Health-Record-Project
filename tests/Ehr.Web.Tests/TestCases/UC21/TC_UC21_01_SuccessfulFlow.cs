@@ -23,14 +23,14 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //   "Once a day".
 // Steps:
 //   1. As Dr. Test, open the inbox, and follow "Review the request".
-//   2. Follow "Approve: write the order", and sign the order.
+//   2. Follow "Approve request…", and sign the order.
 //   3. Open the chart; as the colleague, open the inbox.
 // Expected result: Step 1: the inbox lists a "Refill request" item, "A patient asked to renew a medication", with the
 //   patient's name, a link to the request and no "Mark done"; the request's page shows the medication asked for and as
 //   the chart has it, who asked, the note, and the link to approve; it is one recorded read of the patient. Step 2: the
 //   order form says what the order approves and opens with the item "lisinopril 10 MG Oral Tablet", the medication's own
 //   product, which can't be changed there; signing goes back to the
-//   request's page, which says "Approved:" and names Dr. Test and the item ordered. Step 3: the chart lists the order
+//   request's page, which says "Approved." and names Dr. Test and the item ordered. Step 3: the chart lists the order
 //   under Active orders, signed by Dr. Test; the colleague's inbox has no item for it.
 // Creator: Tahseen Arnan
 public class TC_UC21_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
@@ -71,16 +71,16 @@ public class TC_UC21_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"href=\"{ApprovePath(patient.Patient, request).Replace("&", "&amp;", StringComparison.Ordinal)}\"", review);
 
         var form = await session.Client.GetStringAsync(ApprovePath(patient.Patient, request), Cancel);
-        Assert.Contains("Approves: the refill request for", Said(form));
+        Assert.Contains("Refill request. Signing approves the request for", Said(form));
         Assert.Contains("name=\"Item\" value=\"lisinopril 10 MG Oral Tablet\"", form);
-        Assert.Contains("It renews the same medication: lisinopril 10 MG Oral Tablet.", Said(form));
+        Assert.Contains("This order renews the same medication, lisinopril 10 MG Oral Tablet.", Said(form));
         Assert.Matches("id=\"order-item\"[^>]*readonly", form);
         using var approved = await ApproveAsync(session.Client, patient.Patient, request);
         var answered = Said(await ReadAsync(approved));
         Assert.Equal(ReviewPath(patient.Patient, request), PathOf(approved));
-        Assert.Contains("Approved: the order is signed, and the patient sees what was ordered.", answered);
+        Assert.Contains("Approved. The order is signed, and the patient can see what was ordered.", answered);
         Assert.Contains("Approved by Dr. Test", answered);
-        Assert.Contains("ordered lisinopril 10 MG Oral Tablet.", answered);
+        Assert.Contains("Ordered lisinopril 10 MG Oral Tablet.", answered);
 
         Assert.Equal([$"completed|{Lisinopril}|Synthetic: I have three days left.|{patient.Account}|lisinopril 10 MG Oral Tablet|-|{clinician.Id}"],
             await RequestsAsync(apps, patient.Patient));

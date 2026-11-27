@@ -23,8 +23,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   1. Off-site, with the link up, open the PHQ-9 and send it.
 //   2. Off-site, cut off from the clinic, open the GAD-7, and send it anyway with a token from the clinic's site.
 // Expected result: Step 1: the form is offered; the send is forwarded to the clinic's server and the answers are stored,
-//   scored. Step 2: the page reads "Not sent: forms can't be sent until the clinic's server is back.", has no form to
-//   send, and still says "Not monitored:" with 911 and 988; the send is answered 503 and nothing is stored.
+//   scored. Step 2: the page reads "Read-only. Forms can't be sent until the clinic's server is back.", has no form to
+//   send, and still says "Not monitored." with 911 and 988; the send is answered 503 and nothing is stored.
 // Creator: Tahseen Arnan
 public class TC_UC22_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -59,8 +59,8 @@ public class TC_UC22_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var cutOff = Client(apps.CloudCutOff, jar);
         var pageHtml = await cutOff.GetStringAsync(FormPath(gad), Cancel);
         var page = Text(pageHtml);
-        Assert.Contains("Not sent: forms can't be sent until the clinic's server is back.", page);
-        Assert.Contains("Not monitored: your care team reads this form before your visit, not when you send it. If you need help now, call 911.", page);
+        Assert.Contains("Read-only. Forms can't be sent until the clinic's server is back.", page);
+        Assert.Contains("Not monitored. Your care team reads this form before your visit, not when you send it. If you need help now, call 911.", page);
         Assert.DoesNotContain("Send to my care team", page);
         Assert.DoesNotContain("<fieldset", pageHtml);
         using (var notSaved = await cutOff.PostAsync(FormPath(gad),

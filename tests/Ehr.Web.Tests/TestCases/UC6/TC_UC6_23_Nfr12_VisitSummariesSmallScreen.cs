@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. Open Visit summaries.
 //   2. Press Tab until "Show sensitive summaries" has the focus, and press Enter.
 //   3. Open Visit summaries again, in the light theme and in the dark.
-// Expected result: Step 1: the page is no wider than the window; the notice reads "Sensitive items hidden:" and its
+// Expected result: Step 1: the page is no wider than the window; the notice reads "Sensitive summaries hidden." and its
 //   link "Show sensitive summaries". Step 2: the focused link shows the focus ring; Enter opens
 //   /portal/summaries?sensitive=true, which shows the sensitive summary and is no wider than the window either. Step 3:
 //   in each theme the page is no wider than the window, the summary's card and the placeholder are both padded by the
@@ -48,22 +48,22 @@ public class TC_UC6_23_Nfr12_VisitSummariesSmallScreen(WebApps apps) : IClassFix
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, notes[0], found: "Your chest sounded clear: " + new string('a', 60) + "."))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, notes[1], "We talked about something private.", sensitive: true))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var released = await ReleaseAsync(session.Client, patient.Patient, notes[2]))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         using (var withdrawn = await WithdrawAsync(session.Client, patient.Patient, notes[2], await StandingAsync(apps, patient.Patient)))
         {
-            Assert.Contains("Withdrawn:", Words(await ReadAsync(withdrawn)));
+            Assert.Contains("Withdrawn.", Words(await ReadAsync(withdrawn)));
         }
 
         await using var server = await ClinicalBrowserHost.StartAsync(apps);
@@ -80,7 +80,7 @@ public class TC_UC6_23_Nfr12_VisitSummariesSmallScreen(WebApps apps) : IClassFix
 
         await page.GotoAsync($"{server.Url}/portal/summaries");
         Assert.True(await page.EvaluateAsync<bool>(fits), "The page scrolls sideways at 360 pixels.");
-        Assert.Contains("Sensitive items hidden:", await page.Locator("[data-sensitive=hidden]").TextContentAsync());
+        Assert.Contains("Sensitive summaries hidden.", await page.Locator("[data-sensitive=hidden]").TextContentAsync());
         await AiReviewBrowserTests.TabToAsync(page, "a[href='/portal/summaries?sensitive=true']");
         Assert.Equal("Show sensitive summaries", await page.EvaluateAsync<string>("document.activeElement.textContent"));
         Assert.True(await page.EvaluateAsync<bool>(focusRing));

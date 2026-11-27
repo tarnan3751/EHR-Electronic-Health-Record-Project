@@ -315,7 +315,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 
         var listed = Listed(html);
         Assert.Equal(50, listed.Count);
-        Assert.Contains("More patients match than are listed here. Add more letters of the name, or a date of birth, to narrow them.", html);
+        Assert.Contains("More patients match than are shown. Add more of the name, or a date of birth, to narrow them.", html);
         Assert.Equal(50, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
         foreach (var patient in patients)
         {
@@ -339,7 +339,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("Restricted", RowOf(html, mine));
         Assert.Contains("Restricted", RowOf(html, notMine));
         Assert.DoesNotContain("Yours", RowOf(html, notMine));
-        Assert.Contains("Not on your panel: opening the chart asks for a reason first.", html);
+        Assert.Contains("Not one of your patients. Opening the chart asks for a reason first.", html);
     }
 
     [Fact]
@@ -441,7 +441,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 
         var listed = Listed(typed);
         Assert.Equal(Ehr.Web.Areas.Clinical.Pages.Patients.IndexModel.LiveLimit, listed.Count);
-        Assert.Contains("More patients match than are listed here. Keep typing to narrow them, or press Enter for the full list.", typed);
+        Assert.Contains("More patients match than are shown. Keep typing to narrow them, or press Enter to see more.", typed);
         foreach (var patient in patients)
         {
             Assert.Equal(listed.Contains(patient) ? 1 : 0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
@@ -570,7 +570,7 @@ public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(patients.Order(), Listed(html).Order());
             Assert.Equal(patients.Order(), Listed(typed).Order());
             Assert.Contains("Restricted", html);
-            Assert.Contains("Read-only: the clinic's server can't be reached", Words(html));
+            Assert.Contains("Read-only. The clinic's server can't be reached", Words(html));
             // One read of each patient for each page.
             var (queued, _) = apps.CloudPrimaryDrill.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
             var reads = queued.Where(e => e.ActorId == clinician.Id).ToList();

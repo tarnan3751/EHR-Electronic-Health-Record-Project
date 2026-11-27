@@ -53,7 +53,7 @@ else
                         }
                         else
                         {
-                            <td class="sc-table__muted">Not on your panel</td>
+                            <td class="sc-table__muted">Not one of your patients</td>
                         }
                         <td><span class="sc-tag @(appointment.Status == AppointmentStatus.Cancelled || appointment.Status == AppointmentStatus.NoShow ? "sc-tag--warning" : appointment.Status == AppointmentStatus.Fulfilled ? "sc-tag--success" : null)">@AppointmentStatus.Names[appointment.Status]</span></td>
                         <td><a asp-page="Appointment" asp-route-appointmentId="@appointment.Id" aria-label="Open appointment: @appointment.PatientName, @AppointmentForm.Time(Clinic, appointment)">Open</a></td>

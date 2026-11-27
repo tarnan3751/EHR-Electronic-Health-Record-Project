@@ -36,15 +36,16 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   8. Shorten its Assessment by five characters (15 bytes), and save.
 // Expected result: Step 1: each page shows History, Assessment and Plan, with "Written as History, Assessment and Plan,
 //   before notes had four sections.", and no Subjective; the offline copy gives the note's History as signed. Step 2:
-//   Subjective holds the History, Objective is empty, and a notice starting "Check:" says to move today's vital signs,
-//   examination findings and reviewed results to Objective; the saved draft is exactly as it was. Step 3: the draft is
-//   shown read-only under History, Assessment and Plan, and the saved draft is exactly as it was. Step 4: nothing is
-//   saved ("Choose a visit type from the list."), and the page shows the History in Subjective with the "Check:" notice
-//   again; the saved draft is exactly as it was. Step 5: the draft is saved, in one update that writes the four sections
-//   and clears the History, and signing is refused with "Enter Objective before signing." Step 6: the note is signed in
-//   four sections. Step 7: nothing is saved: the four sections' headings are 15 bytes longer, and the page says "This
-//   draft is at the size limit: shorten it by a few words to save it in four sections.", with the "Check:" notice
-//   without JavaScript. Step 8: the draft is saved in four sections, at exactly 64 KiB.
+//   Subjective holds the History, Objective is empty, and a notice starting "Check before signing." says to move
+//   today's vital signs, examination findings and reviewed results to Objective; the saved draft is exactly as it was.
+//   Step 3: the draft is shown read-only under History, Assessment and Plan, and the saved draft is exactly as it was.
+//   Step 4: nothing is saved ("Choose a visit type from the list."), and the page shows the History in Subjective with
+//   the "Check before signing." notice again; the saved draft is exactly as it was. Step 5: the draft is saved, in one
+//   update that writes the four sections and clears the History, and signing is refused with "Enter Objective before
+//   signing." Step 6: the note is signed in four sections. Step 7: nothing is saved: the four sections' headings are 15
+//   bytes longer, and the page says "This draft is at the size limit. Shorten it by a few words to save it in four
+//   sections.", with the "Check before signing." notice without JavaScript. Step 8: the draft is saved in four
+//   sections, at exactly 64 KiB.
 // Creator: Tahseen Arnan
 public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFixture<WebApps>
 {
@@ -84,11 +85,11 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
         var editor = await session.Client.GetStringAsync(path, Cancel);
         Assert.Matches($"<textarea[^>]*id=\"Subjective\"[^>]*>\\s*{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</textarea>", editor);
         Assert.Matches("<textarea[^>]*id=\"Objective\"[^>]*>\\s*</textarea>", editor);
-        Assert.Contains("Check: this draft was written before notes had four sections. Its History is now in Subjective: move today's vital signs, examination findings and the results you reviewed to Objective before signing.", Words(editor));
+        Assert.Contains("Check before signing. This draft was written before notes had four sections, so its History is in Subjective. Move today's vital signs, examination findings and reviewed results to Objective.", Words(editor));
         Assert.Equal(saved, await RowAsync());
 
         var offSite = await Client(apps.CloudCutOff, session.Jar).GetStringAsync(path, Cancel);
-        Assert.Contains("It is shown as last saved.", offSite);
+        Assert.Contains("It's shown as last saved.", offSite);
         Assert.Matches($"(?s)<h2>History</h2><p class=\"sc-note__text\">{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</p>", offSite);
         Assert.DoesNotContain("<textarea", offSite);
         Assert.Equal(saved, await RowAsync());
@@ -99,7 +100,7 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
             Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var page = await refused.Content.ReadAsStringAsync(Cancel);
             Assert.Contains("Choose a visit type from the list.", Words(page));
-            Assert.Contains("Check: this draft was written before notes had four sections.", Words(page));
+            Assert.Contains("Check before signing. This draft was written before notes had four sections,", Words(page));
             Assert.Matches($"<textarea[^>]*id=\"Subjective\"[^>]*>\\s*{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</textarea>", page);
         }
 
@@ -148,7 +149,7 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
     [Fact]
     public async Task A_draft_written_before_four_sections_at_the_size_limit_is_told_to_shorten_it_by_a_few_words()
     {
-        const string AtLimit = "This draft is at the size limit: shorten it by a few words to save it in four sections.";
+        const string AtLimit = "This draft is at the size limit. Shorten it by a few words to save it in four sections.";
         var (clinician, patient, session) = await OnPanelAsync(apps);
         var (history, assessment) = (new string('界', 16_000), new string('界', 5_836));
         var draft = await EarlierNotes.DraftAsync(apps.Database, clinician.Id, patient, history, assessment, "");
@@ -171,7 +172,7 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
             Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var page = Words(await refused.Content.ReadAsStringAsync(Cancel));
             Assert.Contains(AtLimit, page);
-            Assert.Contains("Check: this draft was written before notes had four sections.", page);
+            Assert.Contains("Check before signing. This draft was written before notes had four sections,", page);
         }
 
         using (var saved = await PostFormAsync(session.Client, path + "?handler=Save", path, Fields(assessment[5..])))

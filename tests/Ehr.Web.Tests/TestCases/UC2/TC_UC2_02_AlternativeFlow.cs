@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 //   2. Bring the on-site database back and let the cloud app's check run.
 //   3. Open the quick texts page again and add the quick text.
 // Expected result: During the outage the chart shows "Returning, Remi", the quick texts page shows the notice
-//   "Read-only: the clinic's server can't be reached" and no form to add one, and the on-site audit log has no read
+//   "Read-only. The clinic's server can't be reached" and no form to add one, and the on-site audit log has no read
 //   of the patient. After recovery the on-site audit log has the one read, with source "cloud"; the quick texts page
 //   no longer shows the notice and offers the form; and the new quick text is saved once on the primary, at
 //   version 1.
@@ -51,7 +51,7 @@ public class TC_UC2_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
             Assert.False(await shipper.ShipAsync(Cancel));
             Assert.Contains("Returning, Remi", await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
             var readOnly = await session.Client.GetStringAsync(QuickTexts, Cancel);
-            Assert.Contains("Read-only: the clinic's server can't be reached", Words(readOnly));
+            Assert.Contains("Read-only. The clinic's server can't be reached", Words(readOnly));
             Assert.DoesNotContain("add-quick-text", readOnly);
             Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
 
@@ -60,7 +60,7 @@ public class TC_UC2_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient, AuditSources.Cloud));
 
             var page = await session.Client.GetStringAsync(QuickTexts, Cancel);
-            Assert.DoesNotContain("Read-only:", page);
+            Assert.DoesNotContain("Read-only.", page);
             Assert.Contains("add-quick-text", page);
             using var added = await HtmxPostAsync(session.Client, $"{QuickTexts}?handler=Add", Token(page), ("Shortcut", shortcut), ("Body", "Saved once it's back"));
             Assert.Equal(HttpStatusCode.OK, added.StatusCode);

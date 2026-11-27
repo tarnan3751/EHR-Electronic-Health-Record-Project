@@ -28,9 +28,9 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. As the second patient's proxy, download and open the printable page, with and without asking; the clinic adds the
 //      sensitive items; again.
 // Expected result: Step 1: without: neither item, no meta.security and the word "sensitive" nowhere in the file, recorded
-//   as a download; the page says "Sensitive items hidden: 2 diagnoses, medications or visit summaries are not shown." with
+//   as a download; the page says "Sensitive items hidden. 2 diagnoses, medications or visit summaries are not shown." with
 //   "Show sensitive items". With: both, each marked R (restricted), recorded as a download of sensitive items; the page
-//   says "Sensitive items shown: your view of them is recorded." and tags both "Sensitive", recorded as a view of
+//   says "Sensitive items shown. Your view is logged." and tags both "Sensitive", recorded as a view of
 //   sensitive items. The page asked with ?sensitive=true has the box ticked. Step 2: every file and every page, but for
 //   what each copy has of its own, is the same as the first.
 // Creator: Tahseen Arnan
@@ -59,11 +59,11 @@ public class TC_UC6_28_DownloadSensitiveAsked(WebApps apps) : IClassFixture<WebA
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.Download, patient.Account, patient.Patient));
 
         var hidden = await PrintAsync(patient.Client);
-        Assert.Contains("Sensitive items hidden: 2 diagnoses, medications or visit summaries are not shown. Show sensitive items", Words(hidden));
+        Assert.Contains("Sensitive items hidden. 2 diagnoses, medications or visit summaries are not shown. Show sensitive items", Words(hidden));
         Assert.DoesNotContain(">Sensitive</span>", hidden);
         var views = await apps.AuditEventsAsync(AuditActions.ReadSensitive, patient.Account, patient.Patient);
         var shown = await PrintAsync(patient.Client, sensitive: true);
-        Assert.Contains("Sensitive items shown: your view of them is recorded.", Words(shown));
+        Assert.Contains("Sensitive items shown. Your view is logged.", Words(shown));
         Assert.Equal(2, shown.Split(">Sensitive</span>").Length - 1);
         Assert.Contains("sertraline", shown);
         Assert.Contains("Generalized anxiety disorder (F41.1)", Words(shown));

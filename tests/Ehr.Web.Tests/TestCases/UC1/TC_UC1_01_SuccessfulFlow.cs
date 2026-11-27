@@ -28,7 +28,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   3. Enter the item and the reason, and select "Sign order".
 //   4. Follow the answer back to the chart.
 //   5. Read the order and its audit row from the database.
-// Expected result: The chart shows "Order signed: Complete blood count (CBC)" and lists, under "Active orders",
+// Expected result: The chart shows "Order signed. Complete blood count (CBC)" and lists, under "Active orders",
 //   "Complete blood count (CBC) (Lab) Reason for the test: Synthetic fatigue"; "No active orders." is gone. The form's
 //   banner and allergies are one recorded read. The order's signer is the clinician and its signing time is the
 //   moment of signing; the audit row for the insert names the same clinician, at that time.
@@ -43,7 +43,7 @@ public class TC_UC1_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         var (clinician, patient, session) = await OnPanelAsync(apps);
 
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
-        Assert.Contains($"href=\"/patients/{patient}/orders/new\">New order</a>", chart);
+        Assert.Contains($"href=\"/patients/{patient}/orders/new\">New order <kbd class=\"sc-kbd\" aria-hidden=\"true\">Alt+Shift+O</kbd></a>", chart);
         Assert.Contains("data-new-order aria-keyshortcuts=\"Alt+Shift+O\"", chart);
         Assert.Contains("/_content/Ehr.Design/js/orders.", chart);
         Assert.DoesNotContain("accesskey", chart);
@@ -68,7 +68,7 @@ public class TC_UC1_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         var url = JsonDocument.Parse(await signed.Content.ReadAsStringAsync(Cancel)).RootElement.GetProperty("url").GetString()!;
 
         var confirmed = await session.Client.GetStringAsync(url, Cancel);
-        Assert.Contains("Order signed: Complete blood count (CBC)", Words(confirmed));
+        Assert.Contains("Order signed. Complete blood count (CBC)", Words(confirmed));
         Assert.Contains("<h3>Active orders</h3>", confirmed);
         Assert.Contains("<strong>Complete blood count (CBC)</strong> (Lab)", confirmed);
         Assert.Contains("Reason for the test: Synthetic fatigue", confirmed);

@@ -40,7 +40,7 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
 
     public static string WithdrawPath(Guid patient, Guid note, Guid summary) => NotePath(patient, note) + $"/summaries/{summary}/withdraw";
 
-    // "Release to the patient", as the page posts it, "Sensitive" ticked or not.
+    // "Release visit summary", as the page posts it, "Sensitive" ticked or not.
     public static Task<HttpResponseMessage> ReleaseAsync(
         HttpClient client, Guid patient, Guid note, string talkedAbout = TalkedAbout, string found = Found, string nextSteps = NextSteps, bool sensitive = false) =>
         PostFormAsync(client, SummaryPath(patient, note), SummaryPath(patient, note), ("TalkedAbout", talkedAbout), ("Found", found), ("NextSteps", nextSteps), ("Sensitive", sensitive));
@@ -150,8 +150,8 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(
                 [("summary-talked-about", "summary-hint", ""), ("summary-found", "summary-error-0 summary-error-1 summary-hint", "true"), ("summary-next-steps", "summary-hint", "")],
                 Fields(page));
-            Assert.StartsWith("Not released: “E11.9” in What we found", Message(page, 0));
-            Assert.StartsWith("Not released: “4548-4” in What we found", Message(page, 1));
+            Assert.StartsWith("Not released. “E11.9” in What we found", Message(page, 0));
+            Assert.StartsWith("Not released. “4548-4” in What we found", Message(page, 1));
         }
 
         using (var empty = await ReleaseAsync(session.Client, patient, note, talkedAbout: " ", nextSteps: ""))
@@ -161,8 +161,8 @@ public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(
                 [("summary-talked-about", "summary-error-0 summary-hint", "true"), ("summary-found", "summary-hint", ""), ("summary-next-steps", "summary-error-1 summary-hint", "true")],
                 Fields(page));
-            Assert.Equal("Not released: Write “What we talked about”.", Message(page, 0));
-            Assert.Equal("Not released: Write “What happens next”.", Message(page, 1));
+            Assert.Equal("Not released. Write “What we talked about”.", Message(page, 0));
+            Assert.Equal("Not released. Write “What happens next”.", Message(page, 1));
         }
 
         // Each part's ID, what describes it and whether it is invalid, in the page's order.

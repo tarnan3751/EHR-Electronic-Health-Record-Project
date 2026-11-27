@@ -44,8 +44,8 @@ public class TC_UC4_28_ReadsByReading(WebApps apps) : IClassFixture<WebApps>
             page);
         Assert.DoesNotContain("<th scope=\"row\">Systolic blood pressure", page);
         Assert.DoesNotContain("<th scope=\"row\">Diastolic blood pressure", page);
-        Assert.Contains("Systolic blood pressure: 2 values from", Words(page));
-        Assert.Contains("Diastolic blood pressure: 2 values from", Words(page));
+        Assert.Contains("Systolic blood pressure, 2 values from", Words(page));
+        Assert.Contains("Diastolic blood pressure, 2 values from", Words(page));
 
         var chart = await session.Client.GetStringAsync($"/patients/{patient}", Cancel);
         Assert.Matches(

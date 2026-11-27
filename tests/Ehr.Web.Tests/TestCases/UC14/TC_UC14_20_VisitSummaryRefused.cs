@@ -25,9 +25,9 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //      page, and posts both.
 //   2. The first clinician opens the other patient's note through this patient's address.
 //   3. The first clinician opens the summary page of the note that has one, and posts another summary.
-// Expected result: Step 1: the note and its summary are shown, with "Add this patient to your panel to write a summary
-//   for the patient." and neither link; each page and post sends them back to the note; nothing changes. Step 2: 404.
-//   Step 3: the page says "Not offered:" and has no form; the post is answered 409 with "A summary of this note has
+// Expected result: Step 1: the note and its summary are shown, with "To write a visit summary, add this patient to
+//   My patients." and neither link; each page and post sends them back to the note; nothing changes. Step 2: 404.
+//   Step 3: the page says "Already released." and has no form; the post is answered 409 with "A summary of this note has
 //   already been released. Withdraw it first to write another."; there is still one summary.
 // Creator: Tahseen Arnan
 public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApps>
@@ -41,7 +41,7 @@ public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApp
         var note = await SignedNoteAsync(session.Client, patient);
         using (var released = await ReleaseAsync(session.Client, patient, note))
         {
-            Assert.Contains("Released:", Words(await ReadAsync(released)));
+            Assert.Contains("Released.", Words(await ReadAsync(released)));
         }
 
         var summary = await StandingAsync(apps, patient);
@@ -55,7 +55,7 @@ public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApp
         var token = Token(await ReadAsync(opened));
         var read = await covering.Client.GetStringAsync(NotePath(patient, note), Cancel);
         Assert.Contains(TalkedAbout, read);
-        Assert.Contains("Add this patient to your panel to write a summary for the patient.", Words(read));
+        Assert.Contains("To write a visit summary, add this patient to My patients.", Words(read));
         Assert.DoesNotContain("data-write-summary", read);
         Assert.DoesNotContain("data-withdraw-summary", read);
         var noRedirects = Client(apps.OnPrem, covering.Jar, followRedirects: false);
@@ -82,7 +82,7 @@ public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApp
 
         // A second standing summary of the same note.
         var form = await session.Client.GetStringAsync(SummaryPath(patient, note), Cancel);
-        Assert.Contains("Not offered: a summary of this note was released by Dr. Test", Words(form));
+        Assert.Contains("Already released. A summary of this note was released by Dr. Test", Words(form));
         Assert.DoesNotContain("data-release-summary", form);
         using var second = await PostFormAsync(session.Client, SummaryPath(patient, note), NotePath(patient, note),
             ("TalkedAbout", "A second summary."), ("Found", "Found."), ("NextSteps", "Next."));

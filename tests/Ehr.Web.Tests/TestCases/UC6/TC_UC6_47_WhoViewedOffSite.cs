@@ -24,7 +24,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. On the app that can't reach the clinic's server, open Who viewed my record.
 //   2. On the connected cloud app, open it; its shipper runs.
 //   3. On the on-site app, open it.
-// Expected result: Step 1: Dr. Test's view is listed, with the read-only notice and "a view from the last minute may
+// Expected result: Step 1: Dr. Test's view is listed, with the read-only notice and "A view from the last minute may
 //   not be listed yet"; the look is queued as a read of audit_events with no row, and not in the clinic's log. Step 2:
 //   the look arrives with source cloud. Step 3: the patient's looks from the cloud are listed as "Who viewed your record".
 // Creator: Tahseen Arnan
@@ -43,8 +43,8 @@ public class TC_UC6_47_WhoViewedOffSite(WebApps apps) : IClassFixture<WebApps>
         Assert.False(await apps.CloudCutOff.Services.GetRequiredService<CloudAuditShipper>().ShipAsync(Cancel));
         var cutOff = Words(await Client(apps.CloudCutOff, patient.Jar).GetStringAsync(ViewsPath, Cancel));
         Assert.Contains("Dr. Test, clinician", cutOff);
-        Assert.Contains("a view from the last minute may not be listed yet", cutOff);
-        Assert.Contains("Read-only: the clinic's server can't be reached", cutOff);
+        Assert.Contains("A view from the last minute may not be listed yet.", cutOff);
+        Assert.Contains("Read-only. The clinic's server can't be reached", cutOff);
         var (queued, _) = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue);
         Assert.Single(queued, e => e.Action == AuditActions.Read && e.ActorId == patient.Account && e.PatientId == patient.Patient
             && e.TableName == "audit_events" && e.RowId is null);

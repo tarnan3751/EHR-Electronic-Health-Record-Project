@@ -30,12 +30,12 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   6. Download the desktop app's offline copy.
 // Expected result: After step 1 the anxiety diagnosis is stored sensitive and the hypertension not. Step 2: the chart
 //   lists the hypertension but neither anxiety nor sertraline, anywhere on the page, banner included, and says
-//   "Sensitive items hidden: 2 diagnoses or medications are not shown." with a "Show sensitive items" link; nothing
+//   "Sensitive items hidden. 2 diagnoses or medications are not shown." with a "Show sensitive items" link; nothing
 //   is recorded as read_sensitive. Step 3: both are listed, each with a "Sensitive" tag, the chart says "Sensitive
-//   items shown: your view of them is recorded.", the banner still names neither, and one read_sensitive is recorded
-//   and no plain read. Step 4: the history leaves their changes out ("Sensitive items hidden: 2 changes are not
+//   items shown. Your view is logged.", the banner still names neither, and one read_sensitive is recorded
+//   and no plain read. Step 4: the history leaves their changes out ("Sensitive items hidden. 2 changes are not
 //   shown.") until asked, then shows them, recorded the same way. Step 5: the form shows the diagnosis with its
-//   "Sensitive" box fixed ("Sensitive by its code."), and is recorded as read_sensitive. Step 6: the offline copy
+//   "Sensitive" box fixed ("Sensitive because of its code."), and is recorded as read_sensitive. Step 6: the offline copy
 //   holds the hypertension only and says "sensitiveNotKept": 2.
 // Creator: Tahseen Arnan (expansion step 2), UC 4 owner Diego Valenzuela
 public class TC_UC4_32_SensitiveItems(WebApps apps) : IClassFixture<WebApps>
@@ -59,14 +59,14 @@ public class TC_UC4_32_SensitiveItems(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("<strong>Essential (primary) hypertension</strong>", chart);
         Assert.DoesNotContain("anxiety", chart, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sertraline", chart, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 2 diagnoses or medications are not shown. Show sensitive items", Words(chart));
+        Assert.Contains("Sensitive items hidden. 2 diagnoses or medications are not shown. Show sensitive items", Words(chart));
         Assert.Equal(views, await SensitiveViewsAsync());
 
         var reads = await ReadsAsync();
         var shown = await session.Client.GetStringAsync($"/patients/{patient}?sensitive=true", Cancel);
         Assert.Matches("<strong>Generalized anxiety disorder</strong>[^<]*\\(F41\\.1\\)[\\s\\S]*?<span class=\"sc-tag sc-tag--warning\">Sensitive</span>", shown);
         Assert.Matches("<strong>sertraline 50 MG Oral Tablet</strong>\\s*<span class=\"sc-tag sc-tag--warning\">Sensitive</span>", shown);
-        Assert.Contains("Sensitive items shown: your view of them is recorded.", Words(shown));
+        Assert.Contains("Sensitive items shown. Your view is logged.", Words(shown));
         var banner = System.Text.RegularExpressions.Regex.Match(shown, "<section class=\"sc-banner\"[\\s\\S]*?</section>").Value;
         Assert.NotEmpty(banner);
         Assert.DoesNotContain("anxiety", banner, StringComparison.OrdinalIgnoreCase);
@@ -77,7 +77,7 @@ public class TC_UC4_32_SensitiveItems(WebApps apps) : IClassFixture<WebApps>
         var history = await session.Client.GetStringAsync($"/patients/{patient}/chart-history", Cancel);
         Assert.DoesNotContain("anxiety", history, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sertraline", history, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sensitive items hidden: 2 changes are not shown.", Words(history));
+        Assert.Contains("Sensitive items hidden. 2 changes are not shown.", Words(history));
         Assert.Equal(views + 1, await SensitiveViewsAsync());
         var historyShown = await session.Client.GetStringAsync($"/patients/{patient}/chart-history?sensitive=true", Cancel);
         Assert.Contains("Generalized anxiety disorder", historyShown);
@@ -87,7 +87,7 @@ public class TC_UC4_32_SensitiveItems(WebApps apps) : IClassFixture<WebApps>
         var entry = Guid.Parse((await RowsAsync(apps, "conditions", patient, "id::text", "display DESC")).First());
         var form = await session.Client.GetStringAsync(EntryPath(patient, "diagnoses", entry), Cancel);
         Assert.Contains("value=\"Generalized anxiety disorder\"", form);
-        Assert.Contains("Sensitive by its code.", Words(form));
+        Assert.Contains("Sensitive because of its code.", Words(form));
         Assert.Equal(views + 3, await SensitiveViewsAsync());
 
         using var offline = await DesktopSignInTests.PostAsync(apps.OnPrem, "/api/desktop/offline-panel", await apps.DesktopSignInAsync(apps.OnPrem, clinician));

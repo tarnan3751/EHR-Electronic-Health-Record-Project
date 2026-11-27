@@ -63,7 +63,7 @@ public class TC_UC4_31_ChildBloodPressureBySexAndAge(WebApps apps) : IClassFixtu
         foreach (var (day, systolic) in new[] { (birthday.AddDays(-1), "125"), (birthday, "125"), (birthday.AddDays(1), "131") })
         {
             using var recorded = await RecordAtAsync(session.Client, adult, $"{day:yyyy-MM-dd}T12:00", (Systolic, systolic), (Diastolic, "75"));
-            Assert.Contains("Saved:", await ReadAsync(recorded));
+            Assert.Contains("Saved.", await ReadAsync(recorded));
         }
 
         // Newest first.

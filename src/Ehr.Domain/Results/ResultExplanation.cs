@@ -68,7 +68,8 @@ public static class ResultExplanation
     // Up to four decimal places, as stored, without trailing zeros: 6.9, not 6.9000.
     static string Number(decimal value) => value.ToString("0.####", CultureInfo.InvariantCulture);
 
-    static string Join(string number, string? unit) => unit is { Length: > 0 } ? $"{number} {unit}" : number;
+    // With the unit as patients read it everywhere in the portal (Units.ForPatients): "7.2 10³/µL", not "10*3/uL".
+    static string Join(string number, string? unit) => Units.ForPatients(unit) is { Length: > 0 } shown ? $"{number} {shown}" : number;
 }
 
 public enum ResultFlag

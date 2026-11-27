@@ -120,7 +120,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.True(await page.EvaluateAsync<bool>("window.__ambient.track.stopped && !window.__ambient.track.enabled"));
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.startsWith('DELETE ') && e.endsWith(' 204'))"
             + " && window.__ambient.events.some(e => e.endsWith('/discard 200'))");
-        Assert.Contains("Discarded: nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Contains("Discarded. Nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
         Assert.True(await page.IsVisibleAsync("[data-ambient-consent]"));
         // The button pressed has gone with the rest: the cursor is on the consent's heading, to start again from.
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-ambient-consent-heading]')"));
@@ -161,13 +161,13 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.startsWith('DELETE ') && e.endsWith(' 204'))"
             + " && window.__ambient.events.some(e => e.endsWith('/discard 200'))");
-        Assert.Equal("Discarded: nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Equal("Discarded. Nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
 
         await page.EvaluateAsync("window.__heldUpload()");
         await page.WaitForFunctionAsync(
             "window.__ambient.events.slice(window.__ambient.events.findIndex(e => e.startsWith('DELETE '))).some(e => /\\/audio (404|409)$/.test(e))");
         await page.WaitForTimeoutAsync(300);
-        Assert.Equal("Discarded: nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Equal("Discarded. Nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
         Assert.DoesNotContain("sc-status--error", await page.GetAttributeAsync("[data-ambient-status]", "class") ?? "");
         Assert.True(await page.IsVisibleAsync("[data-ambient-consent]"));
 
@@ -175,7 +175,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForFunctionAsync("window.__ambient.events.filter(e => e === 'microphone').length === 2");
         await page.WaitForFunctionAsync(
             "window.__ambient.events.slice(window.__ambient.events.lastIndexOf('microphone')).some(e => e.includes('/audio') && e.endsWith(' 200'))");
-        Assert.Equal("Listening: the visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Equal("Listening. The visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
     }
 
     // Opens the Listen page in its own browser, with the fake microphone.
@@ -241,7 +241,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(sent, await ChunksAsync(page));
 
         await page.EvaluateAsync("window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))");
-        Assert.Contains("Listening ended when you left this page: nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Contains("Listening ended when you left this page. Nothing recorded was kept.", await page.TextContentAsync("[data-ambient-status]"));
         Assert.DoesNotContain("Recording", await page.TitleAsync(), StringComparison.Ordinal);
         Assert.True(await page.IsHiddenAsync("[data-ambient-capture]"));
         Assert.True(await page.IsVisibleAsync("[data-ambient-consent]"));
@@ -289,7 +289,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await using var _ = browser;
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("document.querySelector('[data-ambient-clock]').textContent.startsWith('Recording the visit')");
-        Assert.Equal("Listening: the visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Equal("Listening. The visit is being recorded.", await page.TextContentAsync("[data-ambient-status]"));
         Assert.DoesNotContain("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
         await page.EvaluateAsync("""
             window.__said = [];
@@ -342,8 +342,8 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForSelectorAsync("[data-ambient-voice='2']");
         var said = await page.EvaluateAsync<string[]>("window.__said");
         Assert.Single(said, s => s.StartsWith("Listening stops in a minute", StringComparison.Ordinal));
-        Assert.Single(said, s => s == "Listening stopped at its 20-minute limit. Transcribing the visit and telling its voices apart: "
-            + "then say who each voice is to draft the note.");
+        Assert.Single(said, s => s == "Listening stopped at its 20-minute limit. Transcribing the visit and telling its voices apart. "
+            + "Then say who each voice is to draft the note.");
         Assert.DoesNotContain("sc-status--warning", await page.GetAttributeAsync("[data-ambient-status]", "class"));
     }
 
@@ -456,7 +456,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     // goes on to the voices.
     [Theory]
     [InlineData(502, """{"error":"bad_answer","message":"Dictation isn't working right now."}""", 1, "Dictation isn't working right now.")]
-    [InlineData(503, """{"error":"unavailable","message":"Dictation isn't available right now."}""", 4, "The visit couldn't be fetched: the dictation service isn't answering")]
+    [InlineData(503, """{"error":"unavailable","message":"Listening isn't available right now. You can type the note."}""", 4, "The visit couldn't be fetched because the listening service isn't answering")]
     public async Task TC_UC23_04_fetching_the_draft_is_asked_a_few_times_at_most(int status, string answer, int asked, string said)
     {
         var (patient, session) = await AccountAsync(apps);
@@ -477,7 +477,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain("draft", words, StringComparison.OrdinalIgnoreCase);
         if (status == 503)
         {
-            Assert.Contains("Try again in a moment, or discard the recording; the service keeps nothing for more than 10 minutes.", words);
+            Assert.Contains("Try again in a moment, or discard the recording. The service keeps nothing for more than 10 minutes.", words);
         }
 
         Assert.True(await page.IsVisibleAsync("[data-ambient-retry]"));
@@ -498,7 +498,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("""{"transcript":{"text":"","final":true,"segments":[]},"sorting":"unavailable","reason":"transcription_failed","fields":null,"notCarriedOver":[],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null,"llamaServer":null,"prompt":"p","schema":"s","structuring":"t","code":"c"}}""",
         "This visit couldn't be transcribed and its voices told apart, so it can't be drafted.")]
     [InlineData("""{"transcript":{"text":"","final":true,"segments":[]},"sorting":"awaiting_speakers","fields":null,"notCarriedOver":[],"provenance":{"speech":{"repository":"synthetic","commit":"0","sha256":"0"},"language":null,"llamaServer":null,"prompt":"p","schema":"s","structuring":"t","code":"c"},"speakers":[{"group":1,"seconds":1},{"group":2,"seconds":1},{"group":3,"seconds":1},{"group":4,"seconds":1},{"group":5,"seconds":1},{"group":6,"seconds":1},{"group":7,"seconds":1},{"group":8,"seconds":1},{"group":9,"seconds":1},{"group":10,"seconds":1}]}""",
-        "The dictation service told apart more voices than can be named (9 at most), so this visit can't be drafted.")]
+        "More voices were told apart than can be named (9 at most), so this visit can't be drafted.")]
     public async Task TC_UC23_04_a_visit_that_cant_be_drafted_offers_only_discarding_it(string answer, string said)
     {
         var (patient, session) = await AccountAsync(apps);
@@ -539,7 +539,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         {
             Status = 503,
             ContentType = "application/json",
-            Body = """{"error":"unavailable","message":"Dictation isn't available right now."}"""
+            Body = """{"error":"unavailable","message":"Listening isn't available right now. You can type the note."}"""
         }));
         await ConsentAsync(page);
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
@@ -552,7 +552,7 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForFunctionAsync("document.querySelector('[data-ambient-status]').textContent.startsWith('The draft couldn\\'t be fetched')",
             null, new() { Timeout = 30_000 });
-        Assert.Contains("open the draft in a few minutes to retrieve it", await page.TextContentAsync("[data-ambient-status]"));
+        Assert.Contains("open the draft in a few minutes to retrieve or discard it", await page.TextContentAsync("[data-ambient-status]"));
         Assert.True(await page.IsVisibleAsync("[data-ambient-retry]"));
         Assert.True(await page.IsVisibleAsync("[data-ambient-open-draft]"));
         Assert.True(await page.IsHiddenAsync("[data-ambient-discard-stuck]"));
@@ -570,7 +570,9 @@ public class AmbientBrowserTests(WebApps apps) : IClassFixture<WebApps>
             "SELECT id::text FROM ehr.ai_note_reviews WHERE patient_id = @id AND mode = 'ambient'", patient)).Single();
         await page.UnrouteAsync("**/ambient/*/result");
         await page.GotoAsync($"{server.Url}/patients/{patient}/notes/drafts/{draft}/review/{review}");
-        Assert.Contains("hasn't been drafted yet. If its voices were named a moment ago, wait a minute and choose Retrieve.",
+        Assert.Contains("Not drafted yet. A visit was recorded at",
+            await page.TextContentAsync("[data-ambient-not-drafted]"));
+        Assert.Contains("If you named its voices a moment ago, wait a minute, then retrieve its draft.",
             await page.TextContentAsync("[data-ambient-not-drafted]"));
         await AiReviewBrowserTests.TabToAsync(page, "[data-review-retrieve]");
         await page.Keyboard.PressAsync("Tab");

@@ -29,7 +29,7 @@ public sealed class PatientAccounts(UserManager<PatientUser> users, EhrDbContext
 
             {link}
 
-            If you didn't ask for this, you can ignore this message; your password hasn't changed.
+            If you didn't ask for this, ignore this message. Your password hasn't changed.
             """,
             new EmailAction("Reset your password", link),
             cancellationToken);

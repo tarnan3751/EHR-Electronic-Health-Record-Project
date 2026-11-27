@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //      the focus, and press Enter.
 //   3. Press Tab until the first trend's "The values as a table" has the focus, and press Enter.
 // Expected result: Step 1 opens the vital signs page with the cursor in the systolic field. Step 2 saves: the page
-//   says "Saved:" and shows two trend charts. Step 3 opens the table, which lists both values. Every focused control
+//   says "Saved." and shows two trend charts. Step 3 opens the table, which lists both values. Every focused control
 //   shows the focus ring, the charts are drawn (each has a size), and the page reports no script errors.
 // Creator: Tahseen Arnan
 //
@@ -60,7 +60,7 @@ public class TC_UC4_18_Nfr12_VitalSignsKeyboardFirst(WebApps apps) : IClassFixtu
         Assert.True(await page.EvaluateAsync<bool>(focusRing));
         await page.Keyboard.PressAsync("Enter");
         await page.WaitForURLAsync(url => url.Contains("saved=", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("Saved:", await page.Locator(".sc-notice--success").TextContentAsync());
+        Assert.Contains("Saved.", await page.Locator(".sc-notice--success").TextContentAsync());
         Assert.Equal(2, await page.Locator("figure.sc-trend").CountAsync());
         Assert.True(await page.EvaluateAsync<bool>("[...document.querySelectorAll('svg.sc-trend__chart')].every(svg => svg.getBoundingClientRect().height > 40)"));
 
