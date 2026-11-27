@@ -458,8 +458,12 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
     // Step 19.2: the right password, its hash checked, then waiting for the account behind an administrator's password
     // reissue, or ahead of it. Behind it, the password checked is no longer the account's: it is answered as a wrong
-    // one, and nothing is counted or recorded. Ahead of it, it goes on to the code, and the reissue then sends the code
-    // back to the password (step 19.1). Before, behind the reissue, it went on to the code all the same.
+    // one, and nothing is counted or recorded. Ahead of it, it goes on to the code, the earlier wrong one's count reset,
+    // and the reissue then sends the code back to the password (step 19.1). Before, behind the reissue, it went on to
+    // the code all the same. The password's own answer is read, not the code page it redirects to: that page is a
+    // request of its own, sent once the password's transaction has ended and has let the reissue go, so whether it comes
+    // before or after the reissue's commit was the client's timing, and once in a while (main's CI on ffa44c2) it came
+    // after and was sent back to the password. Opened after the reissue has answered, it always is.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -474,7 +478,7 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         var client = Client(apps.OnPrem, jar);
         var signInToken = Token(await client.GetStringAsync("/sign-in", Cancel));
         var adminToken = Token(await adminSession.Client.GetStringAsync("/admin/staff", Cancel));
-        Task<HttpResponseMessage> Password() => client.PostAsync(
+        Task<HttpResponseMessage> Password() => Client(apps.OnPrem, jar, followRedirects: false).PostAsync(
             "/sign-in", Form(("Input.Email", account.Email), ("Input.Password", account.Password), ("__RequestVerificationToken", signInToken)), Cancel);
         Task<HttpResponseMessage> Reissue() => adminSession.Client.PostAsync(
             "/admin/staff?handler=Reissue", Form(("id", account.Id), ("__RequestVerificationToken", adminToken)), Cancel);
@@ -504,15 +508,19 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("/sign-in/setup?user=", await ReadAsync(reissued));
         if (reissueFirst)
         {
-            Assert.Equal("/sign-in", PathOf(step));
+            // Answered on the sign-in page itself, not sent on.
             Assert.Contains("Wrong email or password.", Words(await ReadAsync(step)));
             Assert.Equal(new[] { "wrong password" }, await ReasonsAsync(account));
             Assert.Equal(1, (await AccountOfAsync(account)).AccessFailedCount);
         }
         else
         {
-            Assert.Equal(CodePage, PathOf(step));
-            using var code = await PostFormAsync(client, CodePage, step, ("Code", Totp.Code(account.AuthenticatorKey)));
+            Assert.Equal(HttpStatusCode.Redirect, step.StatusCode);
+            Assert.Equal(CodePage, new Uri(Base, step.Headers.Location!).AbsolutePath);
+            Assert.Equal(0, (await AccountOfAsync(account)).AccessFailedCount);
+            using var codePage = await client.GetAsync(CodePage, Cancel);
+            Assert.Equal("/sign-in", PathOf(codePage));
+            using var code = await PostFormAsync(client, CodePage, codePage, ("Code", Totp.Code(account.AuthenticatorKey)));
             Assert.Equal("/sign-in", PathOf(code));
         }
 

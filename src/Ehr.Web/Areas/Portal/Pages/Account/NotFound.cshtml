@@ -1,0 +1,15 @@
+@page "/portal/not-found"
+@model NotFoundModel
+@{
+    ViewData["Title"] = "Page not found";
+}
+<h1>Page not found</h1>
+<p>There's nothing to show at this address.</p>
+@if (User.IsPortalAccount())
+{
+    <p><a asp-area="Portal" asp-page="/Index">Back to my record</a></p>
+}
+else
+{
+    <p><a asp-page="SignIn">Sign in</a></p>
+}
