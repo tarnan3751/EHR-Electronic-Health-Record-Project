@@ -132,17 +132,20 @@
                             <span class="sc-appbar__count" data-inbox-count><span class="sc-visually-hidden">, </span>@waiting<span class="sc-visually-hidden"> to do</span></span>
                         }
                     </a>
-                    <a asp-area="Clinical" asp-page="/QuickTexts/Index" class="sc-appbar__link" aria-current="@current("/QuickTexts/")">Quick text</a>
-                    @* A staff member's own passkeys (step 19), where the clinic has them. *@
-                    @if (Passkeys.On)
-                    {
-                        <a asp-area="Clinical" asp-page="/Passkeys/Index" class="sc-appbar__link" aria-current="@current("/Passkeys/")">Passkeys</a>
-                    }
                     @if (User.IsInRole(StaffRoles.Admin))
                     {
                         <a asp-area="Clinical" asp-page="/Admin/Staff" class="sc-appbar__link" aria-current="@current("/Admin/Staff")">Staff</a>
                         <a asp-area="Clinical" asp-page="/Admin/Audit" class="sc-appbar__link" aria-current="@current("/Admin/Audit")">Audit</a>
                     }
+                    @* The staff member's own things, after the work: on the right, beside their name. *@
+                    <div class="sc-appbar__account">
+                        <a asp-area="Clinical" asp-page="/QuickTexts/Index" class="sc-appbar__link" aria-current="@current("/QuickTexts/")">Quick text</a>
+                        @* A staff member's own passkeys (step 19), where the clinic has them. *@
+                        @if (Passkeys.On)
+                        {
+                            <a asp-area="Clinical" asp-page="/Passkeys/Index" class="sc-appbar__link" aria-current="@current("/Passkeys/")">Passkeys</a>
+                        }
+                    </div>
                 }
             </nav>
             <form method="post" asp-area="@(isPatient ? "Portal" : "Clinical")" asp-page="/Account/SignOut" class="sc-appbar__end">
@@ -154,16 +157,18 @@
     @if (!OnPrem.IsReachable)
     {
         @* FR-34: off-site, with the clinic's server down, records can still be read but nothing can be saved. The band
-           runs the full width under the app bar on every page. *@
-        <p class="sc-notice sc-notice--warning sc-notice--band" role="status"><span class="sc-notice__state">Read-only.</span> The clinic's server can't be reached, so nothing can be saved until it's back. The newest changes may not show yet.</p>
+           runs the full width under the app bar on every page; its words start where the app bar's do. *@
+        <p class="sc-notice sc-notice--warning sc-notice--band" role="status"><span class="sc-band__line"><span class="sc-notice__state">Read-only.</span> The clinic's server can't be reached, so nothing can be saved until it's back. The newest changes may not show yet.</span></p>
     }
     @if (acting is not null)
     {
         @* FR-19: a proxy is never left to wonder whose record is on screen. The band sits under the app bar on every
            portal page while the session is acting for someone, with the way back. *@
-        <form method="post" asp-area="Portal" asp-page="/Acting" asp-page-handler="Mine" class="sc-notice sc-notice--info sc-notice--band sc-acting" data-acting>
-            <p><span class="sc-notice__state">Shared record.</span> You're viewing <strong>@acting.PatientName</strong>'s record@(subject!.OwnPatientId is null ? "." : ", not your own.")</p>
-            <button type="submit" class="sc-btn sc-btn--compact">@(subject!.OwnPatientId is null ? "Choose another record" : "Back to my record")</button>
+        <form method="post" asp-area="Portal" asp-page="/Acting" asp-page-handler="Mine" class="sc-notice sc-notice--info sc-notice--band" data-acting>
+            <div class="sc-band__line sc-acting">
+                <p><span class="sc-notice__state">Shared record.</span> You're viewing <strong>@acting.PatientName</strong>'s record@(subject!.OwnPatientId is null ? "." : ", not your own.")</p>
+                <button type="submit" class="sc-btn sc-btn--compact">@(subject!.OwnPatientId is null ? "Choose another record" : "Back to my record")</button>
+            </div>
         </form>
     }
     @* The patient banner, on a page about a patient: directly under the app bar, and it stays put as the page scrolls. *@

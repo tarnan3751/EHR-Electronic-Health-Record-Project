@@ -274,10 +274,13 @@
         color: var(--on-appbar);
     }
 
+    /* The portal's bar holds its contents to the reading column the page is on, so the lockup starts where the page
+       does and the sign-out ends where it ends; the links take a row of their own under them, at every width. */
     .sc-appbar--portal {
         background: var(--surface-raised);
         color: var(--ink);
         border-bottom: 1px solid var(--line);
+        padding-inline: max(var(--space-5), (100% - var(--width-reading)) / 2);
     }
 
     .sc-appbar__brand {
@@ -301,6 +304,40 @@
         min-height: var(--appbar-height);
     }
 
+    /* The clinic's links: the work on the left, then the staff member's own pages (sc-appbar__account) on the right,
+       beside their name, a step quieter and set off from it by a hairline. */
+    .sc-appbar--clinician .sc-appbar__nav {
+        flex-grow: 1;
+    }
+
+    .sc-appbar__account {
+        display: flex;
+        align-items: stretch;
+        gap: var(--space-5);
+        margin-left: auto;
+    }
+
+    .sc-appbar__account .sc-appbar__link {
+        font-weight: 500;
+        color: var(--appbar-muted);
+    }
+
+    .sc-appbar__account .sc-appbar__link:hover,
+    .sc-appbar__account .sc-appbar__link[aria-current="page"] {
+        color: var(--on-appbar);
+    }
+
+    .sc-appbar__account::after {
+        content: "";
+        align-self: center;
+        width: 1px;
+        height: 20px;
+        margin-left: calc(var(--space-6) - var(--space-5));
+        background: color-mix(in srgb, var(--on-appbar) 28%, transparent);
+    }
+
+    /* A link's place is marked by a bar on the bar's bottom edge: mint where the page is, a faint one under the
+       pointer, so the two are never confused. */
     .sc-appbar__link {
         display: flex;
         align-items: center;
@@ -311,26 +348,49 @@
         line-height: 20px;
         font-weight: 600;
         white-space: nowrap;
-        border-bottom: 2px solid transparent;
-        border-top: 2px solid transparent;
+        border-bottom: 3px solid transparent;
+        border-top: 3px solid transparent;
     }
 
     .sc-appbar__link:hover {
-        border-bottom-color: currentColor;
+        border-bottom-color: color-mix(in srgb, currentColor 35%, transparent);
     }
 
     .sc-appbar__link[aria-current="page"] {
         border-bottom-color: var(--accent);
     }
 
-    /* A count beside an app bar link, such as the inbox's items that need action. */
+    /* The portal's links are muted until one is the page's, so the place shows in the words too, not only in the
+       mint, which is faint on the light bar. */
+    .sc-appbar--portal .sc-appbar__link {
+        color: var(--ink-muted);
+    }
+
+    .sc-appbar--portal .sc-appbar__link:hover,
+    .sc-appbar--portal .sc-appbar__link[aria-current="page"] {
+        color: var(--ink);
+    }
+
+    /* A shortcut's key on an app bar link ("/" on Patients): a keycap in the bar's muted ink, so it reads as a hint
+       beside the word, not a second word. */
+    .sc-appbar .sc-kbd {
+        display: inline-block;
+        min-width: 18px;
+        text-align: center;
+        color: var(--appbar-muted);
+        border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+    }
+
+    /* A count beside an app bar link, such as the inbox's items that need action: a pill. */
     .sc-appbar__count {
+        min-width: 20px;
+        text-align: center;
         font-family: var(--font-mono);
         font-size: 12px;
-        line-height: 16px;
+        line-height: 18px;
         font-weight: 600;
         padding: 0 var(--space-1);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-full);
         /* Navy on mint, 9.6:1, in both themes: the app bar is dark in both. */
         background: var(--accent);
         color: var(--brand-navy);
@@ -356,6 +416,28 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    /* The portal's first row: the lockup, then the account and its sign-out on the column's right edge. The account
+       is shown whole when the row has room, and in the muted ink, since the page's own heading says whose record it
+       is. */
+    .sc-appbar--portal .sc-appbar__end {
+        flex: 1 1 0;
+        min-width: 0;
+        justify-content: flex-end;
+    }
+
+    .sc-appbar--portal .sc-appbar__user {
+        max-width: none;
+        min-width: 0;
+        color: var(--ink-muted);
+    }
+
+    .sc-appbar--portal .sc-appbar__nav {
+        order: 3;
+        flex-basis: 100%;
+        gap: var(--space-6);
+        min-height: 44px;
     }
 
     .sc-appbar__site {
@@ -385,6 +467,10 @@
         padding: 0 var(--space-3);
         cursor: pointer;
         white-space: nowrap;
+    }
+
+    .sc-appbar__signout:hover {
+        background: color-mix(in srgb, currentColor 12%, transparent);
     }
 
     .sc-appbar .sc-conn {
@@ -425,6 +511,11 @@
             min-width: 0;
         }
 
+        /* The staff member's own pages follow the work in the row that scrolls, without the hairline. */
+        .sc-appbar__account::after {
+            display: none;
+        }
+
         /* The portal's links share one row on a phone, spread across it, and wrap only on a narrower screen, so none is
            hidden off the edge. */
         .sc-appbar--portal .sc-appbar__nav {
@@ -432,6 +523,7 @@
             justify-content: space-between;
             overflow-x: visible;
             gap: 0 var(--space-2);
+            min-height: 40px;
         }
 
         .sc-appbar--portal .sc-appbar__link {
@@ -448,6 +540,16 @@
         .sc-appbar--portal .sc-appbar__link {
             font-size: 13px;
         }
+    }
+
+    /* A band's words under the app bar (read-only off-site, a proxy's shared record), on the column the app bar's
+       contents are on: the bar's own edges in the clinic, the reading column in the portal, where a little more room
+       above and below keeps the proxy's button off the band's edges. */
+    .sc-app--portal .sc-band__line {
+        display: block;
+        max-width: var(--width-reading);
+        margin-inline: auto;
+        padding-block: var(--space-1);
     }
 
     /* The page: clinician pages at width-content, reading at width-reading, account forms at width-form. */
