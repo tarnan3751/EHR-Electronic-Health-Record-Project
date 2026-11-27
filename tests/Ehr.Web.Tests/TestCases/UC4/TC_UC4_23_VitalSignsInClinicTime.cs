@@ -79,7 +79,7 @@ public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebA
         // The hour Chicago's clocks skipped on 8 March 2026: said, not taken for a missing time.
         using var skipped = await RecordAtAsync(session.Client, patient, "2026-03-08T02:30", (HeartRate, "70"));
         Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, skipped.StatusCode);
-        Assert.Contains("That time doesn&#x27;t exist on that day: the clocks go forward.", await skipped.Content.ReadAsStringAsync(Cancel));
+        Assert.Contains("The clocks go forward that day, so that time doesn&#x27;t exist. Enter another time.", await skipped.Content.ReadAsStringAsync(Cancel));
 
         // The desktop's offline copy says which zone its times are shown in.
         using var offline = await DesktopSignInTests.PostAsync(chicago, "/api/desktop/offline-panel", await apps.DesktopSignInAsync(chicago, clinician));

@@ -105,7 +105,7 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         if (taken is null && typed != default && errors.ContainsKey(nameof(TakenAt)))
         {
             // A time was typed, and the clinic's clocks skip it that day.
-            errors[nameof(TakenAt)] = "That time doesn't exist on that day: the clocks go forward. Enter the time on the clinic's clock.";
+            errors[nameof(TakenAt)] = "The clocks go forward that day, so that time doesn't exist. Enter another time.";
         }
 
         var standing = Vitals.Signs.Where(sign => sign.EffectiveAt == taken && sign.Status == ObservationStatus.Final).ToList();

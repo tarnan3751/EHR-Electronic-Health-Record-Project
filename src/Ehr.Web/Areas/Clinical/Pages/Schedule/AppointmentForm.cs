@@ -26,7 +26,7 @@ public static class AppointmentForm
             start = clinic.From(date.ToDateTime(clock));
             if (start is null)
             {
-                errors["Time"] = "That time doesn't exist on that day: the clocks go forward. Choose another.";
+                errors["Time"] = "The clocks go forward that day, so that time doesn't exist. Enter another time.";
             }
             else if (start < DateTimeOffset.UtcNow.AddMinutes(-5))
             {
