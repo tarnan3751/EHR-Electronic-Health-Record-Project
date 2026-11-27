@@ -506,7 +506,7 @@ sealed class Setup(Options options)
                 {
                     var confirm = Portal(new Uri(link.Value).PathAndQuery);
                     var page = await portal.PostAsync(confirm, await portal.GetAsync(confirm));
-                    if (!page.Html.Contains("Your address is confirmed", StringComparison.Ordinal))
+                    if (!page.Html.Contains("Email address confirmed", StringComparison.Ordinal))
                     {
                         throw Unexpected(page, "confirming the email address");
                     }
