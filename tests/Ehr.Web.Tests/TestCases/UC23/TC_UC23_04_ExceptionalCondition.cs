@@ -39,7 +39,7 @@ namespace Ehr.Web.Tests.TestCases.UC23;
 //   3a. Stop listening and send audio after; ask for the result when the service refuses the recording's language.
 //   4. Draft a visit, purge its transcript, open its review, and accept a proposal, edit it back to its own words, and
 //      edit it into others; open the review on an on-site app set to keep transcripts 3 days.
-// Expected result: Step 1: "Listen to the visit" on the clinic's chart only; off-site, the page's "Unavailable:" notice
+// Expected result: Step 1: "Listen to the visit" on the clinic's chart only; off-site, the page's "Unavailable here." notice
 //   and no listening controls; the start refused by the cloud app, nothing forwarded, nothing sent to the service. Step 2:
 //   off-site, "Read-only here." with the review's proposals, no transcript, no decisions and no finishing; the forwarded
 //   decision and finishing refused with "Finish this review at the clinic…", the review still open with its transcript.
