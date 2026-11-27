@@ -2782,6 +2782,155 @@
        anything two areas share belongs in the components layer.
        ---- */
 
+    /* A clinic form, or one task's words and its form, framed: a card on the raised surface on the page's left edge,
+       at the form's width (--wide: a form of notes and messages, at reading width). Its fields take the card's width,
+       and a heading in it is a panel's. */
+    .sc-formcard {
+        max-width: calc(var(--width-form) + 2 * var(--space-6));
+        margin: 0 0 var(--space-6);
+        padding: var(--space-5) var(--space-6) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-formcard--wide {
+        max-width: calc(var(--width-reading) + 2 * var(--space-6));
+    }
+
+    .sc-formcard > :first-child {
+        margin-top: 0;
+    }
+
+    .sc-formcard > :last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-formcard .sc-form {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-formcard .sc-field {
+        max-width: none;
+    }
+
+    .sc-formcard h2 {
+        margin: 0 0 var(--space-3);
+        font-size: 18px;
+        line-height: 24px;
+    }
+
+    .sc-formcard .sc-form > h2 {
+        margin: 0;
+    }
+
+    /* "Cancel" beside a form's button, as a plain link: the quiet button's look, underlined on hover and focus. */
+    .sc-formcard .sc-actions > a:not(.sc-btn) {
+        display: inline-flex;
+        align-items: center;
+        height: var(--control-height);
+        padding: 0 var(--space-3);
+        text-decoration: none;
+    }
+
+    .sc-formcard .sc-actions > a:not(.sc-btn):hover,
+    .sc-formcard .sc-actions > a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    /* A form of short fields (an order, an allergy): the item or name across the card, the details two to a row
+       where they fit; notices, reasons, checkboxes and the buttons across. */
+    .sc-formgrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+        gap: var(--space-4);
+        align-items: end;
+    }
+
+    .sc-formgrid > * {
+        grid-column: 1 / -1;
+    }
+
+    .sc-formgrid > .sc-field:not(:has(#order-item, #entry-name, textarea, .sc-check)) {
+        grid-column: auto;
+    }
+
+    .sc-formgrid > .sc-actions {
+        margin-top: var(--space-1);
+    }
+
+    /* A form in a panel (results to enter, vital signs to record): its fields side by side as many as fit, each box
+       on one line with the others; the sentences before them, a time and the button across. */
+    .sc-sheet > .sc-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+        gap: var(--space-4) var(--space-5);
+        align-items: end;
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-sheet > .sc-form > :not(.sc-field) {
+        grid-column: 1 / -1;
+    }
+
+    .sc-sheet > .sc-form > .sc-field:has(input[type="datetime-local"]) {
+        grid-column: 1;
+    }
+
+    .sc-sheet > .sc-form > .sc-actions {
+        margin-top: 0;
+    }
+
+    .sc-sheet > h2:first-child + .sc-notice {
+        margin-bottom: var(--space-4);
+    }
+
+    /* Two columns that both earn their place: a form beside what it adds to (an addendum beside the note it follows),
+       or a record beside what belongs to it. One column on a narrow window, the form first. */
+    .sc-split {
+        display: grid;
+        grid-template-columns: minmax(0, calc(var(--width-reading) + 2 * var(--space-6))) minmax(0, 1fr);
+        gap: var(--space-6);
+        align-items: start;
+        margin: 0 0 var(--space-6);
+    }
+
+    .sc-split > * {
+        margin: 0;
+    }
+
+    @media (max-width: 64rem) {
+        .sc-split {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    /* A panel on a chart page: its title over a hairline, as the chart's panels. */
+    .sc-sheet {
+        margin: 0 0 var(--space-6);
+        padding: 0 var(--space-6) var(--space-5);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-sheet > :last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-sheet > h2:first-child {
+        display: flex;
+        align-items: center;
+        min-height: calc(28px + 2 * var(--space-3));
+        margin: 0 calc(-1 * var(--space-6)) var(--space-4);
+        padding: 0 var(--space-6);
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
     /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
        comment; anything two areas share belongs in the components layer.
        ---- */
