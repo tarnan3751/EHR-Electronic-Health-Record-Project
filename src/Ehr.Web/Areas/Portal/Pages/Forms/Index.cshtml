@@ -10,6 +10,8 @@
     var toFill = (Model.Forms?.Forms ?? []).Where(form => form.Response is null && !form.ClosedAt(now))
         .OrderBy(form => form.AppointmentStartsAt).ToList();
     var sent = (Model.Forms?.Forms ?? []).Where(form => form.Response is not null).OrderByDescending(form => form.Response!.AnsweredAt).ToList();
+    // One primary button a page (docs/brand): the soonest form that can be filled in now.
+    var next = toFill.FirstOrDefault(form => form.OpenAt(now));
     string When(DateTimeOffset moment) => Clinic.Format(moment, "MMM d, yyyy, HH:mm");
 }
 <h1>Pre-visit forms</h1>
@@ -36,7 +38,7 @@ else
                     @if (form.OpenAt(now))
                     {
                         <p>Fill it in by @When(form.ClosesAt).</p>
-                        <p><a asp-page="Form" asp-route-requestId="@form.Id" class="sc-btn sc-btn--primary">Fill in the form</a></p>
+                        <p><a asp-page="Form" asp-route-requestId="@form.Id" class="@(form == next ? "sc-btn sc-btn--primary" : "sc-btn")">Fill in the form</a></p>
                     }
                     else
                     {

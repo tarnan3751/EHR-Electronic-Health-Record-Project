@@ -41,7 +41,7 @@ else
                 <p>@ProxyAccess.ScopeLabel(record.Scope). Until @Clinic.Plain(record.ExpiresAt, "MMM d, yyyy").</p>
                 <form method="post" asp-page="/Acting">
                     <input type="hidden" name="grantId" value="@record.GrantId">
-                    <button type="submit" class="sc-btn sc-btn--primary">View this record</button>
+                    <button type="submit" class="sc-btn">View this record</button>
                 </form>
             </li>
         }
