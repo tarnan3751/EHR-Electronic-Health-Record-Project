@@ -68,8 +68,8 @@ builder.Services.AddSingleton(new AuditSource(site == Site.OnPrem ? AuditSources
 // The clinic's time zone (step 10d): required outside Development, where the default is UTC.
 builder.Services.AddSingleton(Ehr.Domain.Time.ClinicTime.FromSettings(
     builder.Configuration["Ehr:Clinic:TimeZone"], builder.Configuration["Ehr:Clinic:TimeZoneAbbreviations"], builder.Environment.IsDevelopment()));
-// The addresses the app's links are built from: required outside Development, so a deployment that forgot one fails
-// here, at startup, with what to set (step 6c).
+// The addresses the app's links are built from, the portal's also naming the host whose / goes to the portal (below):
+// required outside Development, so a deployment that forgot one fails here, at startup, with what to set (step 6c).
 var siteAddresses = SiteAddresses.Checked(builder.Configuration.GetSection(SiteAddresses.Section).Get<SiteAddresses>(), builder.Environment.IsDevelopment());
 builder.Services.PostConfigure<SiteAddresses>(addresses =>
 {
@@ -206,8 +206,9 @@ if (keyCertificatePath is not { Length: > 0 })
 }
 
 // Routing first, so the cloud app's forwarding can tell page requests from static files. Forwarded requests are
-// authenticated and authorized by the on-prem app; everything served here is authenticated below, and the signed-in
-// account reaches the database through UserContextMiddleware before any handler runs.
+// authenticated and authorized by the on-prem app; everything served here is authenticated below, but for the redirect
+// of the portal's bare address just after routing, and the signed-in account reaches the database through
+// UserContextMiddleware before any handler runs.
 app.UseRouting();
 // The portal's own address opened bare, such as the local stack's https://portal.example.com:9443/. The portal is under
 // /portal, so / there goes to /portal, which signs a patient in, rather than to the clinic's home, which sends anyone

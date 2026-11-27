@@ -4,7 +4,8 @@ namespace Ehr.Domain.Accounts;
 // password-reset email, an invitation, a new staff member's setup link. A link is always built from here and never
 // from the request: a form posted to the cloud site is handled by the on-prem app, whose own address the person can't
 // reach, and a request's Host header is whatever its sender wrote, so a link built from it could send someone their
-// token on a link to another site. Both are required outside Development: the app refuses to start without them.
+// token on a link to another site. The portal's address also says on which host / goes to the portal (Program.cs).
+// Both are required outside Development: the app refuses to start without them.
 public sealed class SiteAddresses
 {
     public const string Section = "Ehr:Links";
