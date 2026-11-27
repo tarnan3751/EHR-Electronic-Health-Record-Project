@@ -37,13 +37,7 @@ public class VitalSignCorrectionSecurityTests(MigratedDatabase database) : IClas
 
     const string Mark = "UPDATE ehr.observations SET status = 'entered-in-error', entered_in_error_reason = @reason WHERE patient_id = @patient AND code = @code AND status = 'final'";
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     // Heart rate unless another sign is named: a blood pressure value is recorded with its partner (RecordPressureAsync).
     Task RecordAsync(Guid clinician, Guid patient, string code = HeartRate, decimal value = 180m, DateTime? at = null) =>

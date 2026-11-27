@@ -54,13 +54,7 @@ public class AiChartProposalSecurityTests(MigratedDatabase database) : IClassFix
     // A staged review of a clinician's draft for a patient on their panel, with its two proposals.
     sealed record Staged(Guid Clinician, Guid Patient, Guid Draft, Guid Review, Guid OrderProposal, Guid AllergyProposal);
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     // A draft and its dictation review, still recording, as the app begins one.
     async Task<(Guid Draft, Guid Review)> RecordingAsync(Guid clinician, Guid patient)

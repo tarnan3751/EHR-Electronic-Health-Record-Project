@@ -99,7 +99,7 @@ public class PhiReaderTests
             && ReadingTypes.Contains(generic.DeclaringType.FullName)
             && generic.GenericArguments.Any(argument => PhiSets.Values.Any(entity => argument.FullName == entity.FullName)));
 
-    static TypeDefinition Outermost(TypeDefinition type)
+    internal static TypeDefinition Outermost(TypeDefinition type)
     {
         while (type.DeclaringType is { } outer)
         {

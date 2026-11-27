@@ -44,13 +44,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     static (string, object)[] VisitValues(Guid id, Guid patient, DateTime start, string status = "in-progress") =>
         [("id", id), ("patient", patient), ("status", status), ("start", start)];
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     Task RecordAsync(Guid clinician, Guid patient, string code, decimal value, DateTime at, Guid? visit = null) =>
         Accounts.ExecuteAsync(App, clinician, Insert, Values(patient, code, value, at, visit));

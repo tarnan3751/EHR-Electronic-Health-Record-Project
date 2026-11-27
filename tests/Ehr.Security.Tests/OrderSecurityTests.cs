@@ -40,13 +40,7 @@ public class OrderSecurityTests(MigratedDatabase database) : IClassFixture<Migra
         VALUES (@id, @patient, 'lab', 'SYN-LAB-001', '{}', 'active', @signer)
         """;
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     async Task<Guid> OrderAsync(string connection, Guid? user, Guid patient, string sql = InsertOrder, params (string Name, object Value)[] extra)
     {

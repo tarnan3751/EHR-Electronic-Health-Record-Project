@@ -47,13 +47,7 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
         [("patient", patient), ("code", code), ("value", value), ("at", at ?? Taken), ("visit", (object?)visit ?? DBNull.Value), ("reading", (object?)reading ?? DBNull.Value),
             ("status", status)];
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     Task RecordAsync(Guid clinician, Guid patient, string code, decimal value, DateTime? at = null, Guid? visit = null, Guid? reading = null) =>
         Accounts.ExecuteAsync(App, clinician, Insert, Values(patient, code, value, at, visit, reading));

@@ -24,13 +24,7 @@ public class OrderSafetySecurityTests(MigratedDatabase database) : IClassFixture
 
     const string Warnings = "SELECT kind || '|' || severity || '|' || lower(ordered) || '|' || lower(against) || '|' || source FROM ehr.order_safety_warnings(@patient, @code) ORDER BY 1";
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     Task AsSuperuserAsync(string sql, params (string Name, object Value)[] parameters) =>
         Accounts.ExecuteAsync(database.SuperuserConnectionString, null, sql, parameters);
