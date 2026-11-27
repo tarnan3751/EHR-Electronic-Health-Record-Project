@@ -30,8 +30,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_52_RefillAnswered(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_patient_sees_each_answer_and_is_told_by_one_email_that_names_nothing()
     {

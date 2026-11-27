@@ -39,8 +39,6 @@ public class TC_UC11_12_Nfr12_PortalSessionEnd(WebApps apps) : IClassFixture<Web
 {
     const string Body = "Synthetic question for the care team.";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly BrowserNewContextOptions Phone = new() { IgnoreHTTPSErrors = true, ViewportSize = new() { Width = 360, Height = 740 } };
 
     async Task<long> MessagesAsync(Guid patient)

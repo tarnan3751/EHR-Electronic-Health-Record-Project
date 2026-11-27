@@ -10,8 +10,6 @@ namespace Ehr.Web.Tests;
 // cacheable, signed in or not.
 public class NoStoreTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Signed_in_pages_are_never_stored_and_static_files_are()
     {

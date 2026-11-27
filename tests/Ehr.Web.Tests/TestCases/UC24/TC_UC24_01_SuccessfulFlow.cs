@@ -37,8 +37,6 @@ public class TC_UC24_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
     const string Message = "Synthetic words of a message that the review never shows.";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_ended_emergency_access_is_reviewed_from_the_inbox_and_done_for_every_administrator()
     {

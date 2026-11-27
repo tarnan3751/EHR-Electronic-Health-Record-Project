@@ -5,6 +5,7 @@ using Ehr.Testing;
 using Npgsql;
 using NpgsqlTypes;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -16,8 +17,6 @@ namespace Ehr.Security.Tests;
 // completes the order, tells its signer, and is audited with the lab as the source and no account.
 public class LabSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>, IAsyncLifetime
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // When the test started, by the database's clock, which its rules hold a collection time to.
     DateTimeOffset Started { get; set; }
 

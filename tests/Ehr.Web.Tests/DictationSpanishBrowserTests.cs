@@ -62,13 +62,8 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         apps.Dictation.Reset();
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
-        var errors = new List<string>();
-        page.PageError += (_, error) => errors.Add(error);
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, errors) = opened;
         var dictate = $"{server.Url}/patients/{patient}/dictate";
         await page.GotoAsync(dictate);
         var choice = page.Locator("[data-dictation-language]");
@@ -111,11 +106,8 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         apps.Dictation.Reset();
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
         var dictate = $"{server.Url}/patients/{patient}/dictate";
         await page.GotoAsync(dictate);
         await page.Locator("[data-dictation-language]").SelectOptionAsync("es");
@@ -138,13 +130,8 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         apps.Dictation.Reset().SpanishUnavailable = true;
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
-        var errors = new List<string>();
-        page.PageError += (_, error) => errors.Add(error);
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, errors) = opened;
         await page.GotoAsync($"{server.Url}/patients/{patient}/dictate");
         await page.Locator("[data-dictation-language]").SelectOptionAsync("es");
 
@@ -247,11 +234,8 @@ public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         apps.Dictation.Reset();
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
         await page.GotoAsync($"{server.Url}/patients/{patient}/dictate");
         await page.Locator("[data-dictation-language]").SelectOptionAsync("es");
         await page.Locator("[data-dictation-start]").ClickAsync();

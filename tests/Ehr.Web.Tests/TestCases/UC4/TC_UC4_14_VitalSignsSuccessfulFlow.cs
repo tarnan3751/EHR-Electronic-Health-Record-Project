@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_14_VitalSignsSuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Vital_signs_are_recorded_from_the_chart_shown_on_the_flowsheet_and_charted_over_time()
     {

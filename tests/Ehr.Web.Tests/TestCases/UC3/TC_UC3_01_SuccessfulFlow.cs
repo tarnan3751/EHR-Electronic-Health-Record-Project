@@ -26,9 +26,6 @@ namespace Ehr.Web.Tests.TestCases.UC3;
 public class TC_UC3_01_SuccessfulFlow(WebApps apps)
     : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel =>
-        TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Search_with_valid_patient_information()
     {

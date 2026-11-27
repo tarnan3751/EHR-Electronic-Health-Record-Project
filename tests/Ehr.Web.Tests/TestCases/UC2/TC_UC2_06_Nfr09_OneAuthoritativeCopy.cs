@@ -40,8 +40,6 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 // Creator: Tahseen Arnan
 public class TC_UC2_06_Nfr09_OneAuthoritativeCopy(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_clouds_read_role_can_write_no_table()
     {

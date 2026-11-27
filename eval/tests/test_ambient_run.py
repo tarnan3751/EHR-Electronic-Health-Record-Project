@@ -6,12 +6,12 @@ unsure, one that K2 Horizon won't draft, and one of three voices; then a scoring
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import httpx2
 import numpy as np
 import pytest
+from conftest import llama_transport, webm
 
 from ehr_dictation import prompt, provenance
 from ehr_dictation.asr import Recognition
@@ -87,10 +87,7 @@ def recording(pitches: list[float]) -> tuple[bytes, list[float]]:
         at += 3.5
     samples = np.concatenate(pieces).astype(np.float32)
     samples += (np.random.default_rng(1).standard_normal(samples.size) * 3e-4).astype(np.float32)
-    data = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "1", "-i", "pipe:0",
-         "-c:a", "libopus", "-f", "webm", "pipe:1"], input=samples.tobytes(), capture_output=True, check=True).stdout
-    return data, times
+    return webm(samples), times
 
 
 def llama() -> LlamaServer:
@@ -98,17 +95,12 @@ def llama() -> LlamaServer:
               "objective": {"value": "Your chest is clear.", "sources": ["Your chest is clear"]},
               "assessment": {"value": "", "sources": []}, "plan": {"value": "", "sources": []}}
 
-    async def handle(request: httpx2.Request) -> httpx2.Response:
-        if request.url.path == "/props":
-            return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
-                                              "default_generation_settings": {"n_ctx": 4096}})
-        if request.url.path == "/tokenize":
-            return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
+    def complete(request: httpx2.Request) -> httpx2.Response:
         if "ears look normal" in request.content.decode():
             return httpx2.Response(503, json={"error": {"message": "nope"}})
         return httpx2.Response(200, json={"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(answer)}}]})
 
-    return LlamaServer("http://llama.test", "key", transport=httpx2.MockTransport(handle))
+    return LlamaServer("http://llama.test", "key", transport=llama_transport(complete))
 
 
 MODELS = provenance.Models(

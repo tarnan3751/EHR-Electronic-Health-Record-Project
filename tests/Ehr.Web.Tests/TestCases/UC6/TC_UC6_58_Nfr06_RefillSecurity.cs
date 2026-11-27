@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_58_Nfr06_RefillSecurity(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_refill_page_shows_no_identifier_and_takes_nothing_it_should_not()
     {

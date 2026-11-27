@@ -37,8 +37,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_14_SensitiveAfterSigning(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_signed_note_and_an_addendum_are_marked_sensitive_and_unmarked_with_a_reason_by_those_who_may()
     {

@@ -1,6 +1,7 @@
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -8,8 +9,6 @@ namespace Ehr.Security.Tests;
 // even though the app role can't write the log itself.
 public class ChangeLogTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Each_insert_and_update_is_logged_under_its_transaction()
     {

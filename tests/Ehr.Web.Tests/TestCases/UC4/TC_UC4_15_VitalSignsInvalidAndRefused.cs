@@ -26,8 +26,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_15_VitalSignsInvalidAndRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Unsound_vital_signs_are_not_saved_and_a_clinician_off_the_panel_records_none()
     {

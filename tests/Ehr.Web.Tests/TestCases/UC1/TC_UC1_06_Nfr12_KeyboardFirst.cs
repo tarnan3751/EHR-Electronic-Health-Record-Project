@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public partial class TC_UC1_06_Nfr12_KeyboardFirst(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly (string, string)[] Metformin = [("dose", "500 mg"), ("route", "By mouth"), ("frequency", "Twice a day")];
 
     [Fact]

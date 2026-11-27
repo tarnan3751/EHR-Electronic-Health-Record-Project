@@ -13,8 +13,6 @@ namespace Ehr.Web.Tests;
 // Clinicians and the FHIR file read the record's names and units as they are.
 public class PortalTestNameTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Leukocytes = "6690-2";
 
     const string LeukocytesName = "Leukocytes [#/volume] in Blood by Automated count";

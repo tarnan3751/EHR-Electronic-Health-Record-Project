@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Creator: Tahseen Arnan
 public class TC_UC18_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_patient_gives_changes_and_removes_a_family_members_access()
     {

@@ -23,9 +23,6 @@ namespace Ehr.Web.Tests.TestCases.UC3;
 public class TC_UC3_03_InvalidInput(WebApps apps)
     : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel =>
-        TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Empty_search_criteria_are_rejected()
     {

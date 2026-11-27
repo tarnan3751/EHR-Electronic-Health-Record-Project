@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // (RefillRequestSecurityTests).
 static partial class RefillRequestTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string PortalPath = "/portal/refills";
 
     // Lisinopril 10 mg, as the chart's coded entry names it (RxNorm 314076), and as the catalog's item for that product,

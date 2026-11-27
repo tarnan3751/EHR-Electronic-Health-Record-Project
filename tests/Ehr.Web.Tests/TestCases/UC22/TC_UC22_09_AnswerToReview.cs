@@ -59,8 +59,6 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Creator: Tahseen Arnan
 public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_answer_about_self_harm_reaches_the_care_teams_inboxes_first_and_their_charts_with_no_email()
     {

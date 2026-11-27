@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC17;
 // Creator: Tahseen Arnan
 public class TC_UC17_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_empty_or_overlong_message_is_not_sent_and_a_thread_under_another_patient_is_not_found()
     {

@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // password, an authenticator reset for a lost phone, and disabling and enabling the account. Never their own.
 public partial class StaffAdminTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_new_setup_link_replaces_a_forgotten_password()
     {

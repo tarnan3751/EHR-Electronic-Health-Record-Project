@@ -26,8 +26,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_24_PortalTimesOnTheClinicsClock(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_portal_shows_the_clinics_clock_when_the_clinic_has_a_time_zone()
     {

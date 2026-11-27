@@ -37,8 +37,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_35_LinkOpensPageAfterSignIn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_link_asking_for_the_file_or_sensitive_items_lands_on_its_page_alone_after_sign_in()
     {

@@ -3,6 +3,7 @@ using Ehr.Lab.Simulator;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Web.Tests;
 
@@ -12,8 +13,6 @@ namespace Ehr.Web.Tests;
 // zero, to the range's decimals, and outside the range by at least one of them when outside at all.
 public class LabSimulatorTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly DateTimeOffset Signed = new(2026, 11, 20, 15, 0, 0, TimeSpan.Zero);
 
     static readonly LabTest HemoglobinA1c = new("4548-4", "%", 4.0m, 5.6m, 1);

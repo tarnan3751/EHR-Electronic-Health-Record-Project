@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -13,8 +14,6 @@ namespace Ehr.Security.Tests;
 public partial class MonitorRoleTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>, IAsyncLifetime
 {
     const string Password = "test-monitor";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     // Once for the class's database: xUnit makes a new instance for each test.
     public async ValueTask InitializeAsync()

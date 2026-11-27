@@ -16,8 +16,6 @@ static class FhirRequests
 {
     public const string ContentType = "application/fhir+json; charset=utf-8";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A clinician signed in, with the patient on their panel, and the IDs of what the patient's record holds.
     public sealed record Chart(StaffAccount Clinician, Session Session, Guid Patient, string Mrn)
     {

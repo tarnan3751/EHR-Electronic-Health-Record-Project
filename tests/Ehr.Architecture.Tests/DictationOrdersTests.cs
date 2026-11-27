@@ -1,6 +1,7 @@
 using Ehr.Domain.Phi;
 using Mono.Cecil;
 using Xunit;
+using static Ehr.Architecture.Tests.PhiReaderTests;
 
 namespace Ehr.Architecture.Tests;
 
@@ -176,15 +177,5 @@ public class DictationOrdersTests
                 }
             }
         }
-    }
-
-    static TypeDefinition Outermost(TypeDefinition type)
-    {
-        while (type.DeclaringType is { } outer)
-        {
-            type = outer;
-        }
-
-        return type;
     }
 }

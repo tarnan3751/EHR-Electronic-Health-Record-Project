@@ -15,8 +15,6 @@ namespace Ehr.Web.Tests;
 // the apps' own included, stay on.
 public class LoggingTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public void Request_addresses_stay_out_of_the_log_on_both_servers_and_warnings_stay_in()
     {

@@ -44,8 +44,6 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Creator: Tahseen Arnan
 public class TC_UC22_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Crisis = "call 911 or go to the nearest emergency room now. You can call or text 988 at any time, day or night, to talk with someone at "
         + "the 988 Suicide & Crisis Lifeline.";
 

@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 // Creator: Tahseen Arnan
 public class TC_UC2_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task During_an_outage_an_answer_the_on_prem_app_still_gives_leaves_the_site_read_only()
     {

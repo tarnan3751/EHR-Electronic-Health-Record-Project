@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_reading_marked_entered_in_error_stays_in_the_record_and_leaves_every_view_and_the_correct_value_is_a_new_reading()
     {

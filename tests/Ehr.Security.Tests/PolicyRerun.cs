@@ -1,6 +1,7 @@
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -13,8 +14,6 @@ namespace Ehr.Security.Tests;
 // for the concurrency.
 static class PolicyRerun
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public static async Task<List<string>> RunAsync(MigratedDatabase database, string policyFile, Guid user, string call, params (string Name, object Value)[] parameters)
     {
         var policy = await File.ReadAllTextAsync(RepositoryRoot.Combine("db/policies/" + policyFile), Cancel);

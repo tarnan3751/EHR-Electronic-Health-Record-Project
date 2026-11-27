@@ -38,8 +38,6 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
 {
     const string Reason = "Covering the night shift; patient called with chest pain.";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_chart_off_the_panel_asks_for_a_reason_opens_for_four_hours_and_is_flagged_for_review()
     {

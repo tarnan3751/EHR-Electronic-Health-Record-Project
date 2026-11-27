@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 // Creator: Tahseen Arnan
 public class TC_UC2_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly DateTimeOffset Today = DateTimeOffset.UtcNow;
 
     [Fact]

@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 // Creator: Tahseen Arnan
 public partial class TC_UC2_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_form_post_that_cannot_be_forwarded_gets_a_page_that_explains()
     {

@@ -24,9 +24,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 public class TC_UC4_03_AlternativeFlow(WebApps apps)
     : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel =>
-        TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Restricted_chart_offers_emergency_access()
     {

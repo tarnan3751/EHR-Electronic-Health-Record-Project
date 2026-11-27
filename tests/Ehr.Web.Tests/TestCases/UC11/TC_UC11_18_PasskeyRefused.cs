@@ -39,8 +39,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Tahseen Arnan
 public class TC_UC11_18_PasskeyRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Refused = "That passkey didn't work. Try again, or enter the code from your authenticator app.";
 
     [Fact]

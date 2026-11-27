@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_17_SensitiveNotesAddendaInherit(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_sensitive_notes_addenda_are_sensitive_with_it_and_only_the_inherited_marks_go_with_it()
     {

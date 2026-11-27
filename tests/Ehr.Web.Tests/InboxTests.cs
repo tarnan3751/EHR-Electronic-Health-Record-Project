@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // into the table. What the database refuses whatever the app does is in Ehr.Security.Tests (InboxSecurityTests).
 static class InboxTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public static async Task<Guid> AddAsync(
         WebApps apps, Guid recipient, string summary, Guid? patient = null, string kind = InboxItemKind.Message, int minutesAgo = 0)
     {

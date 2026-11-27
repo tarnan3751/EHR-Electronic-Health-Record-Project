@@ -21,8 +21,6 @@ namespace Ehr.Web.Tests;
 // bootstrap admin and an invited account have to do first, and what the audit log says about it.
 public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_wrong_password_is_refused_and_recorded()
     {

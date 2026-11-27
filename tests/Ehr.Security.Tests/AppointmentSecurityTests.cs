@@ -22,13 +22,7 @@ public class AppointmentSecurityTests(MigratedDatabase database) : IClassFixture
 
     static readonly DateTimeOffset Morning = new(2027, 3, 1, 9, 0, 0, TimeSpan.Zero);
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     async Task<Guid> BookAsync(Guid? user, Guid patient, Guid clinician, DateTimeOffset start)
     {

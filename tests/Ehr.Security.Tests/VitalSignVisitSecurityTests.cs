@@ -2,6 +2,7 @@ using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -16,8 +17,6 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     const string Systolic = "8480-6";
     const string Diastolic = "8462-4";
     const string HeartRate = "8867-4";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
@@ -45,13 +44,7 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     static (string, object)[] VisitValues(Guid id, Guid patient, DateTime start, string status = "in-progress") =>
         [("id", id), ("patient", patient), ("status", status), ("start", start)];
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     Task RecordAsync(Guid clinician, Guid patient, string code, decimal value, DateTime at, Guid? visit = null) =>
         Accounts.ExecuteAsync(App, clinician, Insert, Values(patient, code, value, at, visit));

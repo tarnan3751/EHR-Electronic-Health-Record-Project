@@ -19,8 +19,6 @@ namespace Ehr.Web.Tests;
 // and the end, is in the browser tests (TestCases/UC11). Each test moves the fixture's clock on from wherever it is.
 public class SessionTimeTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly TimeSpan JustOver = SessionTimes.Idle + TimeSpan.FromSeconds(5);
 
     internal const string StaffCookie = "__Host-Ehr.Staff";

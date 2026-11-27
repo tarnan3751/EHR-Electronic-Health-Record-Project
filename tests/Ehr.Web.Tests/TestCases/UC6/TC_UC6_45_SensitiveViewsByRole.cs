@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_45_SensitiveViewsByRole(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_view_of_sensitive_items_is_listed_as_such_or_not_at_all()
     {

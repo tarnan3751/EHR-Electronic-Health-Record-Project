@@ -42,8 +42,6 @@ public class TC_UC7_07_DesktopUnlock(WebApps apps) : IClassFixture<WebApps>
 {
     const string Unlock = "/api/desktop/unlock";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_lock_opens_with_the_tokens_own_password_counted_and_recorded_as_sign_in_is()
     {

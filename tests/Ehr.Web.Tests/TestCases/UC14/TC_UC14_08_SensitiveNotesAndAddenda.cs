@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_08_SensitiveNotesAndAddenda(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_sensitive_note_and_a_sensitive_addendum_are_left_out_until_asked_for_and_never_kept_offline()
     {

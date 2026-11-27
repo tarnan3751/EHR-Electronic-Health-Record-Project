@@ -15,8 +15,6 @@ public class PortalResultsTests(WebApps apps) : IClassFixture<WebApps>
 
     internal static readonly DateTimeOffset Oct14 = new(2026, 10, 14, 15, 0, 0, TimeSpan.Zero);
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // TC-UC6-01, TC-UC6-02 and TC-UC6-03 moved to TestCases/UC6/TC_UC6_01_SuccessfulFlow.cs, TC_UC6_02_AlternativeFlow.cs
     // and TC_UC6_03_InvalidInput.cs.
 

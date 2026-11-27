@@ -40,8 +40,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Partial_results_bad_values_and_who_may_file_and_acknowledge()
     {

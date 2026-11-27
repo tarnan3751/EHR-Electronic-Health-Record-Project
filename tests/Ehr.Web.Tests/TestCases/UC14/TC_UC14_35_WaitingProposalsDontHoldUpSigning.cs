@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_35_WaitingProposalsDontHoldUpSigning(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Waiting_proposals_hold_up_neither_the_review_nor_signing_and_the_note_tells_its_author()
     {

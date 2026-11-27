@@ -10,8 +10,6 @@ namespace Ehr.Web.Tests;
 // lets each account learn from the audit log is in Ehr.Security.Tests (RecordViewSecurityTests).
 static partial class RecordViewTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string ViewsPath = "/portal/views";
 
     // The page's lines, in its order, each as "kind | who | part | when": the kind is its data-who, the rest its words.

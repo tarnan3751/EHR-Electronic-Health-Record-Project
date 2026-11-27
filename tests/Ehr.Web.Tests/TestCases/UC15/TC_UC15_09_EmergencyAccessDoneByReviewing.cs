@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Creator: Tahseen Arnan
 public class TC_UC15_09_EmergencyAccessDoneByReviewing(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_emergency_access_is_done_by_reviewing_it_not_from_the_list()
     {

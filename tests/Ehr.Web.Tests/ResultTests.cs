@@ -7,8 +7,6 @@ namespace Ehr.Web.Tests;
 // TC-UC15-07. What the database refuses whatever the app does is in Ehr.Security.Tests (ResultSecurityTests).
 static class ResultTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A complete blood count's tests (db/reference): hemoglobin 12.0 to 17.5 g/dL, platelets 150 to 400.
     public const string Hemoglobin = "718-7";
     public const string Platelets = "777-3";

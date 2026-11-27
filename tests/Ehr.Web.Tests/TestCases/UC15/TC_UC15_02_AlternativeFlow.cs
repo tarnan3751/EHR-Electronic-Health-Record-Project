@@ -28,8 +28,6 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Creator: Tahseen Arnan (expansion step 3); reviewed and run by Samir Mukshe, approving PR 2
 public class TC_UC15_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_empty_inbox_says_so_and_an_admin_sees_patients_by_id_only()
     {

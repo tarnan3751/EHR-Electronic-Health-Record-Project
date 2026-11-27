@@ -24,9 +24,6 @@ namespace Ehr.Web.Tests.TestCases.UC3;
 public class TC_UC3_02_InvalidInput(WebApps apps)
     : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel =>
-        TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Invalid_date_of_birth_is_rejected()
     {

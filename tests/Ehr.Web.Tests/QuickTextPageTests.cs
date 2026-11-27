@@ -9,8 +9,6 @@ namespace Ehr.Web.Tests;
 // so each one uses its own shortcuts.
 public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Home_page_lists_phrases_with_their_text_encoded()
     {

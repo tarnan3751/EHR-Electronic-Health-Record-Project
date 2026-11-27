@@ -1,9 +1,10 @@
-"""Shared by the eval's tests: a small test set written on the fly, so these tests don't depend on the real scripts, and
-stand-ins for MedASR and llama-server, so nothing needs the models."""
+"""Shared by the eval's tests: a small test set written on the fly, so these tests don't depend on the real scripts,
+stand-ins for MedASR and llama-server, so nothing needs the models, and audio encoded as a browser records it."""
 
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import httpx2
@@ -12,6 +13,7 @@ import pytest
 
 from ehr_dictation import prompt
 from ehr_dictation.asr import Recognition
+from ehr_dictation.audio import SAMPLE_RATE
 from ehr_dictation.llama import LlamaServer, Structurer
 from ehr_eval.scripts import load_all
 
@@ -101,18 +103,36 @@ class ScriptedRecognizer:
         return Recognition(self.text, 0.9)
 
 
-def fake_structurer(content: dict, language: str = "en") -> Structurer:
+def llama_transport(complete, n_ctx: int = 4096) -> httpx2.MockTransport:  # noqa: ANN001
+    """llama-server on httpx2's mock transport: its model and context size, a token a word, and each completion as
+    complete(request) answers it."""
     async def handle(request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/props":
             return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
-                                              "default_generation_settings": {"n_ctx": 4096}})
+                                              "default_generation_settings": {"n_ctx": n_ctx}})
         if request.url.path == "/tokenize":
             return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
+        return complete(request)
+
+    return httpx2.MockTransport(handle)
+
+
+def fake_structurer(content: dict, language: str = "en") -> Structurer:
+    def complete(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, json={"choices": [{"finish_reason": "stop",
                                                        "message": {"content": json.dumps(content)}}]})
 
-    server = LlamaServer("http://llama.test", "key", transport=httpx2.MockTransport(handle))
+    server = LlamaServer("http://llama.test", "key", transport=llama_transport(complete))
     return Structurer(server, prompt.load(language=language), "K2.gguf", timeout=5)
+
+
+def webm(samples: np.ndarray) -> bytes:
+    """The samples as Chromium records them, WebM with Opus, made with ffmpeg through pipes."""
+    return subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "1", "-i", "pipe:0",
+         "-c:a", "libopus", "-f", "webm", "pipe:1"],
+        input=samples.tobytes(), capture_output=True, check=True,
+    ).stdout
 
 
 def english_results_to_cap_at(eval_dir: Path, results_dir: Path) -> None:

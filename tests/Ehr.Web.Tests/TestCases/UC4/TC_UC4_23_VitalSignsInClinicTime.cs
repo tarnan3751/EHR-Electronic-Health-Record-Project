@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_23_VitalSignsInClinicTime(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Vital_signs_are_taken_and_shown_on_the_clinics_clock_and_stored_as_the_same_moment()
     {

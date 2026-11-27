@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -17,8 +18,6 @@ namespace Ehr.Security.Tests;
 public class EmergencyAccessReviewsMigrationTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const string Before = "AmbientListening";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     async Task MigrateAsync(string? target)
     {

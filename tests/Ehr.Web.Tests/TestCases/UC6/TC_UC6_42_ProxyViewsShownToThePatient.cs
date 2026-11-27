@@ -27,8 +27,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_42_ProxyViewsShownToThePatient(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_patient_sees_each_proxys_views_by_the_address_they_gave_access_to()
     {

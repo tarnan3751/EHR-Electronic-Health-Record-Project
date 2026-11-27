@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 using static Ehr.Web.Tests.LabTests;
 using static Ehr.Web.Tests.OrderTests;
 using static Ehr.Web.Tests.ResultTests;
@@ -20,8 +21,6 @@ namespace Ehr.Web.Tests;
 // offset a lab sends and whatever time zone the database's session has.
 public class LabDoorTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string WrongKey = "not-the-lab-key-but-long-enough-to-look-real";
 
     // The app's own check of the key, taken away, as a mutation: it holds the right key, and lets any key through. Given

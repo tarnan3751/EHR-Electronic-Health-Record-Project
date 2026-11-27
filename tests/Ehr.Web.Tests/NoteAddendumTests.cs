@@ -8,8 +8,6 @@ namespace Ehr.Web.Tests;
 // 12. What the database refuses whatever the app does is in Ehr.Security.Tests (NoteAddendumSecurityTests).
 static class NoteAddendumTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string Subjective = "Synthetic subjective: cough for two days.";
 
     public const string Objective = "Synthetic objective: chest clear.";

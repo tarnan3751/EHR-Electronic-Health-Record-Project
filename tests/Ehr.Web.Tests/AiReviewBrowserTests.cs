@@ -108,11 +108,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task An_answer_that_arrives_after_a_dictation_is_cancelled_belongs_to_the_dictation_cancelled()
     {
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await AmbientBrowserTests.ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => AmbientBrowserTests.ContextAsync(browser, session));
+        var (server, page, _) = opened;
         await page.GotoAsync($"{server.Url}/patients/{patient}/dictate");
         await page.Keyboard.PressAsync("Alt+Shift+D");
         await page.WaitForFunctionAsync("window.__ambient.events.some(e => e.includes('/audio') && e.endsWith(' 200'))");
@@ -156,13 +153,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         var (patient, session) = await AccountAsync();
         apps.Dictation.IncludeObjective = true;
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
-        var errors = new List<string>();
-        page.PageError += (_, error) => errors.Add(error);
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, errors) = opened;
         await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate", proposals: 4);
         Assert.True(await page.EvaluateAsync<bool>("document.activeElement.matches('[data-dictation-field=subjective] [value=accepted]')"));
         Assert.Contains("Cough", await page.Locator("mark.sc-transcript__source").First.TextContentAsync());
@@ -222,13 +214,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         var (patient, session) = await AccountAsync();
         apps.Dictation.WholeDictation = true;
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
-        var errors = new List<string>();
-        page.PageError += (_, error) => errors.Add(error);
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, errors) = opened;
         await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate", proposals: 1);
 
         Assert.Equal(["This section holds the whole dictation. Sort it into the sections it belongs to before accepting it."],
@@ -248,13 +235,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task TC_UC14_05_a_note_typed_from_scratch_is_written_and_signed_from_the_keyboard()
     {
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
-        var errors = new List<string>();
-        page.PageError += (_, error) => errors.Add(error);
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, errors) = opened;
         await page.GotoAsync($"{server.Url}/patients/{patient}");
 
         await TabToAsync(page, "form[action*='handler=NewNote'] button");
@@ -293,11 +275,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task Failed_review_requests_preserve_edited_text_focus_errors_and_retry_without_duplicate_decisions()
     {
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
         await StartAndReviewAsync(page, $"{server.Url}/patients/{patient}/dictate");
         await page.Locator("[data-dictation-field=subjective] summary").PressAsync("Enter");
         await page.Locator("#edited-subjective").FillAsync("Synthetic corrected text retained after failure");
@@ -318,11 +297,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     public async Task A_failed_result_handoff_keeps_the_transcript_and_retries_into_the_saved_review()
     {
         var (patient, session) = await AccountAsync();
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, _) = opened;
         await page.RouteAsync("**/review/*/stage", route => route.AbortAsync("connectionrefused"));
         await page.GotoAsync($"{server.Url}/patients/{patient}/dictate");
         await page.Keyboard.PressAsync("Alt+Shift+D");
@@ -355,13 +331,8 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
     {
         var (patient, session) = await AccountAsync();
         apps.Dictation.Sorting = StubSorting.NotEnglish;
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, session);
-        var page = await context.NewPageAsync();
-        var errors = new List<string>();
-        page.PageError += (_, error) => errors.Add(error);
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, session));
+        var (server, page, errors) = opened;
         await page.GotoAsync($"{server.Url}/patients/{patient}/dictate");
         await page.Keyboard.PressAsync("Alt+Shift+D");
         await page.WaitForFunctionAsync("document.querySelector('[data-dictation-transcript]').textContent.includes('Fluids and rest.')");

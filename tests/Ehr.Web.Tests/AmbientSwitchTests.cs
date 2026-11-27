@@ -14,8 +14,6 @@ namespace Ehr.Web.Tests;
 // timer, and its review still finished. The setting is true or false, or left out for false, and nothing else starts.
 public class AmbientSwitchTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> SwitchedOff() =>
         apps.OnPrem.WithWebHostBuilder(builder => builder.UseSetting(AmbientListening.Setting, "false"));
 

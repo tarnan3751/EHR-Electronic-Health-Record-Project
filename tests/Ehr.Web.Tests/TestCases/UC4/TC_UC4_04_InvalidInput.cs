@@ -33,9 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 public class TC_UC4_04_InvalidInput(WebApps apps)
     : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel =>
-        TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Emergency_access_requires_reason_and_is_audited()
     {

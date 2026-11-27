@@ -4,6 +4,7 @@ using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -20,8 +21,6 @@ namespace Ehr.Security.Tests;
 // rule's codes alone wouldn't find (the rule's comment says why it relies on that).
 public class VisitSummaryPlanTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly string[] CodeTables = ["clinical_codes", "observation_codes", "order_catalog_items"];
 
     [Fact]

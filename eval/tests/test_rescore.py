@@ -7,8 +7,8 @@ import asyncio
 import dataclasses
 
 import pytest
-from conftest import ScriptedRecognizer, fake_structurer
-from test_run import speech, webm
+from conftest import ScriptedRecognizer, fake_structurer, webm
+from test_run import speech
 
 from ehr_dictation import prompt
 from ehr_eval import rescore, run, scoring
@@ -64,25 +64,14 @@ def test_the_instructions_reported_and_proposed_and_the_scripts_tags_are_the_cur
     assert ([list(entry) for entry in again["not_carried_over"]], again["proposals"], again["tags"]) == expected
 
 
-def test_answers_from_other_recordings_are_refused(tmp_path, scripts):
+@pytest.mark.parametrize(("part", "key", "refusal"), [
+    ("dataset", "recordings_sha256", "other recordings"),
+    ("provenance", "pipeline", "other code making the transcript"),
+    ("provenance", "structuring", "run the eval again"),
+], ids=["from-other-recordings", "from-other-code-making-them", "to-another-prompt"])
+def test_answers_made_otherwise_are_refused(tmp_path, scripts, part, key, refusal):
     results = a_run(tmp_path, scripts)
-    results["dataset"]["recordings_sha256"] = "0" * 64
+    results[part][key] = "0" * 64
 
-    with pytest.raises(ValueError, match="other recordings"):
-        rescore.rescore(results)
-
-
-def test_answers_from_other_code_making_them_are_refused(tmp_path, scripts):
-    results = a_run(tmp_path, scripts)
-    results["provenance"]["pipeline"] = "0" * 64
-
-    with pytest.raises(ValueError, match="other code making the transcript"):
-        rescore.rescore(results)
-
-
-def test_answers_to_another_prompt_are_refused(tmp_path, scripts):
-    results = a_run(tmp_path, scripts)
-    results["provenance"]["structuring"] = "0" * 64
-
-    with pytest.raises(ValueError, match="run the eval again"):
+    with pytest.raises(ValueError, match=refusal):
         rescore.rescore(results)

@@ -2,6 +2,7 @@ using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -13,8 +14,6 @@ namespace Ehr.Security.Tests;
 // time.
 public class OrderSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
@@ -41,13 +40,7 @@ public class OrderSecurityTests(MigratedDatabase database) : IClassFixture<Migra
         VALUES (@id, @patient, 'lab', 'SYN-LAB-001', '{}', 'active', @signer)
         """;
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     async Task<Guid> OrderAsync(string connection, Guid? user, Guid patient, string sql = InsertOrder, params (string Name, object Value)[] extra)
     {

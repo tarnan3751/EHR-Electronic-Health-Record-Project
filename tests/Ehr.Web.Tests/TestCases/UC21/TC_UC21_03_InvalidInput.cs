@@ -39,8 +39,6 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 // Creator: Tahseen Arnan
 public class TC_UC21_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_answer_that_can_not_be_given_is_refused_and_nothing_is_saved()
     {

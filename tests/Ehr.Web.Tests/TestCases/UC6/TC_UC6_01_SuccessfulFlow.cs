@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Simar Rekhi
 public class TC_UC6_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_patient_sees_their_released_results_newest_first_in_plain_language()
     {

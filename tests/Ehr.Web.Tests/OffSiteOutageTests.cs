@@ -20,8 +20,6 @@ namespace Ehr.Web.Tests;
 // primary down.
 public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly (string Name, object Value)[] Note =
         [("Subjective", "Synthetic subjective: cough."), ("Objective", "Synthetic objective: chest clear."), ("Assessment", "Synthetic assessment: viral."), ("Plan", "Synthetic plan: <rest>.")];
 

@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 // Creator: Tahseen Arnan
 public class TC_UC2_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Once_the_clinics_server_is_back_queued_reads_arrive_and_saves_work_again()
     {

@@ -42,8 +42,6 @@ namespace Ehr.Web.Tests.TestCases.UC11;
 // Creator: Tahseen Arnan
 public partial class TC_UC11_07_LinkOpensPageAfterSignIn(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_link_through_the_staff_sign_in_opens_its_page_alone()
     {

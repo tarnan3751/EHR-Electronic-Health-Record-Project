@@ -8,8 +8,6 @@ namespace Ehr.Web.Tests;
 // requires whatever the app does is in Ehr.Security.Tests (OrderSafetySecurityTests).
 static class SafetyTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public static readonly (string Name, string Value)[] Details = [("dose", "50 mg"), ("route", "By mouth"), ("frequency", "Once a day")];
 
     // An active, coded allergy to the drug of that name, as the chart's coded entry writes it.

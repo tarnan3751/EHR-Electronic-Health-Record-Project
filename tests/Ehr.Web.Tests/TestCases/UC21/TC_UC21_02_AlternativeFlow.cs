@@ -38,8 +38,6 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 // Creator: Tahseen Arnan
 public class TC_UC21_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Approving_keeps_every_check_of_an_order_and_declining_sends_a_message()
     {

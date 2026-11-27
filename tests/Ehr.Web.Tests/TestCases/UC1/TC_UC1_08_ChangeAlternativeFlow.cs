@@ -35,8 +35,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_08_ChangeAlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static (string, string)[] Metformin(string dose) => [("dose", dose), ("route", "By mouth"), ("frequency", "Twice a day")];
 
     [Fact]

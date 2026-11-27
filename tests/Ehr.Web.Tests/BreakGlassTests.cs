@@ -13,8 +13,6 @@ namespace Ehr.Web.Tests;
 // server can't be reached, nothing can be recorded, so emergency access isn't offered.
 public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_chart_off_the_panel_asks_for_a_reason_records_it_and_stays_open()
     {

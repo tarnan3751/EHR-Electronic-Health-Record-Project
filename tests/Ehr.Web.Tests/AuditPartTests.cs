@@ -26,8 +26,6 @@ namespace Ehr.Web.Tests;
 // account, of this patient, from the moment before it was sent.
 public class AuditPartTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A patient signed in to the portal, on the panel of a clinician of their own, who is signed in: so the clinician's
     // panel, day and inbox hold this patient alone.
     async Task<(StaffAccount Clinician, Session Session, ProxyTests.Person Patient)> PatientAsync()

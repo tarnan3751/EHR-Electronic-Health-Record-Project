@@ -13,8 +13,6 @@ namespace Ehr.Web.Tests;
 // nothing is recorded. Opening it is one recorded read of the patient, on-site and off-site.
 public class PatientChartTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly DateTimeOffset Today = DateTimeOffset.UtcNow;
 
     [Fact]

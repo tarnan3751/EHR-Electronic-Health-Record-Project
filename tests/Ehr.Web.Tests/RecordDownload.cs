@@ -17,8 +17,6 @@ static partial class RecordDownload
 
     public const string PrintPath = "/portal/record/print";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // The record of FhirRequests.ChartAsync (two allergies; lisinopril, and sertraline marked sensitive; hypertension, and
     // generalized anxiety disorder, sensitive by its code; two released results; a set of vital signs; one appointment
     // booked and one cancelled with a reason), with a confirmed portal account of the patient's own, signed in.

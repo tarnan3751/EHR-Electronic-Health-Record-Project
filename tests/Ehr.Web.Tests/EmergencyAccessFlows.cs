@@ -1,7 +1,6 @@
 using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -12,8 +11,6 @@ namespace Ehr.Web.Tests;
 // Ehr.Security.Tests (EmergencyAccessReviewSecurityTests).
 static class EmergencyAccessFlows
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string Reason = "Synthetic: covering the ward tonight, asked by the charge nurse.";
 
     public const string Note = "Synthetic: checked the rota, the clinician was covering the ward.";
@@ -58,24 +55,8 @@ static class EmergencyAccessFlows
         "SELECT reviewer_id || ' ' || outcome || ' ' || note FROM ehr.emergency_access_reviews WHERE id = @a", ("a", access));
 
     // The first column of each row, as the superuser.
-    public static async Task<List<string>> QueryAsync(WebApps apps, string sql, params (string Name, object Value)[] parameters)
-    {
-        await using var db = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand(sql, db);
-        foreach (var (name, value) in parameters)
-        {
-            command.Parameters.AddWithValue(name, value);
-        }
-
-        var rows = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync(Cancel);
-        while (await reader.ReadAsync(Cancel))
-        {
-            rows.Add(reader.IsDBNull(0) ? "" : reader.GetValue(0).ToString()!);
-        }
-
-        return rows;
-    }
+    public static Task<List<string>> QueryAsync(WebApps apps, string sql, params (string Name, object Value)[] parameters) =>
+        apps.QueryAsync(sql, parameters);
 
     // The migration job's run of the step's policies, whose last statement is the sweep of waiting accesses.
     public static Task SweepAsync(WebApps apps) => MigratedDatabase.ExecuteAsync(apps.Database.OwnerConnectionString,

@@ -457,28 +457,26 @@ def test_more_wrong_trick_proposals_than_the_set_records_fail(eval_dir):
 
 # The acceptances hold no slack, as known-limitations.toml's entries must each still occur: a sentence accepted by name
 # that is no longer proposed fails (the review's case: "Order complete.", which no rule proposes, accepted with the cap
-# raised), and so does a cap that isn't the number accepted (raised alone); each passes once put right.
-def test_a_sentence_accepted_by_name_and_no_longer_proposed_fails_and_one_still_proposed_passes(eval_dir):
+# raised), and so does a cap that isn't the number accepted (raised alone). Proposals are counted, not sentences, so a
+# sentence accepted by name that starts giving two proposals is one more than the cap. Each passes once put right.
+@pytest.mark.parametrize(("trick_sentences", "problem_says"), [
+    (TRICK.format(most_wrong=2, reverses="true", accepted=TRICK_ACCEPTED.replace(
+        'said = ["Order a CBC."]', 'said = ["Order a CBC.", "Order complete."]')),
+     "accepts 'Order complete.' by name, and it is no longer proposed"),
+    (TRICK.format(most_wrong=120, reverses="true", accepted=TRICK_ACCEPTED),
+     "most_wrong = 120, and accepts 1 sentences by name"),
+    (TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED.replace(
+        'said = ["Order a CBC."]', 'said = ["Order a CBC. Order a BMP."]')).replace(
+        'said = ["Order a CBC."]', 'said = ["Order a CBC. Order a BMP."]'),
+     "2 wrong proposals, more than the 1"),
+], ids=["accepted-by-name-no-longer-proposed", "cap-other-than-the-number-accepted",
+        "accepted-by-name-gives-two-proposals"])
+def test_acceptances_out_of_step_with_the_proposals_fail_and_put_right_pass(eval_dir, trick_sentences, problem_says):
     save(eval_dir, "latest.json", results(eval_dir))
-    slack = TRICK_ACCEPTED.replace('said = ["Order a CBC."]', 'said = ["Order a CBC.", "Order complete."]')
-    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=2, reverses="true", accepted=slack),
-                                                   encoding="utf-8")
+    (eval_dir / "trick-sentences.toml").write_text(trick_sentences, encoding="utf-8")
 
     (problem,) = check(eval_dir / "results", eval_dir)
-    assert "accepts 'Order complete.' by name, and it is no longer proposed" in problem
-
-    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
-                                                   encoding="utf-8")
-    assert check(eval_dir / "results", eval_dir) == []
-
-
-def test_a_cap_other_than_the_number_accepted_by_name_fails_and_their_number_passes(eval_dir):
-    save(eval_dir, "latest.json", results(eval_dir))
-    (eval_dir / "trick-sentences.toml").write_text(
-        TRICK.format(most_wrong=120, reverses="true", accepted=TRICK_ACCEPTED), encoding="utf-8")
-
-    (problem,) = check(eval_dir / "results", eval_dir)
-    assert "most_wrong = 120, and accepts 1 sentences by name" in problem
+    assert problem_says in problem
 
     (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
                                                    encoding="utf-8")
@@ -507,45 +505,24 @@ def test_a_trick_set_changed_without_the_gate_fails(eval_dir, edit):
     assert any("isn't the set this gate records" in problem for problem in problems)
 
 
-# Proposals are counted, not sentences: a control with two instructions that loses its second fails, as does a sentence
-# accepted by name that starts giving two proposals, one more than the cap; each passes as it should be.
-def test_a_control_that_loses_one_of_its_instructions_fails_and_one_proposed_at_each_passes(eval_dir):
+# Every control must be proposed, at every instruction it lists, since proposals are counted, not sentences: a control
+# not proposed fails, and so does a control with two instructions that loses its second; each passes as it should be.
+@pytest.mark.parametrize(("said", "problem_says", "put_right"), [
+    ("Order a CBC. Nah.", "control 'Order a CBC. Nah.' is not proposed", "Order a CBC."),
+    ("Order a CBC. Order a BMP. Nah.",
+     "control 'Order a CBC. Order a BMP. Nah.' is not proposed at every instruction it lists",
+     "Order a CBC. Order a BMP."),
+], ids=["not-proposed", "loses-one-of-its-instructions"])
+def test_a_control_not_proposed_at_each_instruction_fails_and_one_proposed_at_each_passes(eval_dir, said, problem_says,
+                                                                                          put_right):
     save(eval_dir, "latest.json", results(eval_dir))
     control = 'most_wrong = 0\n\n[[group]]\nfamily = "c"\nexpect = "proposed"\nsaid = ["{said}"]\n'
-    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC. Order a BMP. Nah."),
-                                                   encoding="utf-8")
+    (eval_dir / "trick-sentences.toml").write_text(control.format(said=said), encoding="utf-8")
 
     (problem,) = check(eval_dir / "results", eval_dir)
-    assert "control 'Order a CBC. Order a BMP. Nah.' is not proposed at every instruction it lists" in problem
+    assert problem_says in problem
 
-    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC. Order a BMP."), encoding="utf-8")
-    assert check(eval_dir / "results", eval_dir) == []
-
-
-def test_a_sentence_accepted_by_name_that_gives_two_proposals_exceeds_the_cap_and_one_that_gives_one_doesnt(eval_dir):
-    save(eval_dir, "latest.json", results(eval_dir))
-    two = TRICK_ACCEPTED.replace('said = ["Order a CBC."]', 'said = ["Order a CBC. Order a BMP."]')
-    (eval_dir / "trick-sentences.toml").write_text(
-        TRICK.format(most_wrong=1, reverses="true", accepted=two).replace(
-            'said = ["Order a CBC."]', 'said = ["Order a CBC. Order a BMP."]'), encoding="utf-8")
-
-    (problem,) = check(eval_dir / "results", eval_dir)
-    assert "2 wrong proposals, more than the 1" in problem
-
-    (eval_dir / "trick-sentences.toml").write_text(TRICK.format(most_wrong=1, reverses="true", accepted=TRICK_ACCEPTED),
-                                                   encoding="utf-8")
-    assert check(eval_dir / "results", eval_dir) == []
-
-
-def test_a_control_not_proposed_fails_and_one_proposed_passes(eval_dir):
-    save(eval_dir, "latest.json", results(eval_dir))
-    control = 'most_wrong = 0\n\n[[group]]\nfamily = "c"\nexpect = "proposed"\nsaid = ["{said}"]\n'
-    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC. Nah."), encoding="utf-8")
-
-    (problem,) = check(eval_dir / "results", eval_dir)
-    assert "control 'Order a CBC. Nah.' is not proposed" in problem
-
-    (eval_dir / "trick-sentences.toml").write_text(control.format(said="Order a CBC."), encoding="utf-8")
+    (eval_dir / "trick-sentences.toml").write_text(control.format(said=put_right), encoding="utf-8")
     assert check(eval_dir / "results", eval_dir) == []
 
 

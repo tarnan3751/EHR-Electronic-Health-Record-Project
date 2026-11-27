@@ -4,6 +4,7 @@ using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -29,8 +30,6 @@ public partial class PreVisitFormSecurityTests(MigratedDatabase database) : ICla
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     // Answers with each scored question given the score at its place (and the PHQ-9's difficulty question, when given).
     static string Answers(string[] items, IReadOnlyList<int> scores, string? difficulty = null)

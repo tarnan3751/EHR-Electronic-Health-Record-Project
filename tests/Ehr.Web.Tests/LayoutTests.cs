@@ -10,9 +10,6 @@ namespace Ehr.Web.Tests;
 // so pages containing PHI are not cached in localStorage.
 public class LayoutTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel =>
-        TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Layout_disables_htmx_history_cache()
     {

@@ -12,8 +12,6 @@ namespace Ehr.Web.Tests;
 // numbered test cases.
 public class AnsweredNoticeTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Filing_results_puts_the_focus_on_the_saved_notice_not_the_acknowledge_button()
     {

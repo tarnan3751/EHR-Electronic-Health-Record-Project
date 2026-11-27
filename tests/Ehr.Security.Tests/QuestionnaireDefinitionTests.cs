@@ -3,6 +3,7 @@ using Ehr.Data.Reference;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -107,8 +108,6 @@ public class QuestionnaireDefinitionTests(MigratedDatabase database) : IClassFix
         yield return "attribution " + Attribution;
         yield return "copyright " + LoincNotice;
     }
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     [Fact]
     public async Task The_questionnaires_are_worded_and_scored_as_their_authors_published_them()

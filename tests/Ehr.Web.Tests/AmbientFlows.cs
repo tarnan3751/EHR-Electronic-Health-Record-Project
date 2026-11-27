@@ -13,8 +13,6 @@ namespace Ehr.Web.Tests;
 // (DictationSidecarStub.Ambient.cs). All data is synthetic.
 static class AmbientFlows
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string ListenApi = DictationApi.AmbientPath;
 
     public sealed record Listening(Session Session, Guid Patient, Guid Review, string SessionId, string Token, long Version);

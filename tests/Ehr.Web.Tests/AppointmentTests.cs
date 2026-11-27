@@ -1,6 +1,5 @@
 using System.Globalization;
 using Ehr.Data.Accounts;
-using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -11,8 +10,6 @@ namespace Ehr.Web.Tests;
 // (AppointmentSecurityTests).
 static class AppointmentTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A day well ahead, so no test's time has passed; each test takes its own day so bookings don't collide.
     public static string Day(int offset) => DateTime.UtcNow.Date.AddDays(30 + offset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
@@ -31,20 +28,8 @@ static class AppointmentTests
         PostFormAsync(client, NewPath(patient), NewPath(patient),
             ("Clinician", clinician), ("Day", day), ("Time", time), ("Minutes", minutes), ("Reason", reason));
 
-    public static async Task<List<string>> RowsAsync(WebApps apps, Guid patient, string expression = "status")
-    {
-        await using var db = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand($"SELECT {expression} FROM ehr.appointments WHERE patient_id = @patient ORDER BY starts_at, id", db);
-        command.Parameters.AddWithValue("patient", patient);
-        var rows = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync(Cancel);
-        while (await reader.ReadAsync(Cancel))
-        {
-            rows.Add(reader.GetString(0));
-        }
-
-        return rows;
-    }
+    public static Task<List<string>> RowsAsync(WebApps apps, Guid patient, string expression = "status") =>
+        apps.PatientRowsAsync($"SELECT {expression} FROM ehr.appointments WHERE patient_id = @patient ORDER BY starts_at, id", patient);
 
     // A change to an appointment, as its page's forms post it: with the version of the appointment the page showed.
     public static async Task<HttpResponseMessage> ChangeAsync(HttpClient client, Guid appointment, string handler, params (string Name, object Value)[] fields)

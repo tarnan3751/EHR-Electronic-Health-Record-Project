@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -16,8 +17,6 @@ namespace Ehr.Security.Tests;
 public class ChildrenRangesMigrationTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const string Before = "VitalReadings";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     static readonly DateTime Taken = new(2026, 11, 1, 9, 0, 0, DateTimeKind.Utc);
 

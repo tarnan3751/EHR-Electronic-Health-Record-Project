@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Pressure = "A blood pressure already stands for that time. Mark it entered in error first, then record the correct one.";
 
     static async Task RefusedAsync(HttpResponseMessage response, string field, string message, params string[] typed)

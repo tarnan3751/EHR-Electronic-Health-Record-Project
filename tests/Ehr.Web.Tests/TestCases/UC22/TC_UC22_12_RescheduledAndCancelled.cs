@@ -45,8 +45,6 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 // Creator: Tahseen Arnan
 public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_form_follows_its_appointment_through_a_reschedule_and_a_cancellation()
     {

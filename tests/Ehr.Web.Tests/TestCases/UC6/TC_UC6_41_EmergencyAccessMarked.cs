@@ -36,8 +36,6 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Creator: Tahseen Arnan
 public class TC_UC6_41_EmergencyAccessMarked(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Reason = "Synthetic reason: covering a colleague's patients overnight.";
 
     [Fact]

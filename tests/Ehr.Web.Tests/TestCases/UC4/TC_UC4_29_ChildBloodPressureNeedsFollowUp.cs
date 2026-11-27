@@ -29,8 +29,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_29_ChildBloodPressureNeedsFollowUp(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // The systolic trend's figure on a page.
     static string Systolic(string page) => Regex.Match(page, $"(?s)<figure class=\"sc-trend\" data-trend=\"{VitalTests.Systolic}\">.*?</figure>").Value;
 

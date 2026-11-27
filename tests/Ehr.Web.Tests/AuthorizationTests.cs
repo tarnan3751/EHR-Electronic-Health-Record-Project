@@ -9,8 +9,6 @@ namespace Ehr.Web.Tests;
 // sign in, who is refused, and what stays anonymous.
 public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Theory]
     [InlineData("/", "/sign-in")]
     [InlineData("/patients", "/sign-in")]

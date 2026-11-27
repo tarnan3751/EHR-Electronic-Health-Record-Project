@@ -361,14 +361,18 @@ def test_a_visits_window_waits_while_a_dictation_is_being_sorted(settings):
     assert waiting == [] and result["sorting"] == "done"
 
 
+class FirstWindowSlow(FakeLlama):
+    """Waits ten seconds before answering the first completion it is asked for, long enough for a dictation to make it
+    give way, and answers the rest at once."""
+
+    async def handle(self, request):
+        self.delay = 0 if any(r.url.path == "/v1/chat/completions" for r in self.requests) else 10
+        return await super().handle(request)
+
+
 # Decision D16 as approved: a window is drafted only while no dictation is being sorted, so one being drafted gives way
 # the moment a dictation asks, and is drafted again after it.
 def test_a_window_being_drafted_gives_way_at_the_first_dictation(settings):
-    class FirstWindowSlow(FakeLlama):
-        async def handle(self, request):
-            self.delay = 0 if any(r.url.path == "/v1/chat/completions" for r in self.requests) else 10
-            return await super().handle(request)
-
     async def run():
         llama = FirstWindowSlow(DRAFTED)
         sessions = make(settings, llama)
@@ -600,11 +604,6 @@ def test_a_visit_and_a_dictation_in_spanish_never_reach_each_others_sessions(set
 # result is its own kind's: the visit's has speakers and no translation, the dictation's translated statements and no
 # speaker.
 def test_a_dictation_in_spanish_has_its_turn_before_a_visit_and_neither_gets_the_others_checks(settings):
-    class FirstWindowSlow(FakeLlama):
-        async def handle(self, request):
-            self.delay = 0 if any(r.url.path == "/v1/chat/completions" for r in self.requests) else 10
-            return await super().handle(request)
-
     async def run():
         llama = FirstWindowSlow(DRAFTED)
         sessions = Listening(settings, PitchRecognizer(), llama.structurer(), BOTH_MODELS, decoder=raw_decoder,

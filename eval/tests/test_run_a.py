@@ -11,6 +11,7 @@ import json
 
 import httpx2
 import pytest
+from conftest import llama_transport
 
 from dictation_scripts_es import HOLDOUT_DIR, load_scripts
 from ehr_dictation import prompt, translation
@@ -30,17 +31,12 @@ def structurer(content: dict | str, finish_reason: str = "stop") -> Structurer:
 
 def llama_server(content: dict | str, finish_reason: str = "stop",
                  server: type[LlamaServer] = LlamaServer) -> LlamaServer:
-    async def handle(request: httpx2.Request) -> httpx2.Response:
-        if request.url.path == "/props":
-            return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
-                                              "default_generation_settings": {"n_ctx": 8192}})
-        if request.url.path == "/tokenize":
-            return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
+    def complete(request: httpx2.Request) -> httpx2.Response:
         text = content if isinstance(content, str) else json.dumps(content)
         return httpx2.Response(200, json={"choices": [{"finish_reason": finish_reason, "message": {"content": text}}],
                                           "timings": {"prompt_n": 900, "predicted_n": 700}})
 
-    return server("http://llama.test", "key", transport=httpx2.MockTransport(handle))
+    return server("http://llama.test", "key", transport=llama_transport(complete, n_ctx=8192))
 
 
 def gold_answer(script_id: str, **changes: list[dict]) -> dict:

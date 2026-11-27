@@ -18,8 +18,6 @@ public class QuickTextSyncTests(WebApps apps) : IClassFixture<WebApps>
 {
     const string Path = "/api/sync/quick-texts";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_first_pull_returns_every_phrase()
     {

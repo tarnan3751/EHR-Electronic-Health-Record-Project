@@ -18,13 +18,8 @@ public class DictationProposalBrowserTests(WebApps apps) : IClassFixture<WebApps
     public async Task TC_UC13_12_a_proposed_order_is_opened_and_signed_and_the_next_dismissed_from_the_keyboard()
     {
         var dictated = await DictateAsync(apps);
-        await using var server = await ClinicalBrowserHost.StartAsync(apps);
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await LaunchAsync(playwright);
-        await using var context = await ContextAsync(browser, dictated.Session);
-        var page = await context.NewPageAsync();
-        var errors = new List<string>();
-        page.PageError += (_, error) => errors.Add(error);
+        await using var opened = await BrowserPage.OpenAsync(apps, browser => ContextAsync(browser, dictated.Session));
+        var (server, page, errors) = opened;
         await page.GotoAsync($"{server.Url}{dictated.ReviewPath}");
 
         var order = $"[data-chart-proposal=\"{dictated.Order}\"] [data-open-proposal]";

@@ -28,13 +28,7 @@ public class OrderChangeSecurityTests(MigratedDatabase database) : IClassFixture
         UPDATE ehr.orders SET status = 'revoked', discontinue_reason = 'Replaced by a changed order', replaced_by_order_id = @new WHERE id = @old
         """;
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     async Task<Guid> OrderAsync(Guid clinician, Guid patient, string code = "SYN-LAB-001")
     {

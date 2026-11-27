@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Creator: Tahseen Arnan
 public class TC_UC15_10_ResultWithNoClinician(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_result_no_clinician_can_receive_reaches_the_administrators_by_patient_id_alone()
     {

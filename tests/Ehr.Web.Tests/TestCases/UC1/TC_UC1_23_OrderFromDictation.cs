@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_23_OrderFromDictation(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_order_form_opened_from_a_proposal_fills_in_nothing_and_signs_through_every_check()
     {

@@ -31,13 +31,7 @@ public class ChartListSecurityTests(MigratedDatabase database) : IClassFixture<M
 
     public static TheoryData<string> Tables => [.. Statements.Keys];
 
-    async Task<(Guid Clinician, Guid Patient)> OnPanelAsync()
-    {
-        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
-        var patient = await Accounts.PatientAsync(database, clinician);
-        await Accounts.AssignAsync(database, clinician, patient);
-        return (clinician, patient);
-    }
+    Task<(Guid Clinician, Guid Patient)> OnPanelAsync() => Accounts.OnPanelAsync(database);
 
     Task<List<string>> AsSuperuserAsync(string sql, params (string Name, object Value)[] parameters) =>
         Accounts.QueryAsync(database.SuperuserConnectionString, null, sql, parameters);

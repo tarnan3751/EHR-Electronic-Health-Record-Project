@@ -9,6 +9,7 @@ import json
 
 import httpx2
 import pytest
+from conftest import llama_transport
 
 from dictation_scripts_es import load_scripts as load_spanish
 from ehr_dictation.llama import LlamaServer
@@ -28,18 +29,13 @@ def gold_for(sent: str) -> dict:
 
 @pytest.fixture
 def english_run(tmp_path, monkeypatch):  # noqa: ANN001, ANN201
-    async def handle(request: httpx2.Request) -> httpx2.Response:
-        if request.url.path == "/props":
-            return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
-                                              "default_generation_settings": {"n_ctx": 8192}})
-        if request.url.path == "/tokenize":
-            return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
+    def complete(request: httpx2.Request) -> httpx2.Response:
         sent = json.loads(request.content)["messages"][-1]["content"]
         return httpx2.Response(200, json={"choices": [{"finish_reason": "stop",
                                                        "message": {"content": json.dumps(gold_for(sent))}}]})
 
     monkeypatch.setattr(run_a_en, "LlamaServer",
-                        lambda url, key: LlamaServer(url, key, transport=httpx2.MockTransport(handle)))
+                        lambda url, key: LlamaServer(url, key, transport=llama_transport(complete, n_ctx=8192)))
     monkeypatch.setattr(run_a_en.provenance, "load", lambda models_dir, verify: Models(
         {"repository": "google/medasr", "commit": "a" * 40, "sha256": "b" * 64},
         {"repository": "IFM/K2-Horizon-7B-GGUF", "commit": "c" * 40, "file": "K2.gguf", "sha256": "d" * 64}))

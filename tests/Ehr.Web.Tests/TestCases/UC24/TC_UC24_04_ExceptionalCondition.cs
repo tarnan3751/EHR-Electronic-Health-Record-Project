@@ -29,8 +29,6 @@ namespace Ehr.Web.Tests.TestCases.UC24;
 // Creator: Tahseen Arnan
 public class TC_UC24_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_the_review_is_forwarded_and_cut_off_it_waits_and_keeps_what_was_typed()
     {

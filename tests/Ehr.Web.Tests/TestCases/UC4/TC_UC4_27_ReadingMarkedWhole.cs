@@ -33,8 +33,6 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 // Creator: Tahseen Arnan
 public class TC_UC4_27_ReadingMarkedWhole(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_blood_pressure_is_marked_as_one_reading_and_corrected_as_a_new_one()
     {

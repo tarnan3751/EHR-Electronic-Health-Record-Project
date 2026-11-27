@@ -31,8 +31,6 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 // Creator: Tahseen Arnan
 public class TC_UC1_19_SafetyInformationOnly(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_moderate_interaction_is_shown_and_kept_without_stopping_the_order()
     {

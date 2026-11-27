@@ -19,8 +19,6 @@ namespace Ehr.Web.Tests;
 // code on a row that is no reading's value is.
 public class FhirReaderTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_read_by_id_is_one_query_and_never_counts_and_a_search_cut_by_its_limit_does()
     {

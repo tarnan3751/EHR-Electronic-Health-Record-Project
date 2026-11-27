@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 // Creator: Tahseen Arnan
 public class TC_UC21_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Off_site_an_answer_is_forwarded_during_an_outage_none_is_offered_and_one_answer_stands()
     {

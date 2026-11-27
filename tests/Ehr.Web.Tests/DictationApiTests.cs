@@ -30,8 +30,6 @@ public class DictationApiTests(WebApps apps) : IClassFixture<WebApps>
 
     readonly DictationSidecarStub service = apps.Dictation.Reset();
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // TC-UC10-01 (FR-08, FR-11, FR-12, FR-13): the proposed fields come back awaiting review, with their sources. Also
     // TC-UC9-01 (FR-07, FR-10, FR-32, NFR-14), through the web app: the transcript grows as the clinician speaks.
     [Fact]

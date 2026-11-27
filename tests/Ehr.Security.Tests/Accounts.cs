@@ -1,6 +1,8 @@
+using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -9,8 +11,6 @@ namespace Ehr.Security.Tests;
 // Work as a runtime role runs in one transaction with the user set first, the way UserContextInterceptor sets it.
 static class Accounts
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public static async Task<Guid> StaffAsync(MigratedDatabase database, params string[] roles)
     {
         var id = Guid.CreateVersion7();
@@ -81,6 +81,15 @@ static class Accounts
             "INSERT INTO ehr.patient_assignments (id, patient_id, clinician_id, assigned_at) VALUES (@id, @patient, @clinician, now())",
             ("id", id), ("patient", patientId), ("clinician", clinicianId));
         return id;
+    }
+
+    // A clinician and a patient on the clinician's panel, made as above.
+    public static async Task<(Guid Clinician, Guid Patient)> OnPanelAsync(MigratedDatabase database)
+    {
+        var clinician = await Accounts.StaffAsync(database, StaffRoles.Clinician);
+        var patient = await Accounts.PatientAsync(database, clinician);
+        await Accounts.AssignAsync(database, clinician, patient);
+        return (clinician, patient);
     }
 
     // The chart's other tables, each with the smallest row it takes. Nothing at runtime writes them yet, so rows are

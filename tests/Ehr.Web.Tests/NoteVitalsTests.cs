@@ -23,8 +23,6 @@ namespace Ehr.Web.Tests;
 // unsigned draft of the route's patient. TC-UC14-30 is the clinician's flow; ObjectiveVitalsTests works out the text.
 public class NoteVitalsTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     ClinicTime Clinic => apps.OnPrem.Services.GetRequiredService<ClinicTime>();
 
     // A clinic day two days ago, by the database's clock (the tests' clinic clock is UTC): every value here is on it.

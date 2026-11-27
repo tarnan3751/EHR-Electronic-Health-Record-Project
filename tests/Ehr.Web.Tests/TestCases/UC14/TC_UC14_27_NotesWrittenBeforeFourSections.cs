@@ -49,8 +49,6 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Creator: Tahseen Arnan
 public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string SignedHistory = "Synthetic history: signed as History, temperature 37.9.";
 
     const string DraftHistory = "Synthetic history: drafted as History, chest clear.";

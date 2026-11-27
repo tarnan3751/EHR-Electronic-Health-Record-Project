@@ -14,8 +14,6 @@ namespace Ehr.Web.Tests;
 // except off-site while the clinic's server can't be reached.
 public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_home_is_a_clinicians_panel_and_an_admins_staff_page()
     {

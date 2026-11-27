@@ -15,7 +15,6 @@ namespace Ehr.Web.Tests;
 
 public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
     static readonly NoteContent Synthetic = new("Synthetic subjective: cough for two days.", "Synthetic objective: chest clear, temperature 37.9.", "Synthetic assessment: viral illness.", "Synthetic plan: rest and follow-up.");
 
     sealed record DraftPage(Session Session, Guid Patient, Guid Draft, string Path, string Token);

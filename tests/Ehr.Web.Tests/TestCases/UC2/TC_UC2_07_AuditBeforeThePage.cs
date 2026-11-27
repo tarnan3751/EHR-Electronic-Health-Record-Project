@@ -32,8 +32,6 @@ namespace Ehr.Web.Tests.TestCases.UC2;
 // Creator: Tahseen Arnan
 public class TC_UC2_07_AuditBeforeThePage(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     sealed class Watched(IDurableAuditQueue? queue) : IDurableAuditQueue
     {
         public List<string[]> Writes { get; } = [];

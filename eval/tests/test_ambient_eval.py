@@ -9,11 +9,10 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
-import subprocess
 
 import numpy as np
 import pytest
-from conftest import fake_structurer
+from conftest import fake_structurer, llama_transport, webm
 
 from ehr_dictation import prompt
 from ehr_dictation.asr import Recognition
@@ -90,10 +89,7 @@ def recording(*turns: str) -> tuple[bytes, list[dict]]:
         at += 3.5
     samples = np.concatenate(pieces).astype(np.float32)
     samples += (np.random.default_rng(1).standard_normal(samples.size) * 3e-4).astype(np.float32)
-    data = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "1", "-i", "pipe:0",
-         "-c:a", "libopus", "-f", "webm", "pipe:1"], input=samples.tobytes(), capture_output=True, check=True).stdout
-    return data, times
+    return webm(samples), times
 
 
 @pytest.fixture
@@ -526,17 +522,12 @@ def test_a_window_retried_as_halves_is_stored_and_read_back(tmp_path, visits, mo
     monkeypatch.setattr(conversation, "WINDOW_TOKENS", 1000)
     asked = []
 
-    async def handle(request):
-        if request.url.path == "/props":
-            return httpx2.Response(200, json={"model_path": "/models/K2.gguf", "build_info": "b11669-test",
-                                              "default_generation_settings": {"n_ctx": 4096}})
-        if request.url.path == "/tokenize":
-            return httpx2.Response(200, json={"tokens": list(range(len(json.loads(request.content)["content"].split())))})
+    def complete(request):
         asked.append(request)
         return httpx2.Response(200, json={"choices": [{"finish_reason": "length" if len(asked) == 1 else "stop",
                                                        "message": {"content": json.dumps(ANSWER)}}]})
 
-    structurer = Structurer(LlamaServer("http://llama.test", "key", transport=httpx2.MockTransport(handle)),
+    structurer = Structurer(LlamaServer("http://llama.test", "key", transport=llama_transport(complete)),
                             ambient.conversation_prompt(), "K2.gguf", timeout=5)
     data, times = recording("clinician", "patient", "clinician")
     (tmp_path / "c01.webm").write_bytes(data)

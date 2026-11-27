@@ -19,8 +19,6 @@ public partial class CloudForwardingTests(WebApps apps) : IClassFixture<WebApps>
 {
     const string LastSaveCookieName = "__Host-Ehr.LastSave";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task The_on_prem_app_reports_its_WAL_position_after_a_save()
     {
