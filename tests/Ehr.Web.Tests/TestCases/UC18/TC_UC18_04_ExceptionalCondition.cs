@@ -21,13 +21,13 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 // Test data: For 90 days. The end date is moved into the past by the test, in the database.
 // Steps:
 //   1. Off-site, give the proxy access.
-//   2. With the link down, open "Access"; post the remove form that was on screen.
-//   3. On-site, after the end date, as the proxy open "Access" and post the grant's ID to view the record; as the
-//      patient open "Access".
+//   2. With the link down, open "Sharing"; post the remove form that was on screen.
+//   3. On-site, after the end date, as the proxy open "Sharing" and post the grant's ID to view the record; as the
+//      patient open "Sharing".
 // Expected result: Step 1: the post is forwarded and the access saved. Step 2: the page lists the proxy and says
-//   "Read-only: access can't be given or removed until the clinic's server is back.", with no form and no buttons;
+//   "Read-only. Sharing can't be changed until the clinic's server is back.", with no form and no buttons;
 //   the post is answered 503 and the access is still in force. Step 3: the proxy's list is empty and the post is
-//   answered 404; the patient sees the entry under "Access that has ended", as expired.
+//   answered 404; the patient sees the entry under "Sharing that has ended", as ended.
 // Creator: Tahseen Arnan
 public class TC_UC18_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
 {
@@ -50,9 +50,9 @@ public class TC_UC18_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var cutOff = Client(apps.CloudCutOff, patient.Jar);
         var readOnly = await cutOff.GetStringAsync("/portal/access", Cancel);
         Assert.Contains(proxy.Email, readOnly);
-        Assert.Contains("Read-only: access can't be given or removed until the clinic's server is back.", Words(readOnly));
+        Assert.Contains("Read-only. Sharing can't be changed until the clinic's server is back.", Words(readOnly));
         Assert.DoesNotContain("name=\"Email\"", readOnly);
-        Assert.DoesNotContain("Remove access", readOnly);
+        Assert.DoesNotContain("Stop sharing", readOnly);
         using var notSaved = await cutOff.PostAsync("/portal/access?handler=Revoke", Form(("__RequestVerificationToken", token), ("grantId", grant.ToString())), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);
         Assert.EndsWith("in-force", (await GrantsAsync(apps, patient.Patient)).Single());
@@ -65,12 +65,12 @@ public class TC_UC18_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             await expire.ExecuteNonQueryAsync(Cancel);
         }
 
-        Assert.Contains("Nobody has given you access to their record.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
+        Assert.Contains("Nobody has shared a record with you.", await proxy.Client.GetStringAsync("/portal/access", Cancel));
         using var tooLate = await PostFormAsync(proxy.Client, "/portal/acting", "/portal/access", ("grantId", grant));
         Assert.Equal(HttpStatusCode.NotFound, tooLate.StatusCode);
         var own = await patient.Client.GetStringAsync("/portal/access", Cancel);
-        Assert.Contains("Access that has ended", own);
-        Assert.Contains("expired", own);
-        Assert.Contains("Nobody else can view your record.", own);
+        Assert.Contains("Sharing that has ended", own);
+        Assert.Contains("· ended ", own);
+        Assert.Contains("You haven't shared your record with anyone.", own);
     }
 }

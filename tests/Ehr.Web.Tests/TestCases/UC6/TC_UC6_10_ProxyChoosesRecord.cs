@@ -19,11 +19,11 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   /portal/results; POST /portal/acting?handler=Mine.
 // Test data: Patient "Synthetic Parent" with result "Hemoglobin A1c"; proxy "Synthetic Carer" with result "Ferritin".
 // Steps:
-//   1. As the proxy, open "Access".
+//   1. As the proxy, open "Sharing".
 //   2. Choose "View this record".
 //   3. Open "Results".
 //   4. Choose "Back to my record", and open "Results".
-// Expected result: Step 1: "Records you can view" lists "Synthetic Parent". Step 2: the home page is headed "Synthetic
+// Expected result: Step 1: "Records shared with you" lists "Synthetic Parent". Step 2: the home page is headed "Synthetic
 //   Parent's record", shows that patient's name and record number, and the band "Shared record. You're viewing Synthetic
 //   Parent's record, not your own." Step 3: the patient's result and not the proxy's; the band again; the read is
 //   recorded with the proxy's account as the actor and the patient as the subject. Step 4: the proxy's own record and

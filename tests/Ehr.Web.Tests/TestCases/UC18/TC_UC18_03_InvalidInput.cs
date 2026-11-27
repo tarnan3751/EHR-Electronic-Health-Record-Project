@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //      3,650 days.
 //   2. Give access to the second patient for the record only, then again with messages.
 //   3. Post the third patient's grant ID to Remove and to Show sensitive items.
-// Expected result: Step 1: each is answered 422 with "Not saved:" and, in turn, "Enter the person's email address.",
+// Expected result: Step 1: each is answered 422 with "Not saved." and, in turn, "Enter the person's email address.",
 //   "Enter an email address, like name@example.com.", "That's your own email address. Enter the other person's.",
 //   "Choose what they can see." and "Choose how long the access lasts."; what was typed stays in the field; nothing is
 //   saved and no email is sent. Step 2: one grant is in force, with messages; the first is ended. Step 3: both are
@@ -53,7 +53,7 @@ public class TC_UC18_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             using var refused = await PostFormAsync(patient.Client, "/portal/access", "/portal/access", ("Email", email), ("Scope", scope), ("Days", days));
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var page = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("Not saved:", page);
+            Assert.Contains("Not saved.", page);
             Assert.Contains(message, Words(page));
             if (email.Length > 0)
             {

@@ -92,7 +92,7 @@ public class TC_UC6_29_DownloadRecordInvalidInput(WebApps apps) : IClassFixture<
         {
             Assert.Equal("/portal", PathOf(forged));
             var home = await ReadAsync(forged);
-            Assert.Contains("Access ended:", Words(home));
+            Assert.Contains("Access ended.", Words(home));
             Assert.DoesNotContain("quince", home);
         }
 

@@ -88,7 +88,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         var ended = proxies[1];
         using (var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", ended.Grant)))
         {
-            Assert.Contains("Removed:", await ReadAsync(removed));
+            Assert.Contains("Sharing removed.", await ReadAsync(removed));
         }
 
         var downloads = await apps.AuditEventsAsync(AuditActions.Download, ended.Proxy.Account, patient.Patient);
@@ -96,7 +96,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         {
             Assert.Equal("/portal", PathOf(after));
             var own = await ReadAsync(after);
-            Assert.Contains("Access ended: you can no longer view that record. This is your own.", Words(own));
+            Assert.Contains("Access ended. You can no longer see that record. This is your own.", Words(own));
             Assert.DoesNotContain("Fhirchart", own);
         }
 
@@ -108,7 +108,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
 
         // An account with no record of its own, not looking at a shared one: sent to choose, nothing recorded.
         var carer = $"synthetic-carer-{Guid.NewGuid():N}@example.com";
-        Assert.Contains("Saved:", await GiveAsync(patient, carer));
+        Assert.Contains("Shared.", await GiveAsync(patient, carer));
         Assert.Contains("Account created.", await AcceptAsync(apps, InvitationPath(apps, carer), "Synthetic Record Carer"));
         var session = await SignInAsync(apps, carer);
         Assert.Equal("/portal/choose", session.Path);

@@ -24,14 +24,14 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   4. Post the link sent to the second patient's address.
 //   4b. A patient account exists that named a third address and never confirmed it. Give that address access, and
 //      accept the invitation with a password of the owner's choosing.
-//   5. As the new account, viewing the record, post the "Give someone access" form.
+//   5. As the new account, viewing the record, post the "Share your record" form.
 //   6. As the patient, remove the new account's access. As the new account, open "Results".
 // Expected result: Step 1: "This invitation link isn't valid any more." and no form. Step 2: "The passwords don't
 //   match." with the form still there and no account; then "Account created."; then "isn't valid any more", and still one
 //   account. Step 3: "isn't valid any more" and no account. Step 4: "You already have a portal account with this email
 //   address." and that patient's account is unchanged. Step 4b: "Account created."; the address signs in with the owner's
 //   password and not with the unconfirmed account's, which no longer has the address. Step 5: nothing is saved. Step 6: the new account lands on
-//   "Whose record?" with "Access ended:" and "Nobody is sharing a record with you at the moment."
+//   "Whose record?" with "Access ended." and "Nobody is sharing a record with you."
 // Creator: Tahseen Arnan
 public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
 {
@@ -113,12 +113,12 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(grants, await GrantsAsync(apps, patient.Patient));
 
         using var removed = await PostFormAsync(patient.Client, "/portal/access?handler=Revoke", "/portal/access", ("grantId", grant));
-        Assert.Contains("Removed:", await ReadAsync(removed));
+        Assert.Contains("Sharing removed.", await ReadAsync(removed));
         using var after = await session.Client.GetAsync("/portal/results", Cancel);
         Assert.Equal("/portal/choose", PathOf(after));
         var ended = await ReadAsync(after);
-        Assert.Contains("Access ended: you can no longer view that record.", Words(ended));
-        Assert.Contains("Nobody is sharing a record with you at the moment.", ended);
+        Assert.Contains("Access ended. You can no longer see that record.", Words(ended));
+        Assert.Contains("Nobody is sharing a record with you.", ended);
         Assert.DoesNotContain("Synthetic Inviter", ended);
     }
 

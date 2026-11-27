@@ -25,13 +25,13 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   2. As the proxy, choose the patient's record and send a message to the care team.
 //   3. As the first clinician, open the conversation.
 //   4. As the second clinician, after giving a reason on the chart, open the proxies page and post a removal.
-//   5. As the patient, open "Access". As the first clinician, choose "Remove access".
+//   5. As the patient, open "Sharing". As the first clinician, choose "Remove access".
 // Expected result: Step 1: "Access given.", and the table lists the email, the scope, "Hidden" for sensitive items, "By the
 //   clinic" and "In force"; the proxy is sent the same email as in TC-UC18-01. Step 2: the message is sent. Step 3: it
 //   is shown from "Synthetic Guardian (proxy)", not from the patient. Step 4: the page lists the proxy, says "To give or
 //   remove access, add this patient to My patients." with no form, and the post is redirected to the chart with
-//   the proxy still in force; opening the page is a recorded read. Step 5: the patient sees "Recorded by your clinic."
-//   and can choose "Show sensitive items"; after the clinician's removal the table says "Removed".
+//   the proxy still in force; opening the page is a recorded read. Step 5: the patient sees "Shared by your clinic."
+//   and can choose "Share sensitive items too"; after the clinician's removal the table says "Removed".
 // Creator: Tahseen Arnan
 public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 {
@@ -86,8 +86,8 @@ public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.EndsWith("in-force", (await GrantsAsync(apps, patient.Patient)).Single());
 
         var own = await patient.Client.GetStringAsync("/portal/access", Cancel);
-        Assert.Contains("Recorded by your clinic.", own);
-        Assert.Contains("Show sensitive items", own);
+        Assert.Contains("Shared by your clinic.", own);
+        Assert.Contains("Share sensitive items too", own);
         using var removed = await PostFormAsync(staff.Client, $"{page}?handler=Revoke", page, ("grantId", grant));
         var after = await ReadAsync(removed);
         Assert.Contains("Access removed.", after);
