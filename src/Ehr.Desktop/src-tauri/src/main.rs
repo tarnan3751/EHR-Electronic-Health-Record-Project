@@ -82,7 +82,7 @@ impl App {
         self.store
             .as_ref()
             .map(store::lock)
-            .map_err(|problem| format!("The local database couldn't be opened: {problem}"))
+            .map_err(|problem| format!("The local database couldn't be opened ({problem})."))
     }
 
     fn sync(&self) -> Result<&sync::Sync, String> {

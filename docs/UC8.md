@@ -20,8 +20,8 @@ busy the app is, as a web sign-in does (Tahseen's ruling 11b of 25 November 2026
 - **Every other refusal** (a session signed out here, a changed password, an account locked out or disabled, or the
   session's 30 days) carries no such header: that session is over.
 - **In the app** (`src/Ehr.Desktop/src-tauri/src/sync.rs`): the 12-hour answer keeps the session and the offline copy,
-  says "Sign in again: a sign-in lasts at most 12 hours. Nothing is sent or brought back until you do, and what you save
-  here waits on this computer.", and locks the window once for a full sign-in (`docs/UC7.md`). Any other 401 ended the
+  says "Sign in again. A sign-in lasts at most 12 hours. Until you do, nothing is sent or brought back. What you save
+  waits on this computer.", and locks the window once for a full sign-in (`docs/UC7.md`). Any other 401 ended the
   session and forgot it, and now locks the window too, keeping the page for the same clinician, rather than clearing it.
   Since step 20's final review the session is ended but its token kept, not forgotten (below).
 - **What it costs.** The offline charts are refreshed only by **Download my charts**, and the drafts' pull brings back
