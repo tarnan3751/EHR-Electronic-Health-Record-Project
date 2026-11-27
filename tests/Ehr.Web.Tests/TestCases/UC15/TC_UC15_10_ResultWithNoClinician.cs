@@ -29,7 +29,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 // Expected result: Step 2: "Result with no clinician", "Results are in, and no clinician can receive them", the patient's
 //   ID and "Ask a clinician to add this patient to their patients and acknowledge the results."; neither the patient's
 //   name, the test, its value, the order, "Abnormal" nor "Mark done"; off-site the same item; the mark is refused with
-//   "Nothing to mark:". Step 3: "Nothing needs your action."; under Done, the item.
+//   "Nothing to mark.". Step 3: "Nothing needs your action."; under Done, the item.
 // Creator: Tahseen Arnan
 public class TC_UC15_10_ResultWithNoClinician(WebApps apps) : IClassFixture<WebApps>
 {
@@ -83,7 +83,7 @@ public class TC_UC15_10_ResultWithNoClinician(WebApps apps) : IClassFixture<WebA
             "SELECT id::text FROM ehr.inbox_items WHERE recipient_id = @r AND source_id = @o", ("r", watcherAccount.Id), ("o", order))).Single());
         using (var refused = await MarkDoneAsync(watcher.Client, item, Token(inbox)))
         {
-            Assert.Contains("Nothing to mark:", await ReadAsync(refused));
+            Assert.Contains("Nothing to mark.", await ReadAsync(refused));
         }
 
         Assert.False(await IsDoneAsync(apps, item));

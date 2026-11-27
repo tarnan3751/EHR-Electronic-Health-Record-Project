@@ -50,8 +50,8 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   emergency access." and "Needs review. Question 9, "Thoughts that you would be better off dead or of
 //   hurting yourself in some way"."; one recorded view of sensitive items and no emergency access; the chart, the
 //   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander;
-//   the inbox says beside "Mark done": "After you mark this done, the answers open from the patient's chart, which needs
-//   the patient on your panel or emergency access."; once it is done, the link sends them to the reason page too, and
+//   the inbox says beside "Mark done": "Once it's done, the answers open only from the chart, which needs the patient
+//   in My patients or emergency access."; once it is done, the link sends them to the reason page too, and
 //   their Done tab keeps the item's line with no link to the answers and nothing more; the clinician's Done tab, the
 //   patient on their panel, says "Open from the patient's chart." as plain words, with no link to the answers. Step
 //   6: the staying clinician's inbox links to the answers again, with a new open item beside the done one; the
@@ -158,7 +158,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
 
         // The inbox says, beside "Mark done", that the item is the way to the answers only while it is open; once the
         // covering clinician marks it done, they are sent to the chart's reason page like anyone else.
-        Assert.Contains("Mark done After you mark this done, the answers open from the patient's chart, which needs the patient on your panel or emergency access.",
+        Assert.Contains("Mark done Once it's done, the answers open only from the chart, which needs the patient in My patients or emergency access.",
             Text(await covering.Client.GetStringAsync("/inbox", Cancel)));
         var coveringItem = (await QueryAsync(apps, "SELECT id::text FROM ehr.inbox_items WHERE recipient_id = @covering AND kind = 'form-alert'",
             ("covering", coveringAccount.Id))).Single();
@@ -181,7 +181,10 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
         Assert.DoesNotContain(FromChart, Text(coveringDoneTab));
         var panelDoneTab = await visit.Session.Client.GetStringAsync("/inbox?done=true", Cancel);
         Assert.DoesNotContain($"href=\"{link}\"", panelDoneTab);
-        Assert.Contains($"A pre-visit form has an answer that needs review Needs review {FromChart}", Text(panelDoneTab));
+        // The note sits in the item's own row, where its link was.
+        var formRow = Text(System.Text.RegularExpressions.Regex.Match(panelDoneTab, "<tr data-inbox-item=\"form-alert\">.*?</tr>", System.Text.RegularExpressions.RegexOptions.Singleline).Value);
+        Assert.Contains("A pre-visit form has an answer that needs review Needs review", formRow);
+        Assert.Contains(FromChart, formRow);
         Assert.DoesNotMatch("<a[^>]*>Open from the patient", panelDoneTab);
     }
 

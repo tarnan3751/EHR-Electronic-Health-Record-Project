@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC15;
 //   2. Post "Mark done" for the item.
 //   3. Decline the request; open the inbox, and its Done tab.
 // Expected result: Step 1: one "Refill request" item, "A patient asked to renew a medication", naming no medication,
-//   with "Review the request" and no "Mark done" button; the app bar counts 1. Step 2: "Nothing to mark:", and the item
+//   with "Review the request" and no "Mark done" button; the app bar counts 1. Step 2: "Nothing to mark.", and the item
 //   still waits. Step 3: nothing needs action, and Done lists the item.
 // Creator: Tahseen Arnan
 public class TC_UC15_08_RefillDoneByAnswering(WebApps apps) : IClassFixture<WebApps>
@@ -53,7 +53,7 @@ public class TC_UC15_08_RefillDoneByAnswering(WebApps apps) : IClassFixture<WebA
 
         using (var ticked = await PostFormAsync(session.Client, $"/inbox?handler=Done&id={item}", "/inbox"))
         {
-            Assert.Contains("Nothing to mark:", Said(await ReadAsync(ticked)));
+            Assert.Contains("Nothing to mark.", Said(await ReadAsync(ticked)));
         }
 
         Assert.All(await ItemsAsync(apps, patient.Patient, request), open => Assert.EndsWith(" false", open));
