@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   4. Choose "View this record". Open "Results" and "Access".
 //   5. Send a message to the care team. As the clinician, open the conversation.
 // Expected result: Step 1: one email to the carer's address with a button "Create your portal account" to
-//   /portal/invitation with a code, and nobody's name. Step 2: the page says "Created:"; the account has no patient,
+//   /portal/invitation with a code, and nobody's name. Step 2: the page says "Account created."; the account has no patient,
 //   a confirmed address and the name typed; the creation is in the audit log under the new account. Step 3: sign-in
 //   lands on "Whose record?", which lists "Synthetic Cared" and no "My record"; the app bar has Access and no record
 //   links; /portal and /portal/results both lead back to "Whose record?". Step 4: the patient's record, with the band
@@ -55,7 +55,7 @@ public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
         var form = await Client(apps.OnPrem, new System.Net.CookieContainer()).GetStringAsync(invitation, Cancel);
         Assert.Contains("name=\"Input.Name\"", form);
         Assert.DoesNotContain("Cared", form);
-        Assert.Contains("Created:", await AcceptAsync(apps, invitation, "Synthetic Outside Carer"));
+        Assert.Contains("Account created.", await AcceptAsync(apps, invitation, "Synthetic Outside Carer"));
         var account = await AccountIdAsync(apps, carer);
         Assert.Equal(["none true Synthetic Outside Carer"], await QueryAsync(apps,
             $"SELECT coalesce(patient_id::text, 'none') || ' ' || email_confirmed || ' ' || display_name FROM ehr.patient_users WHERE id = '{account}' AND @patient IS NOT NULL", patient.Patient));

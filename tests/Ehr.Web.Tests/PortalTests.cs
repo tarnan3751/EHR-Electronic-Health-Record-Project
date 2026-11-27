@@ -46,7 +46,7 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         // The message's button says what its link does, and goes where the text's link goes.
         Assert.Equal(new EmailAction("Confirm your account", ConfirmLink().Match(message.Body).Value), apps.Emails.Actions[message.Body]);
         using var confirmed = await PostFormAsync(client, confirmPath, confirmPath);
-        Assert.Contains("Your address is confirmed", await ReadAsync(confirmed));
+        Assert.Contains("Email address confirmed", await ReadAsync(confirmed));
 
         using var signedIn = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password));
         Assert.Equal("/portal", PathOf(signedIn));
@@ -255,11 +255,11 @@ public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(1, await apps.AuditEventsAsync(AuditActions.RegistrationReplaced, patientId: patient));
 
         using var old = await PostFormAsync(client, oldPath, oldPath);
-        Assert.Contains("This link is not valid or has expired.", await ReadAsync(old));
+        Assert.Contains("This link isn't valid or has expired.", await ReadAsync(old));
 
         var newPath = new Uri(ConfirmLink().Match(Assert.Single(apps.Emails.Sent, m => m.To == right).Body).Value).PathAndQuery;
         using var confirmed = await PostFormAsync(client, newPath, newPath);
-        Assert.Contains("Your address is confirmed", await ReadAsync(confirmed));
+        Assert.Contains("Email address confirmed", await ReadAsync(confirmed));
         using var signedIn = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", right), ("Input.Password", newPassword));
         Assert.Equal("/portal", PathOf(signedIn));
         using var oldAddress = await PostFormAsync(Client(apps.Cloud, new CookieContainer()), "/portal/sign-in", "/portal/sign-in", ("Input.Email", mistyped), ("Input.Password", password));

@@ -27,9 +27,9 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   5. As the new account, viewing the record, post the "Give someone access" form.
 //   6. As the patient, remove the new account's access. As the new account, open "Results".
 // Expected result: Step 1: "This invitation link isn't valid any more." and no form. Step 2: "The passwords don't
-//   match." with the form still there and no account; then "Created:"; then "isn't valid any more", and still one
+//   match." with the form still there and no account; then "Account created."; then "isn't valid any more", and still one
 //   account. Step 3: "isn't valid any more" and no account. Step 4: "You already have a portal account with this email
-//   address." and that patient's account is unchanged. Step 4b: "Created:"; the address signs in with the owner's
+//   address." and that patient's account is unchanged. Step 4b: "Account created."; the address signs in with the owner's
 //   password and not with the unconfirmed account's, which no longer has the address. Step 5: nothing is saved. Step 6: the new account lands on
 //   "Whose record?" with "Access ended:" and "Nobody is sharing a record with you at the moment."
 // Creator: Tahseen Arnan
@@ -59,7 +59,7 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("The passwords don&#x27;t match.", mismatch);
         Assert.Contains("name=\"Input.Password\"", mismatch);
         Assert.Empty(await Accounts(first));
-        Assert.Contains("Created:", await AcceptAsync(apps, link, "Synthetic First"));
+        Assert.Contains("Account created.", await AcceptAsync(apps, link, "Synthetic First"));
         Assert.Contains("This invitation link isn't valid any more.", Words(await AcceptAsync(apps, link, "Synthetic Again")));
         Assert.Equal(["Synthetic First"], await Accounts(first));
 
@@ -94,7 +94,7 @@ public class TC_UC18_08_InvitationRefused(WebApps apps) : IClassFixture<WebApps>
         var (claimed, squattersPassword) = await apps.CreatePatientAccountAsync(squatter, confirmed: false);
         await GiveAsync(patient, claimed);
         const string ownersPassword = "the-invitees-own-password";
-        Assert.Contains("Created:", await AcceptAsync(apps, InvitationPath(apps, claimed), "Synthetic Owner", ownersPassword));
+        Assert.Contains("Account created.", await AcceptAsync(apps, InvitationPath(apps, claimed), "Synthetic Owner", ownersPassword));
         Assert.Equal(["Synthetic Owner"], await Accounts(claimed));
         Assert.Equal("/portal/choose", (await SignInAsync(apps, claimed, ownersPassword)).Path);
         var squatting = await SignInAsync(apps, claimed, squattersPassword);

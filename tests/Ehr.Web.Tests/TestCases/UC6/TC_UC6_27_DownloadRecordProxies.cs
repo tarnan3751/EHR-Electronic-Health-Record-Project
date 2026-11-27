@@ -109,7 +109,7 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         // An account with no record of its own, not looking at a shared one: sent to choose, nothing recorded.
         var carer = $"synthetic-carer-{Guid.NewGuid():N}@example.com";
         Assert.Contains("Saved:", await GiveAsync(patient, carer));
-        Assert.Contains("Created:", await AcceptAsync(apps, InvitationPath(apps, carer), "Synthetic Record Carer"));
+        Assert.Contains("Account created.", await AcceptAsync(apps, InvitationPath(apps, carer), "Synthetic Record Carer"));
         var session = await SignInAsync(apps, carer);
         Assert.Equal("/portal/choose", session.Path);
         foreach (var path in new[] { FilePath, PrintPath, PagePath })

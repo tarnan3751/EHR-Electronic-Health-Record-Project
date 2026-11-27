@@ -6,7 +6,7 @@
 <h1>Create your portal account</h1>
 @if (Model.State == "created")
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Created:</span> your account is ready. <a asp-page="SignIn">Sign in</a> with the email address the invitation was sent to and the password you just chose.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Account created.</span> <a asp-page="SignIn">Sign in</a> with the email address the invitation was sent to and your new password.</p>
 }
 else if (Model.State == "has-account")
 {
@@ -14,12 +14,12 @@ else if (Model.State == "has-account")
 }
 else if (Model.State == "invalid")
 {
-    <p class="sc-notice sc-notice--danger">This invitation link isn't valid any more. It works once and expires after 7 days. Ask the person who gave you access, or their clinic, to give it again.</p>
+    <p class="sc-notice sc-notice--danger">This invitation link isn't valid any more. It works once and expires after 7 days. Ask the person who shared their record with you, or their clinic, to share it again.</p>
     <p>Already have an account? <a asp-page="SignIn">Sign in</a>.</p>
 }
 else
 {
-    <p>Someone gave you access to their record. This creates an account for you to see it: it uses the email address the invitation was sent to, and it has no record of its own.</p>
+    <p>Someone shared their record with you. Create an account to see it. It uses the email address the invitation was sent to, and has no record of its own.</p>
     <form method="post" class="sc-form">
         <input type="hidden" asp-for="Input.Code">
         <div class="sc-field">

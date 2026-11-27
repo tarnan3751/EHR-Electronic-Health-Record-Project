@@ -19,7 +19,7 @@ public partial class PortalPasswordResetTests(WebApps apps) : IClassFixture<WebA
         var client = Client(apps.Cloud, new CookieContainer());
 
         using var asked = await PostFormAsync(client, "/portal/forgot", "/portal/forgot", ("Email", email));
-        Assert.Contains("we have sent it a link", await ReadAsync(asked));
+        Assert.Contains("we've sent it a link", await ReadAsync(asked));
         var message = Assert.Single(apps.Emails.Sent, m => m.To == email && m.Subject.Contains("Reset"));
         var resetPath = new Uri(ResetLink().Match(message.Body).Value).PathAndQuery;
         // The message's button says what its link does, and goes where the text's link goes.
@@ -27,10 +27,10 @@ public partial class PortalPasswordResetTests(WebApps apps) : IClassFixture<WebA
 
         const string newPassword = "a-new-portal-password";
         using var changed = await PostFormAsync(client, resetPath, resetPath, ("Input.Password", newPassword), ("Input.Confirm", newPassword));
-        Assert.Contains("Your password is changed.", await ReadAsync(changed));
+        Assert.Contains("Password changed.", await ReadAsync(changed));
 
         using var again = await PostFormAsync(client, resetPath, resetPath, ("Input.Password", newPassword), ("Input.Confirm", newPassword));
-        Assert.Contains("is not valid or has already been used", await ReadAsync(again));
+        Assert.Contains("isn't valid or has already been used", await ReadAsync(again));
 
         using var oldOne = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password));
         Assert.Contains("Wrong email or password.", await ReadAsync(oldOne));
@@ -48,7 +48,7 @@ public partial class PortalPasswordResetTests(WebApps apps) : IClassFixture<WebA
 
         using var asked = await PostFormAsync(client, "/portal/forgot", "/portal/forgot", ("Email", email));
 
-        Assert.Contains("we have sent it a link", await ReadAsync(asked));
+        Assert.Contains("we've sent it a link", await ReadAsync(asked));
         Assert.DoesNotContain(apps.Emails.Sent, m => m.To == email);
     }
 
