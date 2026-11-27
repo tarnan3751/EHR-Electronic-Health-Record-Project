@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   4. Open "Messages" again.
 // Expected result: Step 1: the conversation opens with "Sent:" and the message from "You"; one item is in the
 //   clinician's inbox, saying only "A patient sent a message". Step 2: one email goes to the patient's address:
-//   subject "You have a new message from your clinic", a button "Read your message" to /portal/messages, and none of
+//   subject "New message from your clinic", a button "Read your message" to /portal/messages, and none of
 //   the subject, the message or the reply in it. Step 3: the list marks the conversation "New"; the conversation
 //   shows the reply from "Your care team", with no staff name; opening it is a recorded read of the thread and marks
 //   the reply read. Step 4: the conversation is no longer "New".
@@ -57,7 +57,7 @@ public class TC_UC6_08_SendMessage(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(HttpStatusCode.OK, reply.StatusCode);
         Assert.Equal(emails + 1, apps.Emails.Sent.Count);
         var email = apps.Emails.Sent.Last();
-        Assert.Equal("You have a new message from your clinic", email.Subject);
+        Assert.Equal("New message from your clinic", email.Subject);
         Assert.Equal("Read your message", apps.Emails.Actions[email.Body].Label);
         Assert.EndsWith("/portal/messages", apps.Emails.Actions[email.Body].Link);
         foreach (var secret in new[] { "inhaler", "puffs", "Dr. Portal Messages", "Messaged" })

@@ -59,7 +59,7 @@ public class TC_UC18_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("In force", table);
         Assert.Equal([$"{proxy.Email} record-and-messages false staff in-force"], await GrantsAsync(apps, patient.Patient));
         Assert.Equal(emails + 1, apps.Emails.Sent.Count);
-        Assert.Equal("You have been given access to a record", apps.Emails.Sent.Last().Subject);
+        Assert.Equal("Someone shared their record with you", apps.Emails.Sent.Last().Subject);
 
         var grant = await GrantIdAsync(apps, patient.Patient);
         await ViewAsync(proxy, grant);

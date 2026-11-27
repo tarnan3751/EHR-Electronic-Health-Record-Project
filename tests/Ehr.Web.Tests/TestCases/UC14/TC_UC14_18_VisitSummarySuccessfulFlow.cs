@@ -35,7 +35,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   says "Released. The patient can now read the summary in the portal." and shows the three parts, line breaks kept,
 //   "Released to the patient by Dr. Test" and the time labeled UTC, and no link to write another; the chart tags the
 //   note "Summary released"; the database has it as released by the clinician, standing, not sensitive, with a write
-//   audit event; the patient gets one email, "There is something new in your patient portal", whose text and button
+//   audit event; the patient gets one email, "Something new in your patient portal", whose text and button
 //   ("See what's new", https://localhost/portal/summaries) say nothing of the summary, the note, the clinician or the
 //   forged host. Step 3: no second email that day. Step 4: one more email.
 // Creator: Tahseen Arnan
@@ -95,7 +95,7 @@ public class TC_UC14_18_VisitSummarySuccessfulFlow(WebApps apps) : IClassFixture
         Assert.Contains("data-summary-released", await session.Client.GetStringAsync($"/patients/{patient}", Cancel));
 
         var notice = Assert.Single(EmailsTo(apps, email));
-        Assert.Equal("There is something new in your patient portal", notice.Subject);
+        Assert.Equal("Something new in your patient portal", notice.Subject);
         Assert.Equal("Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.", notice.Body);
         var action = apps.Emails.Actions[notice.Body];
         Assert.Equal(("See what's new", Base + "portal/summaries"), (action.Label, action.Link));

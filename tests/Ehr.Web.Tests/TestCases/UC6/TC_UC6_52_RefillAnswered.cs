@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   3. The patient opens the page.
 // Expected result: The page lists amlodipine "Declined" with the message as written, and lisinopril "Approved", "your
 //   care team ordered lisinopril 10 MG Oral Tablet"; "Dr. Test" is nowhere on it. The patient's address has one new
-//   email, "There is something new in your patient portal", with no medication in it and a button to /portal; the
+//   email, "Something new in your patient portal", with no medication in it and a button to /portal; the
 //   proxy's address has none.
 // Creator: Tahseen Arnan
 public class TC_UC6_52_RefillAnswered(WebApps apps) : IClassFixture<WebApps>
@@ -73,7 +73,7 @@ public class TC_UC6_52_RefillAnswered(WebApps apps) : IClassFixture<WebApps>
 
         var sent = EmailsTo(apps, patient.Email).Skip(patientEmails).ToList();
         var email = Assert.Single(sent);
-        Assert.Equal("There is something new in your patient portal", email.Subject);
+        Assert.Equal("Something new in your patient portal", email.Subject);
         foreach (var detail in new[] { "lisinopril", "amlodipine", "refill", "medication", "blood pressure", "Dr. Test" })
         {
             Assert.DoesNotContain(detail, email.Subject + email.Body, StringComparison.OrdinalIgnoreCase);

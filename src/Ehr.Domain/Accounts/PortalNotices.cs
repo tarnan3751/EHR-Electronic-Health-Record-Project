@@ -23,7 +23,7 @@ public sealed class PortalNotices(EhrDbContext db, IEmailSender email, ClinicTim
             .Select(u => u.Email).FirstOrDefaultAsync(cancellationToken);
         if (address is not null)
         {
-            await email.SendAsync(address, "There is something new in your patient portal",
+            await email.SendAsync(address, "Something new in your patient portal",
                 "Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.",
                 new EmailAction("See what's new", portalLink), cancellationToken);
         }

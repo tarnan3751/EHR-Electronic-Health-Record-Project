@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   3. Dr. Test releases a third. Nobody opens Visit summaries. Dr. Test withdraws it.
 // Expected result: The patient's emails: one for the first release; one for the first withdrawal; none for the second
 //   release (the same day); one for the second withdrawal; none for the third release or withdrawal. Each says
-//   "There is something new in your patient portal" with the release notice's text and a button to
+//   "Something new in your patient portal" with the release notice's text and a button to
 //   https://localhost/portal/summaries, and nothing of the summary, the reason or the forged host. The proxy's address
 //   gets none.
 // Creator: Tahseen Arnan
@@ -79,7 +79,7 @@ public class TC_UC6_18_WithdrawnAfterViewEmail(WebApps apps) : IClassFixture<Web
 
         foreach (var (_, subject, body) in EmailsTo(apps, patient.Email))
         {
-            Assert.Equal("There is something new in your patient portal", subject);
+            Assert.Equal("Something new in your patient portal", subject);
             Assert.Equal("Your clinic added something to your patient portal. For your privacy it isn't included in this email. Sign in to the patient portal to see it.", body);
             var action = apps.Emails.Actions[body];
             Assert.Equal(("See what's new", Base + "portal/summaries"), (action.Label, action.Link));

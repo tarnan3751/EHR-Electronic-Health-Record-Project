@@ -21,7 +21,7 @@ namespace Ehr.Web.Tests.TestCases.UC18;
 //   3. Choose "Remove access".
 // Expected result: Step 1: the page says "Saved:" and lists the email under "Who can view your record" with the scope,
 //   an end date, "Given by you." and "They can't see items your care team marked sensitive."; one email goes to that
-//   address, subject "You have been given access to a record", saying where to sign in, with a button that creates
+//   address, subject "Someone shared their record with you", saying where to sign in, with a button that creates
 //   an account for someone who has none, and neither person's name in it. Step 2: "Saved:", and the entry now says they can also see sensitive items. Step 3: "Removed:"; the
 //   entry moves to "Access that has ended"; "Nobody else can view your record."
 // Creator: Tahseen Arnan
@@ -50,7 +50,7 @@ public class TC_UC18_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(emails + 1, apps.Emails.Sent.Count);
         var email = apps.Emails.Sent.Last();
         Assert.Equal(proxy.Email.ToUpperInvariant(), email.To, ignoreCase: true);
-        Assert.Equal("You have been given access to a record", email.Subject);
+        Assert.Equal("Someone shared their record with you", email.Subject);
         // The button creates an account for someone who has none (step 6b); the text says where to sign in otherwise.
         Assert.Equal("Create your portal account", apps.Emails.Actions[email.Body].Label);
         Assert.Contains("/portal/invitation?code=", apps.Emails.Actions[email.Body].Link);
