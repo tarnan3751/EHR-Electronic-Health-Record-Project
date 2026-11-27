@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC17;
 //   1. Send a new message with the long subject and no message; then with a subject and the long message.
 //   2. Reply with only spaces.
 //   3. Request the first patient's conversation under the second patient's address, and post a reply there.
-// Expected result: Step 1: each is answered 422 with "Not sent:" and, in turn, "Shorten the subject to 150 characters
+// Expected result: Step 1: each is answered 422 with "Not sent." and, in turn, "Shorten the subject to 150 characters
 //   or fewer." with "Write your message.", then "Shorten the message to 4000 characters or fewer."; the subject typed
 //   is still in its field. Step 2: 422 with "Write your message." Step 3: both are answered 404. No message or email
 //   was added by any of them.
@@ -42,7 +42,7 @@ public class TC_UC17_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         using var longSubject = await PostFormAsync(staff.Client, path, path, ("Subject", new string('s', 151)), ("Body", ""));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, longSubject.StatusCode);
         var first = await longSubject.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Not sent:", first);
+        Assert.Contains("Not sent.", first);
         Assert.Contains("Shorten the subject to 150 characters or fewer.", first);
         Assert.Contains("Write your message.", first);
         using var longBody = await PostFormAsync(staff.Client, path, path, ("Subject", "Synthetic: kept"), ("Body", new string('b', 4001)));
