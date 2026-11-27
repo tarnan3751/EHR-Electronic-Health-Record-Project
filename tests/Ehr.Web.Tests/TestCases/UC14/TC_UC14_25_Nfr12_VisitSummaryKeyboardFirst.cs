@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   1. Open the chart. Press Tab until the signed note's link has the focus, and press Enter.
 //   2. Press Tab until "Write visit summary" has the focus, and press Enter.
 //   3. Type What we talked about (the cursor starts in it), press Tab and type What we found, press Tab and type What
-//      happens next. Press Tab until "Release to the patient" has the focus, and press Enter.
+//      happens next. Press Tab until "Release visit summary" has the focus, and press Enter.
 // Expected result: Step 1 opens the signed note. Step 2 opens the summary page with the cursor in What we talked about.
 //   Step 3 releases it: the note's page says "Released." and shows the summary. Every focused control shows the focus
 //   ring, and the pages report no script errors.

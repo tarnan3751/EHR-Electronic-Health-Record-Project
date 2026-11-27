@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   3. The first clinician opens the summary page of the note that has one, and posts another summary.
 // Expected result: Step 1: the note and its summary are shown, with "To write a visit summary, add this patient to
 //   My patients." and neither link; each page and post sends them back to the note; nothing changes. Step 2: 404.
-//   Step 3: the page says "Not offered:" and has no form; the post is answered 409 with "A summary of this note has
+//   Step 3: the page says "Already released." and has no form; the post is answered 409 with "A summary of this note has
 //   already been released. Withdraw it first to write another."; there is still one summary.
 // Creator: Tahseen Arnan
 public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApps>
@@ -82,7 +82,7 @@ public class TC_UC14_20_VisitSummaryRefused(WebApps apps) : IClassFixture<WebApp
 
         // A second standing summary of the same note.
         var form = await session.Client.GetStringAsync(SummaryPath(patient, note), Cancel);
-        Assert.Contains("Not offered: a summary of this note was released by Dr. Test", Words(form));
+        Assert.Contains("Already released. A summary of this note was released by Dr. Test", Words(form));
         Assert.DoesNotContain("data-release-summary", form);
         using var second = await PostFormAsync(session.Client, SummaryPath(patient, note), NotePath(patient, note),
             ("TalkedAbout", "A second summary."), ("Found", "Found."), ("NextSteps", "Next."));

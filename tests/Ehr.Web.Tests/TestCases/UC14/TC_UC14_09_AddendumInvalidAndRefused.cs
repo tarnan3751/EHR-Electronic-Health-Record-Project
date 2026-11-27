@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Steps:
 //   1. As the clinician, sign an addendum of only spaces, then one of 16,001 characters.
 //   2. As the covering clinician, open the note, open the addendum page, and post an addendum to it.
-// Expected result: Step 1: each is answered 422 with "Not signed:" and "Write the addendum before signing it." or
+// Expected result: Step 1: each is answered 422 with "Not signed." and "Write the addendum before signing it." or
 //   "An addendum can be up to 16,000 characters."; nothing is saved. Step 2: the note is shown with "To sign an addendum, add
 //   this patient to My patients." and no link; the addendum page and the post both send them back to the note;
 //   nothing is saved.
@@ -40,7 +40,7 @@ public class TC_UC14_09_AddendumInvalidAndRefused(WebApps apps) : IClassFixture<
             using var refused = await AddAsync(session.Client, patient, note, text);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var page = Words(await refused.Content.ReadAsStringAsync(Cancel));
-            Assert.Contains("Not signed:", page);
+            Assert.Contains("Not signed. " + message, page);
             Assert.Contains(message, page);
         }
 

@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Steps:
 //   1. Post each refused input in turn.
 //   2. Post the ordinary words.
-// Expected result: Step 1: each is answered 422 with the form again, "Not released:" and the sentence for what was
+// Expected result: Step 1: each is answered 422 with the form again, "Not released." and the sentence for what was
 //   found (for example "“E11.9” in What we found is a diagnosis code. Say what it means in plain words."), and what was
 //   typed is still in the field; nothing is saved and no email is sent. Step 2: the summary is released as typed.
 // Creator: Tahseen Arnan
@@ -59,7 +59,7 @@ public class TC_UC14_19_VisitSummaryInvalidInput(WebApps apps) : IClassFixture<W
             using var refused = await ReleaseAsync(session.Client, patient, note, found: found);
             var page = await refused.Content.ReadAsStringAsync(Cancel);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
-            Assert.Contains("Not released: " + sentence, Words(page));
+            Assert.Contains("Not released. " + sentence, Words(page));
             // What was typed is still there, to change.
             Assert.Contains(found, Words(page));
             Assert.Contains("data-release-summary", page);
@@ -68,13 +68,13 @@ public class TC_UC14_19_VisitSummaryInvalidInput(WebApps apps) : IClassFixture<W
         using (var empty = await ReleaseAsync(session.Client, patient, note, nextSteps: "   "))
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, empty.StatusCode);
-            Assert.Contains("Not released: Write “What happens next”.", Words(await empty.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("Not released. Write “What happens next”.", Words(await empty.Content.ReadAsStringAsync(Cancel)));
         }
 
         using (var tooLong = await ReleaseAsync(session.Client, patient, note, talkedAbout: new string('a', 4001)))
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, tooLong.StatusCode);
-            Assert.Contains("Not released: “What we talked about” can be up to 4,000 characters. It has 4,001.", Words(await tooLong.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("Not released. “What we talked about” can be up to 4,000 characters. It has 4,001.", Words(await tooLong.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Empty(await SummariesAsync(apps, patient));

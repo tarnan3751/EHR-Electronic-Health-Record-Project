@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   quartzwing pattern, nocturnal.".
 // Steps:
 //   1. Open the first signed note, then "Write visit summary".
-//   2. Type the three parts and select "Release to the patient", with a forged Host header.
+//   2. Type the three parts and select "Release visit summary", with a forged Host header.
 //   3. Release a summary of the second note.
 //   4. A day passes. Release a summary of the third note.
 // Expected result: Step 1: the note's page says "None yet." and offers the link; the form's three fields are

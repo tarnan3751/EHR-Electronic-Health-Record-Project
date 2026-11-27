@@ -62,7 +62,7 @@ public class TC_UC14_22_VisitSummarySensitive(WebApps apps) : IClassFixture<WebA
         foreach (var note in new[] { sensitiveNote, withAddendum })
         {
             var form = await session.Client.GetStringAsync(SummaryPath(patient, note), Cancel);
-            Assert.Contains("Sensitive note: the note or an addendum to it is sensitive, so the summary is too.", Words(form));
+            Assert.Contains("Sensitive note. The note or one of its addenda is sensitive, so this summary is too.", Words(form));
             Assert.DoesNotContain("name=\"Sensitive\"", form);
             using var released = await ReleaseAsync(session.Client, patient, note);
             Assert.Contains("Released.", Words(await ReadAsync(released)));

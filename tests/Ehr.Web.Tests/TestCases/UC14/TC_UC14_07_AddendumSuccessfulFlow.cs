@@ -44,7 +44,7 @@ public class TC_UC14_07_AddendumSuccessfulFlow(WebApps apps) : IClassFixture<Web
         Assert.Contains("No addenda.", page);
         Assert.Matches($"<a [^>]*href=\"{AddendumPath(patient, note)}\"[^>]*>Add addendum</a>", page);
         var form = await session.Client.GetStringAsync(AddendumPath(patient, note), Cancel);
-        Assert.Contains("can't be changed. An addendum is a new text shown after it", Words(form));
+        Assert.Contains("can't be changed. An addendum is added after it, signed by you.", Words(form));
         Assert.Contains(Subjective, form);
 
         using var first = await AddAsync(session.Client, patient, note, "Synthetic addendum: culture negative.");

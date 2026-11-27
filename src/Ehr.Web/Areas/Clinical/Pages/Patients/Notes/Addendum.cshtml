@@ -3,7 +3,7 @@
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Notes.AddendumModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
-    ViewData["Title"] = "Add an addendum";
+    ViewData["Title"] = "Add addendum";
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
 }
@@ -11,10 +11,10 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to the signed note</a></p>
+    <p><a asp-page="View" asp-route-patientId="@Model.Patient.Id" asp-route-noteId="@Model.Note.Id">Back to note</a></p>
 </div>
-<h1>Add an addendum</h1>
-<p class="sc-prose">The note, signed @Clinic.Format(Model.Note.SignedAt), can't be changed. An addendum is a new text shown after it, signed as you with the time. It can't be edited or removed.</p>
+<h1>Add addendum</h1>
+<p class="sc-prose">The note, signed @Clinic.Format(Model.Note.SignedAt), can't be changed. An addendum is added after it, signed by you. It can't be edited or removed.</p>
 @if (!OnPrem.IsReachable)
 {
     @* UC 2: reached by Back or a tab opened before the outage. Nothing to sign with until the server is back. *@
@@ -26,7 +26,7 @@ else
     @if (Model.Errors.Count > 0)
     {
         <div class="sc-notice sc-notice--danger" role="alert">
-            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not signed:</span> @error</p> }
+            @foreach (var error in Model.Errors) { <p><span class="sc-notice__state">Not signed.</span> @error</p> }
         </div>
     }
     <div class="sc-field">
@@ -41,7 +41,7 @@ else
     else
     {
         <label class="sc-check" for="addendum-sensitive"><input type="checkbox" id="addendum-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="addendum-sensitive-hint"> Sensitive</label>
-        <p class="sc-field__hint" id="addendum-sensitive-hint">A sensitive addendum is left out of the note's page until someone asks for it, and each view is recorded.</p>
+        <p class="sc-field__hint" id="addendum-sensitive-hint">Hidden on the note's page unless someone chooses to show sensitive items. Views are logged.</p>
     }
     <div class="sc-actions">
         <button type="submit" class="sc-btn sc-btn--primary" data-sign-addendum>Sign addendum</button>
