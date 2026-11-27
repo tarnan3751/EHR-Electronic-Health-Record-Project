@@ -37,7 +37,7 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         var session = await SignInAsync(apps.OnPrem, clinician);
 
         var empty = await session.Client.GetStringAsync("/patients", Cancel);
-        Assert.Contains("No patients are on your panel yet", empty);
+        Assert.Contains("No patients yet. Search for a patient, then add them from their chart.", empty);
 
         // From the chart, which asks for a reason first, since the patient isn't theirs yet. The post comes back to
         // the chart, which now shows the patient as theirs.
@@ -51,7 +51,7 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
         var panel = await session.Client.GetStringAsync("/patients", Cancel);
         Assert.Contains("My patients", panel);
         Assert.Contains($"/patients/{patient}", panel);
-        Assert.DoesNotContain("More patients are on your panel", panel);
+        Assert.DoesNotContain("Showing the first", panel);
         var search = await session.Client.GetStringAsync("/patients?name=Paneled", Cancel);
         Assert.Contains($"/patients/{patient}", search);
         Assert.Contains("Yours", search);
@@ -110,7 +110,7 @@ public partial class PatientPanelTests(WebApps apps) : IClassFixture<WebApps>
 
         var listed = ChartLink().Matches(panel).Select(match => Guid.Parse(match.Groups[1].Value)).ToList();
         Assert.Equal(100, listed.Count);
-        Assert.Contains("More patients are on your panel than are listed here: these are the first 100, in name order. Search to find the others.", panel);
+        Assert.Contains("Showing the first 100, by name. Search to find the others.", panel);
         Assert.Equal(before + 100, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id));
         // In name order the 101st is the last, never listed, and never read. Each one listed was read once for each
         // listing, the sign-in's and this one.

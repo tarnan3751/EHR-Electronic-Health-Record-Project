@@ -94,7 +94,7 @@ public class TC_UC4_04_InvalidInput(WebApps apps)
             ("Reason", "ER"));
 
         Assert.Contains(
-            "Use at least 10 characters.",
+            "Too short. Use 10 to 500 characters.",
             await ReadAsync(invalid));
 
         // No emergency access should be granted.

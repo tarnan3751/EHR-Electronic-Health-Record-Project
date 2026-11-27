@@ -28,7 +28,7 @@ public class BreakGlassTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, actorId: clinician.Id, patientId: patient));
 
         using var tooShort = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "ER"));
-        Assert.Contains("Use at least 10 characters.", await ReadAsync(tooShort));
+        Assert.Contains("Too short. Use 10 to 500 characters.", await ReadAsync(tooShort));
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.BreakGlass, actorId: clinician.Id, patientId: patient));
 
         using var opened = await PostFormAsync(session.Client, $"/patients/{patient}/reason", $"/patients/{patient}/reason", ("Reason", "Covering the night shift"));

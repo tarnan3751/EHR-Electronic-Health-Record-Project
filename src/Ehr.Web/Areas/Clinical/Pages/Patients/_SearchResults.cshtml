@@ -22,16 +22,16 @@ else if (Model.Searched)
     {
         @if (Model.Results.Any(patient => !Model.Panel.Contains(patient.Id)))
         {
-            <p class="sc-muted"><span class="sc-tag sc-tag--warning">Restricted</span> Not on your panel: opening the chart asks for a reason first.</p>
+            <p class="sc-muted"><span class="sc-tag sc-tag--warning">Restricted</span> Not one of your patients. Opening the chart asks for a reason first.</p>
         }
         <partial name="_PatientTable" model="new PatientTable(Model.Results, Model.Panel, MarkPanel: true, Model.Search)" />
         @if (Model.More && Model.Live)
         {
-            <p class="sc-muted">More patients match than are listed here. Keep typing to narrow them, or press Enter for the full list.</p>
+            <p class="sc-muted">More patients match than are shown. Keep typing to narrow them, or press Enter to see more.</p>
         }
         else if (Model.More)
         {
-            <p class="sc-muted">More patients match than are listed here. Add more letters of the name, or a date of birth, to narrow them.</p>
+            <p class="sc-muted">More patients match than are shown. Add more of the name, or a date of birth, to narrow them.</p>
         }
     }
 }
@@ -44,14 +44,14 @@ else
     <h2>My patients</h2>
     @if (Model.PanelPatients.Count == 0)
     {
-        <p class="sc-muted">No patients are on your panel yet. Search for a patient and add them from the chart.</p>
+        <p class="sc-muted">No patients yet. Search for a patient, then add them from their chart.</p>
     }
     else
     {
         <partial name="_PatientTable" model="new PatientTable(Model.PanelPatients, Model.Panel, MarkPanel: false, SearchQuery.None)" />
         @if (Model.PanelMore)
         {
-            <p class="sc-muted">More patients are on your panel than are listed here: these are the first @IndexModel.PanelLimit, in name order. Search to find the others.</p>
+            <p class="sc-muted">Showing the first @IndexModel.PanelLimit, by name. Search to find the others.</p>
         }
     }
 }

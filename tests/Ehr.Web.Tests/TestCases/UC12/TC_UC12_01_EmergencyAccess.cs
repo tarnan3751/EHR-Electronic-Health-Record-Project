@@ -68,7 +68,7 @@ public class TC_UC12_01_EmergencyAccess(WebApps apps) : IClassFixture<WebApps>
         }
 
         var reasonHtml = await session.Client.GetStringAsync($"/patients/{patient}/reason", Cancel);
-        Assert.Contains("This patient is not on your panel", reasonHtml);
+        Assert.Contains("Not one of your patients. To open the chart, say why you need it", reasonHtml);
         Assert.DoesNotContain("Offpanel", reasonHtml);
         Assert.Equal(0, await apps.AuditEventsAsync(AuditActions.Read, clinician.Id, patient));
 
