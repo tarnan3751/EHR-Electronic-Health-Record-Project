@@ -31,7 +31,7 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //      10 MG Oral Tablet from the chart's order form.
 // Expected result: Step 1: 422, the form says Lisinopril 10 mg tablet is already ordered and that there are warnings
 //   to check, and asks for both reasons; nothing is saved and the request still waits. Step 2: the request is approved; its order
-//   keeps both reasons and the allergy warning. Step 3: the approval is refused (422, "It renews the same medication:
+//   keeps both reasons and the allergy warning. Step 3: the approval is refused (422, "This order renews the same medication,
 //   amlodipine 5 MG Oral Tablet.") with nothing saved; the page then says "Declined:" and shows the message under Dr.
 //   Test's name; the request is declined with the message; the new order is an ordinary one, answering no request; every
 //   item for both requests is done.
@@ -72,7 +72,7 @@ public class TC_UC21_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
             Assert.Contains("Already ordered An active order for Lisinopril 10 mg tablet was signed", words);
             Assert.Contains("Cancel, or give a reason and sign to order it again.", words);
             Assert.Contains("Give a reason to sign this order despite the warnings, or cancel.", words);
-            Assert.Contains("Approves: the refill request for", words);
+            Assert.Contains("Refill request. Signing approves the request for", words);
         }
 
         Assert.StartsWith("requested|", (await RequestsAsync(apps, patient.Patient))[0], StringComparison.Ordinal);
@@ -94,7 +94,7 @@ public class TC_UC21_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         using (var stronger = await ApproveAsync(session.Client, patient.Patient, amlodipine, "amlodipine 10 MG Oral Tablet"))
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, stronger.StatusCode);
-            Assert.Contains("It renews the same medication: amlodipine 5 MG Oral Tablet.", Said(await stronger.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("This order renews the same medication, amlodipine 5 MG Oral Tablet.", Said(await stronger.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Equal(ordersBefore, await ProxyTests.QueryAsync(apps, "SELECT count(*)::text FROM ehr.orders WHERE patient_id = @patient", patient.Patient));

@@ -29,8 +29,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. The second clinician discontinues it; then the first chooses "Discontinue order", and then signs a change of it.
 //   3. Off-site with the link down, open the chart.
 //   4. Post a discontinuation of the Urinalysis order, as js/orders.js does and as a plain form.
-// Expected result: In step 2 the first clinician's discontinuation and change are each answered 409 with "Not saved:
-//   this order is no longer active."; the order keeps the second clinician's reason and name, there is one audit row
+// Expected result: In step 2 the first clinician's discontinuation and change are each answered 409 with "Not saved.
+//   This order is no longer active."; the order keeps the second clinician's reason and name, there is one audit row
 //   for its update, and no new order exists. In step 3 the chart lists the Urinalysis order with no "Change" or
 //   "Discontinue…" and says "Changing or discontinuing an order needs the clinic's server." In step 4 both posts are
 //   answered 503, the plain one with the "Not saved" page showing the typed reason again, and the order stays active.
@@ -55,13 +55,13 @@ public class TC_UC1_10_ChangeExceptionalCondition(WebApps apps) : IClassFixture<
 
         using var late = await DiscontinueAsync(session.Client, patient, order, "Synthetic: second", token: token);
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
-        Assert.Contains("Not saved: this order is no longer active.", Words(await late.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This order is no longer active.", Words(await late.Content.ReadAsStringAsync(Cancel)));
 
         using var lateChange = await ChangeAsync(session.Client, patient, "lab", order, "Complete blood count (CBC)",
             [("indication", "Synthetic: changed late")], token: changeToken);
         Assert.Equal(HttpStatusCode.Conflict, lateChange.StatusCode);
         var page = await lateChange.Content.ReadAsStringAsync(Cancel);
-        Assert.Contains("Not saved: this order is no longer active.", Words(page));
+        Assert.Contains("Not saved. This order is no longer active.", Words(page));
         // What was typed is still there to copy.
         Assert.Contains("value=\"Synthetic: changed late\"", page);
 

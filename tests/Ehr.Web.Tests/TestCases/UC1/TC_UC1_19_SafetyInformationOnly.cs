@@ -22,8 +22,8 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   1. Sign amoxicillin.
 //   2. Open the lab order form.
 //   3. Choose "Sign order" for lisinopril; choose it again. Then ask for the same order again off-site.
-// Expected result: Step 1: signed with nothing found (the uncoded allergy can't be checked, and the form says only
-//   coded allergies and medications are). Step 2: no line about safety checks. Step 3: the first press signs nothing and
+// Expected result: Step 1: signed with nothing found (the uncoded allergy can't be checked, and the form says
+//   allergies and medications without a code aren't). Step 2: no line about safety checks. Step 3: the first press signs nothing and
 //   brings the form back with "Be aware" and "Sign again to go ahead, or cancel.", the cursor on "Sign order" and no
 //   reason field; the second signs; the order holds the moderate interaction with metformin from DDInter and no reason. Off-site, the form for the same
 //   drug shows "Be aware" with "Interaction: lisinopril with metformin", "Moderate", "Source: DDInter 2.0" with a link
@@ -43,8 +43,10 @@ public class TC_UC1_19_SafetyInformationOnly(WebApps apps) : IClassFixture<WebAp
         using var uncoded = await SignAsync(session.Client, patient, "Amoxicillin 500 mg capsule");
         Assert.Equal($"/patients/{patient}", PathOf(uncoded));
         Assert.Equal(["-|-"], await OrdersAsync(apps, patient));
-        Assert.Contains("Only coded allergies and medications are checked, and only items with a drug code, and no warning doesn't mean a combination is safe.",
-            Words(await session.Client.GetStringAsync(FormPath(patient, "medication"), Cancel)));
+        var medicationForm = Words(await session.Client.GetStringAsync(FormPath(patient, "medication"), Cancel));
+        Assert.Contains("Only items with a drug code are checked.", medicationForm);
+        Assert.Contains("Allergies and medications without a code aren't checked.", medicationForm);
+        Assert.Contains("No warning doesn't mean a combination is safe.", medicationForm);
         Assert.DoesNotContain("data-safety-disclaimer", await session.Client.GetStringAsync(FormPath(patient, "lab"), Cancel));
 
         await SignedAsync(session.Client, patient, "medication", "Metformin 500 mg tablet", Details);

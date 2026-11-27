@@ -30,9 +30,9 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //   5. As the colleague, open the request; as Dr. Test, open the other patient's request under this patient.
 //   6. Open the order form with both a refill and an order to replace.
 // Expected result: Step 1: 422, "Write a message for the patient" and "Shorten the message to 1,000 characters or
-//   fewer.". Step 2: 422, "It renews the same medication: lisinopril 10 MG Oral Tablet."; no order saved. Step 3: the page says
+//   fewer.". Step 2: 422, "This order renews the same medication, lisinopril 10 MG Oral Tablet."; no order saved. Step 3: the page says
 //   "Can't be approved:" and offers only Decline; the form goes back to the request; its post answers 409 and orders
-//   nothing. Step 4: the decline is saved; the approval answers 409, "someone answered this refill request first", and
+//   nothing. Step 4: the decline is saved; the approval answers 409, "Someone answered this refill request first", and
 //   orders nothing; the second decline answers 409, "Not saved: someone answered this request first.". Step 5: the
 //   colleague lands on the chart's reason page, not the request; the other patient's request is not found (404).
 //   Step 6: 400.
@@ -66,7 +66,7 @@ public class TC_UC21_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
         using (var refused = await ApproveAsync(session.Client, patient.Patient, lisinoprilRequest, "Atorvastatin 20 mg tablet"))
         {
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
-            Assert.Contains("It renews the same medication: lisinopril 10 MG Oral Tablet.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("This order renews the same medication, lisinopril 10 MG Oral Tablet.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Equal(["0"], await ProxyTests.QueryAsync(apps, "SELECT count(*)::text FROM ehr.orders WHERE patient_id = @patient", patient.Patient));
@@ -87,7 +87,7 @@ public class TC_UC21_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             ("Item", "Amlodipine 5 mg tablet"), ("SafetySeen", "true"), ("Details[dose]", "5 mg"), ("Details[route]", "By mouth"), ("Details[frequency]", "Once a day")), Cancel))
         {
             Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-            Assert.Contains("this refill request can't be approved", Said(await refused.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("This refill request can't be approved.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         var formBefore = await session.Client.GetStringAsync(ApprovePath(patient.Patient, lisinoprilRequest), Cancel);
@@ -100,7 +100,7 @@ public class TC_UC21_03_InvalidInput(WebApps apps) : IClassFixture<WebApps>
             ("Item", "Lisinopril 10 mg tablet"), ("SafetySeen", "true"), ("Details[dose]", "10 mg"), ("Details[route]", "By mouth"), ("Details[frequency]", "Once a day")), Cancel))
         {
             Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
-            Assert.Contains("someone answered this refill request first. Nothing was ordered.", Said(await late.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("Someone answered this refill request first, so nothing was ordered.", Said(await late.Content.ReadAsStringAsync(Cancel)));
         }
 
         var reviewBefore = await session.Client.GetStringAsync(ReviewPath(patient.Patient, amlodipineRequest), Cancel);

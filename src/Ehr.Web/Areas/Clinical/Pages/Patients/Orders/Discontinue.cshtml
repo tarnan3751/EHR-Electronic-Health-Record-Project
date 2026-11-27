@@ -16,24 +16,24 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Form.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to the chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to chart</a></p>
 </div>
 <h1>Discontinue order: @patient.FamilyName, @patient.GivenName</h1>
 
 <form method="post" class="sc-form" data-order-form>
     @if (Model.Gone)
     {
-        <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved:</span> this order is no longer active. Someone discontinued or changed it first. Go back to the chart to see its orders.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active. Someone discontinued or changed it first.</p>
     }
     else
     {
-        <p class="sc-notice sc-notice--danger" role="alert" data-order-message hidden="@(Model.Error is null)">Not saved. Fix the highlighted field and discontinue again.</p>
+        <p class="sc-notice sc-notice--danger" role="alert" data-order-message hidden="@(Model.Error is null)"><span class="sc-notice__state">Not saved.</span> Fix the highlighted field and try again.</p>
     }
     @if (Model.Order is { } order)
     {
         <h2>@OrderForms.TypeNames[order.Type] order</h2>
         <p data-order-discontinues><strong>@order.Display</strong> @OrderForms.Summary(order.Type, order.Details) · signed @Clinic.Format(order.SignedAt)</p>
-        <p class="sc-muted">The order stays in the record, marked discontinued, with your name, the time and this reason.</p>
+        <p class="sc-muted">It moves to discontinued orders, with your reason.</p>
     }
     <div class="sc-field">
         <label for="discontinue-reason">Reason for discontinuing <span>(required)</span></label>

@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC21;
 //   3. As Dr. Test, open the order form for the lisinopril request; as the colleague, decline it; as Dr. Test, sign.
 // Expected result: Step 1: the decline is forwarded and saved. Step 2: 503 and the "Not saved" page with the message;
 //   cut off, the page shows the request and "Answering a refill request needs the clinic's server.", with no answer
-//   to give. Step 3: 409, "someone answered this refill request first. Nothing was ordered."; the request is declined by
+//   to give. Step 3: 409, "Someone answered this refill request first, so nothing was ordered."; the request is declined by
 //   the colleague, and the patient has no order.
 // Creator: Tahseen Arnan
 public class TC_UC21_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebApps>
@@ -95,7 +95,7 @@ public class TC_UC21_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
             ("Item", "Lisinopril 10 mg tablet"), ("SafetySeen", "true"), ("Details[dose]", "10 mg"), ("Details[route]", "By mouth"), ("Details[frequency]", "Once a day")), Cancel))
         {
             Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
-            Assert.Contains("someone answered this refill request first. Nothing was ordered.", Said(await late.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("Someone answered this refill request first, so nothing was ordered.", Said(await late.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Equal($"rejected|{Lisinopril}|-|{patient.Account}|-|Synthetic: answered by a colleague.|{colleagueAccount.Id}", (await RequestsAsync(apps, patient.Patient))[0]);

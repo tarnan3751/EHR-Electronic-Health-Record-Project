@@ -21,7 +21,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Form.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to the chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-all-route-data="Model.ChartLink">Back to chart</a></p>
 </div>
 <h1>@heading: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Proposed is { } proposed)
@@ -57,40 +57,41 @@ else
     <form method="post" class="sc-form" data-order-form>
         @if (Model.Gone)
         {
-            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved:</span> this order is no longer active. Someone discontinued or changed it first. Go back to the chart to see its orders.</p>
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This order is no longer active. Someone discontinued or changed it first.</p>
         }
         else if (Model.RefillRefused is { } refused)
         {
             @* Step 13d: nothing was ordered, so nothing waits to be undone. *@
-            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved:</span> @(refused == SignRefusal.Answered
-                ? "someone answered this refill request first. Nothing was ordered."
-                : "this refill request can't be approved: its medication is no longer active, or this isn't the same medication. Nothing was ordered.") <a asp-page="/Patients/Refills/Review" asp-route-patientId="@patient.Id" asp-route-requestId="@Model.Refill">Go back to the request</a>.</p>
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> @if (refused == SignRefusal.Answered)
+                {<text>Someone answered this refill request first, so nothing was ordered.</text>}
+                else
+                {<text>This refill request can't be approved. Its medication is no longer active, or this isn't the same medication.</text>} <a asp-page="/Patients/Refills/Review" asp-route-patientId="@patient.Id" asp-route-requestId="@Model.Refill">Back to request</a></p>
         }
         else if (Model.ProposalDecided)
         {
             @* Step 15: nothing was ordered, so nothing waits to be undone. *@
-            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved:</span> this proposal was decided first, in another tab or window. Nothing was ordered. <a href="@Model.ReviewLink">Go back to the review</a>.</p>
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message><span class="sc-notice__state">Not saved.</span> This proposal was decided first, in another tab or window. Nothing was ordered. <a href="@Model.ReviewLink">Back to review</a></p>
         }
         else
         {
-            <p class="sc-notice sc-notice--danger" role="alert" data-order-message hidden="@(Model.Errors.Count == 0)">Not saved. Fix the highlighted fields and sign again.</p>
+            <p class="sc-notice sc-notice--danger" role="alert" data-order-message hidden="@(Model.Errors.Count == 0)"><span class="sc-notice__state">Not saved.</span> Fix the highlighted fields and try again.</p>
         }
         <h2>@OrderForms.TypeNames[selected] order</h2>
         @if (Model.Form.Refill is { } refill)
         {
             @* Step 13d: what the order approves. Signing it answers the request, and the patient sees what was ordered. *@
             <div class="sc-notice sc-notice--info" data-order-refill>
-                <p><span class="sc-notice__state">Approves:</span> the refill request for <strong>@refill.MedicationDisplay</strong>@if (refill.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }, asked by @refill.AskedBy, @Clinic.Format(refill.RequestedAt).</p>
+                <p><span class="sc-notice__state">Refill request.</span> Signing approves the request for <strong>@refill.MedicationDisplay</strong>@if (refill.Sensitive) { <text> </text><span class="sc-tag sc-tag--warning">Sensitive</span> }, asked by @refill.AskedBy, @Clinic.Format(refill.RequestedAt).</p>
                 <p>On the chart: @refill.Medication.Display@(refill.Medication.Dosage is { } dosage ? $", {dosage}" : "").@if (refill.Note is { } note) { <br><text>The patient's note: </text><span class="sc-note__text">@note</span> }</p>
-                <p>Signing this order approves the request, and the patient sees what was ordered. It renews the same medication: @refill.CatalogItem.</p>
+                <p>This order renews the same medication, @refill.CatalogItem. The patient sees what was ordered.</p>
             </div>
         }
         @if (replaced is not null)
         {
             @* A signed order is never edited: the change is a new order, and signing it discontinues this one. *@
             <div class="sc-notice sc-notice--info" data-order-replaces>
-                <p><span class="sc-notice__state">Replaces:</span> <strong>@replaced.Display</strong> @OrderForms.Summary(replaced.Type, replaced.Details) · signed @Clinic.Format(replaced.SignedAt)</p>
-                <p>Signing the change discontinues that order and keeps it in the chart's discontinued orders.</p>
+                <p><span class="sc-notice__state">Order being changed.</span> <strong>@replaced.Display</strong> @OrderForms.Summary(replaced.Type, replaced.Details) · signed @Clinic.Format(replaced.SignedAt)</p>
+                <p>Signing the change discontinues it, and it moves to discontinued orders.</p>
             </div>
         }
         @{ Field("Item", "order-item", "Item", required: true, Model.Item, Model.Form.Refill is null ? "order-items" : null); }
@@ -170,7 +171,18 @@ else
         }
         @if (Model.KnownType == Ehr.Data.Orders.OrderType.Medication)
         {
-            <p class="sc-muted" data-safety-disclaimer>Medication orders with a drug code are checked against the patient's coded allergies and medications. @OrderSafetyText.Disclaimer</p>
+            @* What the checks are, and that no warning doesn't mean safe, before the order is signed. *@
+            <div class="sc-muted" data-safety-disclaimer>
+                <p>Decision support for this demonstration system, not a complete clinical reference. No warning doesn't mean a combination is safe.</p>
+                <details>
+                    <summary>More about what is checked</summary>
+                    <ul>
+                        <li>A medication order is checked against the patient's allergies and medications.</li>
+                        <li>Only items with a drug code are checked.</li>
+                        <li>Allergies and medications without a code aren't checked.</li>
+                    </ul>
+                </details>
+            </div>
         }
         @if (replaced is not null)
         {

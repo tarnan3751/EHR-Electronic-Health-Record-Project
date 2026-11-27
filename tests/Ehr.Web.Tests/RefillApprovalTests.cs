@@ -150,7 +150,7 @@ public class RefillApprovalTests(WebApps apps) : IClassFixture<WebApps>
             ("Details[frequency]", "Once a day")), Cancel))
         {
             Assert.Equal(System.Net.HttpStatusCode.Conflict, refused.StatusCode);
-            Assert.Contains("this refill request can't be approved", Said(await refused.Content.ReadAsStringAsync(Cancel)));
+            Assert.Contains("This refill request can't be approved.", Said(await refused.Content.ReadAsStringAsync(Cancel)));
         }
 
         Assert.Equal(["0"], await ProxyTests.QueryAsync(apps, "SELECT count(*)::text FROM ehr.orders WHERE patient_id = @patient", patient.Patient));

@@ -27,7 +27,7 @@ namespace Ehr.Web.Tests.TestCases.UC1;
 //   2. Sign with Atorvastatin 20 mg tablet, with lisinopril 20 MG Oral Tablet, then with the form's item.
 //   3. Open the form for the sertraline request.
 // Expected result: Step 1: the form has no type tabs, the item "lisinopril 10 MG Oral Tablet", read-only and with no
-//   search, and "Approves:" with "It renews the same medication: lisinopril 10 MG Oral Tablet."; opening one of this
+//   search, and "Refill request." with "This order renews the same medication, lisinopril 10 MG Oral Tablet."; opening one of this
 //   patient's requests under the other patient goes to that patient's chart. Step 2: the first two are refused (422, the
 //   item marked) with nothing saved; the third signs an active order for lisinopril 10 MG Oral Tablet, signed by Dr.
 //   Test, with its insert in the write audit, listed on the chart; the request is approved with it. Step 3: the form is
@@ -55,8 +55,8 @@ public class TC_UC1_22_OrderFromRefill(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("name=\"Item\" value=\"lisinopril 10 MG Oral Tablet\"", form);
         Assert.Matches("id=\"order-item\"[^>]*readonly", form);
         Assert.DoesNotContain("data-code-search=\"order-medication\"", form);
-        Assert.Contains("Approves: the refill request for lisinopril 10 MG Oral Tablet", Said(form));
-        Assert.Contains("It renews the same medication: lisinopril 10 MG Oral Tablet.", Said(form));
+        Assert.Contains("Refill request. Signing approves the request for lisinopril 10 MG Oral Tablet", Said(form));
+        Assert.Contains("This order renews the same medication, lisinopril 10 MG Oral Tablet.", Said(form));
         using (var elsewhere = await session.Client.GetAsync(ApprovePath(second, lisinopril), Cancel))
         {
             Assert.Equal($"/patients/{second}", PathOf(elsewhere));
@@ -67,7 +67,7 @@ public class TC_UC1_22_OrderFromRefill(WebApps apps) : IClassFixture<WebApps>
             using var refused = await ApproveAsync(session.Client, patient.Patient, lisinopril, other);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var html = await refused.Content.ReadAsStringAsync(Cancel);
-            Assert.Contains("It renews the same medication: lisinopril 10 MG Oral Tablet. To order another, decline the request", Said(html));
+            Assert.Contains("This order renews the same medication, lisinopril 10 MG Oral Tablet. To order another, decline the request", Said(html));
             Assert.Matches("id=\"order-item\"[^>]*aria-invalid=\"true\"", html);
         }
 
