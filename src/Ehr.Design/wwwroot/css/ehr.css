@@ -3645,4 +3645,177 @@
     /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
        under this comment; anything two areas share belongs in the components layer.
        ---- */
+
+    /* Staff: each row's actions on one line on the right, the setup link the one button with an edge. The quiet ones
+       get a link's padding, so the gaps between the words are even and the last word ends on the column's edge; the
+       one that disables an account is in the danger ink. */
+    .sc-staff .sc-actions > form > .sc-btn--quiet {
+        padding-inline: var(--space-2);
+    }
+
+    .sc-staff .sc-actions > form:last-child > .sc-btn--quiet {
+        padding-right: 0;
+    }
+
+    .sc-staff__disable {
+        color: var(--danger);
+    }
+
+    /* A status on one line, as its column's head is fitted to it (the cell itself is plain: tests read it). */
+    .sc-staff td:nth-child(4) {
+        white-space: nowrap;
+    }
+
+    /* An email breaks where it must, so the row's actions always have their room; on a narrow window, where the
+       table scrolls sideways, it stays whole. */
+    @media (min-width: 48rem) {
+        .sc-staff td:nth-child(2) {
+            overflow-wrap: anywhere;
+        }
+    }
+
+    /* Staff: the new account's form, a card at the form's width under the table it adds to. */
+    .sc-staff__add {
+        max-width: calc(var(--width-form) + 2 * var(--space-6));
+        padding: var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    /* The audit log's filters: as many to a row as fit, the patient's ID two wide so the whole of one shows, and the
+       checkbox on the fields' line. */
+    .sc-audit__filters {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+    }
+
+    .sc-audit__filters .sc-check {
+        align-self: end;
+        align-items: center;
+        min-height: var(--control-height);
+    }
+
+    .sc-audit__filters .sc-check input {
+        margin: 0;
+    }
+
+    @media (min-width: 48rem) {
+        .sc-audit__patient {
+            grid-column: span 2;
+        }
+    }
+
+    /* The audit log. The fields a write changed: a muted line in the caption's size that wraps between names, never
+       inside one. */
+    .sc-audit [data-audit-fields] {
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--ink-muted);
+        overflow-wrap: normal;
+    }
+
+    /* IDs at the text's weight, so a column of them reads quieter than the words beside it; the way to a review on a
+       line of its own words. */
+    .sc-audit .sc-table__id {
+        font-weight: 400;
+    }
+
+    .sc-audit [data-review-link] {
+        white-space: nowrap;
+    }
+
+    /* Wide enough for set columns: the time and who did it first, the IDs on one line cut short on screen (the whole
+       ID stays in the cell, to select and copy), and the reason and the fields changed taking what is left. Narrower,
+       the columns fit their values as any table's do. */
+    @media (min-width: 80rem) {
+        .sc-audit .sc-table {
+            table-layout: fixed;
+        }
+
+        .sc-audit th:nth-child(1) {
+            width: 11rem;
+        }
+
+        .sc-audit th:nth-child(2) {
+            width: 12.5rem;
+        }
+
+        .sc-audit th:nth-child(3) {
+            width: 9.5rem;
+        }
+
+        .sc-audit th:nth-child(4) {
+            width: 10.5rem;
+        }
+
+        .sc-audit th:nth-child(5) {
+            width: 13rem;
+        }
+
+        .sc-audit th:nth-child(6) {
+            width: 5rem;
+        }
+
+        .sc-audit td:nth-child(2) {
+            overflow-wrap: anywhere;
+        }
+
+        .sc-audit td.sc-table__id {
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+    }
+
+    /* The administrator's inbox: a patient, shown by ID, on one line. */
+    .sc-table tr[data-inbox-item] > td.sc-table__id {
+        white-space: nowrap;
+    }
+
+    /* The emergency-access review: the access and what was done under it, and the review beside them in a panel. */
+    .sc-access {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 24rem;
+        gap: var(--space-6);
+        align-items: start;
+    }
+
+    .sc-access__done > dl.record {
+        margin: 0;
+    }
+
+    .sc-access__done > h2 {
+        margin-top: var(--space-6);
+    }
+
+    /* What was done: each value on one line, the row's table and ID taking the rest. */
+    .sc-access [data-access-events] td:not(.sc-table__id) {
+        white-space: nowrap;
+    }
+
+    .sc-access__review {
+        overflow-wrap: anywhere;
+    }
+
+    .sc-access__review fieldset {
+        padding: 0;
+        border: 0;
+    }
+
+    .sc-access__review legend {
+        padding: 0;
+        margin-bottom: var(--space-2);
+    }
+
+    @media (max-width: 64rem) {
+        .sc-access {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+
+    /* A clinician's desktop sign-ins: what revoking does and the choice, at a reading width. */
+    .sc-desktop {
+        max-width: var(--width-reading);
+    }
 }

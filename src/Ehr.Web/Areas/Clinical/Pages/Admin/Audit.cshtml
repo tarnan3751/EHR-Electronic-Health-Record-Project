@@ -15,7 +15,7 @@
         <li>Emergency access is flagged until an administrator reviews it.</li>
     </ul>
 </details>
-<form method="get" class="sc-filters">
+<form method="get" class="sc-filters sc-audit__filters">
     <div class="sc-field">
         <label asp-for="Action" class="sc-field__label">Action</label>
         <select asp-for="Action" class="sc-field__input">
@@ -46,7 +46,7 @@
             }
         </select>
     </div>
-    <div class="sc-field">
+    <div class="sc-field sc-audit__patient">
         <label asp-for="Patient" class="sc-field__label">Patient ID</label>
         <input asp-for="Patient" class="sc-field__input sc-field__input--mono" autocomplete="off">
     </div>
@@ -72,13 +72,15 @@
 </form>
 @if (Model.Log.Events.Count == 0)
 {
-    <p class="sc-muted">No events match.</p>
+    <p class="sc-empty">No events match.</p>
 }
 else
 {
     @* Dense (docs/brand: AuditTable): times and IDs in mono, a header that stays in view, and the rows that need
-       review tinted and tagged, so the color is never the only sign. An empty cell shows a muted dash. *@
-    <div class="sc-table-wrap">
+       review tinted and tagged, so the color is never the only sign. An empty cell shows a muted dash. The columns are
+       set (ehr.css, administrator's pages): the time and who first, an ID cut short on screen with the whole of it
+       still in the cell to select and copy, and the reason and the fields changed taking the rest. *@
+    <div class="sc-table-wrap sc-audit">
         <table class="sc-table">
             <thead>
                 <tr><th>When (UTC)</th><th>Who</th><th>What</th><th>Patient</th><th>Row</th><th>Part</th><th>Reason and details</th></tr>
