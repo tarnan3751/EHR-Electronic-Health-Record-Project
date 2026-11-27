@@ -12,8 +12,6 @@ namespace Ehr.Web.Tests;
 // app refuses to start without the addresses, and without the key enrollment codes are hashed with, saying what to set.
 public class EmailedLinkTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_reset_link_is_built_from_the_configured_address_whatever_host_the_request_names()
     {

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -16,8 +17,6 @@ namespace Ehr.Security.Tests;
 public class AmbientListeningMigrationTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const string Before = "AiChartProposals";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     // As the migration job does it (EhrDbContextFactory).
     async Task MigrateAsync(string? target)

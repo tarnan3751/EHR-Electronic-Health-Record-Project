@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Web.Tests;
 
@@ -15,8 +16,6 @@ namespace Ehr.Web.Tests;
 // everyone else (step 12).
 public class RateLimitTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Account_posts_over_the_limit_get_a_page_saying_so()
     {

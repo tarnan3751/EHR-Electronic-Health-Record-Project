@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -18,8 +19,6 @@ namespace Ehr.Security.Tests;
 public class VitalReadingMigrationTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const string Before = "InheritedSensitivity";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     // As the migration job does it (EhrDbContextFactory): what this step's migration reports comes back, without what
     // the database says about anything else on the way (EF's history table, for one).

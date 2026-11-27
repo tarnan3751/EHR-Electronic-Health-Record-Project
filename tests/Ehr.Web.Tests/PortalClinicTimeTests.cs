@@ -12,8 +12,6 @@ namespace Ehr.Web.Tests;
 // on the clinic's zone.
 public class PortalClinicTimeTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly Ehr.Domain.Time.ClinicTime Clock = ClinicTimeTests.ChicagoClock;
 
     // A column's moments among the patient's rows of a table, earliest first, to the second, in UTC.

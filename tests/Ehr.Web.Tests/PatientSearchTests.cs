@@ -14,8 +14,6 @@ namespace Ehr.Web.Tests;
 // fewer of them, and the keyboard reaches them; and the criteria travel to the chart and back.
 public partial class PatientSearchTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_name_matches_the_start_of_a_given_or_family_name_in_any_case()
     {

@@ -8,8 +8,6 @@ namespace Ehr.Web.Tests;
 // and two spaces where the markup meant one, which the page's text keeps though a browser shows one.
 public partial class PageTextTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // The flowsheet's caption, which a screen reader reads: "The latest 1 sets" before.
     [Fact]
     public async Task One_set_of_vital_signs_is_one_set()

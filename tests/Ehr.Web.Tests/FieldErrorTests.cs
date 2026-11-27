@@ -7,8 +7,6 @@ namespace Ehr.Web.Tests;
 // (docs/brand: TextField; Ehr.Web/TagHelpers). The reason for emergency access stands for every form built the same way.
 public class FieldErrorTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_refused_field_is_marked_invalid_and_described_by_its_message()
     {

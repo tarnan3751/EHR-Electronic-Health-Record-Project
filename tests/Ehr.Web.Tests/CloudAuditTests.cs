@@ -22,8 +22,6 @@ namespace Ehr.Web.Tests;
 // the on-prem app takes them only with the shared key. While the on-prem app can't save, the cloud app's pages say so.
 public class CloudAuditTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_chart_read_off_site_comes_from_the_replica_and_reaches_the_audit_log_from_the_cloud()
     {

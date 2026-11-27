@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Web.Tests;
 
@@ -15,8 +16,6 @@ namespace Ehr.Web.Tests;
 // nothing. A small app with the real middleware and holder, and a queue that records what it was given and when.
 public sealed class RequestAuditEventsTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Found = "what the read found";
 
     sealed class RecordingQueue(bool fails = false) : IDurableAuditQueue

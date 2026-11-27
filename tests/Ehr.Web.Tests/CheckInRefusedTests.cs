@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // database, with a trigger of the test's that refuses this patient's visits as that rule would (23514).
 public class CheckInRefusedTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_check_in_the_database_refuses_is_not_saved_and_the_appointment_stays_booked()
     {

@@ -2,6 +2,7 @@ using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -16,8 +17,6 @@ public class VitalSignVisitSecurityTests(MigratedDatabase database) : IClassFixt
     const string Systolic = "8480-6";
     const string Diastolic = "8462-4";
     const string HeartRate = "8867-4";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 

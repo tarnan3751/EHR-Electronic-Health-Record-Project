@@ -20,8 +20,6 @@ namespace Ehr.Web.Tests;
 // whatever the app does is in Ehr.Security.Tests (ChartListSecurityTests).
 public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     internal static string EntryPath(Guid patient, string list, Guid? entry = null) => $"/patients/{patient}/{list}{(entry is null ? "" : $"/{entry}")}";
 
     internal static async Task<(StaffAccount Clinician, Guid Patient, Session Session)> OnPanelAsync(WebApps apps, string family = "Listed")

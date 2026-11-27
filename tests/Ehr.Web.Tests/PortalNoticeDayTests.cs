@@ -15,8 +15,6 @@ namespace Ehr.Web.Tests;
 // events are moved back to just before midnight by the superuser, past the triggers that would refuse it.
 public class PortalNoticeDayTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // Two days back at 23:59, and yesterday at 23:58: 23 hours 59 minutes apart, and the second less than a day before
     // anything done today, unless it is done in today's last two minutes.
     static (DateTimeOffset TwoDaysAgo, DateTimeOffset Yesterday) LateOnTheDaysBefore()

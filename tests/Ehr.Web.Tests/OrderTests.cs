@@ -20,8 +20,6 @@ namespace Ehr.Web.Tests;
 // (OrderSecurityTests).
 public class OrderTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     internal static string FormPath(Guid patient, string type) => $"/patients/{patient}/orders/new?type={type}";
 
     internal static async Task<(StaffAccount Clinician, Guid Patient, Session Session)> OnPanelAsync(WebApps apps)

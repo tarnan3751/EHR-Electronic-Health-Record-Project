@@ -24,8 +24,6 @@ namespace Ehr.Web.Tests;
 // declined: the review approved a request for amlodipine 5 mg with 10 mg, and the portal said so.
 public class RefillApprovalTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

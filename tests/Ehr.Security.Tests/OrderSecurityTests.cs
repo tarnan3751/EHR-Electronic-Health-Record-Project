@@ -2,6 +2,7 @@ using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -13,8 +14,6 @@ namespace Ehr.Security.Tests;
 // time.
 public class OrderSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);

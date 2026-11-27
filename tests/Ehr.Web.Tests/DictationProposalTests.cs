@@ -22,8 +22,6 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 {
     readonly DictationSidecarStub sidecar = apps.Dictation.Reset();
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A dictation staged for review: the clinician's session and page token, the patient, the draft, the review, its page,
     // and its two proposals: the order's and the allergy's.
     internal sealed record Dictated(Session Session, string Token, Guid Patient, Guid Draft, Guid Review, string ReviewPath, Guid Order, Guid Allergy);

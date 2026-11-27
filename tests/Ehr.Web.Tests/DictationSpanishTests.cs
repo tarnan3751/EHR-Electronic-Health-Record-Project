@@ -17,8 +17,6 @@ public class DictationSpanishTests(WebApps apps) : IClassFixture<WebApps>
 {
     readonly DictationSidecarStub service = apps.Dictation.Reset();
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     const string Api = DictationApi.Path;
 
     sealed record Note(Session Session, Guid Patient, string Token);

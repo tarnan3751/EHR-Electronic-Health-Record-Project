@@ -22,8 +22,6 @@ public class DesktopSignInTests(WebApps apps) : IClassFixture<WebApps>
 {
     const string Sync = "/api/sync/quick-texts?since=0";
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_clinician_signs_in_with_both_factors_and_syncs_on_both_servers()
     {

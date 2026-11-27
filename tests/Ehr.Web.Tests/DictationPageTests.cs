@@ -23,8 +23,6 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
 {
     readonly DictationSidecarStub service = apps.Dictation.Reset();
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static string DictatePath(Guid patient) => $"/patients/{patient}/dictate";
 
     // Without the dictation service's settings, Dictate and Listen say so first, before the dictation's controls and the

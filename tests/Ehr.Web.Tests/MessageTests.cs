@@ -10,8 +10,6 @@ namespace Ehr.Web.Tests;
 // Ehr.Security.Tests (MessageSecurityTests).
 static class MessageTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A clinician with a patient on their panel, both signed in: the clinician on the on-site app, the patient in the
     // portal.
     public static async Task<(StaffAccount Clinician, Guid Patient, Session Staff, (HttpClient Client, System.Net.CookieContainer Jar) Portal)> CareAsync(

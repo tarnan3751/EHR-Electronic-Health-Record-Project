@@ -3,6 +3,7 @@ using Ehr.Testing;
 using Fhir.Metrics;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Web.Tests;
 
@@ -16,8 +17,6 @@ namespace Ehr.Web.Tests;
 public class UcumTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     static readonly SystemOfUnits Ucum = UCUM.Load();
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     static bool IsUcum(string unit)
     {

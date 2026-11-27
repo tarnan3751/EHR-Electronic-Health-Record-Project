@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // that doesn't exist, opened or posted to; and the APIs and htmx requests left with their bare statuses, as before.
 public class NotFoundPageTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     WebApplicationFactory<Program> App(string site) => site switch
     {
         "on-site" => apps.OnPrem,

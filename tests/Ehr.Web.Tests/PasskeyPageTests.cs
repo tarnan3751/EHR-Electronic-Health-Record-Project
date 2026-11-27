@@ -23,8 +23,6 @@ namespace Ehr.Web.Tests;
 // its name; and off-site, both posts forwarded to the clinic's server, or, cut off from it, not offered.
 public class PasskeyPageTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_passkey_is_added_with_a_current_code_listed_and_removed_by_its_owner()
     {

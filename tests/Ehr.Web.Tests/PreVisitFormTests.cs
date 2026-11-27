@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // refuses whatever the app does is in Ehr.Security.Tests (PreVisitFormSecurityTests).
 static class PreVisitFormTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string Phq9 = "44249-1";
 
     public const string Gad7 = "69737-5";

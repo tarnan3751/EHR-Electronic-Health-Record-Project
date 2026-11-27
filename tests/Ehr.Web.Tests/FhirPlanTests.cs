@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Web.Tests;
 
@@ -28,8 +29,6 @@ namespace Ehr.Web.Tests;
 public class FhirPlanTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     const int Patients = 10_000;
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     [Fact]
     public async Task No_read_scans_a_whole_table_with_the_statistics_cleared_or_gathered()

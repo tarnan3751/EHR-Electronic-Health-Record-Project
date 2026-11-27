@@ -10,8 +10,6 @@ namespace Ehr.Web.Tests;
 // access flagged and its reason shown; nobody else gets in; and the cloud app serves it from its own database.
 public class AuditLogTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task An_admin_reviews_a_patients_events_with_emergency_access_flagged()
     {

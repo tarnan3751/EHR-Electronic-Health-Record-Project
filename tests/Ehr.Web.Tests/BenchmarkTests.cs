@@ -6,6 +6,7 @@ using Ehr.Testing;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Web.Tests;
 
@@ -16,8 +17,6 @@ namespace Ehr.Web.Tests;
 // own commit, and nothing else; a full time's p99 not under the budget only gets a warning.
 public class BenchmarkTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public void Its_gate_passes_a_page_over_20_ms_only_with_its_commits()
     {

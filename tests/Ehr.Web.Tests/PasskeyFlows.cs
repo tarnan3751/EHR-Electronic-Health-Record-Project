@@ -16,8 +16,6 @@ namespace Ehr.Web.Tests;
 // from outside the apps (step 19.1).
 static class PasskeyFlows
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string PasskeysPage = "/passkeys";
 
     // The add form's first post, as the script sends it: the name and a code.

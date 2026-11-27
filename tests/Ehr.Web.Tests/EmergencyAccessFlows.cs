@@ -12,8 +12,6 @@ namespace Ehr.Web.Tests;
 // Ehr.Security.Tests (EmergencyAccessReviewSecurityTests).
 static class EmergencyAccessFlows
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string Reason = "Synthetic: covering the ward tonight, asked by the charge nurse.";
 
     public const string Note = "Synthetic: checked the rota, the clinician was covering the ward.";

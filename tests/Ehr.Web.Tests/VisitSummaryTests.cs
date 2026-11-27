@@ -24,8 +24,6 @@ namespace Ehr.Web.Tests;
 // (VisitSummarySecurityTests).
 public class VisitSummaryTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // The three parts of the summary the tests release, unless they say otherwise.
     public const string TalkedAbout = "We talked about your cough and how you have been sleeping.";
     public const string Found = "Your chest sounded clear.\nYour temperature was normal.";

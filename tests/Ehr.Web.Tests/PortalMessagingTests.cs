@@ -13,8 +13,6 @@ namespace Ehr.Web.Tests;
 // tests, not numbered test cases.
 public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     static readonly DateTimeOffset Nov2 = new(2026, 11, 2, 15, 0, 0, TimeSpan.Zero);
 
     [Fact]

@@ -14,8 +14,6 @@ namespace Ehr.Web.Tests;
 // else's. And the chart view and the portal view are both in the audit log.
 public partial class PortalTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // TC-UC5-01, TC-UC5-02 and TC-UC5-03 in the SE document (Simar Rekhi), all three in this one test:
     //   TC-UC5-01 (successful flow; FR-15, FR-27, FR-32): register with an enrollment code;
     //   TC-UC5-02 (alternative flow; FR-15): sign-in is refused before the address is confirmed;

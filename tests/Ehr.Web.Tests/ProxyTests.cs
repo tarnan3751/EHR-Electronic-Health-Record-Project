@@ -10,8 +10,6 @@ namespace Ehr.Web.Tests;
 // does is in Ehr.Security.Tests (ProxyAccessSecurityTests).
 static class ProxyTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A patient with a confirmed portal account, signed in on the on-site app.
     public sealed record Person(Guid Patient, Guid Account, string Email, HttpClient Client, CookieContainer Jar);
 

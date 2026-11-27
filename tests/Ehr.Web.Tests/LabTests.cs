@@ -14,8 +14,6 @@ namespace Ehr.Web.Tests;
 // app has the key (WebApps).
 static class LabTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public const string Orders = "/api/lab/orders";
 
     public static string ResultsPath(Guid order) => $"/api/lab/orders/{order}/results";

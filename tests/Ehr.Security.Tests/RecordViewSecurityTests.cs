@@ -3,6 +3,7 @@ using Ehr.Data.Accounts;
 using Ehr.Data.Audit;
 using Ehr.Testing;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -17,8 +18,6 @@ namespace Ehr.Security.Tests;
 // same whether or not there are views a proxy is not shown.
 public class RecordViewSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);

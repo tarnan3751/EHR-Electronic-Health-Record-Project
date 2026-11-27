@@ -14,7 +14,8 @@ static partial class Browser
 {
     public static readonly Uri Base = new("https://localhost");
 
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
+    // The run's token (TestRun), here as well so that the files that import Browser have it with the rest.
+    public static CancellationToken Cancel => TestRun.Cancel;
 
     // An anonymous client with no jar of its own, for requests that bring their own Cookie header.
     public static HttpClient CreateClient(WebApplicationFactory<Program> app, bool handleCookies = true) =>

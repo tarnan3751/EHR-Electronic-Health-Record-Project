@@ -11,8 +11,6 @@ namespace Ehr.Web.Tests;
 // (AppointmentSecurityTests).
 static class AppointmentTests
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     // A day well ahead, so no test's time has passed; each test takes its own day so bookings don't collide.
     public static string Day(int offset) => DateTime.UtcNow.Date.AddDays(30 + offset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

@@ -4,6 +4,7 @@ using Ehr.Data.Patients;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -18,8 +19,6 @@ namespace Ehr.Security.Tests;
 // what ehr.portal_refill_requests gives. Nothing else changes and nothing is deleted.
 public class RefillRequestSecurityTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 
     string Read => database.ConnectionStringFor("ehr_read", MigratedDatabase.ReadPassword);

@@ -17,8 +17,6 @@ namespace Ehr.Web.Tests;
 // privilege back before it ends.
 public class ErrorPageTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_database_error_says_the_search_could_not_be_completed()
     {

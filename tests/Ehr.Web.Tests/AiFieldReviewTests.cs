@@ -16,7 +16,6 @@ namespace Ehr.Web.Tests;
 public class AiFieldReviewTests(WebApps apps) : IClassFixture<WebApps>
 {
     readonly DictationSidecarStub sidecar = apps.Dictation.Reset();
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
     const string Api = DictationApi.Path;
 
     sealed record Flow(Session Session, Guid Patient, Guid Review, Guid Draft, string SessionId, string Token, string Editor, string ReviewUrl);

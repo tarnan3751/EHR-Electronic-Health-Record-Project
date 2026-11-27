@@ -14,8 +14,6 @@ namespace Ehr.Web.Tests;
 // lists. The database's side of each is in Ehr.Security.Tests (RefillRequestSecurityTests).
 public class RefillCareTeamTests(WebApps apps) : IClassFixture<WebApps>
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task A_clinician_who_joins_after_the_care_team_left_answers_the_waiting_request()
     {

@@ -2,6 +2,7 @@ using Ehr.Data.Accounts;
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -18,8 +19,6 @@ public class VitalReadingSecurityTests(MigratedDatabase database) : IClassFixtur
     const string Diastolic = "8462-4";
     const string HeartRate = "8867-4";
     const string Temperature = "8310-5";
-
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
 
     string App => database.ConnectionStringFor("ehr_app", MigratedDatabase.AppPassword);
 

@@ -1,6 +1,7 @@
 using Ehr.Testing;
 using Npgsql;
 using Xunit;
+using static Ehr.Testing.TestRun;
 
 namespace Ehr.Security.Tests;
 
@@ -9,8 +10,6 @@ namespace Ehr.Security.Tests;
 // Work as a runtime role runs in one transaction with the user set first, the way UserContextInterceptor sets it.
 static class Accounts
 {
-    static CancellationToken Cancel => TestContext.Current.CancellationToken;
-
     public static async Task<Guid> StaffAsync(MigratedDatabase database, params string[] roles)
     {
         var id = Guid.CreateVersion7();
