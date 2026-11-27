@@ -706,6 +706,17 @@
         text-decoration: underline;
     }
 
+    /* The way back above a portal page's title, at the portal's size: as tall as its controls, so a finger finds it. */
+    .sc-app--portal .sc-pagehead {
+        margin: calc(-1 * var(--space-4)) 0 var(--space-2);
+    }
+
+    .sc-app--portal .sc-back {
+        min-height: var(--control-height-portal);
+        font-size: 16px;
+        line-height: 24px;
+    }
+
     /* A section's heading with what belongs to it on the right, such as a day's heading and the way to the next. */
     .sc-sectionhead {
         display: flex;
@@ -720,6 +731,20 @@
         margin: 0;
     }
 
+    /* The page's title with its one action on the right ("New message"), under it where the line is too short. */
+    .sc-titlebar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-3) var(--space-4);
+        margin: 0 0 var(--space-4);
+    }
+
+    .sc-titlebar > h1 {
+        margin: 0;
+    }
+
     /* A list or table with nothing in it: one quiet line, framed, so the empty space reads as meant. */
     .sc-empty {
         margin: 0 0 var(--space-4);
@@ -729,6 +754,11 @@
         background: var(--surface-raised);
         border: 1px solid var(--line);
         border-radius: var(--radius-md);
+    }
+
+    /* An empty list has the corners of the portal's cards. */
+    .sc-app--portal .sc-empty {
+        border-radius: var(--radius-lg);
     }
 
     /* A title with its status beside it. */
@@ -878,12 +908,28 @@
         margin: 0;
     }
 
-    /* A plain link beside the buttons, such as "Cancel": the quiet button's weight. */
+    /* A plain link beside the buttons, such as "Cancel": a quiet control as tall as the buttons, underlined on hover
+       and focus. In the portal, at the portal's size and height. */
     .sc-actions > a:not(.sc-btn) {
-        padding: 0 var(--space-2);
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--control-height);
+        padding: 0 var(--space-3);
         font-size: 14px;
         line-height: 20px;
         font-weight: 600;
+        text-decoration: none;
+    }
+
+    .sc-actions > a:not(.sc-btn):hover,
+    .sc-actions > a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    .sc-app--portal .sc-actions > a:not(.sc-btn) {
+        min-height: var(--control-height-portal);
+        font-size: 16px;
+        line-height: 24px;
     }
 
     /* Form: one column of fields at width-form. */
@@ -931,6 +977,75 @@
     .sc-card > .sc-form + p {
         padding-top: var(--space-6);
         border-top: 1px solid var(--line);
+    }
+
+    /* Form card: a form, or one task's words and its form, on the raised surface, on the page's left edge. The card is
+       the form itself or wraps it; its fields take the card's width, and a heading in it is a panel's. In the clinic
+       at the form's width (--wide: a form of notes and messages, at reading width); in the portal a portal card as
+       wide as the column, its buttons as wide as the card on a phone. */
+    .sc-formcard {
+        max-width: calc(var(--width-form) + 2 * var(--space-6));
+        margin: 0 0 var(--space-6);
+        padding: var(--space-5) var(--space-6) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-formcard--wide {
+        max-width: calc(var(--width-reading) + 2 * var(--space-6));
+    }
+
+    .sc-formcard > :first-child {
+        margin-top: 0;
+    }
+
+    .sc-formcard > :last-child {
+        margin-bottom: 0;
+    }
+
+    .sc-formcard .sc-form {
+        max-width: none;
+        margin: 0;
+    }
+
+    .sc-formcard .sc-field {
+        max-width: none;
+    }
+
+    .sc-formcard h2 {
+        margin: 0 0 var(--space-3);
+        font-size: 18px;
+        line-height: 24px;
+    }
+
+    .sc-formcard .sc-form > h2 {
+        margin: 0;
+    }
+
+    .sc-app--portal .sc-formcard {
+        max-width: none;
+        padding: var(--space-6);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-app--portal .sc-formcard .sc-form > .sc-btn {
+        align-self: flex-start;
+    }
+
+    @media (max-width: 40rem) {
+        .sc-app--portal .sc-formcard {
+            padding: var(--space-4);
+        }
+
+        .sc-app--portal .sc-formcard .sc-form > .sc-btn,
+        .sc-app--portal .sc-formcard .sc-actions {
+            align-self: stretch;
+        }
+
+        .sc-app--portal .sc-formcard .sc-actions > .sc-btn {
+            flex: 1 1 100%;
+        }
     }
 
     /* Text field: the label above, then the input, its hint and its error. */
@@ -1652,6 +1767,124 @@
         text-decoration: underline;
     }
 
+    /* Rows: a list as rows on one card (the portal's appointments, conversations, requests, forms, sharing, views):
+       what a row is about on the left, semibold, its date or state on the right (sc-rows__end), and a muted line under
+       it (sc-rows__meta). A row that opens something is a
+       target as big as the row, its link keeping the focus ring. One column on a phone, the right-hand part under the
+       rest. */
+    .sc-rows {
+        list-style: none;
+        margin: 0 0 var(--space-6);
+        padding: 0;
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+    }
+
+    .sc-rows > li {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: var(--space-6);
+        align-items: baseline;
+        margin: 0;
+        padding: var(--space-4) var(--space-6);
+        border-top: 1px solid var(--line);
+        overflow-wrap: anywhere;
+    }
+
+    .sc-rows > li:first-child {
+        border-top: 0;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .sc-rows > li:last-child {
+        border-bottom-left-radius: var(--radius-lg);
+        border-bottom-right-radius: var(--radius-lg);
+    }
+
+    .sc-rows > li > * {
+        grid-column: 1;
+        margin: 0;
+    }
+
+    .sc-rows > li > :is(h2, h3) {
+        font-family: var(--font-sans);
+        font-size: 18px;
+        line-height: 28px;
+        font-weight: 600;
+        letter-spacing: normal;
+    }
+
+    .sc-rows__meta {
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+    }
+
+    .sc-rows > li > .sc-rows__end {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-end;
+        gap: var(--space-2);
+        font-size: 16px;
+        line-height: 24px;
+        color: var(--ink-muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sc-rows a:not(.sc-btn) {
+        text-decoration: none;
+    }
+
+    .sc-rows a:not(.sc-btn):hover,
+    .sc-rows a:not(.sc-btn):focus-visible {
+        text-decoration: underline;
+    }
+
+    .sc-rows__link::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+    }
+
+    .sc-rows > li:has(.sc-rows__link):hover {
+        background: var(--surface-subtle);
+    }
+
+    @media (max-width: 40rem) {
+        .sc-rows > li {
+            grid-template-columns: minmax(0, 1fr);
+            padding: var(--space-4);
+        }
+
+        .sc-rows > li > .sc-rows__end {
+            grid-column: 1;
+            grid-row: auto;
+            justify-content: flex-start;
+            white-space: normal;
+        }
+    }
+
+    /* A link on a row's right ("See your answers") has a list's link weight; a row's buttons go under its words. */
+    .sc-rows__end > a:not(.sc-btn) {
+        font-weight: 600;
+    }
+
+    .sc-rows > li > .sc-actions {
+        margin-top: var(--space-3);
+    }
+
+    /* On a phone a row's button (fill in a form, look at a record) is as wide as the row. */
+    @media (max-width: 40rem) {
+        .sc-rows__end > .sc-btn {
+            flex: 1 1 100%;
+        }
+    }
+
     /* A conversation: messages oldest first, each in its own block. The reader's own are set in from the left, and
        marked with the accent bar, so who wrote what is clear without color alone (each also says who). */
     .sc-thread {
@@ -1767,7 +2000,7 @@
     .sc-table__actions > a:not(.sc-btn) {
         display: inline-flex;
         align-items: center;
-        height: 28px;
+        min-height: 28px;
         padding: 0 var(--space-2);
         font-size: 14px;
         line-height: 20px;
@@ -2782,63 +3015,6 @@
        anything two areas share belongs in the components layer.
        ---- */
 
-    /* A clinic form, or one task's words and its form, framed: a card on the raised surface on the page's left edge,
-       at the form's width (--wide: a form of notes and messages, at reading width). Its fields take the card's width,
-       and a heading in it is a panel's. */
-    .sc-formcard {
-        max-width: calc(var(--width-form) + 2 * var(--space-6));
-        margin: 0 0 var(--space-6);
-        padding: var(--space-5) var(--space-6) var(--space-6);
-        background: var(--surface-raised);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
-    }
-
-    .sc-formcard--wide {
-        max-width: calc(var(--width-reading) + 2 * var(--space-6));
-    }
-
-    .sc-formcard > :first-child {
-        margin-top: 0;
-    }
-
-    .sc-formcard > :last-child {
-        margin-bottom: 0;
-    }
-
-    .sc-formcard .sc-form {
-        max-width: none;
-        margin: 0;
-    }
-
-    .sc-formcard .sc-field {
-        max-width: none;
-    }
-
-    .sc-formcard h2 {
-        margin: 0 0 var(--space-3);
-        font-size: 18px;
-        line-height: 24px;
-    }
-
-    .sc-formcard .sc-form > h2 {
-        margin: 0;
-    }
-
-    /* "Cancel" beside a form's button, as a plain link: the quiet button's look, underlined on hover and focus. */
-    .sc-formcard .sc-actions > a:not(.sc-btn) {
-        display: inline-flex;
-        align-items: center;
-        height: var(--control-height);
-        padding: 0 var(--space-3);
-        text-decoration: none;
-    }
-
-    .sc-formcard .sc-actions > a:not(.sc-btn):hover,
-    .sc-formcard .sc-actions > a:not(.sc-btn):focus-visible {
-        text-decoration: underline;
-    }
-
     /* A form of short fields (an order, an allergy): the item or name across the card, the details two to a row
        where they fit; notices, reasons, checkboxes and the buttons across. */
     .sc-formgrid {
@@ -3319,172 +3495,33 @@
         border-bottom: 0;
     }
 
-    /* Quick text: adding a phrase is a panel, and the phrases a framed list under it, shown once there is one. */
-    #add-quick-text {
+    /* Quick text: adding a phrase is a panel, and the phrases a framed list under it, shown once there is one. Not
+       where they are already in a panel (the desktop app's phrases). */
+    #add-quick-text:not(.sc-panel *) {
         padding: var(--space-5) var(--space-6);
         background: var(--surface-raised);
         border: 1px solid var(--line);
         border-radius: var(--radius-md);
     }
 
-    #quick-texts {
+    #quick-texts:not(.sc-panel *) {
         padding: 0 var(--space-6);
         background: var(--surface-raised);
         border: 1px solid var(--line);
         border-radius: var(--radius-md);
     }
 
-    #quick-texts > li:last-child {
+    #quick-texts:not(.sc-panel *) > li:last-child {
         border-bottom: 0;
     }
 
-    #quick-texts:not(:has(li)) {
+    #quick-texts:not(.sc-panel *):not(:has(li)) {
         display: none;
     }
 
     /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
        comment; anything two areas share belongs in the components layer.
        ---- */
-
-    /* The way back above a portal page's title, at the portal's size: as tall as its controls, so a finger finds it. */
-    .sc-app--portal .sc-pagehead {
-        margin: calc(-1 * var(--space-4)) 0 var(--space-2);
-    }
-
-    .sc-app--portal .sc-back {
-        min-height: var(--control-height-portal);
-        font-size: 16px;
-        line-height: 24px;
-    }
-
-    /* A page's title with its one action on the right ("New message"), under it where the line is too short. */
-    .sc-titlebar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--space-3) var(--space-4);
-        margin: 0 0 var(--space-4);
-    }
-
-    .sc-titlebar > h1 {
-        margin: 0;
-    }
-
-    /* A list as rows on one card (appointments, conversations): what a row is about on the left, semibold, its date
-       or state on the right (sc-rows__end), and a muted line under it (sc-rows__meta). A row that opens something is a
-       target as big as the row, its link keeping the focus ring. One column on a phone, the right-hand part under the
-       rest. */
-    .sc-rows {
-        list-style: none;
-        margin: 0 0 var(--space-6);
-        padding: 0;
-        background: var(--surface-raised);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-lg);
-    }
-
-    .sc-rows > li {
-        position: relative;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        column-gap: var(--space-6);
-        align-items: baseline;
-        margin: 0;
-        padding: var(--space-4) var(--space-6);
-        border-top: 1px solid var(--line);
-        overflow-wrap: anywhere;
-    }
-
-    .sc-rows > li:first-child {
-        border-top: 0;
-        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    }
-
-    .sc-rows > li:last-child {
-        border-bottom-left-radius: var(--radius-lg);
-        border-bottom-right-radius: var(--radius-lg);
-    }
-
-    .sc-rows > li > * {
-        grid-column: 1;
-        margin: 0;
-    }
-
-    .sc-rows > li > :is(h2, h3) {
-        font-family: var(--font-sans);
-        font-size: 18px;
-        line-height: 28px;
-        font-weight: 600;
-        letter-spacing: normal;
-    }
-
-    .sc-rows__meta {
-        font-size: 16px;
-        line-height: 24px;
-        color: var(--ink-muted);
-    }
-
-    .sc-rows > li > .sc-rows__end {
-        grid-column: 2;
-        grid-row: 1;
-        display: flex;
-        align-items: baseline;
-        justify-content: flex-end;
-        gap: var(--space-2);
-        font-size: 16px;
-        line-height: 24px;
-        color: var(--ink-muted);
-        white-space: nowrap;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .sc-rows a:not(.sc-btn) {
-        text-decoration: none;
-    }
-
-    .sc-rows a:not(.sc-btn):hover,
-    .sc-rows a:not(.sc-btn):focus-visible {
-        text-decoration: underline;
-    }
-
-    .sc-rows__link::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-    }
-
-    .sc-rows > li:has(.sc-rows__link):hover {
-        background: var(--surface-subtle);
-    }
-
-    @media (max-width: 40rem) {
-        .sc-rows > li {
-            grid-template-columns: minmax(0, 1fr);
-            padding: var(--space-4);
-        }
-
-        .sc-rows > li > .sc-rows__end {
-            grid-column: 1;
-            grid-row: auto;
-            justify-content: flex-start;
-            white-space: normal;
-        }
-    }
-
-    /* A plain link beside a form's button ("Cancel"), at the portal's size and as tall as the button. */
-    .sc-app--portal .sc-actions > a:not(.sc-btn) {
-        display: inline-flex;
-        align-items: center;
-        min-height: var(--control-height-portal);
-        font-size: 16px;
-        line-height: 24px;
-    }
-
-    /* An empty list has the corners of the portal's cards. */
-    .sc-app--portal .sc-empty {
-        border-radius: var(--radius-lg);
-    }
 
     /* The home: whose record it is as one line of facts, then a card each for results, appointments, messages and the
        rest of the record. Where the column has room, a card holds what it says on the left and its buttons in a
@@ -3675,34 +3712,34 @@
         border-top: 0;
     }
 
-    details.sc-result {
+    .sc-results details.sc-result {
         margin: 0;
         background: none;
         border: 0;
         border-radius: 0;
     }
 
-    details.sc-result > summary::marker {
+    .sc-results details.sc-result > summary::marker {
         color: var(--ink-muted);
     }
 
-    details.sc-result .sc-result__line {
+    .sc-results details.sc-result .sc-result__line {
         width: calc(100% - var(--space-6));
         max-width: none;
     }
 
-    details.sc-result .sc-result__date {
+    .sc-results details.sc-result .sc-result__date {
         order: 1;
         margin-left: auto;
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
     }
 
-    details.sc-result[open] > summary {
+    .sc-results details.sc-result[open] > summary {
         border-bottom: 1px solid var(--line);
     }
 
-    details.sc-result > .sc-result__body {
+    .sc-results details.sc-result > .sc-result__body {
         padding-top: var(--space-4);
     }
 
@@ -3731,7 +3768,7 @@
     }
 
     @media (max-width: 40rem) {
-        details.sc-result .sc-result__date {
+        .sc-results details.sc-result .sc-result__date {
             flex-basis: 100%;
             margin-left: 0;
         }
@@ -3739,35 +3776,6 @@
         .sc-result__body dl.record {
             gap: 0 var(--space-6);
             padding: var(--space-3) var(--space-4);
-        }
-    }
-
-    /* Writing to the care team: the form on a card as wide as the conversation over it, its fields the card's width,
-       its button at its own width. */
-    .sc-composer {
-        margin: 0 0 var(--space-6);
-        padding: var(--space-6);
-        background: var(--surface-raised);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-lg);
-    }
-
-    .sc-composer > .sc-form {
-        max-width: none;
-        margin: 0;
-    }
-
-    .sc-composer .sc-field {
-        max-width: none;
-    }
-
-    .sc-app--portal .sc-composer .sc-form > .sc-btn {
-        align-self: flex-start;
-    }
-
-    @media (max-width: 40rem) {
-        .sc-composer {
-            padding: var(--space-4);
         }
     }
 
@@ -3819,31 +3827,6 @@
         .sc-result--plain[data-summary="standing"] > h2 + p {
             margin-inline: calc(-1 * var(--space-4));
             padding-inline: var(--space-4);
-        }
-    }
-
-    /* A portal form on a card (downloading the record, asking for a refill, a pre-visit form, sharing the record): as
-       wide as the column, its fields the card's width, its buttons at their own width, as wide as the card on a phone. */
-    .sc-formcard {
-        max-width: none;
-        margin: 0 0 var(--space-6);
-        padding: var(--space-6);
-        background: var(--surface-raised);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-lg);
-    }
-
-    .sc-formcard .sc-field {
-        max-width: none;
-    }
-
-    @media (max-width: 40rem) {
-        .sc-formcard {
-            padding: var(--space-4);
-        }
-
-        .sc-formcard .sc-actions > .sc-btn {
-            flex: 1 1 100%;
         }
     }
 
@@ -3904,24 +3887,7 @@
         }
     }
 
-    /* On a phone a row's button (fill in a form, look at a record) is as wide as the row. */
-    @media (max-width: 40rem) {
-        .sc-rows__end > .sc-btn {
-            flex: 1 1 100%;
-        }
-    }
-
-    /* A link on a row's right ("See your answers") has a list's link weight. */
-    .sc-rows__end > a:not(.sc-btn) {
-        font-weight: 600;
-    }
-
-    /* Sharing (step 6): the records shared with the account and the people the record is shared with as rows, the
-       latter with their buttons under what they can see; sharing that has ended as a quiet list on a card. */
-    .sc-rows > li > .sc-actions {
-        margin-top: var(--space-3);
-    }
-
+    /* Sharing (step 6): sharing that has ended as a quiet list on a card. */
     .sc-ended {
         padding: var(--space-2) var(--space-6);
         background: var(--surface-raised);
@@ -3977,15 +3943,6 @@
         .sc-staff td:nth-child(2) {
             overflow-wrap: anywhere;
         }
-    }
-
-    /* Staff: the new account's form, a card at the form's width under the table it adds to. */
-    .sc-staff__add {
-        max-width: calc(var(--width-form) + 2 * var(--space-6));
-        padding: var(--space-6);
-        background: var(--surface-raised);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-md);
     }
 
     /* The audit log's filters: as many to a row as fit, the patient's ID two wide so the whole of one shows, and the
