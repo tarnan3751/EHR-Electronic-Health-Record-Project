@@ -2523,13 +2523,23 @@
         margin-top: 0;
     }
 
-    /* Audit: the filters in a row above the table. */
+    /* Filters (the schedule, the audit log): a toolbar above the table, its fields as wide as they need and the
+       button on their line. */
     .sc-filters {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 16rem));
         gap: var(--space-3) var(--space-4);
         align-items: end;
         margin: 0 0 var(--space-6);
+        padding: var(--space-4);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    .sc-filters .sc-field__input {
+        font-size: 14px;
+        line-height: 20px;
     }
 
     .sc-filters .sc-btn {
