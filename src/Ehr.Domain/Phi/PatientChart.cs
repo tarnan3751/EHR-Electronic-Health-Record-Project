@@ -68,7 +68,7 @@ public sealed record PatientChart(
     public IReadOnlyList<Ehr.Domain.Results.ResultedOrder> Resulted { get; init; } = [];
 
     // Set when the entry form sent the clinician here after saving an entry, and that entry is this patient's: what
-    // the chart's "Saved:" notice says about it. Part of the same recorded read.
+    // the chart's "Saved." notice says about it. Part of the same recorded read.
     public SavedEntry? Saved { get; init; }
 
     // When "No known allergies" is the allergy list's state: who recorded it, when the history knows (seeded entries

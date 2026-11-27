@@ -36,15 +36,16 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   8. Shorten its Assessment by five characters (15 bytes), and save.
 // Expected result: Step 1: each page shows History, Assessment and Plan, with "Written as History, Assessment and Plan,
 //   before notes had four sections.", and no Subjective; the offline copy gives the note's History as signed. Step 2:
-//   Subjective holds the History, Objective is empty, and a notice starting "Check:" says to move today's vital signs,
-//   examination findings and reviewed results to Objective; the saved draft is exactly as it was. Step 3: the draft is
-//   shown read-only under History, Assessment and Plan, and the saved draft is exactly as it was. Step 4: nothing is
-//   saved ("Choose a visit type from the list."), and the page shows the History in Subjective with the "Check:" notice
-//   again; the saved draft is exactly as it was. Step 5: the draft is saved, in one update that writes the four sections
-//   and clears the History, and signing is refused with "Enter Objective before signing." Step 6: the note is signed in
-//   four sections. Step 7: nothing is saved: the four sections' headings are 15 bytes longer, and the page says "This
-//   draft is at the size limit. Shorten it by a few words to save it in four sections.", with the "Check:" notice
-//   without JavaScript. Step 8: the draft is saved in four sections, at exactly 64 KiB.
+//   Subjective holds the History, Objective is empty, and a notice starting "Check before signing." says to move
+//   today's vital signs, examination findings and reviewed results to Objective; the saved draft is exactly as it was.
+//   Step 3: the draft is shown read-only under History, Assessment and Plan, and the saved draft is exactly as it was.
+//   Step 4: nothing is saved ("Choose a visit type from the list."), and the page shows the History in Subjective with
+//   the "Check before signing." notice again; the saved draft is exactly as it was. Step 5: the draft is saved, in one
+//   update that writes the four sections and clears the History, and signing is refused with "Enter Objective before
+//   signing." Step 6: the note is signed in four sections. Step 7: nothing is saved: the four sections' headings are 15
+//   bytes longer, and the page says "This draft is at the size limit. Shorten it by a few words to save it in four
+//   sections.", with the "Check before signing." notice without JavaScript. Step 8: the draft is saved in four
+//   sections, at exactly 64 KiB.
 // Creator: Tahseen Arnan
 public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFixture<WebApps>
 {

@@ -3,7 +3,7 @@ using Ehr.Data.Patients;
 namespace Ehr.Domain.Patients;
 
 // The words the chart's lists use for their stored codes (FHIR's status, severity and criticality values), in one
-// place: the entry form offers them, the history page and the chart's "Saved:" notice describe a change with them.
+// place: the entry form offers them, the history page and the chart's "Saved." notice describe a change with them.
 // Each list is named by its table.
 public static class ChartListWords
 {
