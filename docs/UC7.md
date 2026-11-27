@@ -196,7 +196,7 @@ only: the page has no permission for the updater.
   installer runs at **Restart now**, showing its progress, for this user, and starts the new version (quitting instead
   offers it again at the next start). **Restart now** is refused while recording. A start after an update opens on the lock, as every start with a sign-in kept does, and what
   the app keeps is untouched: the identifier is the same.
-- **Below the minimum** a server names (`docs/UC8.md`), the status says the server's words, "Update needed: the
+- **Below the minimum** a server names (`docs/UC8.md`), the status says the server's words, "Update needed. The
   clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the offline charts can
   still be read.", and the app checks for the update at once. The lock and the offline charts work as before.
 - **No going back** from inside the app: a bad release is followed by a newer one, or the previous installer run again,

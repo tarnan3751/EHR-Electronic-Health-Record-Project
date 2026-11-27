@@ -1528,7 +1528,7 @@ mod tests {
                     head.push_str(&line.to_ascii_lowercase());
                 }
                 seen.lock().unwrap().push(head);
-                let body = r#"{"problem":"Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later."}"#;
+                let body = r#"{"problem":"Update needed. The clinic's server syncs only with SwiftChart 0.3.0 or later."}"#;
                 write!(
                     stream,
                     "HTTP/1.1 426 Upgrade Required\r\nEhr-Desktop-Minimum: 0.3.0\r\nContent-Type: application/json\r\n\
@@ -1544,7 +1544,7 @@ mod tests {
 
         let report = client.round(&store).await;
         let problem =
-            "Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later.";
+            "Update needed. The clinic's server syncs only with SwiftChart 0.3.0 or later.";
         assert_eq!(report.problem.as_deref(), Some(problem));
         assert!(client.take_update_required());
         assert!(!client.take_update_required(), "once");

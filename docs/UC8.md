@@ -67,7 +67,7 @@ name a minimum version and refuse sync below it"). The app says its version in `
 one older, or a build from before step 20, which says nothing, or a pre-release such as 0.3.0-beta, which isn't read as
 a version and so is always below any minimum, gets 426 from the sync API and the desktop's data
 (the chart download, the drafts, the offline recordings), with the minimum in `Ehr-Desktop-Minimum` and "Update
-needed: the clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the
+needed. The clinic's server syncs only with SwiftChart … or later. What you save waits on this computer, and the
 offline charts can still be read." Sign-in, the lock's check of the password, sign-out and the updates are never
 refused for the version. 426, not a 401, which every build takes as its token refused, nor a 403, which a build from
 before step 20 takes as a waiting recording refused for good.

@@ -32,8 +32,8 @@ namespace Ehr.Web.Tests.TestCases.UC8;
 //   2. Sync as each build at or past the minimum.
 //   3. Sign in, check a wrong password at the lock, and sign out, saying no version.
 //   4. Sync with no version on the app with no minimum.
-// Expected result: Step 1: 426 each time, "Ehr-Desktop-Minimum: 0.3.0", and "Update needed:". Step 2: 200. Step 3: 200,
-//   403 "Wrong password." and 204: none is 426. Step 4: 200.
+// Expected result: Step 1: 426 each time, "Ehr-Desktop-Minimum: 0.3.0", and "Update needed. The clinic's server …".
+//   Step 2: 200. Step 3: 200, 403 "Wrong password." and 204: none is 426. Step 4: 200.
 // Creator: Tahseen Arnan
 public class TC_UC8_10_MinimumDesktopVersion(WebApps apps) : IClassFixture<WebApps>
 {
@@ -58,7 +58,7 @@ public class TC_UC8_10_MinimumDesktopVersion(WebApps apps) : IClassFixture<WebAp
                 Assert.Equal(HttpStatusCode.UpgradeRequired, refused.StatusCode);
                 Assert.Equal(["0.3.0"], refused.Headers.GetValues(DesktopVersionFilter.MinimumHeader));
                 var refusal = await refused.Content.ReadFromJsonAsync<Refusal>(JsonSerializerOptions.Web, Cancel);
-                Assert.StartsWith("Update needed: the clinic's server syncs only with SwiftChart 0.3.0 or later.", refusal!.Problem);
+                Assert.StartsWith("Update needed. The clinic's server syncs only with SwiftChart 0.3.0 or later.", refusal!.Problem);
             }
         }
 
