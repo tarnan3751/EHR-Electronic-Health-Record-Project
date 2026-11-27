@@ -25,8 +25,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. The proxy opens Who viewed the record.
 // Expected result: Step 1: Dr. Test's lines are, newest first, "A visit note, being written", "Who you share your record
 //   with", "Your orders for tests and medicines", "Your allergies, medications and diagnoses", "Your vital signs", "Your
-//   chart: the summary page, which lists your visit notes". Step 2: "The record, 4 times", "The vital signs", "The chart:
-//   the summary page, which lists the visit notes".
+//   chart, with the list of your visit notes". Step 2: "The record, 4 times", "The vital signs", "The chart, with
+//   the list of visit notes".
 // Creator: Tahseen Arnan
 public class TC_UC6_68_RestrictedProxyToldSafeParts(WebApps apps) : IClassFixture<WebApps>
 {
@@ -58,11 +58,11 @@ public class TC_UC6_68_RestrictedProxyToldSafeParts(WebApps apps) : IClassFixtur
         Assert.Equal(
             [
                 "A visit note, being written", "Who you share your record with", "Your orders for tests and medicines", "Your allergies, medications and diagnoses",
-                "Your vital signs", "Your chart: the summary page, which lists your visit notes",
+                "Your vital signs", "Your chart, with the list of your visit notes",
             ],
             PartsOf(await PageAsync(patient.Client), "staff"));
 
         // Step 2.
-        Assert.Equal(["The record, 4 times", "The vital signs", "The chart: the summary page, which lists the visit notes"], PartsOf(await PageAsync(without.Client), "staff"));
+        Assert.Equal(["The record, 4 times", "The vital signs", "The chart, with the list of visit notes"], PartsOf(await PageAsync(without.Client), "staff"));
     }
 }

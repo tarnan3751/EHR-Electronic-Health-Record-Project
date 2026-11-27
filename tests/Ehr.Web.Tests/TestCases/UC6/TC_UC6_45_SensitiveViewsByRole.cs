@@ -22,7 +22,7 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   2. Dr. Test opens the chart with "Show sensitive items".
 //   3. The patient, the proxy with sensitive items, and the one without, open the page.
 // Expected result: Step 3: the patient's newest line from someone else is "Dr. Test, clinician", "Your chart, with its
-//   sensitive items: the summary page, ..."; the proxy's with sensitive items, "The chart, with its sensitive items: ...". The page of the proxy
+//   sensitive items and the list of your visit notes"; the proxy's with sensitive items, "The chart, with its sensitive items and the list of visit notes". The page of the proxy
 //   without them is the page of step 1 with one line before it, their own "Who viewed the record", and nothing on it
 //   says "sensitive".
 // Creator: Tahseen Arnan
@@ -46,9 +46,9 @@ public class TC_UC6_45_SensitiveViewsByRole(WebApps apps) : IClassFixture<WebApp
         await session.Client.GetStringAsync(chart + "?sensitive=true", Cancel);
 
         // Step 3.
-        Assert.StartsWith("staff | Dr. Test, clinician | Your chart, with its sensitive items: the summary page, which lists your visit notes | ",
+        Assert.StartsWith("staff | Dr. Test, clinician | Your chart, with its sensitive items and the list of your visit notes | ",
             Lines(await PageAsync(patient.Client)).First(line => !line.StartsWith("you", StringComparison.Ordinal)), StringComparison.Ordinal);
-        Assert.StartsWith("staff | Dr. Test, clinician | The chart, with its sensitive items: the summary page, which lists the visit notes | ",
+        Assert.StartsWith("staff | Dr. Test, clinician | The chart, with its sensitive items and the list of visit notes | ",
             Lines(await PageAsync(allowed.Client)).First(line => !line.StartsWith("you", StringComparison.Ordinal)), StringComparison.Ordinal);
         var html = await PageAsync(without.Client);
         var after = Lines(html);

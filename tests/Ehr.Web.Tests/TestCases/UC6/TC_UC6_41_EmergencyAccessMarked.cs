@@ -29,8 +29,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 // Expected result: Step 2: the reason page says "The patient, and anyone they share sensitive items with, can see in
 //   the portal that you used emergency access, and when. They never see your reason." Step 4: the patient's lines
 //   from the care team are, newest first: Dr. Oak (step 3), not marked; Dr. Oak (step 2), marked "Emergency access";
-//   Dr. Test, not marked. The notice "Emergency access: a clinician who wasn't on your care team opened the record and
-//   gave the clinic a reason, which the clinic reviews." is shown. The proxy with sensitive items has the same three
+//   Dr. Test, not marked. The notice "Emergency access. A clinician outside your care team opened the record and gave
+//   a reason. The clinic reviews each one." is shown. The proxy with sensitive items has the same three
 //   lines and the notice. The proxy without has Dr. Oak (step 3) and Dr. Test only, and no word "Emergency" on the page.
 //   The reason is nowhere in any of the three pages.
 // Creator: Tahseen Arnan
@@ -77,25 +77,25 @@ public class TC_UC6_41_EmergencyAccessMarked(WebApps apps) : IClassFixture<WebAp
         var html = await PageAsync(patient.Client);
         Assert.Equal(
             [
-                "staff | Dr. Oak, clinician | Your chart: the summary page, which lists your visit notes",
-                "staff | Dr. Oak, clinician Emergency access | Your chart: the summary page, which lists your visit notes",
-                "staff | Dr. Test, clinician | Your chart: the summary page, which lists your visit notes",
+                "staff | Dr. Oak, clinician | Your chart, with the list of your visit notes",
+                "staff | Dr. Oak, clinician Emergency access | Your chart, with the list of your visit notes",
+                "staff | Dr. Test, clinician | Your chart, with the list of your visit notes",
             ], Staff(html));
-        Assert.Contains("Emergency access: a clinician who wasn't on your care team opened the record and gave the clinic a reason, which the clinic reviews.", Words(html));
+        Assert.Contains("Emergency access. A clinician outside your care team opened the record and gave a reason. The clinic reviews each one.", Words(html));
 
         var allowedHtml = await PageAsync(allowed.Client);
         Assert.Equal(
             [
-                "staff | Dr. Oak, clinician | The chart: the summary page, which lists the visit notes",
-                "staff | Dr. Oak, clinician Emergency access | The chart: the summary page, which lists the visit notes",
-                "staff | Dr. Test, clinician | The chart: the summary page, which lists the visit notes",
+                "staff | Dr. Oak, clinician | The chart, with the list of visit notes",
+                "staff | Dr. Oak, clinician Emergency access | The chart, with the list of visit notes",
+                "staff | Dr. Test, clinician | The chart, with the list of visit notes",
             ], Staff(allowedHtml));
-        Assert.Contains("Emergency access: a clinician who wasn't on the patient's care team opened the record", Words(allowedHtml));
+        Assert.Contains("Emergency access. A clinician outside the patient's care team opened the record", Words(allowedHtml));
 
         var withoutHtml = await PageAsync(without.Client);
-        Assert.Equal(["staff | Dr. Oak, clinician | The chart: the summary page, which lists the visit notes", "staff | Dr. Test, clinician | The chart: the summary page, which lists the visit notes"], Staff(withoutHtml));
+        Assert.Equal(["staff | Dr. Oak, clinician | The chart, with the list of visit notes", "staff | Dr. Test, clinician | The chart, with the list of visit notes"], Staff(withoutHtml));
         Assert.DoesNotContain("Emergency", Words(withoutHtml), StringComparison.Ordinal);
-        Assert.Contains("shown to the patient's care team, the lab or you", Words(withoutHtml));
+        Assert.Contains("Each time the patient's care team, the lab or you saw the record", Words(withoutHtml));
 
         foreach (var page in new[] { html, allowedHtml, withoutHtml })
         {
