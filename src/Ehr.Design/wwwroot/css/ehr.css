@@ -1881,8 +1881,8 @@
         overflow-wrap: anywhere;
     }
 
-    /* Over every pair, across both columns, warning or not: "Translated from Spanish: check it against the Spanish
-       beside it", so no sentence reads as checked for having no warning. */
+    /* Over every pair, across both columns, warning or not: "Translated from Spanish. Check it against the Spanish
+       beside it.", so no sentence reads as checked for having no warning. */
     .sc-translation__check {
         grid-column: 1 / -1;
         font-size: 14px;
