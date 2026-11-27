@@ -6,8 +6,9 @@ namespace Ehr.Seed;
 
 // A synthetic clinic, the same every time (NFR-13: synthetic data only). Patient number i is always the same patient,
 // with the same allergies, medications, diagnoses and visits, whatever the clinic's size, so the benchmark knows whom
-// to search for and whose chart to open without reading anyone. Obviously synthetic: every name carries a number, as
-// the Synthea generator's do ("Larkin807"), and every MRN starts SYN.
+// to search for and whose chart to open without reading anyone. Its names are ordinary ones of many origins, the given
+// and family names drawn apart from the lists below, so full names repeat now and then, as in a real clinic; the MRN,
+// which always starts SYN, and the date of birth tell patients apart.
 //
 // Clinically coherent, on Synthea's model but with this project's own code lists (Synthea codes conditions in SNOMED
 // CT, which isn't used here): a patient's conditions, by age, decide the rest of the chart. Someone with type 2
@@ -38,20 +39,29 @@ public sealed class SyntheticClinic
         var random = new SplitMix64(0x5EED_0000_0000_0000UL + (ulong)index);
         var made = Made.AddMilliseconds(index);
         var patientId = Uuid7(made, random);
+        // Each name takes the two draws it took when names carried a number, so the rest of the chart comes out the
+        // same. The given name's draw picks from the names for the gender, which is drawn after it.
+        var given = random.NextUInt64();
+        _ = random.NextUInt64();
+        var familyName = Pick(FamilyNames, random);
+        _ = random.NextUInt64();
+        var birthDate = EarliestBirth.AddDays(random.Next(LatestBirth.DayNumber - EarliestBirth.DayNumber + 1));
+        var gender = random.NextDouble() switch
+        {
+            < 0.49 => AdministrativeGender.Female,
+            < 0.98 => AdministrativeGender.Male,
+            < 0.99 => AdministrativeGender.Other,
+            _ => AdministrativeGender.Unknown,
+        };
+        var givenNames = GivenNames(gender);
         var patient = new Patient
         {
             Id = patientId,
             Mrn = Mrn(index),
-            GivenName = Pick(GivenNames, random) + random.Next(100, 1000),
-            FamilyName = Pick(FamilyNames, random) + random.Next(100, 1000),
-            BirthDate = EarliestBirth.AddDays(random.Next(LatestBirth.DayNumber - EarliestBirth.DayNumber + 1)),
-            Gender = random.NextDouble() switch
-            {
-                < 0.49 => AdministrativeGender.Female,
-                < 0.98 => AdministrativeGender.Male,
-                < 0.99 => AdministrativeGender.Other,
-                _ => AdministrativeGender.Unknown,
-            },
+            GivenName = givenNames[(int)(given % (ulong)givenNames.Length)],
+            FamilyName = familyName,
+            BirthDate = birthDate,
+            Gender = gender,
             Version = 1,
             UpdatedAt = made,
         };
@@ -323,27 +333,93 @@ public sealed class SyntheticClinic
         public double NextDouble() => (NextUInt64() >> 11) * (1.0 / (1UL << 53));
     }
 
-    static readonly string[] GivenNames =
+    // The given names for a patient of the gender: ordinary ones of many origins, plain letters, at least three of them.
+    // A patient recorded as other or unknown gets one of the names any gender has.
+    internal static string[] GivenNames(string gender) => gender switch
+    {
+        AdministrativeGender.Female => FemaleNames,
+        AdministrativeGender.Male => MaleNames,
+        _ => SharedNames,
+    };
+
+    static readonly string[] FemaleNames =
     [
-        "Ada", "Alder", "Arlo", "Aspen", "Beatrix", "Bodhi", "Bramble", "Briar", "Calla", "Cedar", "Clover", "Cora",
-        "Dahlia", "Dax", "Delphine", "Ellis", "Elm", "Ember", "Ezra", "Fern", "Finch", "Flint", "Greer", "Hazel",
-        "Heath", "Indigo", "Iris", "Jasper", "Juniper", "Kestrel", "Larch", "Laurel", "Linden", "Lowen", "Maple",
-        "Marlow", "Moss", "Nova", "Oakley", "Odette", "Orrin", "Pax", "Pearl", "Quill", "Rowan", "Rue", "Sage", "Sorrel",
-        "Story", "Tamsin", "Thatcher", "Tove", "Umber", "Vale", "Wren", "Wynn", "Xan", "Yarrow", "Zephyr", "Zinnia",
+        "Abigail", "Adaeze", "Adriana", "Agnieszka", "Aisha", "Akiko", "Alejandra", "Alice", "Amanda", "Amelia",
+        "Amina", "Ana", "Ananya", "Angela", "Anna", "Annika", "Astrid", "Audrey", "Barbara", "Beatriz", "Brenda",
+        "Camille", "Carmen", "Caroline", "Catherine", "Charlotte", "Chiamaka", "Chiara", "Christine", "Claire",
+        "Daniela", "Deborah", "Diana", "Divya", "Donna", "Eleanor", "Elena", "Eleni", "Elizabeth", "Ella", "Emily",
+        "Emma", "Esperanza", "Evelyn", "Fatima", "Folake", "Francesca", "Freya", "Gabriela", "Giulia", "Grace", "Greta",
+        "Guadalupe", "Hana", "Hannah", "Haruka", "Heather", "Heidi", "Helen", "Hiwot", "Hoa", "Ingrid", "Irina",
+        "Isabel", "Janet", "Jing", "Julia", "Karen", "Katarzyna", "Katherine", "Kavya", "Keiko", "Lakshmi", "Laura",
+        "Layla", "Leilani", "Linda", "Linh", "Lucia", "Lucy", "Magdalena", "Mai", "Makena", "Margaret", "Maria",
+        "Mariam", "Marisol", "Meera", "Megan", "Mei", "Melissa", "Nancy", "Natalie", "Natasha", "Neha", "Ngozi", "Olga",
+        "Olivia", "Pamela", "Patricia", "Paula", "Pooja", "Priya", "Rachel", "Rebecca", "Rosa", "Ruth", "Sandra",
+        "Sarah", "Selam", "Sharon", "Sofia", "Sophie", "Sunita", "Susan", "Svetlana", "Teresa", "Thao", "Tsion",
+        "Valentina", "Victoria", "Wanjiru", "Wendy", "Ximena", "Yasmin", "Yolanda", "Yuki", "Yumi", "Zainab", "Zoe",
+        "Zofia",
     ];
 
-    static readonly string[] FamilyNames =
+    static readonly string[] MaleNames =
     [
-        "Abernathy", "Ashbury", "Ashgrove", "Barrowe", "Bellweather", "Birchall", "Blackwood", "Brambleton", "Calloway",
-        "Cindergate", "Clearwater", "Copperfield", "Crane", "Dewhurst", "Driftwood", "Duskwood", "Elderberry", "Emberly",
-        "Everhart", "Fairweather", "Fenwick", "Foxglove", "Frostwick", "Galloway", "Glenmoor", "Greywater", "Hallowell",
-        "Harrowgate", "Hawthorne", "Heathcote", "Holloway", "Inglewood", "Ironwood", "Ivesdale", "Jessamine", "Juniperra",
-        "Kettleby", "Kilbride", "Kingsmere", "Larkin", "Lindqvist", "Lockhart", "Lowmoor", "Mapleton", "Marchbank",
-        "Meadowcroft", "Mossley", "Netherby", "Nettlefold", "Northcott", "Oakhurst", "Oldcastle", "Orchardson",
-        "Pemberton", "Pennywhistle", "Pinecrest", "Quarrington", "Quillfeather", "Rainsford", "Ravenscroft", "Redfern",
-        "Rookwood", "Saltmarsh", "Sedgewick", "Silverthorn", "Stonebridge", "Thistlewood", "Thornbury", "Underhill",
-        "Upwood", "Valemont", "Vantreight", "Wakefield", "Whitlock", "Willowmere", "Winterbourne", "Wrexley",
-        "Yarborough", "Yewdale", "Zellweger",
+        "Aaron", "Adam", "Ahmed", "Alberto", "Alejandro", "Anders", "Andrei", "Andrew", "Anil", "Anthony", "Arjun",
+        "Bao", "Benjamin", "Brian", "Carlos", "Charles", "Chinedu", "Christopher", "Daisuke", "Daniel", "David",
+        "Dawit", "Dennis", "Diego", "Dmitri", "Douglas", "Duc", "Eduardo", "Edward", "Emeka", "Erik", "Francisco",
+        "Frank", "Gary", "George", "Giovanni", "Gregory", "Hao", "Harold", "Haruto", "Hassan", "Henrik", "Henry",
+        "Hiroshi", "Hugo", "Ivan", "Jack", "Jacob", "Jakub", "James", "Jason", "Jeffrey", "Jian", "Jiho", "Joao",
+        "Johan", "John", "Jonathan", "Jorge", "Jose", "Joseph", "Joshua", "Juan", "Jun", "Karim", "Kenji", "Kenneth",
+        "Kevin", "Khalid", "Kofi", "Kwame", "Lars", "Lawrence", "Louis", "Luca", "Luis", "Marco", "Mark", "Mateo",
+        "Mathieu", "Matteo", "Matthew", "Michael", "Miguel", "Ming", "Minh", "Minjun", "Mustafa", "Nathan", "Nicholas",
+        "Nikos", "Nils", "Oluwaseun", "Omar", "Pablo", "Patrick", "Paul", "Pavel", "Peter", "Pierre", "Piotr", "Quang",
+        "Rafael", "Rahul", "Ravi", "Raymond", "Ricardo", "Richard", "Robert", "Rohan", "Ronald", "Samuel", "Santiago",
+        "Scott", "Seojun", "Stephen", "Steven", "Tadesse", "Takeshi", "Tariq", "Tendai", "Thomas", "Timothy", "Tomasz",
+        "Tuan", "Vikram", "Walter", "Wei", "William", "Yaw", "Youssef",
+    ];
+
+    static readonly string[] SharedNames =
+    [
+        "Ari", "Avery", "Blake", "Casey", "Dakota", "Drew", "Eden", "Elliot", "Emerson", "Finley", "Hayden", "Jamie",
+        "Jesse", "Kai", "Morgan", "Noor", "Parker", "Quinn", "Reese", "Remy", "Riley", "Rowan", "Sam", "Sasha",
+        "Skyler", "Toni",
+    ];
+
+    // Ordinary family names of many origins, plain letters, at least four of them: the benchmark searches by a family
+    // name's first four.
+    internal static readonly string[] FamilyNames =
+    [
+        "Abbott", "Abdullah", "Abebe", "Abramson", "Adebayo", "Adeyemi", "Adler", "Aguilar", "Ahmadi", "Ainsworth",
+        "Almeida", "Alvarez", "Aquino", "Asante", "Aydin", "Bailey", "Bakker", "Balogun", "Banerjee", "Barbieri",
+        "Barker", "Bauer", "Becker", "Bekele", "Berg", "Bernard", "Bertrand", "Bhat", "Bianchi", "Bishop", "Blackburn",
+        "Boateng", "Bondarenko", "Bouchard", "Brandt", "Briggs", "Bruno", "Burke", "Carroll", "Carvalho", "Castillo",
+        "Castro", "Celik", "Chan", "Chatterjee", "Chaudhry", "Chen", "Cheng", "Cheung", "Chevalier", "Choi",
+        "Choudhury", "Clarke", "Connolly", "Conti", "Cortez", "Cunningham", "Dabrowski", "Dahl", "Dang", "Darwish",
+        "Davies", "Dekker", "Delgado", "Demir", "Deng", "Desai", "Diallo", "Diaz", "Dinh", "Dizon", "Dlamini",
+        "Doherty", "Donnelly", "Doyle", "Dubois", "Dumitru", "Durand", "Ellison", "Engel", "Eriksson", "Esposito",
+        "Farahani", "Feldman", "Feng", "Ferrari", "Ferraro", "Ferreira", "Fletcher", "Flores", "Fontana", "Fournier",
+        "Friedrich", "Gagnon", "Gallagher", "Gallo", "Garcia", "Gauthier", "Georgiou", "Gilbert", "Girard", "Girma",
+        "Goldberg", "Gomez", "Gonzalez", "Goodwin", "Graham", "Greco", "Greenberg", "Griffiths", "Grigoryan", "Gupta",
+        "Gutierrez", "Guzman", "Habib", "Haddad", "Haile", "Halvorsen", "Hamdan", "Hansen", "Harding", "Hartley",
+        "Hartmann", "Hayashi", "Hayes", "Hernandez", "Herrera", "Hoang", "Hoffmann", "Holland", "Horowitz", "Horvat",
+        "Horvath", "Hossain", "Hosseini", "Hovhannisyan", "Howell", "Huang", "Inoue", "Ionescu", "Ivanov", "Iyer",
+        "Jafari", "Jang", "Jankowski", "Jansen", "Jenkins", "Jimenez", "Johansson", "Joshi", "Jovanovic", "Jung",
+        "Kamau", "Kaminski", "Kang", "Kaplan", "Karimi", "Karlsson", "Kato", "Katz", "Kavanagh", "Kaya", "Khoury",
+        "Kimura", "Kiprop", "Klein", "Kobayashi", "Kovac", "Kovalenko", "Kowalski", "Kozlowski", "Kramer", "Krause",
+        "Kumar", "Lange", "Larsen", "Laurent", "Lawson", "Leblanc", "Lefebvre", "Lehmann", "Leung", "Liang", "Lombardi",
+        "Maguire", "Malhotra", "Manalo", "Mansour", "Marino", "Marsh", "Martinez", "Matsumoto", "Mazur", "Medina",
+        "Mehta", "Mekonnen", "Mendoza", "Menon", "Mensah", "Mercier", "Meyer", "Mohammadi", "Moreau", "Moreno",
+        "Moretti", "Mori", "Morozov", "Moyo", "Mukherjee", "Murphy", "Mutua", "Mwangi", "Nagy", "Nair", "Najjar",
+        "Nakamura", "Ndiaye", "Neumann", "Nguyen", "Nielsen", "Nikolaidis", "Nikolic", "Nkosi", "Novak", "Novotny",
+        "Nowak", "Nwosu", "Nyberg", "Ogunleye", "Okonkwo", "Okoro", "Oliveira", "Osei", "Otieno", "Owusu", "Ozturk",
+        "Papadopoulos", "Pappas", "Park", "Parsons", "Pascual", "Patel", "Pavlenko", "Pearson", "Pelletier", "Pereira",
+        "Perera", "Perez", "Petrosyan", "Petrov", "Petrovic", "Pham", "Phan", "Pillai", "Popescu", "Quinlan", "Qureshi",
+        "Rahman", "Ramirez", "Reddy", "Reilly", "Reyes", "Ribeiro", "Richter", "Rinaldi", "Rodriguez", "Rojas", "Rosen",
+        "Rosenberg", "Rostami", "Rousseau", "Russo", "Saberi", "Sahin", "Salazar", "Saleh", "Sanchez", "Santoro",
+        "Santos", "Sargsyan", "Sasaki", "Sato", "Schneider", "Schwartz", "Sharma", "Sharpe", "Shimizu", "Shin",
+        "Siddiqui", "Silva", "Singh", "Sokolov", "Soriano", "Stein", "Sullivan", "Sutton", "Suzuki", "Szabo",
+        "Szymanski", "Takahashi", "Tanaka", "Tang", "Tehrani", "Tesfaye", "Thornton", "Tolentino", "Torres", "Toth",
+        "Tran", "Traore", "Tremblay", "Tsang", "Varga", "Vargas", "Vasquez", "Vermeulen", "Villanueva", "Vincent",
+        "Visser", "Vitale", "Vogel", "Volkov", "Vuong", "Walsh", "Wang", "Watanabe", "Weber", "Werner", "Whelan",
+        "Whitaker", "Wilkinson", "Wisniewski", "Wojcik", "Wong", "Woodward", "Yamada", "Yamamoto", "Yilmaz", "Yoon",
+        "Yoshida", "Zhang", "Zhao", "Zhou", "Zielinski", "Zimmermann",
     ];
 
     // What patients are allergic to, coded as the reference data codes it (db/reference): a drug by its RxNorm

@@ -69,7 +69,7 @@ In VS Code, the same three are under Terminal → Run Task: "Server stack: start
 |---|---|
 | https://ehr.example.com:8443 | On-site clinician: the LAN, straight to the on-prem app |
 | https://ehr-remote.example.com:9443 | Off-site clinician: the internet, to the cloud app |
-| https://portal.example.com:9443 | Patient portal: the internet, to the cloud app |
+| https://portal.example.com:9443 | Patient portal: the internet, to the cloud app. Its pages are under `/portal`, where this address goes |
 | `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env`, over TLS (the certificate also names `localhost` and `127.0.0.1`) |
 | http://127.0.0.1:8474 | Toxiproxy API, to change latency or cut links |
 | http://127.0.0.1:8025 | Mailpit: the emails the on-prem app sent, and the monitoring profile's alerts |
@@ -99,6 +99,18 @@ These are example accounts for this local stack with synthetic data only, the sa
 | `dotnet run test-accounts.cs -- code` | Prints each account's email and password, and the staff accounts' current authenticator codes. |
 
 The authenticator secrets and recovery codes are made by the stack at enrollment, so they differ on every machine and are never committed: they are kept, with each account's email and password, in `test-accounts.json` in this folder, which is gitignored and, on macOS, readable only by you (on Windows it has the folder's permissions). A code changes every 30 seconds; run `code` as you sign in, or add the secret from the file to an authenticator app. A reset (`down -v`) deletes the accounts and the seeded clinic with everything else, so delete `test-accounts.json` with it and seed the clinic again; `setup` says so when an account in the file can't sign in.
+
+## Demonstration data
+
+`demo-data.cs` fills the stack with a believable clinic day for a demonstration, after `test-accounts.cs -- setup`: run `dotnet run demo-data.cs`. It signs in as the test clinician and the test patient and works through the web app's own pages, as they would, so everything it adds passes the same authorization, row-level security, audit trail and write triggers as a person's work; it never connects to the database. It refuses to start until the test accounts are set up, and refuses any address but the stack's. `--help` lists the options, such as another accounts file or certificate. It adds, in this order:
+
+1. **The clinician's panel:** `SYN0000001` to `SYN0000025` on **My patients**, each added from its chart as a clinician does, so each records an emergency access with the reason "Adding to my patients for the demonstration clinic on the local stack": the admin's inbox gets one to review for each, and each patient's portal lists it.
+2. **The schedule:** today and the next four working days on the clinic's clock, 8 to 12 appointments a day across the panel, and three of today's checked in. The app refuses a time that has passed, so there are no past days, and today's appointments start from whatever time it is.
+3. **The test patient (`SYN0000001`):** an allergy, a medication and a diagnosis where the chart has fewer than three of a kind; four sets of vital signs over the past year; three lab orders signed, resulted by hand on their results pages and acknowledged; two signed notes with visit summaries released; a conversation started from each side, each answered; a refill request answered (declined, with a message) and one waiting, and an appointment coming up with a pre-visit form answered and one to fill in, where the patient has none of these already.
+4. **The inbox:** results to acknowledge on the first five adult patients after the test patient; portal accounts for the first three, each with an unread message and, where the portal offers one of their medications, a refill request; and a draft note on two more charts.
+5. **Lived-in charts:** two sets of vital signs and a signed note on the first six adult patients after the test patient.
+
+It is safe to run again: each step looks at what the pages show (a patient on the panel, an appointment at that time, a note with that text, a conversation with that subject) and adds only what is missing; it never deletes or changes what is there, by hand or from the seed. A run that stops partway is finished by the next. Each step prints what the stack holds and what it added. Notes are signed, messages sent and results filed when the script runs: the app dates them, and only vital signs and a result's collection time can be given a time in the past. The vital signs fall on the 10th of a month and the schedule on the days from today, so a run in a later month or on a later day adds that month's or those days'. The portal accounts it makes (`demo-` and the MRN at `example.com`, such as `demo-syn0000002@example.com`, password `local-demo-patient-1234`) are kept in `demo-accounts.json` in this folder, gitignored and readable only by you like `test-accounts.json`; after a reset it enrolls them again.
 
 ## Simulated latency
 

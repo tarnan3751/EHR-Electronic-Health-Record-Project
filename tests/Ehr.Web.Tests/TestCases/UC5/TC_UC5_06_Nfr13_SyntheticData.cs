@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC5;
 //   3. Make the first 1,000 patients of the synthetic clinic.
 //   4. Make an address with the test fixture, as the registration tests do.
 // Expected result: Every address is at example.com, every MRN starts SYN, every synthetic patient has a SYN MRN and a
-//   name with a number in it, and the fixture's address is at example.test.
+//   name from the synthetic clinic's own lists, and the fixture's address is at example.test.
 // Creator: Tahseen Arnan
 public partial class TC_UC5_06_Nfr13_SyntheticData
 {
@@ -60,8 +60,8 @@ public partial class TC_UC5_06_Nfr13_SyntheticData
         foreach (var chart in new SyntheticClinic(1_000).Charts())
         {
             Assert.StartsWith("SYN", chart.Patient.Mrn);
-            Assert.Matches("[0-9]", chart.Patient.GivenName);
-            Assert.Matches("[0-9]", chart.Patient.FamilyName);
+            Assert.Contains(chart.Patient.GivenName, SyntheticClinic.GivenNames(chart.Patient.Gender));
+            Assert.Contains(chart.Patient.FamilyName, SyntheticClinic.FamilyNames);
         }
     }
 

@@ -68,8 +68,8 @@ builder.Services.AddSingleton(new AuditSource(site == Site.OnPrem ? AuditSources
 // The clinic's time zone (step 10d): required outside Development, where the default is UTC.
 builder.Services.AddSingleton(Ehr.Domain.Time.ClinicTime.FromSettings(
     builder.Configuration["Ehr:Clinic:TimeZone"], builder.Configuration["Ehr:Clinic:TimeZoneAbbreviations"], builder.Environment.IsDevelopment()));
-// The addresses the app's links are built from: required outside Development, so a deployment that forgot one fails
-// here, at startup, with what to set (step 6c).
+// The addresses the app's links are built from, the portal's also naming the host whose / goes to the portal (below):
+// required outside Development, so a deployment that forgot one fails here, at startup, with what to set (step 6c).
 var siteAddresses = SiteAddresses.Checked(builder.Configuration.GetSection(SiteAddresses.Section).Get<SiteAddresses>(), builder.Environment.IsDevelopment());
 builder.Services.PostConfigure<SiteAddresses>(addresses =>
 {
@@ -206,9 +206,32 @@ if (keyCertificatePath is not { Length: > 0 })
 }
 
 // Routing first, so the cloud app's forwarding can tell page requests from static files. Forwarded requests are
-// authenticated and authorized by the on-prem app; everything served here is authenticated below, and the signed-in
-// account reaches the database through UserContextMiddleware before any handler runs.
+// authenticated and authorized by the on-prem app; everything served here is authenticated below, but for the redirect
+// of the portal's bare address just after routing, and the signed-in account reaches the database through
+// UserContextMiddleware before any handler runs.
 app.UseRouting();
+// The portal's own address opened bare, such as the local stack's https://portal.example.com:9443/. The portal is under
+// /portal, so / there goes to /portal, which signs a patient in, rather than to the clinic's home, which sends anyone
+// not signed in to the staff sign-in. Only when the portal has an address of its own (Ehr:Links; in Development, unless
+// set, both are the local address), only for a GET or HEAD of / itself, and before forwarding, so the cloud app answers
+// it. The Host header is its sender's to write, so all it decides is whether / answers with a redirect to that one
+// fixed local path.
+var portalHost = HostString.FromUriComponent(new Uri(siteAddresses.PortalBaseUrl!));
+if (portalHost != HostString.FromUriComponent(new Uri(siteAddresses.ClinicalBaseUrl!)))
+{
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path == "/" && context.Request.Host == portalHost
+            && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
+        {
+            context.Response.Redirect(AccountSchemes.PortalPath);
+            return;
+        }
+
+        await next(context);
+    });
+}
+
 // Before forwarding, so the cloud app counts each off-site client by its own address.
 app.UseRateLimiter();
 if (site == Site.Cloud)

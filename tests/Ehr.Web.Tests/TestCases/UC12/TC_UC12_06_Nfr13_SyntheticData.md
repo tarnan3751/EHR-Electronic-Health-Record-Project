@@ -13,7 +13,7 @@ access and reason, and the synthetic clinic) is `TC_UC12_06_Nfr13_SyntheticData.
 | Preconditions | The local stack is running (`infra/compose/README.md`), the synthetic clinic is seeded ("Synthetic data and the benchmark" in the root README), the example accounts exist (`dotnet run infra/compose/test-accounts.cs -- setup`), and the manual parts of TC-UC12-01 to TC-UC12-05 have been run. |
 | Inputs and system conditions | `psql` as the database superuser through `docker compose exec`, run from `infra/compose`, which sees every row whatever row-level security allows. |
 | Test data | The reasons from these test cases and from `test-accounts.cs` ("Setting up a test portal account on the local stack"). |
-| Expected result | Step 1 lists only patients whose MRN starts `SYN` and whose names carry a number (for example `Larkin807`), and step 2 finds every reason among the test texts. Steps 3 and 4 each return the count 0. |
+| Expected result | Step 1 lists only patients whose MRN starts `SYN`, and step 2 finds every reason among the test texts. Steps 3 and 4 each return the count 0. |
 | Creator | Luke Garcia |
 
 ## Steps
@@ -23,9 +23,9 @@ access and reason, and the synthetic clinic) is `TC_UC12_06_Nfr13_SyntheticData.
 2. Read every reason from step 1: each should be one of the test texts above, with no names, MRNs, dates or contact
    details of a real person.
 3. Emergency accesses to a patient who isn't synthetic:
-   `docker compose exec -u postgres onprem-db psql -d ehr -c "select count(*) from ehr.break_glass_accesses b join ehr.patients p on p.id = b.patient_id where p.mrn not like 'SYN%' or p.given_name !~ '[0-9]' or p.family_name !~ '[0-9]'"`
+   `docker compose exec -u postgres onprem-db psql -d ehr -c "select count(*) from ehr.break_glass_accesses b join ehr.patients p on p.id = b.patient_id where p.mrn not like 'SYN%'"`
 4. Patients who aren't synthetic at all:
-   `docker compose exec -u postgres onprem-db psql -d ehr -c "select count(*) from ehr.patients where mrn not like 'SYN%' or given_name !~ '[0-9]' or family_name !~ '[0-9]'"`
+   `docker compose exec -u postgres onprem-db psql -d ehr -c "select count(*) from ehr.patients where mrn not like 'SYN%'"`
 
 ## Results
 

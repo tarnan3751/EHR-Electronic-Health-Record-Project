@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Ehr.Seed;
 using Ehr.Testing;
 using Npgsql;
@@ -9,7 +10,7 @@ namespace Ehr.Security.Tests;
 // forced row-level security and the write-audit trigger on each table it fills, inside its one transaction: so it must
 // leave both as they were, fill only an empty clinic, and on any failure leave nothing behind. Each class here has a
 // database of its own, since a seed fills it.
-public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
+public partial class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
 {
     [Fact]
     public async Task A_seed_fills_an_empty_clinic_once_and_leaves_it_protected()
@@ -91,6 +92,23 @@ public class SeedTests(MigratedDatabase database) : IClassFixture<MigratedDataba
         Assert.All(children, sign => Assert.True(sign.Value.Flagged * 7 <= sign.Value.All, $"Too many seeded children flagged for {sign.Key}: {sign.Value}"));
         Assert.Equal(7, first.Patient.Id.Version);
     }
+
+    // The clinic's names are ordinary ones, with no number in them: each from the seed's lists, the given name one for the
+    // patient's gender, every family name long enough for the benchmark's four-letter search. Across a clinic of 50,000
+    // a full name repeats now and then, as in a real clinic, and never often.
+    [Fact]
+    public void The_clinics_names_are_plain_names_from_its_lists()
+    {
+        var patients = Enumerable.Range(0, 50_000).Select(i => SyntheticClinic.Chart(i).Patient).ToList();
+
+        Assert.DoesNotContain(patients, p => !PlainName().IsMatch(p.GivenName) || !PlainName().IsMatch(p.FamilyName));
+        Assert.DoesNotContain(patients, p => !SyntheticClinic.GivenNames(p.Gender).Contains(p.GivenName) || !SyntheticClinic.FamilyNames.Contains(p.FamilyName));
+        Assert.All(SyntheticClinic.FamilyNames, name => Assert.True(name.Length >= 4, name));
+        Assert.InRange(patients.CountBy(p => (p.GivenName, p.FamilyName)).Max(name => name.Value), 2, 10);
+    }
+
+    [GeneratedRegex("^[A-Z][a-z]+$")]
+    private static partial Regex PlainName();
 }
 
 public class SeedRollbackTests(MigratedDatabase database) : IClassFixture<MigratedDatabase>
