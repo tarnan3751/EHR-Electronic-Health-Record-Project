@@ -2,7 +2,7 @@
 @* Both versions side by side; nothing is merged silently (docs/brand). *@
 <li id="quick-text-@Model.Theirs.Id">
     <form class="sc-conflict" method="post" hx-post="@Url.Page("Index", "Save")" hx-target="closest li" hx-swap="outerHTML">
-        <p class="sc-notice sc-notice--warning" role="alert">Someone else saved this phrase while you were editing it. Choose which version to keep.</p>
+        <p class="sc-notice sc-notice--warning" role="alert"><span class="sc-notice__state">Not saved.</span> Someone else saved this phrase while you were editing it. Choose which version to keep.</p>
         <dl class="sc-versions">
             <div class="sc-version">
                 <dt class="sc-version__label">Theirs (saved)</dt>

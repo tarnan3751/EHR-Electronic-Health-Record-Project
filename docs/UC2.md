@@ -55,7 +55,7 @@ TC-UC2-05 runs only against a run of the render benchmark; `tests/Ehr.Web.Tests/
 | Note confirmation: Confirm and sign | The page stays, "Signature not confirmed" | "Not saved" page; only a checkbox was set | **New:** no signature offered |
 | Dictation | Recording carries on; the audio waits in the page and is sent again when the connection returns | Needs JavaScript; not offered | Not offered |
 | Order form (UC 1): Sign order | The form stays filled and says nothing was saved (`orders.js`) | "Not saved" page with the item, the details and the duplicate reason shown again | The chart doesn't offer "New order" |
-| Quick text: Add, Save, Keep mine | htmx leaves the form as typed and says "Not saved" | "Not saved" page with Shortcut and Body shown again | **New:** no add form or Edit buttons |
+| Quick text: Add phrase, Save phrase, Keep mine | htmx leaves the form as typed and says "Not saved" | "Not saved" page with Shortcut and Body shown again | **New:** no add form or Edit buttons |
 | Sign-in steps (password, code, enrollment, new password, setup) | "Not saved" page; nothing typed is shown back | Same | Still offered (sign-in unchanged) |
 | Sign-in with a passkey (step 19): its options, then the passkey | The page says the clinic's server couldn't be reached; the code is still on the page | Not offered without JavaScript | Still offered, and refused the same way (no sign-in is possible) |
 | Passkeys page (step 19): Add passkey, Remove | Adding says the clinic's server couldn't be reached; removing gets the "Not saved" page | Adding needs JavaScript; removing gets the "Not saved" page | **New:** no add form or Remove buttons, with a sentence why |

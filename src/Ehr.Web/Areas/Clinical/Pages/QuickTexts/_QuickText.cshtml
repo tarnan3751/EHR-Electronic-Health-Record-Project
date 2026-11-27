@@ -6,6 +6,6 @@
     @if (OnPrem.IsReachable)
     {
         <button type="button" class="sc-btn sc-btn--compact" hx-get="@Url.Page("Index", "Edit", new { id = Model.Id })"
-                hx-target="closest li" hx-swap="outerHTML">Edit</button>
+                hx-target="closest li" hx-swap="outerHTML" aria-label="Edit @Model.Shortcut">Edit</button>
     }
 </li>
