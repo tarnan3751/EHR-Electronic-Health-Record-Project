@@ -209,6 +209,28 @@ if (keyCertificatePath is not { Length: > 0 })
 // authenticated and authorized by the on-prem app; everything served here is authenticated below, and the signed-in
 // account reaches the database through UserContextMiddleware before any handler runs.
 app.UseRouting();
+// The portal's own address opened bare, such as the local stack's https://portal.example.com:9443/. The portal is under
+// /portal, so / there goes to /portal, which signs a patient in, rather than to the clinic's home, which sends anyone
+// not signed in to the staff sign-in. Only when the portal has an address of its own (Ehr:Links; in Development, unless
+// set, both are the local address), only for a GET or HEAD of / itself, and before forwarding, so the cloud app answers
+// it. The Host header is its sender's to write, so all it decides is whether / answers with a redirect to that one
+// fixed local path.
+var portalHost = HostString.FromUriComponent(new Uri(siteAddresses.PortalBaseUrl!));
+if (portalHost != HostString.FromUriComponent(new Uri(siteAddresses.ClinicalBaseUrl!)))
+{
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path == "/" && context.Request.Host == portalHost
+            && (HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)))
+        {
+            context.Response.Redirect(AccountSchemes.PortalPath);
+            return;
+        }
+
+        await next(context);
+    });
+}
+
 // Before forwarding, so the cloud app counts each off-site client by its own address.
 app.UseRateLimiter();
 if (site == Site.Cloud)

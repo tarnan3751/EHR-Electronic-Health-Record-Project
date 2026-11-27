@@ -69,7 +69,7 @@ In VS Code, the same three are under Terminal → Run Task: "Server stack: start
 |---|---|
 | https://ehr.example.com:8443 | On-site clinician: the LAN, straight to the on-prem app |
 | https://ehr-remote.example.com:9443 | Off-site clinician: the internet, to the cloud app |
-| https://portal.example.com:9443 | Patient portal: the internet, to the cloud app |
+| https://portal.example.com:9443 | Patient portal: the internet, to the cloud app. Its pages are under `/portal`, where this address goes |
 | `127.0.0.1:15432` / `15433` | Primary / replica, database `ehr`: log in as `ehr_app` (primary only) or `ehr_read`, with the passwords in `.env`, over TLS (the certificate also names `localhost` and `127.0.0.1`) |
 | http://127.0.0.1:8474 | Toxiproxy API, to change latency or cut links |
 | http://127.0.0.1:8025 | Mailpit: the emails the on-prem app sent, and the monitoring profile's alerts |

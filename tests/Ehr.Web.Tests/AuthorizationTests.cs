@@ -1,5 +1,7 @@
 using System.Net;
 using Ehr.Data.Accounts;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -28,6 +30,50 @@ public class AuthorizationTests(WebApps apps) : IClassFixture<WebApps>
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal(signIn, new Uri(Base, response.Headers.Location!).AbsolutePath);
+    }
+
+    // The portal's own address opened bare, as the local stack's https://portal.example.com:9443/ is: / there goes to the
+    // portal, signed in or not, which signs a patient in as it does at /portal. The staff sites' / is the clinic's home,
+    // as before, which sends anyone not signed in to the staff sign-in. (With both addresses the same, as in the other
+    // tests and in Development, / is the clinic's home everywhere: the first case above.)
+    [Fact]
+    public async Task The_portals_own_address_sends_its_root_to_the_portal()
+    {
+        var portal = new Uri("https://portal.example.test:9443");
+        using var cloud = apps.Cloud.WithWebHostBuilder(builder => builder.UseSetting("Ehr:Links:PortalBaseUrl", portal.ToString()));
+        HttpClient At(Uri site, CookieContainer jar, bool followRedirects = false) => followRedirects
+            ? cloud.CreateDefaultClient(site, new RedirectHandler(), new CookieContainerHandler(jar))
+            : cloud.CreateDefaultClient(site, new CookieContainerHandler(jar));
+
+        using (var root = await At(portal, new CookieContainer()).GetAsync("/", Cancel))
+        {
+            Assert.Equal(HttpStatusCode.Redirect, root.StatusCode);
+            Assert.Equal("/portal", root.Headers.Location!.OriginalString);
+        }
+
+        using (var followed = await At(portal, new CookieContainer(), followRedirects: true).GetAsync("/", Cancel))
+        {
+            Assert.Equal("/portal/sign-in", PathOf(followed));
+        }
+
+        foreach (var staff in new[] { Base, new Uri(WebApps.OffSiteOrigin) })
+        {
+            using var root = await At(staff, new CookieContainer()).GetAsync("/", Cancel);
+            Assert.Equal(HttpStatusCode.Redirect, root.StatusCode);
+            Assert.Equal("/sign-in", new Uri(staff, root.Headers.Location!).AbsolutePath);
+        }
+
+        // Signed in to the portal at its own address, / is the portal's home, where it was the staff sign-in.
+        var (email, password) = await apps.CreatePatientAccountAsync(await apps.InsertPatientAsync("Synthetic", "Rootpath"));
+        var client = At(portal, new CookieContainer(), followRedirects: true);
+        using (var signedIn = await PostFormAsync(client, "/portal/sign-in", "/portal/sign-in", ("Input.Email", email), ("Input.Password", password)))
+        {
+            Assert.Equal("/portal", PathOf(signedIn));
+        }
+
+        using var home = await client.GetAsync("/", Cancel);
+        Assert.Equal(HttpStatusCode.OK, home.StatusCode);
+        Assert.Equal("/portal", PathOf(home));
     }
 
     [Theory]
