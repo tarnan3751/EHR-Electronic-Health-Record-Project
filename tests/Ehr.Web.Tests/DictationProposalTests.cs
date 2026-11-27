@@ -605,7 +605,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         var editor = RefillRequestTests.Said(await cutOff.GetStringAsync($"/patients/{dictated.Patient}/notes/drafts/{dictated.Draft}", Cancel));
 
-        Assert.Contains("This draft can't be changed or signed while the clinic's server can't be reached.", editor);
+        Assert.Contains("This draft can't be changed or signed until the clinic's server is back.", editor);
         Assert.DoesNotContain("proposed from dictation", editor);
         var queued = apps.CloudCutOff.Services.GetRequiredService<CloudAuditQueue>().ReadPending(int.MaxValue).Events
             .Where(e => e.PatientId == dictated.Patient).Select(e => e.TableName).ToList();

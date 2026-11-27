@@ -26,7 +26,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 //   2. With the clinic's server unreachable, open the draft.
 // Expected result: Step 1: the editor lists the visit types with the telephone visit chosen, and offers the vital
 //   signs, whose text names the heart rate; the read reaches the clinic's audit log from the cloud, with the part
-//   "vitals". Step 2: "It is shown as last saved.", the four sections as saved, and no visit type, vital signs or
+//   "vitals". Step 2: "It's shown as last saved.", the four sections as saved, and no visit type, vital signs or
 //   editor.
 // Creator: Tahseen Arnan
 public class TC_UC14_31_FourSectionsOffSite(WebApps apps) : IClassFixture<WebApps>
@@ -67,7 +67,7 @@ public class TC_UC14_31_FourSectionsOffSite(WebApps apps) : IClassFixture<WebApp
             $"SELECT id::text FROM ehr.audit_events WHERE patient_id = @patient AND actor_id = '{clinician.Id}' AND source = 'cloud' AND table_name = 'patients' AND part = 'vitals'", patient));
 
         var cutOff = await Client(apps.CloudCutOff, session.Jar).GetStringAsync(path, Cancel);
-        Assert.Contains("It is shown as last saved.", cutOff);
+        Assert.Contains("It's shown as last saved.", cutOff);
         Assert.Matches("(?s)<h2>Subjective</h2><p class=\"sc-note__text\">Synthetic subjective: by phone\\.</p>\\s*<h2>Objective</h2>.*<h2>Assessment</h2>.*<h2>Plan</h2>", cutOff);
         Assert.DoesNotContain("data-note-template", cutOff);
         Assert.DoesNotContain("data-note-vitals", cutOff);

@@ -62,7 +62,8 @@ public class ClinicalNoteTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains(Synthetic.Objective, html);
         Assert.Contains(Synthetic.Assessment, html);
         Assert.Contains(Synthetic.Plan, html);
-        Assert.Contains("Saved", html);
+        // Reopening saves nothing, so the status says nothing until the clinician types (note-editor.js says the rest).
+        Assert.Contains("<p id=\"note-save-status\" class=\"sc-status\" role=\"status\" aria-live=\"polite\"></p>", html);
         var chart = await page.Session.Client.GetStringAsync($"/patients/{page.Patient}", Cancel);
         Assert.Contains(page.Path, chart);
         Assert.DoesNotContain("htmx.min.js", chart);

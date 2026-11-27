@@ -51,8 +51,8 @@ TC-UC2-05 runs only against a run of the render benchmark; `tests/Ehr.Web.Tests/
 | Chart: Issue an enrollment code | "Not saved" page; nothing was typed | Same | Not offered |
 | Chart: New note | "Not saved" page; nothing was typed | Same | Not offered |
 | Emergency access reason | The page uses a plain form either way: "Not saved" page with the reason shown again | Same | Not offered (says why) |
-| Note editor: Save draft, autosave, Sign note… | The text stays on screen with "could not confirm this save" | "Not saved" page with Subjective, Objective, Assessment and Plan shown again | **New:** the draft as last saved, no editor |
-| Note confirmation: Confirm and sign | The page stays, "Signature not confirmed" | "Not saved" page; only a checkbox was set | **New:** no signature offered |
+| Note editor: Save draft, autosave, Sign note… | The text stays on screen with "didn't confirm this save" | "Not saved" page with Subjective, Objective, Assessment and Plan shown again | **New:** the draft as last saved, no editor |
+| Note confirmation: Sign note | The page stays, "Signature not confirmed" | "Not saved" page; only a checkbox was set | **New:** no signature offered |
 | Dictation | Recording carries on; the audio waits in the page and is sent again when the connection returns | Needs JavaScript; not offered | Not offered |
 | Order form (UC 1): Sign order | The form stays filled and says nothing was saved (`orders.js`) | "Not saved" page with the item, the details and the duplicate reason shown again | The chart doesn't offer "New order" |
 | Quick text: Add phrase, Save phrase, Keep mine | htmx leaves the form as typed and says "Not saved" | "Not saved" page with Shortcut and Body shown again | **New:** no add form or Edit buttons |

@@ -258,7 +258,7 @@ public class TC_UC23_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         var draft = (await RowsAsync(apps, "SELECT draft_id::text FROM ehr.ai_note_reviews WHERE id = @id", l.Review)).Single();
         var url = $"/patients/{l.Patient}/notes/drafts/{draft}/review/{l.Review}";
         var editor = await l.Session.Client.GetStringAsync($"/patients/{l.Patient}/notes/drafts/{draft}", Cancel);
-        Assert.Contains("Resume saved AI review", editor);
+        Assert.Contains("Resume dictation review", editor);
         var html = await l.Session.Client.GetStringAsync(url, Cancel);
         Assert.Matches(@"A visit recorded at \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC hasn't been drafted yet\. If its voices were named a moment ago, wait a minute and choose Retrieve\. Otherwise discard it to dictate or listen again\.", WebUtility.HtmlDecode(html));
 

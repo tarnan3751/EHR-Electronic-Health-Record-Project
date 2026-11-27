@@ -31,7 +31,7 @@ else if (Model.Errors.Count == 0)
         @* Step 10: a sensitive note is left out of the chart until asked for; its signer can unmark it later, with a reason (step 10b). *@
         <label class="sc-check" for="note-sensitive"><input type="checkbox" id="note-sensitive" name="Sensitive" value="true" checked="@Model.Sensitive" aria-describedby="note-sensitive-hint"> Sensitive</label>
         <p class="sc-field__hint" id="note-sensitive-hint">Hidden from the chart unless someone chooses to show sensitive items. Views are logged, and it isn't kept offline. You can unmark it later, with a reason.</p>
-        <button class="sc-btn sc-btn--primary">Confirm and sign note</button>
+        <button class="sc-btn sc-btn--primary">Sign note</button>
         <p id="note-save-status" class="sc-status" role="status" aria-live="polite"></p>
     </form>
 }

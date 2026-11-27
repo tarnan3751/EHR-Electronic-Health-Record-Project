@@ -133,7 +133,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         // The draft, reopened off-site, is shown as last saved, without the editor.
         var draft = await offSite.GetStringAsync(path, Cancel);
-        Assert.Contains("This draft can't be changed or signed while the clinic's server can't be reached.", draft);
+        Assert.Contains("This draft can't be changed or signed until the clinic's server is back.", draft);
         Assert.DoesNotContain("<textarea", draft);
         Assert.DoesNotContain("note-editor.js", draft);
         Assert.Contains(patient.ToString(), draft);
@@ -211,7 +211,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
         var offSite = Client(apps.CloudCutOff, session.Jar);
         var confirm = await offSite.GetStringAsync($"{path}/confirm?version=2", Cancel);
         Assert.Contains("This note can't be signed while the clinic's server can't be reached.", confirm);
-        Assert.DoesNotContain("Confirm and sign note", confirm);
+        Assert.DoesNotContain("Sign note", confirm);
 
         // Signed on-site, read off-site.
         string noteUrl;

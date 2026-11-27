@@ -20,7 +20,7 @@ namespace Ehr.Web.Tests.TestCases.UC14;
 // Steps:
 //   1. From the chart, choose "New note".
 //   2. Type the four sections and save; open the draft again.
-//   3. Choose "Sign note…", tick the confirmation and choose "Confirm and sign note".
+//   3. Choose "Sign note…", tick the confirmation and choose "Sign note".
 // Expected result: Step 1: the editor has the four sections, labeled, in order, with the cursor in Subjective, and says
 //   to complete all four before signing. Step 2: each section comes back as typed; the draft's plain text (what the
 //   desktop app keeps) has the four headings, each before its text. Step 3: the note is signed as the clinician, holds
@@ -46,7 +46,7 @@ public class TC_UC14_26_FourSectionsSuccessfulFlow(WebApps apps) : IClassFixture
         var (path, token) = (PathOf(created), Token(editor));
         Assert.Matches("(?s)<label[^>]*for=\"Subjective\"[^>]*>Subjective</label>.*<label[^>]*for=\"Objective\"[^>]*>Objective</label>.*<label[^>]*for=\"Assessment\"[^>]*>Assessment</label>.*<label[^>]*for=\"Plan\"[^>]*>Plan</label>", editor);
         Assert.Matches("<textarea[^>]*autofocus[^>]*id=\"Subjective\"|<textarea[^>]*id=\"Subjective\"[^>]*autofocus", editor);
-        Assert.Contains("Complete all four sections before signing.", Words(editor));
+        Assert.Contains("Fill in all four sections to sign it.", Words(editor));
         Assert.DoesNotContain("data-note-origin", editor);
 
         async Task<JsonElement> PostAsync(string target, long version, params (string Name, object Value)[] extra)

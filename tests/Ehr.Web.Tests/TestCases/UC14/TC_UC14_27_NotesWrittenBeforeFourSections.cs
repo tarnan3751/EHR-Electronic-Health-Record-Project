@@ -84,11 +84,11 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
         var editor = await session.Client.GetStringAsync(path, Cancel);
         Assert.Matches($"<textarea[^>]*id=\"Subjective\"[^>]*>\\s*{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</textarea>", editor);
         Assert.Matches("<textarea[^>]*id=\"Objective\"[^>]*>\\s*</textarea>", editor);
-        Assert.Contains("Check: this draft was written before notes had four sections. Its History is now in Subjective: move today's vital signs, examination findings and the results you reviewed to Objective before signing.", Words(editor));
+        Assert.Contains("Check before signing. This draft was written before notes had four sections, so its History is in Subjective. Move today's vital signs, examination findings and reviewed results to Objective.", Words(editor));
         Assert.Equal(saved, await RowAsync());
 
         var offSite = await Client(apps.CloudCutOff, session.Jar).GetStringAsync(path, Cancel);
-        Assert.Contains("It is shown as last saved.", offSite);
+        Assert.Contains("It's shown as last saved.", offSite);
         Assert.Matches($"(?s)<h2>History</h2><p class=\"sc-note__text\">{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</p>", offSite);
         Assert.DoesNotContain("<textarea", offSite);
         Assert.Equal(saved, await RowAsync());
@@ -99,7 +99,7 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
             Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var page = await refused.Content.ReadAsStringAsync(Cancel);
             Assert.Contains("Choose a visit type from the list.", Words(page));
-            Assert.Contains("Check: this draft was written before notes had four sections.", Words(page));
+            Assert.Contains("Check before signing. This draft was written before notes had four sections,", Words(page));
             Assert.Matches($"<textarea[^>]*id=\"Subjective\"[^>]*>\\s*{System.Text.RegularExpressions.Regex.Escape(DraftHistory)}</textarea>", page);
         }
 
@@ -171,7 +171,7 @@ public class TC_UC14_27_NotesWrittenBeforeFourSections(WebApps apps) : IClassFix
             Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, refused.StatusCode);
             var page = Words(await refused.Content.ReadAsStringAsync(Cancel));
             Assert.Contains(AtLimit, page);
-            Assert.Contains("Check: this draft was written before notes had four sections.", page);
+            Assert.Contains("Check before signing. This draft was written before notes had four sections,", page);
         }
 
         using (var saved = await PostFormAsync(session.Client, path + "?handler=Save", path, Fields(assessment[5..])))

@@ -39,7 +39,7 @@ public class TC_UC14_29_VisitTypePrompts(WebApps apps) : IClassFixture<WebApps>
         using var created = await PostFormAsync(session.Client, $"/patients/{patient}?handler=NewNote", $"/patients/{patient}");
         var editor = await ReadAsync(created);
         var (path, token) = (PathOf(created), Token(editor));
-        Assert.Equal(["None", "Follow-up visit", "New patient visit", "Acute visit", "Well-child visit", "Telephone visit"],
+        Assert.Equal(["No visit type", "Follow-up visit", "New patient visit", "Acute visit", "Well-child visit", "Telephone visit"],
             Regex.Matches(editor, "<option[^>]*>([^<]*)</option>").Select(match => match.Groups[1].Value));
         // None is the list's first option, and no other is chosen.
         Assert.DoesNotContain("selected=\"selected\"", editor);

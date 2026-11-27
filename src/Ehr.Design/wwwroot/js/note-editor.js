@@ -66,7 +66,7 @@
         const data = new FormData(form);
         const target = new URL(form.action);
         if (review) target.searchParams.set('handler', 'Review');
-        setStatus('Saving');
+        setStatus('Saving…');
         const operation = (async () => {
             try {
                 const { response, result } = await request(target, data);
@@ -76,8 +76,8 @@
                 }
                 if (!response.ok) {
                     conflict = response.status === 409 || response.status === 404;
-                    showErrors(result.errors || ['The request could not be completed.']);
-                    setStatus(result.version ? 'Saved' : 'Save failed');
+                    showErrors(result.errors || ['Not saved. Try again.']);
+                    setStatus(result.version ? 'Saved' : 'Not saved');
                     return;
                 }
                 showErrors([]);
@@ -85,10 +85,10 @@
                     window.location.assign(result.url);
                     return;
                 }
-                setStatus(revision === savedRevision ? 'Saved' : 'Unsaved');
+                setStatus(revision === savedRevision ? 'Saved' : 'Unsaved changes');
             } catch {
-                setStatus('Save failed');
-                showErrors(['The clinic server could not confirm this save. Your text is still here. Retry Save draft when connected; if it conflicts, compare with the saved draft in another tab.']);
+                setStatus('Not saved');
+                showErrors(['The clinic\'s server didn\'t confirm this save. Your text is still here. Select Save draft to try again.']);
             }
         })();
         pending = operation;
@@ -101,7 +101,7 @@
     if (editor) {
         fields.forEach(field => field.addEventListener('input', () => {
             revision++;
-            setStatus('Unsaved');
+            setStatus('Unsaved changes');
             schedule();
         }));
         // The visit type (step 14) is saved with the draft, and its prompts, kept on its option, shown under the sections.
@@ -114,7 +114,7 @@
                 prompt.hidden = text === '';
             });
             revision++;
-            setStatus('Unsaved');
+            setStatus('Unsaved changes');
             schedule();
         });
         // The latest day's vital signs for Objective (step 14): fetched only when asked, shown as text, and added to the
@@ -129,7 +129,7 @@
             const add = offer.querySelector('[data-note-vitals-add]');
             vitals.hidden = false;
             vitals.addEventListener('click', async () => {
-                vitalsStatus.textContent = 'Loading vital signs';
+                vitalsStatus.textContent = 'Loading vital signs…';
                 try {
                     const url = new URL(window.location.href);
                     url.search = '?handler=Vitals';
@@ -138,14 +138,14 @@
                     const result = await response.json();
                     text.textContent = result.text || '';
                     add.hidden = !result.text;
-                    day.textContent = !result.text ? 'None recorded: this patient has no vital signs to add.'
-                        : result.today ? '' : `Not today: these were taken on ${result.day}.`;
+                    day.textContent = !result.text ? 'No vital signs to add.'
+                        : result.today ? '' : `Not today. These were taken on ${result.day}.`;
                     day.hidden = day.textContent === '';
                     offer.hidden = false;
                     vitalsStatus.textContent = '';
                     (result.text ? add : vitals).focus();
                 } catch {
-                    vitalsStatus.textContent = 'The vital signs could not be loaded. Try again.';
+                    vitalsStatus.textContent = 'The vital signs couldn\'t be loaded. Try again.';
                 }
             });
             add.addEventListener('click', () => {
@@ -169,7 +169,7 @@
         form.addEventListener('keydown', event => {
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
                 event.preventDefault();
-                // The Save draft button by name: the form has buttons that don't submit it ("Vital signs for Objective…").
+                // The Save draft button by name: the form has buttons that don't submit it ("Add vital signs to Objective…").
                 form.requestSubmit(form.querySelector('[data-note-save]'));
             }
         });
@@ -185,7 +185,7 @@
             if (pending) return;
             const data = new FormData(form);
             buttons(true);
-            setStatus('Signing');
+            setStatus('Signing…');
             pending = (async () => {
                 try {
                     const { response, result } = await request(form.action, data);
@@ -193,10 +193,10 @@
                         window.location.assign(result.url);
                         return;
                     }
-                    showErrors(result.errors || ['The note could not be signed. Return to the editor and check the saved draft.']);
+                    showErrors(result.errors || ['Not signed. Go back to the draft and check it.']);
                     setStatus('Not signed');
                 } catch {
-                    showErrors(['The clinic server could not confirm the signature. This note is still displayed. Retry when connected or check the chart to see whether signing completed.']);
+                    showErrors(['The clinic\'s server didn\'t confirm the signature. Try again, or check the chart to see if the note was signed.']);
                     setStatus('Signature not confirmed');
                 }
             })();
