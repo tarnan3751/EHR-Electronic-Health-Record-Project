@@ -690,6 +690,8 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
         using var codePage = await PostFormAsync(client, "/sign-in", "/sign-in", ("Input.Email", account.Email), ("Input.Password", account.Password));
         Assert.Equal("/sign-in/code", PathOf(codePage));
+        // Wrong codes and wrong passwords count together toward the lockout, so the hint says attempts.
+        Assert.Contains("Five wrong attempts lock the account for 15 minutes.", await ReadAsync(codePage));
 
         using var home = await Client(apps.OnPrem, jar, followRedirects: false).GetAsync("/", Cancel);
         Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
