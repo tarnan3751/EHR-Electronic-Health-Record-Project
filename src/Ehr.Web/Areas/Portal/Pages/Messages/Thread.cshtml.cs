@@ -27,9 +27,6 @@ public class ThreadModel(PortalSubject subject, PhiReader phi, SecureMessages me
 
     public string? Error { get; private set; }
 
-    // Whether these are someone else's messages, read as a proxy (FR-19): the page then doesn't call them "yours".
-    public bool Acting => subject.Acting is not null;
-
     Guid PatientId => subject.PatientId;
 
     public async Task<IActionResult> OnGetAsync(Guid threadId)

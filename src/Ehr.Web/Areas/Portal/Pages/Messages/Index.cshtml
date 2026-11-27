@@ -20,12 +20,12 @@
 </div>
 @if (!OnPrem.IsReachable)
 {
-    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Messages can't be sent until the clinic's server is back. You can still read them.</p>
+    <p class="sc-notice sc-notice--warning"><span class="sc-notice__state">Read-only.</span> Messages can't be sent until the clinic's server is back.</p>
 }
-<p class="sc-muted">For an emergency, call your local emergency number. Messages are read during clinic hours.</p>
+<p class="sc-muted">For an emergency, call your local emergency number.</p>
 @if (Model.Threads is not { } threads)
 {
-    <p class="sc-notice sc-notice--danger">@(Model.Acting ? "The messages are" : "Your messages are") not available right now. Contact the clinic if this continues.</p>
+    <p class="sc-notice sc-notice--danger">@(Model.Acting ? "The messages are" : "Your messages are") not available right now.</p>
 }
 else if (threads.Threads.Count == 0)
 {
@@ -51,6 +51,6 @@ else
     </ul>
     @if (threads.Threads.Count == Ehr.Web.Areas.Portal.Pages.Messages.IndexModel.Limit)
     {
-        <p class="sc-muted">These are the @Ehr.Web.Areas.Portal.Pages.Messages.IndexModel.Limit latest conversations. For an older one, contact the clinic.</p>
+        <p class="sc-muted">Only the @Ehr.Web.Areas.Portal.Pages.Messages.IndexModel.Limit latest conversations are shown.</p>
     }
 }
