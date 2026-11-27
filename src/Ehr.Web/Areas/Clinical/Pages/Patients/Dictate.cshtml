@@ -24,7 +24,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(Model.Patient, Model.Allergies)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="Chart" asp-all-route-data="chartRoute">Back to chart</a></p>
+    <p><a asp-page="Chart" asp-all-route-data="chartRoute" class="sc-back">Back to chart</a></p>
 </div>
 <h1>Dictate a note: @Model.Patient.FamilyName, @Model.Patient.GivenName</h1>
 
@@ -47,6 +47,10 @@ else
         <p class="sc-notice sc-notice--info">Dictate in English or Spanish, with a microphone. Nothing goes into the note until you review it. The proposals and the transcript they came from are kept with your review. Orders and allergy changes are never filled in from dictation.</p>
         <noscript><p class="sc-notice sc-notice--danger">Dictation needs JavaScript. You can still type the note.</p></noscript>
 
+        @* The controls and the transcript beside the proposed fields, each in its frame. *@
+        <div class="sc-review">
+        <div>
+        <div class="sc-formcard sc-formcard--wide">
         @* The language of this dictation (the expansion plan's step 17): chosen for each, English first, and never
            remembered, by this page or the browser. js/dictation.js shows the hint when Spanish is chosen, and disables
            the choice while a dictation is under way. Spanish is labelled experimental (the owner's ruling of
@@ -77,6 +81,7 @@ else
             <a data-dictation-manual hidden>Open the draft</a>
             <form method="post" asp-page="Chart" asp-page-handler="NewNote" asp-route-id="@Model.Patient.Id" data-dictation-new-manual><button class="sc-btn">New note</button></form>
         </div>
+        </div>
 
         @* Not a live region: the script rebuilds the transcript every second, and a screen reader would read all of it again
            each time. The status line above announces what changes. *@
@@ -88,7 +93,9 @@ else
             <div class="sc-transcript__body" data-dictation-transcript><p class="sc-transcript__placeholder">Your words appear here as you speak.</p></div>
             <p class="sc-transcript__note" data-dictation-unclear hidden>Highlighted passages may be wrong. They were too quiet or noisy, not heard as Spanish in a Spanish dictation, or the speech model wasn't sure. Say them again, or correct them during review.</p>
         </section>
+        </div>
 
+        <div class="sc-sheet">
         <h2>Proposed fields</h2>
         <p class="sc-status" data-dictation-sort-message>The fields are proposed once you stop.</p>
         <dl class="sc-proposals">
@@ -106,5 +113,7 @@ else
             <p>Dictation never places orders or changes the allergy list. Those marked proposed wait in the review, to open in their form. Place the others yourself.</p>
             <ul data-dictation-not-carried-list></ul>
         </section>
+        </div>
+        </div>
     </section>
 }

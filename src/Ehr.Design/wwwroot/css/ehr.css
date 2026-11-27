@@ -3294,6 +3294,31 @@
         margin-bottom: 0;
     }
 
+    /* A field standing in a card that isn't a form itself (the language of a dictation): at the form's width, the
+       buttons a step under it. */
+    .sc-formcard:not(form) > .sc-field {
+        max-width: var(--width-form);
+    }
+
+    .sc-formcard:not(form) > .sc-field + .sc-actions {
+        margin-top: var(--space-3);
+    }
+
+    /* Dictating: the proposed fields in their panel, their rows from edge to edge. */
+    .sc-sheet > .sc-proposals {
+        max-width: none;
+        margin: 0 calc(-1 * var(--space-6));
+    }
+
+    .sc-sheet > .sc-proposals > .sc-proposal {
+        max-width: none;
+        padding-inline: var(--space-6);
+    }
+
+    .sc-sheet > .sc-proposals > .sc-proposal:last-child {
+        border-bottom: 0;
+    }
+
     /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
        comment; anything two areas share belongs in the components layer.
        ---- */
