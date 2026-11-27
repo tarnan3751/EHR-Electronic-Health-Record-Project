@@ -1,5 +1,6 @@
 @page "/patients/{patientId:guid}/orders/{orderId:guid}/results"
 @using Ehr.Data.Orders
+@using Ehr.Domain.Results
 @model Ehr.Web.Areas.Clinical.Pages.Patients.Orders.ResultsModel
 @inject Ehr.Web.Forwarding.OnPremStatus OnPrem
 @{
@@ -56,15 +57,15 @@ else
                 @foreach (var test in filed)
                 {
                     <tr class="@(test.Flag is null ? null : "sc-table__flagged")" data-result="@(test.Flag is null ? "normal" : "abnormal")">
-                        <th scope="row">@test.Display</th>
-                        <td class="sc-table__mono">@test.Value!.Value.ToString("0.####") @test.Unit</td>
+                        <th scope="row" title="@TestNames.Full(test.Code, test.Display)">@TestNames.Short(test.Code, test.Display)</th>
+                        <td class="sc-table__mono">@test.Value!.Value.ToString("0.####") @Units.Shown(test.Unit)</td>
                         <td>
                             @if (test.Flag is { } flag)
                             {
                                 <span class="sc-tag sc-tag--warning">@flag</span>
                             }
                         </td>
-                        <td class="sc-table__mono">@test.Range @(test.Range.Length > 0 ? test.Unit : null)</td>
+                        <td class="sc-table__mono">@test.Range @(test.Range.Length > 0 ? Units.Shown(test.Unit) : null)</td>
                         <td class="sc-table__mono">@Clinic.Format(test.CollectedAt!.Value)</td>
                     </tr>
                 }
@@ -140,7 +141,7 @@ else
                 var id = $"result-{test.Code}";
                 var error = Model.Errors.GetValueOrDefault(test.Code);
                 <div class="sc-field">
-                    <label for="@id">@test.Display <span>(@(string.IsNullOrEmpty(test.Unit) ? "no unit" : test.Unit)@(test.Range.Length > 0 ? $"; reference {test.Range}" : null))</span></label>
+                    <label for="@id" title="@TestNames.Full(test.Code, test.Display)">@TestNames.Short(test.Code, test.Display) <span>(@(string.IsNullOrEmpty(test.Unit) ? "no unit" : Units.Shown(test.Unit))@(test.Range.Length > 0 ? $"; reference {test.Range}" : null))</span></label>
                     <input id="@id" class="sc-field__input" name="Values[@test.Code]" value="@Model.Values.GetValueOrDefault(test.Code)" inputmode="decimal" autocomplete="off" autofocus="@(first && filed.Count == 0 && !answered)"
                            aria-invalid="@(error is null ? null : "true")" aria-describedby="@(error is null ? null : id + "-error")">
                     @if (error is not null)

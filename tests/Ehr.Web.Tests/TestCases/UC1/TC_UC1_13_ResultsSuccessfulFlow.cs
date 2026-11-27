@@ -43,7 +43,7 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("No results yet.", chart);
         var empty = await session.Client.GetStringAsync(Path(patient, order), Cancel);
         Assert.Contains("No results yet.", empty);
-        Assert.Contains("Hemoglobin [Mass/volume] in Blood <span>(g/dL; reference 12 to 17.5)</span>", empty);
+        Assert.Contains("title=\"Hemoglobin [Mass/volume] in Blood\">Hemoglobin <span>(g/dL; reference 12 to 17.5)</span>", empty);
 
         using var filed = await FileAsync(apps, session.Client, patient, order, (Platelets, "250"), (Hemoglobin, "9.1"));
         var page = await ReadAsync(filed);
@@ -51,7 +51,7 @@ public class TC_UC1_13_ResultsSuccessfulFlow(WebApps apps) : IClassFixture<WebAp
         Assert.Contains("Abnormal. 1 of 2 results is outside the reference range, listed first.", Words(page));
         Assert.True(page.IndexOf("Hemoglobin [Mass/volume]", StringComparison.Ordinal) < page.IndexOf("Platelets [#/volume]", StringComparison.Ordinal));
         Assert.Matches("(?s)data-result=\"abnormal\".*?9.1 g/dL.*?<span class=\"sc-tag sc-tag--warning\">Low</span>.*?12 to 17.5 g/dL", page);
-        Assert.Matches("(?s)data-result=\"normal\".*?250 10\\*3/uL", page);
+        Assert.Matches("(?s)data-result=\"normal\".*?250 10&#xB3;/&#xB5;L", page);
         Assert.Equal([$"{Hemoglobin} 9.1 low", $"{Platelets} 250 normal"], await FiledAsync(apps, patient));
         Assert.Equal("completed", await StatusAsync(apps, patient));
 

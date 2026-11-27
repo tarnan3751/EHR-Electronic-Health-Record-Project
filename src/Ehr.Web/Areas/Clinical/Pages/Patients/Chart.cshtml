@@ -385,7 +385,7 @@ else if (Model.Chart.SensitiveHidden > 0 || Model.Chart.SensitiveNotesHidden > 0
                 @foreach (var resulted in Model.Chart.Resulted)
                 {
                     <li data-resulted="@(resulted.Acknowledged ? "acknowledged" : "to-acknowledge")">
-                        <a asp-page="Orders/Results" asp-route-patientId="@Model.Patient.Id" asp-route-orderId="@resulted.Id">@resulted.Display</a>
+                        <a asp-page="Orders/Results" asp-route-patientId="@Model.Patient.Id" asp-route-orderId="@resulted.Id" title="@Ehr.Domain.Results.TestNames.Full(null, resulted.Display)">@Ehr.Domain.Results.TestNames.Short(null, resulted.Display)</a>
                         @if (resulted.Abnormal > 0)
                         {
                             <span class="sc-tag sc-tag--warning">Abnormal</span>

@@ -80,7 +80,7 @@ public class TC_UC1_14_ResultsAlternativeAndInvalid(WebApps apps) : IClassFixtur
         Assert.Equal(HttpStatusCode.Conflict, unseen.StatusCode);
         var shownAgain = await unseen.Content.ReadAsStringAsync(Cancel);
         Assert.Contains("Not saved.", shownAgain);
-        Assert.Contains("90 10*3/uL", shownAgain);
+        Assert.Contains("90 10&#xB3;/&#xB5;L", shownAgain);
         Assert.Empty(await MessageTests.RowsAsync(apps, patient, "id::text", "result_acknowledgments", "id"));
         Assert.Equal([$"{Hemoglobin} 14.2 normal", $"{Platelets} 90 low"], await FiledAsync(apps, patient));
         Assert.Equal([clinician.Id.ToString()], await MessageTests.RowsAsync(apps, patient, "recipient_id::text", "inbox_items", "created_at", "done_at IS NULL"));

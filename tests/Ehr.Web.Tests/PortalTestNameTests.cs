@@ -10,7 +10,8 @@ namespace Ehr.Web.Tests;
 // Short names and readable units for patients (Tahseen's decision of 26 November 2026, ForPatients): the portal names
 // a test by its long name's part before the first " [", and a vital sign as the clinic's form labels it, with UCUM's
 // print form for the few units that read badly (Units.ForPatients), in a result's value, range and meaning too.
-// Clinicians and the FHIR file read the record's names and units as they are.
+// Clinicians' results pages name and write them the same way (Tahseen's decision of 27 November 2026, TestNames and
+// Units), with the long name in the name's title; the FHIR file reads the record's names and units as they are.
 public class PortalTestNameTests(WebApps apps) : IClassFixture<WebApps>
 {
     const string Leukocytes = "6690-2";
@@ -27,8 +28,12 @@ public class PortalTestNameTests(WebApps apps) : IClassFixture<WebApps>
     [InlineData("59408-5", "Oxygen saturation in Arterial blood by Pulse oximetry", "Oxygen saturation")]
     [InlineData("8310-5", "Body temperature", "Temperature")]
     [InlineData("39156-5", "Body mass index (BMI) [Ratio]", "Body mass index")]
-    public void A_test_is_named_by_its_name_before_the_first_bracket_and_a_vital_sign_as_the_form_labels_it(string? code, string display, string name) =>
+    public void A_test_is_named_by_its_name_before_the_first_bracket_and_a_vital_sign_as_the_form_labels_it(string? code, string display, string name)
+    {
         Assert.Equal(name, ForPatients.Name(code, display));
+        Assert.Equal(name, TestNames.Short(code, display));
+        Assert.Equal(name == display ? null : display, TestNames.Full(code, display));
+    }
 
     [Theory]
     [InlineData("10*3/uL", "10³/µL")]
@@ -42,6 +47,7 @@ public class PortalTestNameTests(WebApps apps) : IClassFixture<WebApps>
     {
         Assert.Equal(shown, ForPatients.Unit(ucum));
         Assert.Equal(shown, Units.ForPatients(ucum));
+        Assert.Equal(shown, Units.Shown(ucum));
     }
 
     [Fact]
@@ -122,11 +128,13 @@ public class PortalTestNameTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains("Oxygen saturation", print);
         Assert.DoesNotContain("Arterial blood", print);
 
-        // The clinician's results page and the patient's file keep the record's own names and units. The clinic's vital
-        // signs page names a sign as its form does, in its trends as in its rows.
-        var clinical = Words(await session.Client.GetStringAsync(ResultTests.Path(patient, orders[1]), Cancel));
-        Assert.Contains(LeukocytesName, clinical);
-        Assert.Contains("10*3/uL", clinical);
+        // The clinician's results page names the test and writes its unit as the portal does, with the long name in the
+        // name's title; the patient's file keeps the record's own names and units. The clinic's vital signs page names a
+        // sign as its form does, in its trends as in its rows.
+        var clinical = WebUtility.HtmlDecode(await session.Client.GetStringAsync(ResultTests.Path(patient, orders[1]), Cancel));
+        Assert.Contains($"<th scope=\"row\" title=\"{LeukocytesName}\">Leukocytes</th>", clinical);
+        Assert.Contains("7.2 10³/µL", clinical);
+        Assert.DoesNotContain("10*3/uL", clinical);
         var vitals = Words(await session.Client.GetStringAsync(VitalTests.Path(patient), Cancel));
         Assert.Contains("Oxygen saturation (%)", vitals);
         Assert.Contains("Oxygen saturation, 2 values from", vitals);
