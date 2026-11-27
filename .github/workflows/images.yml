@@ -1,0 +1,192 @@
+# The four images the server stack builds and runs (infra/compose/compose.yaml), for linux/amd64 and linux/arm64, and
+# when asked pushed to ghcr.io: ehr-web, ehr-dictation, ehr-migrate and ehr-lab, each under every tag given. Called by
+# ci.yml on main (the commit and `edge`) and by release.yml (the version and `latest`, or nothing pushed in a dry run).
+# Barman's image (infra/barman) is the stack's own and isn't published. See "Continuous integration" in README.md.
+name: Images
+
+on:
+  workflow_call:
+    inputs:
+      tags:
+        description: The tags every image gets, separated by spaces (such as "1.0.0 latest")
+        type: string
+        required: true
+      version:
+        description: The images' org.opencontainers.image.version label
+        type: string
+        required: true
+      push:
+        description: Push the images to ghcr.io; without it they are built and thrown away
+        type: boolean
+        default: false
+
+# packages: write is used only when pushing; GitHub checks a called workflow's permissions before it runs.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # The .NET images. Each Dockerfile's build stage runs on the runner's own architecture and compiles for the target
+  # one, so one runner builds both without emulating the .NET SDK.
+  dotnet:
+    name: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ehr-web
+            file: src/Ehr.Web/Dockerfile
+            description: "SwiftChart's web app: the clinic's on-prem site, the cloud site and the patient portal. Synthetic data only."
+          - image: ehr-migrate
+            file: infra/migrate/Dockerfile
+            description: "SwiftChart's migration job: brings the primary database's schema and policies up to date, then exits."
+          - image: ehr-lab
+            file: src/Ehr.Lab.Simulator/Dockerfile
+            description: "SwiftChart's simulated lab, for the local demonstration stack."
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - if: inputs.push
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Name the tags
+        id: tags
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          TAGS: ${{ inputs.tags }}
+        run: |
+          {
+            echo "list<<EOF"
+            for tag in $TAGS; do echo "$IMAGE:$tag"; done
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ inputs.push }}
+          tags: ${{ steps.tags.outputs.list }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ inputs.version }}
+          # GitHub shows a multi-platform image's description from its index.
+          annotations: ${{ inputs.push && format('index:org.opencontainers.image.description={0}', matrix.description) || '' }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  # The dictation sidecar installs its packages in the image's last stage, so each architecture is built on a runner of
+  # its own, as ci.yml's dictation-image job does; pushed by digest, the two are joined under the tags below.
+  dictation:
+    name: ehr-dictation (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/ehr-dictation
+      DESCRIPTION: "SwiftChart's dictation sidecar: transcribes and drafts notes on the clinic's own server. No model is in the image."
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - if: inputs.push
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: src/Ehr.Dictation
+          file: src/Ehr.Dictation/sidecar/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=${{ inputs.push }}
+          labels: |
+            org.opencontainers.image.title=ehr-dictation
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ inputs.version }}
+          cache-from: type=gha,scope=ehr-dictation-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=ehr-dictation-${{ matrix.arch }}
+
+      - name: Keep the digest
+        if: inputs.push
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - if: inputs.push
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ehr-dictation-digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  dictation-tags:
+    name: ehr-dictation
+    needs: dictation
+    if: inputs.push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/ehr-dictation
+      DESCRIPTION: "SwiftChart's dictation sidecar: transcribes and drafts notes on the clinic's own server. No model is in the image."
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ehr-dictation-digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag both architectures as one image
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          TAGS: ${{ inputs.tags }}
+        run: |
+          sources=()
+          for digest in *; do sources+=("$IMAGE@sha256:$digest"); done
+          [ "${#sources[@]}" = 2 ] || { echo "Expected 2 digests, found ${#sources[@]}"; exit 1; }
+          read -ra names <<< "$TAGS"
+          options=()
+          for name in "${names[@]}"; do options+=(--tag "$IMAGE:$name"); done
+          docker buildx imagetools create "${options[@]}" \
+            --annotation "index:org.opencontainers.image.description=$DESCRIPTION" "${sources[@]}"
+          for name in "${names[@]}"; do docker buildx imagetools inspect "$IMAGE:$name"; done

@@ -51,9 +51,9 @@ Install Tailscale on both servers and on the staff devices the clinic manages, a
 
 | Image | Where it comes from |
 |---|---|
-| `ghcr.io/tarnan3751/ehr-web:<commit>` | Published by CI for each commit on `main`, for `linux/amd64` and `linux/arm64` (`docs/development.md`, "Published images"). Both apps run it |
+| `ghcr.io/tarnan3751/ehr-web:<commit>`, `ehr-migrate:<commit>`, `ehr-dictation:<commit>` | Published by CI for each commit on `main`, for `linux/amd64` and `linux/arm64` (`docs/development.md`, "Published images"), and as the version for each release. Both apps run `ehr-web` |
 | `postgres:18`, `prom/*`, `quay.io/prometheuscommunity/postgres-exporter`, `ghcr.io/ggml-org/llama.cpp` | Their public registries, at the versions `infra/compose/compose.yaml` pins |
-| `ehr-migrate`, `ehr-barman`, `ehr-dictation` | **Not published yet.** CI builds them but pushes only `ehr-web`. Publishing them the same way is work before the first deployment (below); images are built in CI, never on a laptop or a server (AGENTS.md) |
+| `ehr-barman` | **Not published yet.** CI builds it in the stack job but pushes it nowhere. Publishing it the same way is work before the first deployment (below); images are built in CI, never on a laptop or a server (AGENTS.md) |
 
 ## Secrets
 
@@ -148,6 +148,6 @@ The owner's, when he chooses to host (accounts and money):
 Work still to do, before a first deployment can follow this guide:
 
 - **Compose files for each server**, from the services and settings above, with the clinic's `pg_hba.conf` naming the cloud server's address. They need two things made settings first: the primary's address that `infra/compose/postgres/replica/bootstrap-standby.sh` clones from and `infra/barman/onprem.conf` connects to, both hard-coded to the stack's `wan` today.
-- **Publishing `ehr-migrate`, `ehr-barman` and `ehr-dictation` from CI**, for both architectures, as `ehr-web` is. CI's publish job runs only on `main`, and `ehr-barman`'s build needs an arm64 runner or emulation.
+- **Publishing `ehr-barman` from CI**, for both architectures, as the other images are (`.github/workflows/images.yml`). Its build needs an arm64 runner or emulation.
 - **A Data Protection certificate** made for that alone, valid for years, held by both apps and kept with the backups' keys (the warning under "Certificates").
 - **The clinic's own certificate authority** for the databases, and the database certificates it signs.
