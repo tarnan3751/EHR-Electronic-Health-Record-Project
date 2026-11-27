@@ -132,7 +132,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.WaitForFunctionAsync("typeof window.__heldUpload === 'function'");
         await TabToAsync(page, "[data-dictation-cancel]");
         await page.Keyboard.PressAsync("Enter");
-        const string Discarded = "Temporary dictation discarded. The manual draft was kept; no AI text was approved.";
+        const string Discarded = "Dictation discarded. The draft is kept, with nothing from the dictation in it.";
         await page.WaitForFunctionAsync("words => document.querySelector('[data-dictation-status]').textContent === words", Discarded);
         Assert.Contains(await AmbientBrowserTests.EventsAsync(page), e => e.StartsWith("DELETE ", StringComparison.Ordinal) && e.EndsWith(" 204", StringComparison.Ordinal));
 
@@ -328,7 +328,7 @@ public class AiReviewBrowserTests(WebApps apps) : IClassFixture<WebApps>
         await page.Keyboard.PressAsync("Alt+Shift+D");
         await page.WaitForFunctionAsync("document.querySelector('[data-dictation-transcript]').textContent.includes('Fluids and rest.')");
         await page.Keyboard.PressAsync("Alt+Shift+D");
-        await page.WaitForFunctionAsync("document.querySelector('[data-dictation-status]').textContent.includes('could not confirm')");
+        await page.WaitForFunctionAsync("document.querySelector('[data-dictation-status]').textContent.includes('confirm the save')");
         Assert.EndsWith("/dictate", page.Url);
         Assert.Contains("Cough for three days.", await page.Locator("[data-dictation-transcript]").TextContentAsync());
         Assert.False(await page.Locator("[data-dictation-manual]").IsHiddenAsync());

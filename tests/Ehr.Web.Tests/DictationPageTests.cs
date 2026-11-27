@@ -41,9 +41,9 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         Assert.Contains($"data-dictation-api=\"{DictationApi.Path}\"", html);
         // The script, under its fingerprinted name (dictation.<hash>.js).
         Assert.Contains("/_content/Ehr.Design/js/dictation.", html);
-        Assert.Contains("Dictation supports English and Spanish", html);
-        Assert.Contains("Nothing is saved", html);
-        Assert.Contains("orders and allergy changes are never filled in from dictation", html);
+        Assert.Contains("Dictate in English or Spanish, with a microphone.", html);
+        Assert.Contains("Nothing goes into the note until you review it.", html);
+        Assert.Contains("Orders and allergy changes are never filled in from dictation.", html);
         foreach (var field in new[] { "subjective", "objective", "assessment", "plan" })
         {
             Assert.Contains($"data-dictation-field=\"{field}\"", html);
@@ -207,7 +207,7 @@ public class DictationPageTests(WebApps apps) : IClassFixture<WebApps>
         var html = await Client(apps.CloudCutOff, session.Jar).GetStringAsync(DictatePath(patient), Cancel);
 
         Assert.Contains("Dictate a note: Offsite, Pat", html);
-        Assert.Contains("Dictation needs the clinic's server, which can't be reached right now.", html);
+        Assert.Contains("Dictation needs the clinic's server, which can't be reached.", html);
         Assert.DoesNotContain("data-dictation-start", html);
         Assert.DoesNotContain("/js/dictation.", html);
     }

@@ -14,7 +14,7 @@ namespace Ehr.Web.Tests;
 [Collection(BrowserTests.Collection)]
 public class DictationSpanishBrowserTests(WebApps apps) : IClassFixture<WebApps>
 {
-    const string Hint = "Experimental Spanish: speak Spanish. The transcript stays in Spanish and the proposed note is in English for you to check. "
+    const string Hint = "Experimental Speak Spanish. The transcript stays in Spanish, and the proposed note is in English for you to check. "
         + "You don't need to say punctuation. Up to 2 minutes in Spanish.";
 
     // A stand-in microphone that runs a dictation to its limit in a moment: AiReviewBrowserTests' with no end to its
