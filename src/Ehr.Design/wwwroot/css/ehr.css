@@ -2674,4 +2674,17 @@
             padding: var(--space-4);
         }
     }
+
+    /* Chart pages and clinic forms: the pages opened from a chart (lists, orders, vital signs, notes, dictation,
+       appointments, sharing, forms), quick text and passkeys. Rules for those pages only go under this comment;
+       anything two areas share belongs in the components layer.
+       ---- */
+
+    /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
+       comment; anything two areas share belongs in the components layer.
+       ---- */
+
+    /* Administrator's pages: staff, the audit log and the emergency-access review. Rules for those pages only go
+       under this comment; anything two areas share belongs in the components layer.
+       ---- */
 }
