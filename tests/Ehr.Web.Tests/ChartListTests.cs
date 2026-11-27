@@ -35,20 +35,8 @@ public class ChartListTests(WebApps apps) : IClassFixture<WebApps>
         PostFormAsync(client, EntryPath(patient, list, entry), EntryPath(patient, list, entry), fields);
 
     // One column of a patient's rows in a chart table, in the order given.
-    internal static async Task<List<string>> RowsAsync(WebApps apps, string table, Guid patient, string expression, string order = "display")
-    {
-        await using var db = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand($"SELECT {expression} FROM ehr.{table} WHERE patient_id = @patient ORDER BY {order}", db);
-        command.Parameters.AddWithValue("patient", patient);
-        var rows = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync(Cancel);
-        while (await reader.ReadAsync(Cancel))
-        {
-            rows.Add(reader.GetString(0));
-        }
-
-        return rows;
-    }
+    internal static Task<List<string>> RowsAsync(WebApps apps, string table, Guid patient, string expression, string order = "display") =>
+        apps.PatientRowsAsync($"SELECT {expression} FROM ehr.{table} WHERE patient_id = @patient ORDER BY {order}", patient);
 
     internal static async Task<Guid> IdAsync(WebApps apps, string table, Guid patient) =>
         Guid.Parse((await RowsAsync(apps, table, patient, "id::text", "id")).Single());

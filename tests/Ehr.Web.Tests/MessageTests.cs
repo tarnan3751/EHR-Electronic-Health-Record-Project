@@ -1,5 +1,4 @@
 using Ehr.Data.Accounts;
-using Npgsql;
 using Xunit;
 using static Ehr.Web.Tests.Browser;
 
@@ -28,20 +27,8 @@ static class MessageTests
         return Guid.Parse(sent.RequestMessage!.RequestUri!.AbsolutePath.Split('/').Last());
     }
 
-    public static async Task<List<string>> RowsAsync(WebApps apps, Guid patient, string expression, string table = "messages", string order = "sent_at, id", string where = "true")
-    {
-        await using var db = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand($"SELECT {expression} FROM ehr.{table} WHERE patient_id = @patient AND {where} ORDER BY {order}", db);
-        command.Parameters.AddWithValue("patient", patient);
-        var rows = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync(Cancel);
-        while (await reader.ReadAsync(Cancel))
-        {
-            rows.Add(reader.GetString(0));
-        }
-
-        return rows;
-    }
+    public static Task<List<string>> RowsAsync(WebApps apps, Guid patient, string expression, string table = "messages", string order = "sent_at, id", string where = "true") =>
+        apps.PatientRowsAsync($"SELECT {expression} FROM ehr.{table} WHERE patient_id = @patient AND {where} ORDER BY {order}", patient);
 
     public static Task<List<string>> OpenInboxAsync(WebApps apps, Guid patient) =>
         RowsAsync(apps, patient, "recipient_id::text", "inbox_items", "created_at", "done_at IS NULL");

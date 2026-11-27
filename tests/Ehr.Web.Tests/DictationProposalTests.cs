@@ -108,20 +108,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     // The first column of each row, as text, for a query with one ID.
-    internal static async Task<List<string>> QueryAsync(WebApps apps, string sql, Guid id)
-    {
-        await using var db = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand(sql, db);
-        command.Parameters.AddWithValue("id", id);
-        var rows = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync(Cancel);
-        while (await reader.ReadAsync(Cancel))
-        {
-            rows.Add(reader.IsDBNull(0) ? "" : reader.GetValue(0).ToString()!);
-        }
-
-        return rows;
-    }
+    internal static Task<List<string>> QueryAsync(WebApps apps, string sql, Guid id) => apps.QueryAsync(sql, ("id", id));
 
     // "state|order or -|allergy or -" of a proposal.
     internal static async Task<string> StateAsync(WebApps apps, Guid proposal) => (await QueryAsync(apps,

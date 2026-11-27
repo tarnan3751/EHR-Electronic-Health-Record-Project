@@ -158,22 +158,6 @@ static class PreVisitFormTests
     }
 
     // The first column of each row, as text, read as the superuser.
-    public static async Task<List<string>> QueryAsync(WebApps apps, string sql, params (string Name, object Value)[] parameters)
-    {
-        await using var db = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand(sql, db);
-        foreach (var (name, value) in parameters)
-        {
-            command.Parameters.AddWithValue(name, value);
-        }
-
-        var rows = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync(Cancel);
-        while (await reader.ReadAsync(Cancel))
-        {
-            rows.Add(reader.IsDBNull(0) ? "" : reader.GetValue(0).ToString()!);
-        }
-
-        return rows;
-    }
+    public static Task<List<string>> QueryAsync(WebApps apps, string sql, params (string Name, object Value)[] parameters) =>
+        apps.QueryAsync(sql, parameters);
 }

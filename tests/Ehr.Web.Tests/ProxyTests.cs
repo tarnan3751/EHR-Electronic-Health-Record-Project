@@ -98,18 +98,5 @@ static class ProxyTests
     public static async Task<Guid> GrantIdAsync(WebApps apps, Guid patient) =>
         Guid.Parse((await QueryAsync(apps, "SELECT id::text FROM ehr.proxy_grants WHERE patient_id = @patient AND revoked_at IS NULL ORDER BY id DESC LIMIT 1", patient)).Single());
 
-    public static async Task<List<string>> QueryAsync(WebApps apps, string sql, Guid patient)
-    {
-        await using var db = await apps.OpenDatabaseAsync();
-        await using var command = new NpgsqlCommand(sql, db);
-        command.Parameters.AddWithValue("patient", patient);
-        var rows = new List<string>();
-        await using var reader = await command.ExecuteReaderAsync(Cancel);
-        while (await reader.ReadAsync(Cancel))
-        {
-            rows.Add(reader.GetString(0));
-        }
-
-        return rows;
-    }
+    public static Task<List<string>> QueryAsync(WebApps apps, string sql, Guid patient) => apps.PatientRowsAsync(sql, patient);
 }

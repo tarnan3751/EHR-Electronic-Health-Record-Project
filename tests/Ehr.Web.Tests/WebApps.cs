@@ -474,6 +474,42 @@ public sealed class WebApps : IAsyncLifetime
         return connection;
     }
 
+    // The first column of each row, as text, read as the superuser.
+    public async Task<List<string>> QueryAsync(string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var db = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(sql, db);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        var rows = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            rows.Add(reader.IsDBNull(0) ? "" : reader.GetValue(0).ToString()!);
+        }
+
+        return rows;
+    }
+
+    // The first column of each of a patient's rows, which must be text, read as the superuser.
+    public async Task<List<string>> PatientRowsAsync(string sql, Guid patient)
+    {
+        await using var db = await OpenDatabaseAsync();
+        await using var command = new NpgsqlCommand(sql, db);
+        command.Parameters.AddWithValue("patient", patient);
+        var rows = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            rows.Add(reader.GetString(0));
+        }
+
+        return rows;
+    }
+
     sealed class App(
         Site site, string connectionString, RecordingEmailSender emails, WebApps apps, OnPremApp? onPrem = null, bool bootstrapAdmin = false,
         string? environment = null, DictationSidecar? dictation = null, bool unreachable = false)
