@@ -8,7 +8,7 @@
     var answered = form.Response!;
     var definition = form.Definition;
     // A page title names no form: it is a sensitive item (docs/brand: sensitive items).
-    ViewData["Title"] = $"Pre-visit form: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "Pre-visit form";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient)" />
@@ -23,11 +23,11 @@
         <p><a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true" asp-fragment="appointment-@form.AppointmentId" class="sc-back">Back to pre-visit forms</a></p>
     }
 </div>
-<h1>Pre-visit form: @patient.FamilyName, @patient.GivenName</h1>
+<h1>Pre-visit form</h1>
 @if (Model.Answers.CareTeam is { } team)
 {
     @* Opened from the reader's inbox, not their panel: whose patient this is, and the one way to the chart. *@
-    <p class="sc-notice sc-notice--info" data-form-not-on-panel><span class="sc-notice__state">Not one of your patients.</span> @patient.GivenName @patient.FamilyName @(team.Count == 0 ? "has no care team" : $"is a patient of {string.Join(", ", team)}"). To open <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">their chart</a>, you'll need emergency access.</p>
+    <p class="sc-notice sc-notice--info" data-form-not-on-panel><span class="sc-notice__state">Not one of your patients.</span> @patient.GivenName @patient.FamilyName @(team.Count == 0 ? "has no care team" : $"is a patient of {string.Join(", ", team)}"). To open <a asp-page="/Patients/Chart" asp-route-id="@patient.Id">their chart</a>, break the glass.</p>
 }
 <p class="sc-notice sc-notice--info" data-sensitive="shown"><span class="sc-notice__state">Sensitive items shown.</span> Your view is logged.</p>
 @if (answered.Alert)

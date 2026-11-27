@@ -78,7 +78,7 @@ public class TC_UC21_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         }
 
         var readOnly = await cutOff.GetStringAsync(ReviewPath(patient.Patient, lisinopril), Cancel);
-        Assert.Contains("Answering a refill request needs the clinic's server. The request remains readable.", Said(readOnly));
+        Assert.Contains("Answering a refill request needs the clinic's server.", Said(readOnly));
         Assert.Contains(Lisinopril, Said(readOnly));
         Assert.DoesNotContain("data-refill-approve", readOnly);
         Assert.DoesNotContain("data-refill-decline", readOnly);

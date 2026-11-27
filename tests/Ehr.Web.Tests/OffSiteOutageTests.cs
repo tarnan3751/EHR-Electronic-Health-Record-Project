@@ -157,7 +157,7 @@ public class OffSiteOutageTests(WebApps apps) : IClassFixture<WebApps>
 
         var page = await offSite.GetStringAsync(QuickTexts, Cancel);
         Assert.Contains("Still readable off-site", page);
-        Assert.Contains("Phrases can't be added or changed until the clinic's server is back.", page);
+        Assert.Contains("Quick text can't be added or changed until the clinic's server is back.", page);
         Assert.DoesNotContain("add-quick-text", page);
         Assert.DoesNotContain("handler=Edit", page);
     }

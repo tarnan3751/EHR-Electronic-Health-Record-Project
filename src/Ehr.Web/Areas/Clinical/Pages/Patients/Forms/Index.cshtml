@@ -8,7 +8,7 @@
     ViewData["UseHtmx"] = false;
     var patient = Model.Forms.Patient;
     // A page title names no form: it is a sensitive item (docs/brand: sensitive items).
-    ViewData["Title"] = $"Pre-visit forms: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "Pre-visit forms";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient)" />
@@ -16,10 +16,10 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
 </div>
-<h1>Pre-visit forms: @patient.FamilyName, @patient.GivenName</h1>
+<h1>Pre-visit forms</h1>
 @if (Model.Asked)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Form asked for.</span> The patient can fill it in from @PreVisitForms.OpenDays days before the appointment until it ends. An answer that needs review comes to your inbox.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Form asked for.</span></p>
 }
 @if (Model.Forms.SensitiveShown)
 {
@@ -43,7 +43,7 @@ else if (!OnPrem.IsReachable)
 }
 else if (Model.Forms.Upcoming.Count == 0)
 {
-    <p class="sc-muted">No upcoming appointments. To ask for a form, book one from the chart first.</p>
+    <p class="sc-muted">No upcoming appointments.</p>
 }
 else
 {
@@ -52,7 +52,6 @@ else
         {
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not asked.</span> @error</p>
         }
-        <p class="sc-muted">The patient can fill it in from @PreVisitForms.OpenDays days before the appointment until it ends. Forms aren't watched as they arrive. An answer that needs review goes to the inbox of the appointment's clinician and the patient's care team.</p>
         <div class="sc-field">
             <label for="form-appointment">Appointment</label>
             <select id="form-appointment" class="sc-field__input" name="AppointmentId" required autofocus>
@@ -133,7 +132,7 @@ else
                         else
                         {
                             @* Checked in with the visit in progress: open until 12 hours after the scheduled end, or the visit's end. *@
-                            <br><span class="sc-muted">Not answered yet. Open from @Clinic.Format(form.OpensAt) until @Clinic.Format(form.ClosesAt)@(form.VisitUnderWay ? ", while the visit is in progress" : "").</span>
+                            <br><span class="sc-muted">Not answered. Open from @Clinic.Format(form.OpensAt) until @Clinic.Format(form.ClosesAt)@(form.VisitUnderWay ? ", while the visit is in progress" : "").</span>
                         }
                         <br><span class="sc-muted">Asked by @form.RequestedBy, @Clinic.Format(form.RequestedAt)</span>
                     </li>

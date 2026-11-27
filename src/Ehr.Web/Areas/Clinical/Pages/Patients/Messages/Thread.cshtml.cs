@@ -59,7 +59,7 @@ public class ThreadModel(
             return RedirectToPage(new { patientId, threadId, sent = true });
         }
 
-        Error = errors.GetValueOrDefault("Body") ?? "The reply couldn't be sent. Reload the page and try again.";
+        Error = errors.GetValueOrDefault("Body") ?? "Reload the page and try again.";
         Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
         return Page();
     }

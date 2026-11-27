@@ -7,7 +7,7 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.Patient;
-    ViewData["Title"] = $"People who can see this record: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "People who can see this record";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Allergies)" />
@@ -15,16 +15,15 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
 </div>
-<h1>People who can see this record: @patient.FamilyName, @patient.GivenName</h1>
+<h1>People who can see this record</h1>
 @if (Model.Done is "recorded")
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Access given.</span> They can now open this record in the portal. Their email has a link to sign in or create an account, and doesn't say whose record it is.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Access given.</span></p>
 }
 else if (Model.Done is "removed")
 {
-    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Access removed.</span> They can no longer open this record.</p>
+    <p class="sc-notice sc-notice--success" role="status" tabindex="-1" data-focus-on-load><span class="sc-notice__state">Access removed.</span></p>
 }
-<p class="sc-muted">Each person signs in to the portal with their own account. Only the patient can let them see sensitive items.</p>
 @if (Model.Grants.Count == 0)
 {
     <p class="sc-empty">No one else has access.</p>
@@ -42,7 +41,7 @@ else
                     <tr data-grant="@(grant.InForce ? "in-force" : "ended")">
                         <td>@grant.Email</td>
                         <td>@ProxyAccess.ScopeLabel(grant.Scope)</td>
-                        <td>@(grant.IncludeSensitive ? "Shown (the patient allowed it)" : "Hidden")</td>
+                        <td>@(grant.IncludeSensitive ? "Shown" : "Hidden")</td>
                         <td class="sc-table__fit">@(grant.ByClinic ? "By the clinic" : "By the patient"), @Clinic.Day(grant.GrantedAt)</td>
                         <td class="sc-table__fit">
                             @if (grant.InForce)

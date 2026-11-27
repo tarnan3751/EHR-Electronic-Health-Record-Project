@@ -5,7 +5,6 @@
     ViewData["Title"] = "Quick text";
 }
 <h1>Quick text</h1>
-<p class="sc-lede">Shared phrases, each inserted by typing its shortcut.</p>
 
 @if (OnPrem.IsReachable)
 {
@@ -14,7 +13,7 @@
 else
 {
     @* UC 2 (Tahseen Arnan): off-site with the clinic's server unreachable, nothing could be saved. *@
-    <p class="sc-muted">Phrases can't be added or changed until the clinic's server is back.</p>
+    <p class="sc-muted">Quick text can't be added or changed until the clinic's server is back.</p>
 }
 
 <ul id="quick-texts" class="sc-quicktexts">

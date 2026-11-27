@@ -46,12 +46,11 @@ namespace Ehr.Web.Tests.TestCases.UC22;
 //   linking to the answers. Step 3: both charts say "Needs review. A pre-visit form has an answer for you to review."
 //   Step 4: the clinician's chart no longer says so; the colleague's still does. Step 5 (after the colleague marks theirs
 //   done too): the covering clinician's inbox holds the item; its link shows the answers with "Not one of your
-//   patients. Synthetic Booked is a patient of Dr. Forms Colleague, Dr. Forms Nine. To open their chart, you'll need
-//   emergency access." and "Needs review. Question 9, "Thoughts that you would be better off dead or of
+//   patients. Synthetic Booked is a patient of Dr. Forms Colleague, Dr. Forms Nine. To open their chart, break the
+//   glass." and "Needs review. Question 9, "Thoughts that you would be better off dead or of
 //   hurting yourself in some way"."; one recorded view of sensitive items and no emergency access; the chart, the
 //   forms page and the GAD-7's answers each send them to the chart's reason page; so does the link, for the bystander;
-//   the inbox says beside "Mark done": "Once it's done, the answers open only from the chart, which needs the patient
-//   in My patients or emergency access."; once it is done, the link sends them to the reason page too, and
+//   the inbox says beside "Mark done": "Once done, the answers open only from the chart."; once it is done, the link sends them to the reason page too, and
 //   their Done tab keeps the item's line with no link to the answers and nothing more; the clinician's Done tab, the
 //   patient on their panel, says "Open from the patient's chart." as plain words, with no link to the answers. Step
 //   6: the staying clinician's inbox links to the answers again, with a new open item beside the done one; the
@@ -128,7 +127,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             var page = Text(await read.Content.ReadAsStringAsync(Cancel));
             Assert.Contains("Not one of your patients. Synthetic Booked is a patient of Dr. Forms Colleague, Dr. Forms Nine. To open their chart, "
-                + "you'll need emergency access.", page);
+                + "break the glass.", page);
             Assert.Contains("Needs review. Question 9, \"Thoughts that you would be better off dead or of hurting yourself in some way\".", page);
             Assert.Contains("Thoughts that you would be better off dead or of hurting yourself in some way Several days · score 1", page);
             Assert.Contains("Back to inbox", page);
@@ -156,7 +155,7 @@ public class TC_UC22_09_AnswerToReview(WebApps apps) : IClassFixture<WebApps>
 
         // The inbox says, beside "Mark done", that the item is the way to the answers only while it is open; once the
         // covering clinician marks it done, they are sent to the chart's reason page like anyone else.
-        Assert.Contains("Mark done Once it's done, the answers open only from the chart, which needs the patient in My patients or emergency access.",
+        Assert.Contains("Mark done Once done, the answers open only from the chart.",
             Text(await covering.Client.GetStringAsync("/inbox", Cancel)));
         var coveringItem = (await QueryAsync(apps, "SELECT id::text FROM ehr.inbox_items WHERE recipient_id = @covering AND kind = 'form-alert'",
             ("covering", coveringAccount.Id))).Single();

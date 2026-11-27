@@ -26,11 +26,11 @@
 </nav>
 @if (Model.AlreadyDone)
 {
-    <p class="sc-notice sc-notice--info" role="status"><span class="sc-notice__state">Nothing to mark.</span> That item isn't waiting in your inbox. It may already be done.</p>
+    <p class="sc-notice sc-notice--info" role="status"><span class="sc-notice__state">Nothing to mark.</span> That item may already be done.</p>
 }
 @if (!Model.Done && !OnPrem.IsReachable)
 {
-    <p class="sc-muted">Marking an item done needs the clinic's server. Your inbox remains readable.</p>
+    <p class="sc-muted">Marking an item done needs the clinic's server.</p>
 }
 @if (Model.Items.Items.Count == 0)
 {
@@ -38,10 +38,6 @@
 }
 else
 {
-    @if (!Model.Done && Model.Items.Items.Any(MarkedHere))
-    {
-        <p class="sc-muted" id="inbox-done-note">Marking an item done can't be undone.</p>
-    }
     @* Each row: when, one line saying what it is, the patient, then what to do about it, on the right. The line takes
        what the other columns leave. *@
     <div class="sc-table-wrap">
@@ -124,7 +120,7 @@ else
                                 @if (!Model.Done && MarkedHere(item))
                                 {
                                     <form method="post" asp-page-handler="Done" asp-route-id="@item.Id">
-                                        <button class="sc-btn sc-btn--compact" aria-describedby="@(item.Kind == InboxItemKind.FormAlert ? $"inbox-done-note done-{item.Id}" : "inbox-done-note")"
+                                        <button class="sc-btn sc-btn--compact" aria-describedby="@(item.Kind == InboxItemKind.FormAlert ? $"done-{item.Id}" : null)"
                                                 aria-label="Mark done: @item.Summary">Mark done</button>
                                     </form>
                                 }
@@ -138,13 +134,13 @@ else
                             @if (!Model.Done && MarkedHere(item) && item.Kind == InboxItemKind.FormAlert)
                             {
                                 @* Step 13e: the item is the way to the answers only while it is open (PhiReader.FormAnswersAsync). *@
-                                <p class="sc-muted" id="done-@item.Id" data-inbox-done-note>Once it's done, the answers open only from the chart, which needs the patient in My patients or emergency access.</p>
+                                <p class="sc-muted" id="done-@item.Id" data-inbox-done-note>Once done, the answers open only from the chart.</p>
                             }
                             @if (item.Kind == InboxItemKind.UnroutedResult && item.SourceTable == "orders" && item.DoneAt is null)
                             {
                                 @* Step 18a: what an administrator can do. Only a clinician adds a patient to their own patients, and
                                    only a clinician with the patient on their panel acknowledges results; that marks this done. *@
-                                <p class="sc-muted" data-inbox-unrouted-note>Ask a clinician to add this patient to their patients and acknowledge the results. That marks this done for every administrator.</p>
+                                <p class="sc-muted" data-inbox-unrouted-note>Ask a clinician to add this patient to their patients and acknowledge the results.</p>
                             }
                         </td>
                     </tr>
@@ -154,6 +150,6 @@ else
     </div>
     @if (Model.Items.More)
     {
-        <p class="sc-muted">Showing the first @IndexModel.Limit. Finish some to see the rest.</p>
+        <p class="sc-muted">Showing the first @IndexModel.Limit.</p>
     }
 }

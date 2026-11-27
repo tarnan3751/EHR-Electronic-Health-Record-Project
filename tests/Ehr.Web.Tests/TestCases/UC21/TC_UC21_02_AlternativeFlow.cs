@@ -100,7 +100,7 @@ public class TC_UC21_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         using (var declined = await DeclineAsync(session.Client, patient.Patient, amlodipine, Raised))
         {
             var words = Said(await ReadAsync(declined));
-            Assert.Contains("Declined. The patient can read your message in the portal.", words);
+            Assert.Contains("Declined.", words);
             Assert.Contains("Declined by Dr. Test", words);
             Assert.Contains(Raised, words);
             Assert.DoesNotContain("Decline request", words);
