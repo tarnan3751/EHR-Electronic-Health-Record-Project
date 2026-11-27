@@ -122,8 +122,8 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
             && standing.Any(sign => sign.Code == value.Code || (value.Code == VitalSign.Systolic && sign.Code == VitalSign.Diastolic))))
         {
             errors[code] = code == VitalSign.Systolic
-                ? "A blood pressure already stands for that time. Mark it entered in error first, then record the correct one."
-                : "A value already stands for this sign at that time. Mark it entered in error first, then record the correct one.";
+                ? "A blood pressure is already recorded for that time. Mark it as entered in error first."
+                : "A value is already recorded for that time. Mark it as entered in error first.";
         }
 
         if (errors.Count == 0)
@@ -139,8 +139,8 @@ public class IndexModel(PhiReader phi, PatientAssignments assignments, BreakGlas
                     return RedirectToPage(new { patientId, saved = true });
                 case Recorded.AlreadyRecorded:
                     errors[""] = fresh.Count == 0
-                        ? "Vital signs are already recorded for that time. Check the flowsheet, or change the time."
-                        : "A value already stands for one of these signs at that time. Mark it entered in error first, then record the correct one.";
+                        ? "Vital signs are already recorded for that time."
+                        : "A value is already recorded for one of these signs at that time. Mark it as entered in error first.";
                     break;
                 default:
                     errors[""] = "Reload the page and try again.";

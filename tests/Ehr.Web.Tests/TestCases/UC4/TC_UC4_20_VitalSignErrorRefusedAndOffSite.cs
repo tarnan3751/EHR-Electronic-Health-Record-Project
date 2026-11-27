@@ -23,10 +23,10 @@ namespace Ehr.Web.Tests.TestCases.UC4;
 //   2. As the covering clinician, open the flowsheet, open the page, and post to it.
 //   3. Off-site, mark the heart rate with the reason.
 //   4. On the app that is cut off, open the flowsheet and the page, and post to it.
-// Expected result: Step 1: each is answered 422 with "Not saved." and "Choose at least one reading." or "Say why, so
-//   the record shows it."; nothing changes. Step 2: the flowsheet has no "Mark in error" link; the page and the post
+// Expected result: Step 1: each is answered 422 with "Not saved." and "Select at least one reading." or "Reason is
+//   required."; nothing changes. Step 2: the flowsheet has no "Mark as entered in error" link; the page and the post
 //   send them back to the chart; nothing changes. Step 3: forwarded, and the heart rate is entered in error. Step 4:
-//   the flowsheet has no link, the page says "Readings can't be marked until the clinic's server is back." with no
+//   the flowsheet has no link, the page shows the read-only band and no
 //   form, and the post is answered 503; the temperature still stands.
 // Creator: Tahseen Arnan
 public class TC_UC4_20_VitalSignErrorRefusedAndOffSite(WebApps apps) : IClassFixture<WebApps>
@@ -42,10 +42,10 @@ public class TC_UC4_20_VitalSignErrorRefusedAndOffSite(WebApps apps) : IClassFix
 
         using var none = await MarkAsync(apps, session.Client, patient, set, "Wrong patient.");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, none.StatusCode);
-        Assert.Contains("Not saved. Choose at least one reading.", Words(await none.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. Select at least one reading.", Words(await none.Content.ReadAsStringAsync(Cancel)));
         using var unexplained = await MarkAsync(apps, session.Client, patient, set, null, HeartRate);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unexplained.StatusCode);
-        Assert.Contains("Say why, so the record shows it.", Words(await unexplained.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Reason is required.", Words(await unexplained.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal(standing, await StatesAsync(apps, patient));
 
         var covering = await SignInAsync(apps.OnPrem, await apps.CreateStaffAsync("Dr. Covering Vitals", Ehr.Data.Accounts.StaffRoles.Clinician));
@@ -74,7 +74,7 @@ public class TC_UC4_20_VitalSignErrorRefusedAndOffSite(WebApps apps) : IClassFix
         var cutOff = Client(apps.CloudCutOff, session.Jar);
         Assert.DoesNotContain("data-mark-in-error", await cutOff.GetStringAsync(Path(patient), Cancel));
         var readOnly = await cutOff.GetStringAsync(ErrorPath(patient, set), Cancel);
-        Assert.Contains("Readings can't be marked until the clinic's server is back.", readOnly);
+        Assert.Contains("sc-notice--band", readOnly);
         Assert.DoesNotContain("data-mark-entered-in-error", readOnly);
         using var notSaved = await cutOff.PostAsync(ErrorPath(patient, set), Form(("__RequestVerificationToken", own), ("Reason", "During the outage.")), Cancel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, notSaved.StatusCode);

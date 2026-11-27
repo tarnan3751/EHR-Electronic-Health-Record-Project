@@ -71,7 +71,7 @@ public class TC_UC14_30_VitalSignsForObjective(WebApps apps) : IClassFixture<Web
 
         using (var marked = await MarkAsync(apps, session.Client, first, At(1) + ":00", "Synthetic: cuff too small.", Systolic, HeartRate))
         {
-            Assert.Contains("Marked in error.", Words(await ReadAsync(marked)));
+            Assert.Contains("Entered in error.", Words(await ReadAsync(marked)));
         }
 
         var (path, token) = await DraftAsync(session.Client, first);

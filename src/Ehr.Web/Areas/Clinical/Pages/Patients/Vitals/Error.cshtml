@@ -7,7 +7,7 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.Vitals.Patient;
-    ViewData["Title"] = "Mark vital signs entered in error";
+    ViewData["Title"] = "Mark as entered in error";
 }
 @section Banner {
     <partial name="_PatientBanner" model="new PatientBanner(patient, Model.Vitals.Allergies)" />
@@ -15,16 +15,12 @@
 <div class="sc-pagehead">
     <p><a asp-page="Index" asp-route-patientId="@patient.Id" class="sc-back">Back to vital signs</a></p>
 </div>
-<h1>Mark vital signs entered in error</h1>
-@* The set, what marking does, then the readings and the reason: one task, in one card. *@
+<h1>Mark as entered in error</h1>
+@* The set, then the readings and the reason: one task, in one card. Off-site with the clinic's server down there is no
+   form: the layout's band says why. *@
 <div class="sc-formcard sc-formcard--wide">
-<p class="sc-prose">The set taken <strong>@Clinic.Format(Model.Taken)</strong>. Marked readings are left out of the flowsheet, trends and chart. They stay in the record, marked entered in error.</p>
-<p class="sc-prose">This can't be undone. Record the correct values as a new set.</p>
-@if (!OnPrem.IsReachable)
-{
-    <p class="sc-muted">Readings can't be marked until the clinic's server is back.</p>
-}
-else
+<p class="sc-prose">Set taken <strong>@Clinic.Format(Model.Taken)</strong>.</p>
+@if (OnPrem.IsReachable)
 {
     <form method="post" class="sc-form sc-form--wide" asp-route-patientId="@patient.Id" asp-route-at="@Model.At">
         @if (Model.Errors.Count > 0)
@@ -32,7 +28,7 @@ else
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : string.Join(" ", Model.Errors.Values))</p>
         }
         <fieldset class="sc-stack" aria-describedby="@(Model.Errors.ContainsKey("Chosen") ? "chosen-error" : null)">
-            <legend>Which readings are wrong?</legend>
+            <legend>Readings</legend>
             @{ var first = true; }
             @foreach (var reading in Model.Readings)
             {
@@ -51,14 +47,6 @@ else
                 </label>
                 first = false;
             }
-            @if (Model.Diastolic.Count > 0)
-            {
-                <p class="sc-field__hint">A blood pressure is one reading. Marking it marks both numbers.</p>
-            }
-            @if (Model.HasBodyMassIndex)
-            {
-                <p class="sc-field__hint">Body mass index isn't listed. Marking the weight or height marks it too.</p>
-            }
             @if (Model.Errors.TryGetValue("Chosen", out var chosenError))
             {
                 <p class="sc-field__error" id="chosen-error">@chosenError</p>
@@ -68,15 +56,15 @@ else
             <label for="error-reason">Reason <span>(required)</span></label>
             <input id="error-reason" class="sc-field__input" name="Reason" value="@Model.Reason" maxlength="500" required autocomplete="off"
                    autofocus="@Model.Errors.ContainsKey("Reason")" aria-invalid="@(Model.Errors.ContainsKey("Reason") ? "true" : null)"
-                   aria-describedby="@(Model.Errors.ContainsKey("Reason") ? "error-reason-error" : "error-reason-hint")">
-            <p class="sc-field__hint" id="error-reason-hint">For example: wrong patient, cuff too small, typed 180 for 108.</p>
+                   aria-describedby="@(Model.Errors.ContainsKey("Reason") ? "error-reason-error" : null)">
             @if (Model.Errors.TryGetValue("Reason", out var reasonError))
             {
                 <p class="sc-field__error" id="error-reason-error">@reasonError</p>
             }
         </div>
+        <p class="sc-muted">This can't be undone.</p>
         <div class="sc-actions">
-            <button type="submit" class="sc-btn sc-btn--primary" data-mark-entered-in-error>Mark entered in error</button>
+            <button type="submit" class="sc-btn sc-btn--primary" data-mark-entered-in-error>Mark as entered in error</button>
             <a asp-page="Index" asp-route-patientId="@patient.Id">Cancel</a>
         </div>
     </form>

@@ -7,7 +7,7 @@
     // The address carries the patient. Without htmx, nothing keeps it in the browser's sessionStorage history.
     ViewData["UseHtmx"] = false;
     var patient = Model.Vitals.Patient;
-    ViewData["Title"] = $"Vital signs: {patient.FamilyName}, {patient.GivenName}";
+    ViewData["Title"] = "Vital signs";
     var names = Model.Vitals.Signs.GroupBy(sign => sign.Code!).ToDictionary(group => group.Key, group => group.First());
     // The signs with something to show in the sets listed: a value that stands, or, when they are shown, one in error.
     var recorded = VitalSign.All.Where(code => names.ContainsKey(code)
@@ -19,27 +19,25 @@
 <div class="sc-pagehead">
     <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
 </div>
-<h1>Vital signs: @patient.FamilyName, @patient.GivenName</h1>
+<h1>Vital signs</h1>
 @if (Model.Marked is > 0)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Marked in error.</span> @Model.Marked @(Model.Marked == 1 ? "reading is" : "readings are") now left out of the flowsheet and trends. Record the correct values as a new set.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Entered in error.</span></p>
 }
 @if (Model.Saved)
 {
-    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved.</span> The patient can now see these vital signs.</p>
+    <p class="sc-notice sc-notice--success" role="status"><span class="sc-notice__state">Saved.</span></p>
 }
 
 @* The form comes first, in its panel: the cursor starts in it (NFR-12), and the flowsheet and trends stay in view under
-   it. *@
+   it. Off-site with the clinic's server down, for a patient on the panel, there is no panel: the layout's band says why. *@
+@if (OnPrem.IsReachable || !Model.OnPanel)
+{
 <div class="sc-sheet">
 <h2>Record vital signs</h2>
 @if (!Model.OnPanel)
 {
     <p class="sc-muted">To record vital signs, add this patient to My patients.</p>
-}
-else if (!OnPrem.IsReachable)
-{
-    <p class="sc-muted">Vital signs can't be recorded until the clinic's server is back.</p>
 }
 else
 {
@@ -48,7 +46,6 @@ else
         {
             <p class="sc-notice sc-notice--danger" role="alert"><span class="sc-notice__state">Not saved.</span> @(Model.Errors.TryGetValue("", out var formError) ? formError : "Fix the highlighted fields and try again.")</p>
         }
-        <p class="sc-muted">Enter what was taken and leave the rest empty. Body mass index is worked out from the weight and height.</p>
         @{
             // The cursor starts in the first field that is wrong; in the first field when nothing is, or when what is
             // wrong is the whole form; in the time when only the time is.
@@ -87,6 +84,7 @@ else
     </form>
 }
 </div>
+}
 
 <h2>Flowsheet</h2>
 @if (recorded.Count == 0)
@@ -171,13 +169,13 @@ else
                 @* Step 9b: a reading is never deleted or edited. A wrong one is marked entered in error, a set at a time. *@
                 <tfoot>
                     <tr>
-                        <th scope="row">Correct a set</th>
+                        <th scope="row">Actions</th>
                         @foreach (var time in Model.Times)
                         {
                             <td>
                                 @if (recorded.Any(code => Model.At(code, time) is not null))
                                 {
-                                    <a asp-page="Error" asp-route-patientId="@patient.Id" asp-route-at="@time.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss")" data-mark-in-error>Mark in error<span class="sc-visually-hidden">, the set taken @Clinic.Format(time)</span></a>
+                                    <a asp-page="Error" asp-route-patientId="@patient.Id" asp-route-at="@time.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss")" data-mark-in-error>Mark as entered in error<span class="sc-visually-hidden">, the set taken @Clinic.Format(time)</span></a>
                                 }
                             </td>
                         }
@@ -205,17 +203,17 @@ else
     <p class="sc-muted" data-in-error-count>
         @if (Model.ShowErrors)
         {
-            <text>@Model.InError @(Model.InError == 1 ? "reading entered in error is" : "readings entered in error are") shown struck through.</text>
+            <text>@Model.InError @(Model.InError == 1 ? "reading entered in error is" : "readings entered in error are") shown.</text>
             <a asp-page="Index" asp-route-patientId="@patient.Id">Hide entries in error</a>
         }
         else if (Model.InError == 1)
         {
-            <text>1 reading entered in error isn't shown.</text>
+            <text>1 reading entered in error is not shown.</text>
             <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-showErrors="true">Show entries in error</a>
         }
         else
         {
-            <text>@Model.InError readings entered in error aren't shown.</text>
+            <text>@Model.InError readings entered in error are not shown.</text>
             <a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-showErrors="true">Show entries in error</a>
         }
     </p>

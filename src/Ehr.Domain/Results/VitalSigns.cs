@@ -75,7 +75,7 @@ public sealed class VitalSigns(EhrDbContext db)
     {
         var errors = new Dictionary<string, string>();
         values = [];
-        foreach (var (code, _, unit, least, most) in Fields)
+        foreach (var (code, label, unit, least, most) in Fields)
         {
             if (!typed.TryGetValue(code, out var text) || string.IsNullOrWhiteSpace(text))
             {
@@ -84,11 +84,11 @@ public sealed class VitalSigns(EhrDbContext db)
 
             if (!decimal.TryParse(text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value) || decimal.Round(value, 1) != value)
             {
-                errors[code] = "Enter a number, like 36.8.";
+                errors[code] = $"{label} must be a number.";
             }
             else if (value < least || value > most)
             {
-                errors[code] = $"Enter a value from {least:0.#} to {most:0.#} {unit}.";
+                errors[code] = $"{label} must be {least:0.#} to {most:0.#} {unit}.";
             }
             else
             {
@@ -99,21 +99,21 @@ public sealed class VitalSigns(EhrDbContext db)
         var entered = values.Select(value => value.Code).ToHashSet();
         if (entered.Contains(VitalSign.Systolic) != entered.Contains(VitalSign.Diastolic) && !errors.ContainsKey(VitalSign.Systolic) && !errors.ContainsKey(VitalSign.Diastolic))
         {
-            errors[entered.Contains(VitalSign.Systolic) ? VitalSign.Diastolic : VitalSign.Systolic] = "Enter both numbers of the blood pressure.";
+            errors[entered.Contains(VitalSign.Systolic) ? VitalSign.Diastolic : VitalSign.Systolic] = "Both blood pressure numbers are required.";
         }
 
         if (errors.Count == 0 && values.Count == 0)
         {
-            errors[""] = "Enter at least one vital sign.";
+            errors[""] = "At least one vital sign is required.";
         }
 
         if (takenAt is null)
         {
-            errors["TakenAt"] = "Enter when they were taken.";
+            errors["TakenAt"] = "Taken is required.";
         }
         else if (takenAt > DateTimeOffset.UtcNow.AddMinutes(1))
         {
-            errors["TakenAt"] = "The time can't be in the future.";
+            errors["TakenAt"] = "Taken must not be in the future.";
         }
 
         return errors;

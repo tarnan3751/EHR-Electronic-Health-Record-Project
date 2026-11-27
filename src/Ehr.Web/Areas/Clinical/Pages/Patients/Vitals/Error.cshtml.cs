@@ -38,9 +38,6 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
 
     public DateTimeOffset Taken { get; private set; }
 
-    // Whether the set has a body mass index worked out from its weight and height.
-    public bool HasBodyMassIndex { get; private set; }
-
     public IReadOnlyDictionary<string, string> Errors { get; private set; } = new Dictionary<string, string>();
 
     public async Task<IActionResult> OnGetAsync(Guid patientId) => await LoadAsync(patientId) ?? Page();
@@ -58,16 +55,16 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
         var reason = Reason?.Trim();
         if (ids.Count == 0)
         {
-            errors["Chosen"] = "Choose at least one reading.";
+            errors["Chosen"] = "Select at least one reading.";
         }
 
         if (string.IsNullOrEmpty(reason))
         {
-            errors["Reason"] = "Say why, so the record shows it.";
+            errors["Reason"] = "Reason is required.";
         }
         else if (reason.Length > 500)
         {
-            errors["Reason"] = $"The reason can be up to 500 characters. This one has {reason.Length}.";
+            errors["Reason"] = "Reason must be 500 characters or less.";
         }
 
         if (errors.Count == 0)
@@ -112,7 +109,6 @@ public class ErrorModel(PhiReader phi, PatientAssignments assignments, BreakGlas
             .OrderBy(sign => Array.IndexOf(VitalSign.All, sign.Code))];
         Diastolic = read.Signs.Where(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code == VitalSign.Diastolic)
             .ToDictionary(sign => sign.ReadingId!.Value);
-        HasBodyMassIndex = read.Signs.Any(sign => sign.EffectiveAt == Taken && sign.Status == ObservationStatus.Final && sign.Code == VitalSign.BodyMassIndex);
         return Readings.Count == 0 ? RedirectToPage("Index", new { patientId }) : null;
     }
 }
