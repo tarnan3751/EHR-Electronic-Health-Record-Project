@@ -51,6 +51,7 @@ public class TC_UC4_19_VitalSignEnteredInError(WebApps apps) : IClassFixture<Web
         Assert.Contains($"/patients/{patient}/vitals/error?at={Uri.EscapeDataString(yesterday + ":00")}", flowsheet);
         var form = await session.Client.GetStringAsync(ErrorPath(patient, yesterday + ":00"), Cancel);
         Assert.Contains("Which readings are wrong?", form);
+        Assert.Contains("Marked readings are left out of the flowsheet, trends and chart. They stay in the record, marked entered in error.", form);
         Assert.Contains("Body mass index isn't listed. Marking the weight or height marks it too.", form);
         // The body mass index is not a reading to tick: it follows its weight and height. A blood pressure is one.
         Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(form, "name=\"Chosen\"").Count);

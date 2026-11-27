@@ -16,7 +16,7 @@
     <p><a asp-page="Index" asp-route-patientId="@patient.Id">Back to vital signs</a></p>
 </div>
 <h1>Mark vital signs entered in error</h1>
-<p class="sc-prose">The set taken <strong>@Clinic.Format(Model.Taken)</strong>. Marked readings are left out of the flowsheet, trends and chart.</p>
+<p class="sc-prose">The set taken <strong>@Clinic.Format(Model.Taken)</strong>. Marked readings are left out of the flowsheet, trends and chart. They stay in the record, marked entered in error.</p>
 <p class="sc-prose">This can't be undone. Record the correct values as a new set.</p>
 @if (!OnPrem.IsReachable)
 {
