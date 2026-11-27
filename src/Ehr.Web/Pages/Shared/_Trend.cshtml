@@ -33,7 +33,7 @@
             }
         }
     </svg>
-    <p class="sc-trend__summary">@(zoned ? Model.SummaryIn(Clinic) : Model.Summary)@(!Model.HasRange ? "" : Model.IsScreening ? " The shaded band is below the screening value; values at or above it need follow-up and are diamonds." : " The shaded band is the reference range; values outside it are diamonds.")</p>
+    <p class="sc-trend__summary">@(zoned ? Model.SummaryIn(Clinic) : Model.Summary)@(!Model.HasRange ? "" : Model.IsScreening ? " Values at or above the shaded band need follow-up and are diamonds." : " Values outside the shaded reference range are diamonds.")</p>
     <details class="sc-trend__values">
         <summary>The values as a table</summary>
         <div class="sc-table-wrap">
