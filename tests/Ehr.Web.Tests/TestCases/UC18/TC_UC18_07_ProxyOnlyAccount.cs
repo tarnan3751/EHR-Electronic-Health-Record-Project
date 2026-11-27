@@ -77,7 +77,7 @@ public class TC_UC18_07_ProxyOnlyAccount(WebApps apps) : IClassFixture<WebApps>
         using var chosen = await PostFormAsync(session.Client, "/portal/acting", "/portal/choose", ("grantId", grant));
         var home = await ReadAsync(chosen);
         Assert.Equal("/portal", PathOf(chosen));
-        Assert.Contains("Synthetic Cared&#x27;s record", home);
+        Assert.Contains("<dd>Synthetic Cared</dd>", home);
         Assert.Contains("Choose another record", home);
         Assert.Contains("href=\"/portal/results\"", home);
         Assert.Contains("Test results", await session.Client.GetStringAsync("/portal/results", Cancel));

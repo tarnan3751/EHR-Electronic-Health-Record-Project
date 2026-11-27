@@ -29,7 +29,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
             ("Body", "Synthetic: yes, nothing to worry about."));
         Assert.Equal(HttpStatusCode.OK, reply.StatusCode);
         var home = Words(await portal.Client.GetStringAsync("/portal", Cancel));
-        Assert.Contains("New 1 message from your care team.", home);
+        Assert.Contains("New 1 message.", home);
 
         await portal.Client.GetStringAsync($"/portal/messages/{thread}", Cancel);
         Assert.Contains("No new messages.", Words(await portal.Client.GetStringAsync("/portal", Cancel)));
@@ -120,7 +120,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         var home = Words(html);
         Assert.Contains("id=\"home-messages\"", html);
         Assert.Contains("Messages with the care team", home);
-        Assert.Contains("New 1 message from the care team.", home);
+        Assert.Contains("New 1 message.", home);
         Assert.DoesNotContain("your care team", home);
         Assert.Contains("Open messages", home);
 
@@ -166,7 +166,7 @@ public class PortalMessagingTests(WebApps apps) : IClassFixture<WebApps>
         var page = $"/patients/{patient.Patient}/messages/new";
         using var sent = await PostFormAsync(staff.Client, page, page, ("Subject", "Synthetic: your results"), ("Body", "Synthetic: please read."));
         Assert.Equal(HttpStatusCode.OK, sent.StatusCode);
-        Assert.Contains("New 1 message from your care team.", Words(await patient.Client.GetStringAsync("/portal", Cancel)));
+        Assert.Contains("New 1 message.", Words(await patient.Client.GetStringAsync("/portal", Cancel)));
 
         await ProxyTests.GiveAsync(patient, proxy.Email, scope);
         await ProxyTests.ViewAsync(proxy, await ProxyTests.GrantIdAsync(apps, patient.Patient));

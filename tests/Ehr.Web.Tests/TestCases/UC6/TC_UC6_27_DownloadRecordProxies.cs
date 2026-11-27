@@ -94,7 +94,8 @@ public class TC_UC6_27_DownloadRecordProxies(WebApps apps) : IClassFixture<WebAp
         {
             Assert.Equal("/portal", PathOf(after));
             var own = await ReadAsync(after);
-            Assert.Contains("Access ended. You can no longer see that record. This is your own.", Words(own));
+            Assert.Contains("Access ended. You can no longer see that record.", Words(own));
+            Assert.Contains("<h1>My record</h1>", own);
             Assert.DoesNotContain("Fhirchart", own);
         }
 
