@@ -37,7 +37,7 @@ Nothing is published: there is no GitHub release. Two ways:
   x64), and the `.deb` and AppImage (Linux, x86-64), and keeps none of them. A run started by hand with
   **upload_installers** keeps them as the run's artifacts for 7 days: `gh workflow run ci.yml --ref <branch> -f
   upload_installers=true`, then download `SwiftChart-macOS`, `SwiftChart-Windows` or `SwiftChart-Linux` from the run's
-  page. Add `-f desktop_version=0.2.1` to build them as another version, to test an
+  page. Add `-f desktop_version=1.0.1` to build them as another version, to test an
   update to it. The repository is public, so anyone signed in to GitHub can download them meanwhile: an upload is
   publishing (the owner's decision of 2026-11-26), which is why no run does it but one started by hand, and why they
   are kept 7 days and no longer. **What such a run keeps are unsigned test builds for a local stack:** not signed for

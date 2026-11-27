@@ -17,7 +17,7 @@ on:
         type: boolean
         default: false
       desktop_version:
-        description: Build the desktop installers as this version (such as 0.2.1, to test an update), not Cargo.toml's
+        description: Build the desktop installers as this version (such as 1.0.1, to test an update), not Cargo.toml's
         type: string
         default: ""
 

@@ -223,12 +223,12 @@ folder:
 
 ```
 {
-  "version": "0.2.1",
+  "version": "1.0.1",
   "notes": "What changed, in a sentence.",
   "pub_date": "2026-11-25T12:00:00Z",
   "platforms": {
     "darwin-aarch64": { "signature": "<the contents of SwiftChart.app.tar.gz.sig>", "url": "SwiftChart.app.tar.gz" },
-    "windows-x86_64": { "signature": "<the contents of the setup's .sig>", "url": "SwiftChart_0.2.1_x64-setup.exe" }
+    "windows-x86_64": { "signature": "<the contents of the setup's .sig>", "url": "SwiftChart_1.0.1_x64-setup.exe" }
   }
 }
 ```
@@ -238,8 +238,8 @@ are made on the owner's Mac with the updater's private key, never here or in CI 
 `EHR_DESKTOP_MINIMUM_VERSION`, set when starting the stack, makes both apps refuse to sync with an older desktop build,
 which then offers the update; its lock and offline charts still work. A build named EHR, from before step 20, says no
 version and is refused too. On macOS:
-`EHR_DESKTOP_MINIMUM_VERSION=0.2.1 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait`; in
-PowerShell: `$env:EHR_DESKTOP_MINIMUM_VERSION = "0.2.1"; docker compose -f compose.yaml -f compose.desktop-updates.yaml
+`EHR_DESKTOP_MINIMUM_VERSION=1.0.1 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait`; in
+PowerShell: `$env:EHR_DESKTOP_MINIMUM_VERSION = "1.0.1"; docker compose -f compose.yaml -f compose.desktop-updates.yaml
 up -d --wait; Remove-Item Env:EHR_DESKTOP_MINIMUM_VERSION`.
 
 ## Encryption

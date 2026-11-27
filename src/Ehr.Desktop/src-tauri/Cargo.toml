@@ -1,6 +1,6 @@
 [package]
 name = "ehr-desktop"
-version = "0.2.0"
+version = "1.0.0"
 description = "SwiftChart desktop app: Tauri shell, encrypted local SQLite, sync client"
 edition = "2024"
 publish = false
