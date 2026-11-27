@@ -51,7 +51,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to save or sign. Your work is still displayed."]);
+            return new(503, ["Saving or signing needs the clinic's server. Your work is still here."]);
         }
 
         var draft = await phi.ReadDraftAsync(id, patient, cancel);
@@ -138,7 +138,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
         // ReadDraft enforces ownership AND current panel assignment through RLS, even for a retried signature.
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to save or sign. Your work is still displayed."]);
+            return new(503, ["Saving or signing needs the clinic's server. Your work is still here."]);
         }
 
         var draft = await phi.ReadDraftAsync(id, patient, cancel);
@@ -205,7 +205,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to change this. Your reason is still displayed."]);
+            return new(503, ["This change needs the clinic's server. Your reason is still here."]);
         }
 
         reason = reason?.Trim();
@@ -284,7 +284,7 @@ public sealed class ClinicalNotes(EhrDbContext db, PhiReader phi, UserContext us
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to sign an addendum. Your text is still displayed."]);
+            return new(503, ["Signing an addendum needs the clinic's server. Your text is still here."]);
         }
 
         text = text?.ReplaceLineEndings("\n").Trim();
@@ -341,7 +341,7 @@ public sealed record AddendumResult(int Status, IReadOnlyList<string> Errors);
 
 public sealed record NoteResult(int Status, IReadOnlyList<string> Errors, ClinicalDraft? Draft = null, ClinicalNote? Note = null)
 {
-    public static NoteResult Missing => new(404, ["This draft is unavailable. Check your patient panel and draft ownership."]);
+    public static NoteResult Missing => new(404, ["This draft isn't available. Check that the patient is in My patients and the draft is yours."]);
     public static NoteResult Conflict => new(409, ["This draft changed elsewhere. Your text is still here. Open the saved draft in another tab and compare before saving again."]);
 }
 

@@ -32,7 +32,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to release a summary. Your text is still displayed."]);
+            return new(503, ["Releasing a summary needs the clinic's server. Your text is still here."]);
         }
 
         string[] parts = [.. new[] { talkedAbout, found, nextSteps }.Select(part => part?.ReplaceLineEndings("\n").Trim() ?? "")];
@@ -118,7 +118,7 @@ public sealed class VisitSummaries(EhrDbContext db, PhiReader phi, NoteWriteAuth
     {
         if (!authority.IsPrimaryHost)
         {
-            return new(503, ["The authoritative clinic server must be available to withdraw a summary. Your reason is still displayed."]);
+            return new(503, ["Withdrawing a summary needs the clinic's server. Your reason is still here."]);
         }
 
         reason = reason?.Trim();

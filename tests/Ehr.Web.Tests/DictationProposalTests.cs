@@ -485,7 +485,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
 
         using var refused = await DismissAsync(second, second.Order);
         Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-        Assert.Contains("Not saved: this proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
         Assert.StartsWith("ordered|", await StateAsync(apps, second.Order), StringComparison.Ordinal);
     }
 
@@ -706,7 +706,7 @@ public class DictationProposalTests(WebApps apps) : IClassFixture<WebApps>
         var responses = await Task.WhenAll(sent);
         Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Conflict], responses.Select(r => r.StatusCode).Order());
         var refused = responses.Single(r => r.StatusCode == HttpStatusCode.Conflict);
-        Assert.Contains("Not saved: this proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This proposal was already decided", RefillRequestTests.Said(await refused.Content.ReadAsStringAsync(Cancel)));
         Assert.StartsWith("dismissed|-|-", await StateAsync(apps, dictated.Order), StringComparison.Ordinal);
         Assert.Equal(["1"], await QueryAsync(apps,
             "SELECT count(*) FROM ehr.audit_events WHERE table_name = 'ai_chart_proposals' AND row_id = @id AND action = 'update'", dictated.Order));
