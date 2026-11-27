@@ -14,7 +14,8 @@
 }
 else
 {
-    @* The one thing to do first, then what follows from it as a short list. *@
+    @* The one thing to do first, then what follows from it as a short list, and the reason: one task, in one card. *@
+    <div class="sc-formcard sc-formcard--wide">
     <div class="sc-prose">
         <p>Not one of your patients. To open the chart, say why you need it, in @BreakGlass.MinimumReasonLength to @BreakGlass.MaximumReasonLength characters.</p>
         <ul>
@@ -32,5 +33,6 @@ else
         </div>
         <button class="sc-btn sc-btn--primary">Open the chart</button>
     </form>
+    </div>
 }
 <p><partial name="_BackToSearch" model="Model.Search" /></p>

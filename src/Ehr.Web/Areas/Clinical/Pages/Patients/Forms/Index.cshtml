@@ -14,7 +14,7 @@
     <partial name="_PatientBanner" model="new PatientBanner(patient)" />
 }
 <div class="sc-pagehead">
-    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id">Back to chart</a></p>
+    <p><a asp-page="/Patients/Chart" asp-route-id="@patient.Id" class="sc-back">Back to chart</a></p>
 </div>
 <h1>Pre-visit forms: @patient.FamilyName, @patient.GivenName</h1>
 @if (Model.Asked)
@@ -31,6 +31,7 @@ else if (Model.Forms.Hidden > 0)
 }
 
 @* Asking comes first: the cursor starts in it (NFR-12). *@
+<div class="sc-sheet">
 <h2>Ask for a form</h2>
 @if (!Model.OnPanel)
 {
@@ -73,6 +74,7 @@ else
         <div class="sc-actions"><button class="sc-btn sc-btn--primary">Ask for form</button></div>
     </form>
 }
+</div>
 
 @if (Model.Forms.SensitiveShown)
 {
@@ -90,12 +92,12 @@ else
     <h2>Forms by visit</h2>
     @if (Model.Forms.Forms.Count == 0)
     {
-        <p class="sc-muted">No pre-visit forms.</p>
+        <p class="sc-empty">No pre-visit forms.</p>
     }
     @foreach (var visit in Model.Forms.Forms.GroupBy(form => form.AppointmentId))
     {
         var first = visit.First();
-        <section class="sc-panel" id="appointment-@visit.Key" aria-labelledby="appointment-@visit.Key-title" data-form-visit>
+        <section class="sc-panel sc-sheet" id="appointment-@visit.Key" aria-labelledby="appointment-@visit.Key-title" data-form-visit>
             <h3 class="sc-panel__title" id="appointment-@visit.Key-title">@Clinic.Format(first.AppointmentStartsAt) with @first.AppointmentClinician <span class="sc-tag">@AppointmentStatus.Names[first.AppointmentStatus]</span></h3>
             <ul class="sc-list">
                 @foreach (var form in visit)

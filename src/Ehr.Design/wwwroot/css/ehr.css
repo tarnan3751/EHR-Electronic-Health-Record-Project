@@ -3319,6 +3319,29 @@
         border-bottom: 0;
     }
 
+    /* Quick text: adding a phrase is a panel, and the phrases a framed list under it, shown once there is one. */
+    #add-quick-text {
+        padding: var(--space-5) var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    #quick-texts {
+        padding: 0 var(--space-6);
+        background: var(--surface-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+
+    #quick-texts > li:last-child {
+        border-bottom: 0;
+    }
+
+    #quick-texts:not(:has(li)) {
+        display: none;
+    }
+
     /* Portal pages: everything under /portal, at a phone's width first. Rules for those pages only go under this
        comment; anything two areas share belongs in the components layer.
        ---- */

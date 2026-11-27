@@ -16,11 +16,11 @@
 <div class="sc-pagehead">
     @if (Model.FromInbox)
     {
-        <p><a asp-page="/Inbox/Index">Back to inbox</a></p>
+        <p><a asp-page="/Inbox/Index" class="sc-back">Back to inbox</a></p>
     }
     else
     {
-        <p><a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true" asp-fragment="appointment-@form.AppointmentId">Back to pre-visit forms</a></p>
+        <p><a asp-page="Index" asp-route-patientId="@patient.Id" asp-route-sensitive="true" asp-fragment="appointment-@form.AppointmentId" class="sc-back">Back to pre-visit forms</a></p>
     }
 </div>
 <h1>Pre-visit form: @patient.FamilyName, @patient.GivenName</h1>
@@ -37,7 +37,7 @@
         <p class="sc-notice sc-notice--danger" data-form-alert><span class="sc-notice__state">Needs review.</span> Question @number, "@item.Text".</p>
     }
 }
-<section class="sc-panel" aria-label="The form">
+<section class="sc-panel sc-sheet" aria-label="The form">
     <dl class="record">
         <dt>Questionnaire</dt><dd>@form.Title <span class="sc-tag sc-tag--warning">Sensitive</span></dd>
         <dt>Before</dt><dd>@Clinic.Format(form.AppointmentStartsAt) with @form.AppointmentClinician</dd>
@@ -49,6 +49,7 @@
         }
     </dl>
 </section>
+<div class="sc-sheet">
 <h2>Answers</h2>
 <p>@definition.Prompt</p>
 @* Each question, then the answer chosen beneath it, with its score when the question is scored (sc-answers). *@
@@ -67,3 +68,4 @@
 {
     <p class="sc-muted">@attribution</p>
 }
+</div>
