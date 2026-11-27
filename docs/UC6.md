@@ -4,7 +4,7 @@ SwiftChart EHR · Simar Rekhi · CS 3354 Software Engineering, Fall 2026
 
 ## Patient workflow
 
-Sign in to the portal and choose **Results** in the navigation, or **See your test results** on the portal home (`/portal/results`). Each released result shows the test, the date the sample was taken (on the clinic's calendar, labelled with its time zone), the value with its unit, and whether it is low, normal or high. Open a result to read its normal range, what the result means in plain language, what the test measures, and any note from the care team. With no released results, the page says so and points the patient to their care team.
+Sign in to the portal and choose **Results** in the navigation, or **See your test results** on the portal home (`/portal/results`). Each released result shows the test, by a short name ("Hematocrit", with its full LOINC name when opened; a vital sign as the clinic's form labels it), with units as UCUM prints them ("10³/µL"), the date the sample was taken (on the clinic's calendar, labelled with its time zone), the value with its unit, and whether it is low, normal or high. Open a result to read its normal range, what the result means in plain language, what the test measures, and any note from the care team. With no released results, the page says so and points the patient to their care team.
 
 ## Decisions
 

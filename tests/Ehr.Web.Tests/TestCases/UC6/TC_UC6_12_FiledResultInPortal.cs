@@ -20,8 +20,8 @@ namespace Ehr.Web.Tests.TestCases.UC6;
 //   1. As the patient, open "Results" before anything is filed.
 //   2. As the clinician, file the result. Don't acknowledge it.
 //   3. As the patient, open "Results". As the second patient, open "Results".
-// Expected result: Step 1: no results. Step 3: the patient sees "Hemoglobin [Mass/volume] in Blood" with 9.1 g/dL and
-//   the range 12 to 17.5; the second patient sees no results.
+// Expected result: Step 1: no results. Step 3: the patient sees "Hemoglobin", with its full name "Hemoglobin
+//   [Mass/volume] in Blood" under it, 9.1 g/dL and the range 12 to 17.5; the second patient sees no results.
 // Creator: Tahseen Arnan
 public class TC_UC6_12_FiledResultInPortal(WebApps apps) : IClassFixture<WebApps>
 {
@@ -40,7 +40,8 @@ public class TC_UC6_12_FiledResultInPortal(WebApps apps) : IClassFixture<WebApps
         Assert.Equal([$"{Hemoglobin} 9.1 low"], await FiledAsync(apps, patient));
 
         var results = await portal.Client.GetStringAsync("/portal/results", Cancel);
-        Assert.Contains("Hemoglobin [Mass/volume] in Blood", results);
+        Assert.Contains("<strong>Hemoglobin</strong>", results);
+        Assert.Contains("Full name: Hemoglobin [Mass/volume] in Blood", results);
         Assert.Contains("9.1", results);
         Assert.Contains("12", results);
         Assert.Contains("17.5", results);

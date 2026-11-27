@@ -155,7 +155,7 @@ else
                             var flag = ResultExplanation.Flag(result);
                             <tr>
                                 <td>
-                                    @result.Display
+                                    @ForPatients.Name(result.Code, result.Display)
                                     @if (result.Note is { Length: > 0 } note)
                                     {
                                         <br><span class="sc-muted">Note from the care team: @note</span>
@@ -196,8 +196,8 @@ else
                                 ? new BloodPressure(sign, diastolic.Observation).Text
                                 : sign.Value?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
                             <tr>
-                                <td>@(entry.Diastolic is null ? VitalSigns.Name(sign.Code ?? "", sign.Display) : "Blood pressure")</td>
-                                <td>@value @Units.Shown(sign.Unit)</td>
+                                <td>@(entry.Diastolic is null ? ForPatients.Name(sign.Code, sign.Display) : "Blood pressure")</td>
+                                <td>@value @ForPatients.Unit(sign.Unit)</td>
                                 <td>@Clinic.Format(sign.EffectiveAt, "MMM d, yyyy HH:mm")</td>
                             </tr>
                         }
