@@ -64,7 +64,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
         {
             using var moved = await AppointmentTests.ChangeAsync(visit.Session.Client, visit.Appointment, "Reschedule",
                 ("Day", Day(visit, days)), ("Time", "16:00"), ("Minutes", 20), ("Reason", "Synthetic: follow-up"));
-            Assert.Contains("Appointment rescheduled:", Words(await ReadAsync(moved)));
+            Assert.Contains("Appointment rescheduled.", Words(await ReadAsync(moved)));
         }
 
         await RescheduleAsync(12);
@@ -90,7 +90,7 @@ public class TC_UC22_12_RescheduledAndCancelled(WebApps apps) : IClassFixture<We
 
         using (var cancelled = await AppointmentTests.ChangeAsync(visit.Session.Client, visit.Appointment, "Cancel", ("CancelReason", "Synthetic: unwell")))
         {
-            Assert.Contains("Appointment cancelled:", Words(await ReadAsync(cancelled)));
+            Assert.Contains("Appointment cancelled.", Words(await ReadAsync(cancelled)));
         }
 
         // The PHQ-9 had been filled in before the cancellation, question 9 included: not sent, and said so, with the help.

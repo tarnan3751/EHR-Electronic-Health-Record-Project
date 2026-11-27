@@ -25,7 +25,7 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 // Expected result: Step 1: the form shows the patient's banner, with the signed-in clinician chosen, and is one
 //   recorded read. Step 2: the chart lists the appointment under "Appointments" with its time, length, clinician and
 //   reason; the row's booker is the clinician and the write audit names them. Step 3: the day shows 09:30 to 09:50
-//   UTC, the patient linked to their chart, the reason and "Booked". Step 4: the page says "Checked in:"; the
+//   UTC, the patient linked to their chart, the reason and "Booked". Step 4: the page says "Checked in."; the
 //   appointment is fulfilled and names a visit of the patient, in progress, with the appointment's reason; the chart's
 //   recent visits list it; the appointment offers no more changes.
 // Creator: Tahseen Arnan
@@ -65,7 +65,7 @@ public class TC_UC16_01_SuccessfulFlow(WebApps apps) : IClassFixture<WebApps>
 
         using var checkedIn = await ChangeAsync(session.Client, appointment, "CheckIn");
         var after = await ReadAsync(checkedIn);
-        Assert.Contains("Checked in: the visit has started and is on the chart.", Words(after));
+        Assert.Contains("Checked in. The visit has started and is on the chart.", Words(after));
         Assert.DoesNotContain("Cancel appointment</button>", after);
         Assert.Equal(["fulfilled in-progress Synthetic: blood pressure check"], await RowsAsync(apps, patient,
             "status || ' ' || (SELECT e.status || ' ' || e.reason FROM ehr.encounters e WHERE e.id = encounter_id AND e.patient_id = appointments.patient_id)"));

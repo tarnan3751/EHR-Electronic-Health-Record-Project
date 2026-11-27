@@ -29,9 +29,9 @@ namespace Ehr.Web.Tests.TestCases.UC16;
 //   3. Book another appointment. Off-site with the link down, open the chart, the day and the appointment, and post
 //      a cancellation.
 // Expected result: Step 1: before giving a reason, both requests are answered with a redirect to the chart; after,
-//   the appointment page shows the appointment and "Add this patient to your panel to change their appointments.",
-//   with no forms, and the post changes nothing. Step 2: the second post is answered 409 with "Not saved: this
-//   appointment was changed by someone else first." Step 3: the chart says "Booking an appointment needs the clinic's
+//   the appointment page shows the appointment and "To change this appointment, add this patient to My patients.",
+//   with no forms, and the post changes nothing. Step 2: the second post is answered 409 with "Not saved. This
+//   appointment changed while the page was open." Step 3: the chart says "Booking an appointment needs the clinic's
 //   server."; the day lists the appointment; its page says "Changing an appointment needs the clinic's server. The
 //   schedule remains readable."; the post is answered 503 and the appointment stays booked.
 // Creator: Tahseen Arnan
@@ -61,7 +61,7 @@ public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         Assert.DoesNotContain("data-book-appointment", chart);
         var readOnly = await covering.Client.GetStringAsync($"/appointments/{appointment}", Cancel);
         Assert.Contains("Synthetic: follow-up", readOnly);
-        Assert.Contains("Add this patient to your panel to change their appointments.", readOnly);
+        Assert.Contains("To change this appointment, add this patient to My patients.", readOnly);
         Assert.DoesNotContain("<form method=\"post\" action=\"/appointments", readOnly);
         using var refused = await noRedirects.PostAsync($"/appointments/{appointment}?handler=Cancel",
             Form(("__RequestVerificationToken", Token(readOnly)), ("CancelReason", "Synthetic")), Cancel);
@@ -80,7 +80,7 @@ public class TC_UC16_04_ExceptionalCondition(WebApps apps) : IClassFixture<WebAp
         using var cancelled = await ChangeAsync(session.Client, appointment, "Cancel", ("CancelReason", "Synthetic: first"));
         using var late = await session.Client.PostAsync($"/appointments/{appointment}?handler=NoShow", Form(("__RequestVerificationToken", stale), ("Version", "2")), Cancel);
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
-        Assert.Contains("Not saved: this appointment was changed by someone else first.", Words(await late.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved. This appointment changed while the page was open.", Words(await late.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal(["cancelled"], await RowsAsync(apps, patient));
         // Two updates were saved: the reschedule and the cancellation.
         Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.Update, clinician.Id, patient));

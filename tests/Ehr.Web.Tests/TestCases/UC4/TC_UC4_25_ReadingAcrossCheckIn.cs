@@ -54,7 +54,7 @@ public class TC_UC4_25_ReadingAcrossCheckIn(WebApps apps) : IClassFixture<WebApp
 
         using var booked = await AppointmentTests.BookAsync(session.Client, patient, clinician.Id, AppointmentTests.Day(0), at, "Synthetic: blood pressure check");
         using var checkedIn = await AppointmentTests.ChangeAsync(session.Client, await AppointmentTests.IdAsync(apps, patient), "CheckIn");
-        Assert.Contains("Checked in:", Words(await ReadAsync(checkedIn)));
+        Assert.Contains("Checked in.", Words(await ReadAsync(checkedIn)));
         if (!typedFirst)
         {
             await RecordFirstAsync();

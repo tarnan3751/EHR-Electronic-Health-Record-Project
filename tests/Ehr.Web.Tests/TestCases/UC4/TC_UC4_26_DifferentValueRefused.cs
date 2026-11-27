@@ -62,7 +62,7 @@ public class TC_UC4_26_DifferentValueRefused(WebApps apps) : IClassFixture<WebAp
 
         using var booked = await AppointmentTests.BookAsync(session.Client, patient, clinician.Id, AppointmentTests.Day(0), "10:00", "Synthetic: blood pressure check");
         using var checkedIn = await AppointmentTests.ChangeAsync(session.Client, await AppointmentTests.IdAsync(apps, patient), "CheckIn");
-        Assert.Contains("Checked in:", Words(await ReadAsync(checkedIn)));
+        Assert.Contains("Checked in.", Words(await ReadAsync(checkedIn)));
         using var after = await RecordAtAsync(session.Client, patient, taken, (Systolic, "130"), (Diastolic, "80"));
         await RefusedAsync(after, Systolic, Pressure, "130", "80");
         using var withRate = await RecordAtAsync(session.Client, patient, taken, (Systolic, "130"), (Diastolic, "80"), (HeartRate, "70"));

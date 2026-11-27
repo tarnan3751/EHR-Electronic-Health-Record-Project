@@ -34,7 +34,7 @@ public class CheckInRefusedTests(WebApps apps) : IClassFixture<WebApps>
         using var checkedIn = await AppointmentTests.ChangeAsync(session.Client, appointment, "CheckIn");
 
         Assert.Equal(HttpStatusCode.Conflict, checkedIn.StatusCode);
-        Assert.Contains("Not saved:", Words(await checkedIn.Content.ReadAsStringAsync(Cancel)));
+        Assert.Contains("Not saved.", Words(await checkedIn.Content.ReadAsStringAsync(Cancel)));
         Assert.Equal(["booked none"], await ProxyTests.QueryAsync(apps,
             "SELECT status || ' ' || coalesce(encounter_id::text, 'none') FROM ehr.appointments WHERE patient_id = @patient", patient));
         Assert.Equal(["0"], await ProxyTests.QueryAsync(apps, "SELECT count(*)::text FROM ehr.encounters WHERE patient_id = @patient", patient));

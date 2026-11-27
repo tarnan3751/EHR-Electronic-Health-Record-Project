@@ -45,14 +45,14 @@ public class TC_UC16_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
 
         using var moved = await ChangeAsync(session.Client, ids[0], "Reschedule",
             ("Day", Day(2)), ("Time", "10:30"), ("Minutes", 30), ("Reason", "Synthetic: first, moved"));
-        Assert.Contains("Appointment rescheduled:", Words(await ReadAsync(moved)));
+        Assert.Contains("Appointment rescheduled.", Words(await ReadAsync(moved)));
         using var cancelled = await ChangeAsync(session.Client, ids[1], "Cancel",
             ("CancelReason", "Synthetic: patient asked to cancel"));
         var cancelledPage = await ReadAsync(cancelled);
-        Assert.Contains("Appointment cancelled:", Words(cancelledPage));
+        Assert.Contains("Appointment cancelled.", Words(cancelledPage));
         Assert.Contains("Synthetic: patient asked to cancel", cancelledPage);
         using var missed = await ChangeAsync(session.Client, ids[2], "NoShow");
-        Assert.Contains("Marked as a no-show:", Words(await ReadAsync(missed)));
+        Assert.Contains("Marked as a no-show.", Words(await ReadAsync(missed)));
 
         Assert.Equal(["booked 30 Synthetic: first, moved -", "cancelled 20 Synthetic: second Synthetic: patient asked to cancel", "noshow 20 Synthetic: third -"],
             await RowsAsync(apps, patient, "concat_ws(' ', status, minutes, reason, coalesce(cancel_reason, '-'))"));
@@ -68,7 +68,7 @@ public class TC_UC16_02_AlternativeFlow(WebApps apps) : IClassFixture<WebApps>
         var colleagueSession = await SignInAsync(apps.OnPrem, colleague);
         var seen = await colleagueSession.Client.GetStringAsync($"/schedule?clinician={clinician.Id}&day={Day(2)}", Cancel);
         Assert.Contains("10:30 to 11:00 UTC", seen);
-        Assert.Contains("Not on your panel", seen);
+        Assert.Contains("Not one of your patients", seen);
         Assert.DoesNotContain("Synthetic: first, moved", seen);
         // On their own day they see the reason for their own appointment.
         Assert.Contains("Synthetic: second", await colleagueSession.Client.GetStringAsync($"/schedule?day={Day(2)}", Cancel));
