@@ -98,7 +98,7 @@ To remove it: **Settings > Apps > Installed apps > SwiftChart > Uninstall**, whi
 
 ## Updates
 
-SwiftChart asks before it updates, and never over the lock or a recording (`docs/UC7.md`). **Get it ready** downloads
+SwiftChart asks before it updates, and never over the lock or a recording (`docs/UC7.md`). **Download update** downloads
 the update and checks its signature; on a Mac it then installs at once and runs from the next start, and on Windows it
 installs at **Restart now**, which shows the installer's progress and starts SwiftChart again. Either way what SwiftChart
 keeps stays, since the identifier is the same: the next start opens on the lock, with the sign-in kept, and drafts and

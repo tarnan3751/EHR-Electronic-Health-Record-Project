@@ -30,7 +30,7 @@ and 10a, 11b and 12b of 25 November 2026; proposed FR-68). `src/Ehr.Desktop/src-
   most (the desktop records 60 seconds at most), and count as activity.
 
 **The warning** is the web's session warning (the `sc-dialog` component), in words for a lock: "This window will lock
-soon", the countdown, that what was typed stays and sync carries on, **Stay unlocked** (the focus; Escape does the same)
+soon", the countdown, **Stay unlocked** (the focus; Escape does the same)
 and **Lock now**.
 
 **What the lock covers.** The app bar and the page are made inert and hidden: nothing in them can be focused, clicked,
@@ -57,8 +57,7 @@ A server's no stands: once one has said "wrong password" or "locked out", nothin
 **Only the servers the sign-in was made with** answer for the lock (step 19a's final review). Any server can answer yes
 to a password, so the app keeps, with the lock's record, the servers each sign-in was made with (the built-in ones, or
 `EHR_SYNC_SERVERS` in a development build), and asks only those. Started with any others, it forgets the kept sign-in and its record before
-anything is sent, the token included, and the sign-in form says: "Signed out. SwiftChart started with different
-servers from the ones you signed in with. Sign in again. Nothing on this computer was deleted." So the hash on this computer isn't used then either: the lock is gone, and only a sign-in opens the offline
+anything is sent, the token included, and the sign-in form says: "Signed out. The servers changed since you signed in." So the hash on this computer isn't used then either: the lock is gone, and only a sign-in opens the offline
 charts. A release build takes HTTPS servers only, so nothing on the computer can stand in for one unauthenticated, and
 since step 20 only the ones it was built for (`EHR_BUILD_SERVERS` when it was compiled), so it can't be started pointing
 at another server at all; the sign-in form names them ("Signs in to: …"), so a person can see where their password
@@ -67,7 +66,7 @@ goes.
 **Past the 12 hours with no server** (decided under the plan's first principle: an outage is when the offline chart is
 needed, and the password still has to be known). The password alone opens the offline charts, to read and to save
 drafts and recordings on this computer, which wait in its outbox. A banner says so, with when the charts were last
-updated, and **Sign in now**: "Offline. Sign in with your code as soon as the clinic's server can be reached.",
+updated, and **Sign in now**: "Offline. Sign in when the clinic's server can be reached.",
 or "Sign in again." once a server answers. The window isn't locked again each time a server says the 12 hours
 are over (the cloud app does, every 10 seconds, while the clinic's server is cut off, and the sign-in itself needs the
 clinic's server); its next lock asks for the full sign-in again. The offline charts still close 30 days after the
@@ -118,18 +117,17 @@ asks for (Tahseen's ruling 11b of 25 November 2026, proposed FR-68; `src/Ehr.Web
 
 The offline charts are refreshed only by **Download my charts**; nothing in the background refreshes them. Since step
 19a stops every sync 12 hours after a sign-in until the next one (`docs/UC8.md`), a computer left running can hold a
-copy older than it would have, so the offline charts now say how old they are: "Offline charts last updated 2026-11-25
+copy older than it would have, so the offline charts now say how old they are: "Offline charts updated 2026-11-25
 14:05 CST.", on the clinic's clock as the charts' own times are (step 10d), under the section's description. The time is
 recorded with each download, by this computer's clock, in the encrypted store (`charts.rs`); charts downloaded by an
-earlier build say that when isn't recorded, until they are downloaded again.
+earlier build say "Offline charts updated: date unknown.", until they are downloaded again.
 
 ## When the 30 days pass offline (the plan's step 20)
 
 A sign-in's session lets the app open its offline copy for 30 days (the sign-in's `offlineAccess`). A computer that
 stops reaching any server, a revoked one that is never connected again included, could otherwise keep its charts open
 with the password alone. So, Tahseen's ruling 14b: when the 30 days pass, by this computer's clock, the window locks,
-as soon as no recording holds it off, and also opens on that lock at start: "Locked. It's been 30 days since you
-signed in, so the offline charts are closed. Nothing on this computer was deleted." Only a full sign-in, the password
+as soon as no recording holds it off, and also opens on that lock at start: "Locked. Offline access expired." Only a full sign-in, the password
 and the code, opens it, and only once a server can complete one: the password alone is never enough, whether or not a
 server can be reached (`lock.rs`, `Why::OfflineEnded`). Nothing is deleted, and the session is kept, so the next server
 to answer says what became of it: a revoked one is wiped (below); one merely over is ended, keeping what the
@@ -165,9 +163,8 @@ In this order, so that a crash at any point leaves nothing readable and the next
    again, so nothing it showed or had typed in it stays in memory.
 4. The kept sign-in, last: until then a start after a crash presents it again and is told again.
 
-The window then shows only: "Deleted. An administrator revoked this computer's sign-in, so SwiftChart deleted the
-offline charts and everything else it kept here. Drafts and recordings not yet sent are lost. Quit SwiftChart. When it
-starts again, it's empty and you can sign in.", with **Quit SwiftChart**; every command is refused. If something
+The window then shows only: "Deleted. An administrator revoked this computer's sign-in. Unsent drafts and recordings are lost.", with
+**Quit SwiftChart**; every command is refused. If something
 couldn't be deleted, it says "Not finished." and what, and starting again finishes it. Drafts and recordings not yet
 sent are lost, by design: the administrator is told before revoking. One way past it: a clinician who signs in again
 with the password and the code before the app's first round reaches a server replaces the revoked sign-in, so nothing
@@ -186,10 +183,9 @@ only: the page has no permission for the updater.
   into the app (`tauri.conf.json`, `plugins.updater.pubkey`) for the very version announced (`requireSignedVersion`), so
   nobody who can change what a server says can pair a new version number with an older release. The updater checks it
   after downloading and again before installing; a signature that doesn't match installs nothing: "Not installed.
-  SwiftChart … couldn't be downloaded or installed, or its signature didn't match. Nothing was changed." An
+  SwiftChart … couldn't be downloaded, verified or installed." An
   interrupted download fails the same check. The signing key never reaches CI (`docs/desktop-install.md`).
-- **When:** it asks, and only while the window is unlocked and nothing is recording: "Update available. Get SwiftChart …
-  ready, and it installs at the next restart. Nothing you've saved is affected.", with **Get it ready**
+- **When:** it asks, and only while the window is unlocked and nothing is recording: "Update available. SwiftChart ….", with **Download update**
   and **Not now**, which puts it away; a notice that it failed can be put away too. The daily check goes on all the
   same, and offers a release again unless it's the one put away; a check gives up after 30 seconds. Got ready, on macOS
   the checked app replaces this one on disk at once, swapped whole, and runs from the next start; on Windows its

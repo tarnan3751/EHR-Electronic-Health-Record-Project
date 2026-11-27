@@ -34,8 +34,8 @@ Write down, for each numbered step, whether you saw what it says, and anything t
 1. **The warning.** In the desktop app, open a chart, type a sentence under **New draft**, don't save, and leave the
    keyboard and mouse alone. After about 2½ minutes: a dialog "This window will lock soon" with a countdown, the focus on
    **Stay unlocked**. Press Enter: it closes, and your sentence is there.
-2. **The lock.** Leave it alone again until it locks. You should see only the lock: the mark, "Locked. Nothing was done
-   here for 3 minutes.", when the offline charts were last updated, **Password**, **Unlock**, and **Sign out** under your
+2. **The lock.** Leave it alone again until it locks. You should see only the lock: the mark, "Locked. Inactive for 3
+   minutes.", when the offline charts were last updated, **Password**, **Unlock**, and **Sign out** under your
    name. Nothing of the chart. Then:
    - press Tab several times: the focus goes only to the lock's field and buttons;
    - turn VoiceOver on (Cmd+F5), let it read, and turn it off: it reads only the lock;
@@ -47,7 +47,7 @@ Write down, for each numbered step, whether you saw what it says, and anything t
    the moment it shows. "You'll be signed out soon", the focus on **Stay signed in**. Press Enter: it closes, and your
    sentence is there. Then minimize Safari (Cmd+M) and leave it: steps 11 and 12 come back to it.
 5. **A recording is never locked over.** In the desktop app choose **Record audio** and leave the app alone. It stops
-   itself at 60 seconds and says "Recording saved on this device". No warning or lock while it records and saves; the
+   itself at 60 seconds and says "Recording saved.". No warning or lock while it records and saves; the
    lock comes 3 minutes after.
 6. **The clinic's server cut off, then the network off.** Unlock. From `infra/compose`, `docker compose stop onprem-app`:
    the app now reaches only the cloud app, which can't check a password without the clinic's server. Wait for the
@@ -74,10 +74,10 @@ Write down, for each numbered step, whether you saw what it says, and anything t
     EHR_DEBUG_IDLE_SECONDS=180 EHR_DEBUG_SIGN_IN_SECONDS=150 cargo tauri dev
     ```
 
-    - Your sign-in is older than that, so it opens on "Locked. A sign-in lasts at most 12 hours.", with **Password** and
-      **Code** and a highlighted "Offline charts last updated … Nothing is brought back until you sign in again." Sign in
+    - Your sign-in is older than that, so it opens on "Locked. Your sign-in expired.", with **Password** and
+      **Code** and a highlighted "Offline charts updated …" Sign in
       with your password and a code: it opens. (The server's own 12 hours aren't shortened: TC-UC8-07 tests those.)
-    - About 2 minutes later a dialog says "A sign-in lasts at most 12 hours, and yours ends in …" with **Keep working**;
+    - About 2 minutes later a dialog says "Your sign-in ends in …" with **Keep working**;
       press it. At 2½ minutes the window locks again, asking for the password and the code.
     - `docker compose stop onprem-app cloud-app`, type the password only, and **Sign in**: it opens, with a banner
       "Offline. Sign in with your code as soon as the clinic's server can be reached.", the charts' time, and

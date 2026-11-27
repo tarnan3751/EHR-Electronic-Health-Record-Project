@@ -63,8 +63,8 @@ async function refresh() {
     chartsUpdated = view.chartsUpdated;
     renderChartsUpdated();
     byId('clinical-waiting').textContent = view.clinicalWaiting
-      ? `${view.clinicalWaiting} draft or recording changes need sync or review.`
-      : 'No draft or recording changes waiting.';
+      ? `${view.clinicalWaiting} ${view.clinicalWaiting === 1 ? 'draft or recording' : 'drafts or recordings'} waiting.`
+      : 'No drafts or recordings waiting.';
     if (selectedPatient) void openChart(selectedPatient, false);
     renderConflicts(view.conflicts);
     renderPhrases(view.phrases, signedIn);
@@ -85,17 +85,17 @@ function renderStatus(status, waiting) {
   connection.replaceChildren(el('span', { className: 'sc-conn__dot' }), el('span', {}, ...words));
 
   byId('waiting').textContent =
-    waiting === 0 ? 'No Quick text changes waiting.' : `${waiting} ${waiting === 1 ? 'change' : 'changes'} waiting to send.`;
+    waiting === 0 ? 'All changes sent.' : `${waiting} ${waiting === 1 ? 'change' : 'changes'} not sent.`;
   byId('checked').textContent = checked ? `Checked at ${new Date(status.checkedAt).toLocaleTimeString()}.` : '';
   show(byId('sync-problem'), status.problem);
 }
 
 // An update (src-tauri/src/updates.rs), which the Rust side gives only while the window is unlocked and nothing is
-// recording: offered, being got ready, ready for a restart, or not installed. Each notice starts with its state word.
+// recording: offered, downloading, ready for a restart, or not installed. Each notice starts with its state word.
 const updateWords = {
-  offered: (update) => ['Update available.', ` Get SwiftChart ${update.version} ready, and it installs at the next restart. Nothing you've saved is affected.`],
-  downloading: (update) => ['Getting it ready.', ` Downloading SwiftChart ${update.version} and checking its signature.`],
-  ready: (update) => ['Ready.', ` SwiftChart ${update.version} is ready to install. Save what you're typing, then choose Restart now. Restarting closes this window.`],
+  offered: (update) => ['Update available.', ` SwiftChart ${update.version}.`],
+  downloading: (update) => ['Downloading.', ` SwiftChart ${update.version}.`],
+  ready: (update) => ['Ready to install.', ` SwiftChart ${update.version}. Save what you're typing before you restart.`],
   failed: (update) => ['Not installed.', ` ${update.problem}`],
 };
 
@@ -185,14 +185,14 @@ function conflictItem(conflict) {
 
   const content = conflict.canKeepMine
     ? [
-        notice('Not saved.', 'Someone else saved this phrase before your change reached the server. Choose which version to keep.'),
+        notice('Not saved.', 'Someone else changed this phrase.'),
         bothVersions(theirs, conflict),
         actions(button('Keep mine', resolve(true)), button('Keep theirs', resolve(false))),
       ]
     : [
         notice('Not saved.', theirs
-          ? `${theirs.shortcut} is already in use by another phrase.`
-          : `The server didn't accept your change. ${conflict.message ?? ''}`),
+          ? `${theirs.shortcut} is already in use.`
+          : conflict.message ?? 'The server refused this change.'),
         el('dl', { className: 'sc-versions' }, version('Mine (not saved)', ...phraseText(conflict))),
         actions(button('Discard mine', resolve(false), 'sc-btn sc-btn--danger')),
       ];
@@ -220,7 +220,7 @@ function renderPhrases(phrases, signedIn) {
 function phraseItem(phrase, signedIn) {
   const li = el('li', {}, ...phraseText(phrase));
   li.dataset.id = phrase.id;
-  if (phrase.pending) li.append(el('span', { className: 'sc-tag sc-tag--warning sc-quicktext__pending', textContent: 'Not sent yet' }));
+  if (phrase.pending) li.append(el('span', { className: 'sc-tag sc-tag--warning sc-quicktext__pending', textContent: 'Not sent' }));
   if (signedIn) {
     li.append(
       button('Edit', () => {
@@ -299,7 +299,7 @@ async function saveEdit(li, id, version, mine) {
         el(
           'div',
           { className: 'sc-conflict' },
-          notice('Not saved.', 'Someone else saved this phrase while you were editing it. Choose which version to keep.'),
+          notice('Not saved.', 'Someone else changed this phrase.'),
           bothVersions(answer.current, mine),
           actions(button('Keep mine', () => saveEdit(li, id, answer.current.version, mine)), button('Keep theirs', () => closeEdit(li))),
         ),
@@ -446,16 +446,16 @@ async function loadPanel() {
     el('li', {}, button(`${patient.name} · MRN ${patient.mrn}`, () => openChart(patient.id), 'sc-btn sc-btn--quiet')),
   ));
   if (panel.length === 0) {
-    list.append(el('li', { className: 'sc-muted', textContent: 'No charts downloaded. Add patients to My patients in the web app, then download them here.' }));
+    list.append(el('li', { className: 'sc-muted', textContent: 'No charts downloaded.' }));
   }
   if (selectedPatient && !panel.some((patient) => patient.id === selectedPatient)) clearChart();
 }
 
-// "Offline charts last updated …", on the clinic's clock when the charts named it. Only Download my charts refreshes
+// "Offline charts updated …", on the clinic's clock when the charts named it. Only Download my charts refreshes
 // them, so this says how old the copy is; charts downloaded by a build that didn't record it say so.
 function chartsUpdatedText(updated) {
-  if (updated) return `Offline charts last updated ${clinicStamp(new Date(updated.at).toISOString(), updated.clinicTimeZone)}.`;
-  return panelSize ? 'When these charts were downloaded isn\'t recorded. Download them again to record it.' : '';
+  if (updated) return `Offline charts updated ${clinicStamp(new Date(updated.at).toISOString(), updated.clinicTimeZone)}.`;
+  return panelSize ? 'Offline charts updated: date unknown.' : '';
 }
 
 function renderChartsUpdated() {
@@ -500,7 +500,7 @@ function signedNotes(notes, zone) {
       ...part('Assessment', note.assessment), ...part('Plan', note.plan),
       ...note.addenda.flatMap((addendum) => part(`${addendum.notNoteAuthor ? `Addendum by ${addendum.author}, not the note's author` : `Addendum · ${addendum.author}`} · ${stamp(addendum.signedAt)}`, addendum.text)),
       ...(note.sensitiveAddendaNotKept
-        ? [el('p', { className: 'sc-muted', textContent: `${note.sensitiveAddendaNotKept} sensitive ${note.sensitiveAddendaNotKept === 1 ? 'addendum is' : 'addenda are'} not kept offline. Open the note on the clinic's site to see them.` })]
+        ? [el('p', { className: 'sc-muted', textContent: `${note.sensitiveAddendaNotKept} sensitive ${note.sensitiveAddendaNotKept === 1 ? 'addendum is' : 'addenda are'} not shown offline.` })]
         : []),
     )) : [el('p', { className: 'sc-muted', textContent: 'No signed notes.' })]));
 }
@@ -525,7 +525,7 @@ async function openChart(patient, reset = true) {
     chartSection('Diagnoses', chart.conditions.map((c) => details(c.display, c.onsetDate))),
     // Sensitive diagnoses and medications are never kept on this device: say so, rather than look complete.
     ...(chart.sensitiveNotKept
-      ? [el('p', { className: 'sc-muted', textContent: `${chart.sensitiveNotKept} sensitive ${chart.sensitiveNotKept === 1 ? 'item is' : 'items are'} not kept offline. Open the chart on the clinic's site to see them.` })]
+      ? [el('p', { className: 'sc-muted', textContent: `${chart.sensitiveNotKept} sensitive ${chart.sensitiveNotKept === 1 ? 'item is' : 'items are'} not shown offline.` })]
       : []),
     chartSection('Recent visits', chart.visits.map((v) => details(clinicStamp(v.periodStart, chart.clinicTimeZone, false), v.reason,
       v.systolicMmHg != null && v.diastolicMmHg != null ? `${v.systolicMmHg}/${v.diastolicMmHg} mmHg` : '',
@@ -535,7 +535,7 @@ async function openChart(patient, reset = true) {
   byId('saved-drafts').replaceChildren(...drafts.map((draft) => renderDraft(patient, draft)));
   if (!drafts.length) byId('saved-drafts').append(el('li', { className: 'sc-muted', textContent: 'No saved drafts.' }));
   byId('saved-recordings').replaceChildren(...recordings.map(({ problem }) =>
-    el('li', { textContent: problem ?? 'Recording saved on this device · Pending transcription' }),
+    el('li', { textContent: problem ?? 'Recording · Pending transcription' }),
   ));
 }
 
@@ -545,7 +545,7 @@ downloadPanel.addEventListener('click', async () => {
   try {
     const answer = await call('download_panel');
     if (!offlineAvailable) return;
-    byId('offline-message').textContent = answer === undefined ? 'Download failed.' : 'Offline charts updated.';
+    byId('offline-message').textContent = answer === undefined ? 'Not downloaded.' : 'Downloaded.';
     if (answer !== undefined) await loadPanel();
   } finally {
     downloadPanel.disabled = false;
@@ -554,12 +554,12 @@ downloadPanel.addEventListener('click', async () => {
 
 function renderDraft(patient, draft) {
   const labels = {
-    synced: 'Synced · Unsigned draft',
-    pending: 'Saved on this device · Pending sync',
-    conflict: 'A newer version is on the server. Choose which to keep.',
-    invalid: draft.problem ?? 'This draft needs review.',
+    synced: 'Synced',
+    pending: 'Pending sync',
+    conflict: 'Not saved · Changed on the server',
+    invalid: draft.problem ?? 'Not saved',
     // Signed as a sensitive note: its text was removed from this device, and it can't be edited here.
-    withheld: 'Signed as a sensitive note · Not kept on this device',
+    withheld: 'Signed · Sensitive',
   };
   if (draft.state === 'withheld') return el('li', {}, el('p', { className: 'desktop-draft__state', textContent: labels.withheld }));
   const row = el('li', {}, el('p', { className: 'desktop-draft__state', textContent: labels[draft.state] }),
@@ -601,7 +601,7 @@ draftForm.addEventListener('submit', async (event) => {
     const answer = await call(edit ? 'edit_clinical' : 'save_clinical_draft', args);
     if (!offlineAvailable || selectedPatient !== patient || answer === undefined) return;
     resetDraftEditor();
-    byId('offline-message').textContent = 'Draft saved on this device.';
+    byId('offline-message').textContent = 'Draft saved.';
     await openChart(patient, false);
   } finally {
     submit.disabled = false;
@@ -636,7 +636,7 @@ byId('record-audio').addEventListener('click', async () => {
     });
     recorder.addEventListener('error', () => {
       capture.cancelled = true;
-      message.textContent = 'The microphone recording failed.';
+      message.textContent = 'Recording failed.';
     });
     let timer;
     recorder.addEventListener('stop', async () => {
@@ -648,7 +648,7 @@ byId('record-audio').addEventListener('click', async () => {
         const type = parts[0]?.type || recorder.mimeType;
         const audio = new Blob(parts, { type });
         if (audio.size === 0 || audio.size > 8 * 1024 * 1024) {
-          message.textContent = 'The recording is empty or too large. Try a shorter recording.';
+          message.textContent = 'Not saved. The recording is empty or too large.';
           return;
         }
         message.textContent = 'Saving recording…';
@@ -656,7 +656,7 @@ byId('record-audio').addEventListener('click', async () => {
         if (capture.cancelled || selectedPatient !== patient) return;
         const saved = await call('save_recording', { patient, mediaType: type, audio: bytes });
         if (recording !== capture) return;
-        message.textContent = saved === undefined ? 'Recording could not be saved.' : 'Recording saved on this device.';
+        message.textContent = saved === undefined ? 'Recording not saved.' : 'Recording saved.';
         if (saved !== undefined) await openChart(patient, false);
       } finally {
         holdLock(false);
@@ -674,14 +674,14 @@ byId('record-audio').addEventListener('click', async () => {
     }, 60_000);
     control.textContent = 'Stop and save';
     control.disabled = false;
-    message.textContent = 'Recording for up to 60 seconds.';
+    message.textContent = 'Recording. Stops at 60 seconds.';
   } catch {
     holdLock(false);
     stream?.getTracks().forEach((track) => track.stop());
     if (recording === capture) {
       recording = null;
       control.disabled = false;
-      message.textContent = 'The microphone could not be opened. Check your microphone permissions.';
+      message.textContent = 'Microphone unavailable. Check the microphone permission.';
     }
   }
 });
@@ -754,20 +754,22 @@ function unlockWindow() {
 }
 
 // Why it locked, as the lock says it: each starts with its state word (docs/brand).
+// Where the title already says it all, there is no notice.
 const lockReasons = {
-  idle: (view) => ['Locked.', ` Nothing was done here for ${view.idleMinutes} minutes.`],
-  started: () => ['Locked.', ' SwiftChart opens locked while a clinician is signed in.'],
-  asked: () => ['Locked.', ' You locked this window.'],
-  longest: () => ['Locked.', ' A sign-in lasts at most 12 hours.'],
-  wrongPasswords: () => ['Locked.', ' Too many wrong passwords were typed here.'],
-  ended: () => ['Signed out.', ' The server ended this sign-in. Your password or authenticator was reset, your account was locked or disabled, or 30 days passed.'],
-  offlineEnded: () => ['Locked.', ' It\'s been 30 days since you signed in, so the offline charts are closed. Nothing on this computer was deleted.'],
+  idle: (view) => ['Locked.', ` Inactive for ${view.idleMinutes} minutes.`],
+  started: () => ['Locked.', ''],
+  asked: () => ['Locked.', ''],
+  longest: () => ['Locked.', ' Your sign-in expired.'],
+  wrongPasswords: () => ['Locked.', ' Too many wrong passwords.'],
+  ended: () => ['Signed out.', ''],
+  offlineEnded: () => ['Locked.', ' Offline access expired.'],
 };
 
+// What only the form can't say: offline, the password alone opens the offline charts.
 const lockHow = {
-  password: 'Enter your password to unlock. What you typed is kept, and sync carries on.',
-  signIn: 'Enter your password and the code from your authenticator app. If the clinic\'s server can\'t be reached, your password alone opens the offline charts. What you typed is kept.',
-  signedOut: 'Sign in again with your password and the code from your authenticator app. The window comes back as you left it.',
+  password: '',
+  signIn: 'Offline, your password alone opens the offline charts.',
+  signedOut: '',
 };
 
 function renderLock(view) {
@@ -775,10 +777,11 @@ function renderLock(view) {
   const why = byId('lock-why');
   why.className = `sc-notice sc-notice--${view.need === 'signedOut' ? 'warning' : 'info'}`;
   why.replaceChildren(el('span', { className: 'sc-notice__state', textContent: state }), words);
+  why.hidden = !words;
   byId('lock-title').textContent = view.why === 'ended' ? 'Signed out' : 'Locked';
-  byId('lock-how').textContent = view.why === 'wrongPasswords'
-    ? 'Enter your password and the code from your authenticator app, once the clinic\'s server can be reached. Nothing on this computer was deleted, and what you typed is kept.'
-    : lockHow[view.need];
+  show(byId('lock-how'), view.why === 'wrongPasswords'
+    ? 'Sign in when the clinic\'s server can be reached.'
+    : lockHow[view.need]);
   const full = view.need !== 'password';
   byId('lock-code-field').hidden = !full;
   byId('lock-submit').textContent = full ? 'Sign in' : 'Unlock';
@@ -788,7 +791,7 @@ function renderLock(view) {
   const charts = byId('lock-charts');
   charts.hidden = !updated;
   charts.className = full ? 'sc-notice sc-notice--warning' : 'sc-status';
-  charts.textContent = full && updated ? `${updated} Nothing is brought back until you sign in again.` : updated;
+  charts.textContent = updated;
 }
 
 // After the 12 hours, opened with the password alone: say a full sign-in is needed, and how old the charts are.
@@ -798,10 +801,8 @@ function renderSignInNeeded(view) {
   if (!needed) return;
   byId('sign-in-needed-text').replaceChildren(
     el('span', { className: 'sc-notice__state', textContent: serverAnswered ? 'Sign in again.' : 'Offline.' }),
-    serverAnswered
-      ? ' A sign-in lasts at most 12 hours. If signing in can\'t reach the clinic\'s server, your password alone still opens the offline charts.'
-      : ' Sign in with your code as soon as the clinic\'s server can be reached.',
-    ` ${chartsUpdatedText(view.chartsUpdated)} Drafts and recordings are saved on this computer and sent after you sign in.`,
+    serverAnswered ? ' Your sign-in expired.' : ' Sign in when the clinic\'s server can be reached.',
+    ` ${chartsUpdatedText(view.chartsUpdated)}`,
   );
 }
 
@@ -873,8 +874,8 @@ function showDeleted(problem) {
   byId('deleted-text').replaceChildren(
     el('span', { className: 'sc-notice__state', textContent: problem ? 'Not finished.' : 'Deleted.' }),
     problem
-      ? ` An administrator revoked this computer's sign-in, and SwiftChart couldn't delete everything it keeps here (${problem}). Quit SwiftChart and start it again to finish.`
-      : ' An administrator revoked this computer\'s sign-in, so SwiftChart deleted the offline charts and everything else it kept here. Drafts and recordings not yet sent are lost. Quit SwiftChart. When it starts again, it\'s empty and you can sign in.',
+      ? ` An administrator revoked this computer's sign-in. Quit SwiftChart and open it again to finish deleting its data (${problem}).`
+      : ' An administrator revoked this computer\'s sign-in. Unsent drafts and recordings are lost.',
   );
   byId('deleted').hidden = false;
   byId('quit').focus();

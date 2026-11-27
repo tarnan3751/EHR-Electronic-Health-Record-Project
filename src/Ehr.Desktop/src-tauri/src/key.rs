@@ -26,7 +26,7 @@ pub fn load(database_exists: bool) -> Result<[u8; 32], String> {
             Ok(bytes)
         }
         Err(Error::NoEntry) if database_exists => {
-            Err("The local database key is missing. The database was kept.".to_owned())
+            Err("The local database key is missing.".to_owned())
         }
         Err(Error::NoEntry) => {
             let mut bytes = [0; 32];

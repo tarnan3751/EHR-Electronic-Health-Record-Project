@@ -97,8 +97,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Database(error) => write!(f, "local database: {error}"),
-            Error::NotFound => f.write_str("That phrase isn't here any more."),
-            Error::ChangedSince => f.write_str("This phrase changed while you were editing it."),
+            Error::NotFound => f.write_str("Phrase not found."),
+            Error::ChangedSince => f.write_str("Someone else changed this phrase."),
             Error::Refused(reason) => f.write_str(reason),
         }
     }
@@ -176,7 +176,7 @@ impl Store {
 
     pub fn save_clinical_draft(&self, owner: Uuid, patient: Uuid, body: &str) -> Result<()> {
         if body.trim().is_empty() || body.len() > 65_536 || body.contains('\0') {
-            return Err(Error::Refused("Enter a draft of up to 64 KiB."));
+            return Err(Error::Refused("Draft must have text, up to 64 KiB."));
         }
         if !charts::contains(&self.connection, owner, patient)? {
             return Err(Error::Refused("This chart is only available online."));
@@ -240,7 +240,7 @@ impl Store {
         body: &str,
     ) -> Result<()> {
         if body.trim().is_empty() || body.len() > 65_536 || body.contains('\0') {
-            return Err(Error::Refused("Enter a draft of up to 64 KiB."));
+            return Err(Error::Refused("Draft must have text, up to 64 KiB."));
         }
         if !charts::contains(&self.connection, owner, patient)?
             || !draft_sync::edit(&mut self.connection, owner, patient, id, version, body)?
@@ -489,7 +489,7 @@ impl Store {
             .ok_or(Error::NotFound)?;
         if keep_mine && !conflict.can_keep_mine {
             return Err(Error::Refused(
-                "This change can't be kept. Change the shortcut and add it again.",
+                "Not saved. Change the shortcut and add the phrase again.",
             ));
         }
 
@@ -1273,7 +1273,7 @@ mod tests {
         let operation = only_pending(&store);
         let errors = BTreeMap::from([(
             "shortcut".to_owned(),
-            vec!["Start with a period.".to_owned()],
+            vec!["Shortcut must start with a period.".to_owned()],
         )]);
 
         store
@@ -1289,7 +1289,10 @@ mod tests {
             .unwrap();
 
         let conflict = store.conflicts().unwrap().remove(0);
-        assert_eq!(conflict.message.as_deref(), Some("Start with a period."));
+        assert_eq!(
+            conflict.message.as_deref(),
+            Some("Shortcut must start with a period.")
+        );
         assert!(!conflict.can_keep_mine);
     }
 

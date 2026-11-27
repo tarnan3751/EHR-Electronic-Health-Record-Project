@@ -50,10 +50,10 @@ public class QuickTextPageTests(WebApps apps) : IClassFixture<WebApps>
     }
 
     [Theory]
-    [InlineData("nad", "Text", "Start with a period")]
-    [InlineData(".two words", "Text", "Start with a period")]
-    [InlineData(".abcdefghijklmnopqrstuvwxyz1234567", "Text", "Use 32 characters or fewer.")]
-    [InlineData(".no-text", " ", "Enter the text.")]
+    [InlineData("nad", "Text", "Shortcut must start with a period")]
+    [InlineData(".two words", "Text", "Shortcut must start with a period")]
+    [InlineData(".abcdefghijklmnopqrstuvwxyz1234567", "Text", "Shortcut must be 32 characters or fewer.")]
+    [InlineData(".no-text", " ", "Text is required.")]
     public async Task Invalid_input_is_refused(string shortcut, string body, string message)
     {
         var page = await OpenAsync(apps, apps.OnPrem);
