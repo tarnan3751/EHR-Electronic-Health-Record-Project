@@ -1074,6 +1074,10 @@ def test_adding_an_allergy_just_named_to_her_list_is_the_instruction():
     "There is no reason at all that we should not order an MRI.",
     "There's no reason whatsoever that the team would not order labs.",
     "There is no reason at all why we can not order a CT today.",
+    # The review of issue 24's series: "no reason at all" or "for us" right before the negation.
+    "There's no reason at all not to order an MRI.",
+    "I see no reason at all not to order an MRI.",
+    "No reason at all for us not to order an MRI.",
 ])
 def test_two_negations_make_an_instruction_again(said):
     assert said_instructions(said) == [said.rstrip(".")]
@@ -1087,6 +1091,9 @@ def test_two_negations_make_an_instruction_again(said):
     # Issue 24's controls: "no reason at all" or "whatsoever" negating something else.
     "There is no reason at all to worry so we should not order an MRI.",
     "No reason whatsoever for her to be worried so we should not order a CT.",
+    "She had no reason at all to stop it and we should not order a refill.",
+    "No reason at all to repeat it, would not order a CT.",
+    "No reason at all to worry so would not order an MRI.",
 ])
 def test_a_negation_of_something_else_does_not_undo_an_instruction_not_to(said):
     assert said_instructions(said) == []
