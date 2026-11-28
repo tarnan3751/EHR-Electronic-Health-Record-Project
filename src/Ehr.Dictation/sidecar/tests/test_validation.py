@@ -1202,6 +1202,20 @@ def test_a_negation_of_something_else_does_not_undo_an_instruction_not_to(said):
     assert own(said, said).value == said
 
 
+# Known limits: the review of issue 24's series found these neighbours still shown, and no rule reads them without
+# reaching documentation: a call about a medicine with no refill or amount named (the patient may be calling about side
+# effects), a refill on a condition, "now" before where the call goes, and an order in the passive. The clinician's
+# review against the transcript is the net.
+@pytest.mark.parametrize("said", [
+    "Call in tomorrow about his amoxicillin.",
+    "Call in about her refill if she runs out.",
+    "The nurse was calling in amoxicillin now to her pharmacy.",
+    "There is no reason at all why the patient should not be ordered an MRI.",
+])
+def test_a_limit_the_reviews_neighbours_not_read_as_instructions(said):
+    assert said_instructions(said) == []
+
+
 # A single "no reason" before an order isn't read as negating it, as before issue 24's series: the order is listed and
 # cut, unchanged.
 @pytest.mark.parametrize(("said", "listed"), [
