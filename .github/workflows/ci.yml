@@ -8,7 +8,7 @@ on:
     branches: ["**"]
   pull_request:
     branches: [main]
-  # A run started by hand can keep the desktop installers it builds (the desktop job). Every other run builds them and
+  # A run started by hand can keep the desktop installers it builds (desktop.yml). Every other run builds them and
   # keeps nothing: the repository is public, and the owner decides whether a downloadable artifact counts as publishing.
   workflow_dispatch:
     inputs:
@@ -17,16 +17,20 @@ on:
         type: boolean
         default: false
       desktop_version:
-        description: Build the desktop installers as this version (such as 0.2.1, to test an update), not Cargo.toml's
+        description: Build the desktop installers as this version (such as 1.0.1, to test an update), not Cargo.toml's
         type: string
         default: ""
+      release_dry_run:
+        description: Also rehearse the release (release.yml) as a dry run, keeping its installers for 7 days; nothing is pushed or released
+        type: boolean
+        default: false
 
 # Every job gets a read-only token unless it asks for more.
 permissions:
   contents: read
 
 # A newer push to the same branch cancels the older run. Runs on main always finish,
-# so every commit on main gets its image.
+# so every commit on main gets its images.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -327,91 +331,14 @@ jobs:
         if: always()
         run: docker compose --profile "*" down --volumes
 
+  # The desktop app on macOS, Windows and Linux (desktop.yml, which release.yml calls too). A run started by hand may
+  # keep its installers, or build them as another version.
   desktop:
-    name: Desktop (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        # The team's machines: Apple Silicon Macs and x64 Windows PCs. Running the desktop sync tests on both is
-        # TC-UC8-06, NFR-10.
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    defaults:
-      run:
-        working-directory: src/Ehr.Desktop/src-tauri
-    env:
-      # MSVC can't use paths over 260 characters, and OpenSSL's build nests deep under the runner's
-      # long checkout folder, so build at the repository root instead of in src-tauri/target.
-      CARGO_TARGET_DIR: ${{ github.workspace }}/target
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # Installs the Rust version and components pinned in rust-toolchain.toml.
-      - name: Install Rust
-        run: rustup toolchain install --no-self-update
-
-      # The same folder as CARGO_TARGET_DIR, relative to the crate: rust-cache can't take an absolute path.
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          workspaces: src/Ehr.Desktop/src-tauri -> ../../../target
-
-      # The vendored OpenSSL build rejects Git's Perl, which can come first on PATH.
-      - name: Use Strawberry Perl for OpenSSL
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $perl = Get-Command perl -All | Where-Object Source -NotLike '*\Git\*' | Select-Object -First 1 -ExpandProperty Source
-          if (-not $perl) { throw "No Perl other than Git's is on PATH." }
-          Write-Output "Using $perl"
-          "OPENSSL_SRC_PERL=$perl" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Check formatting
-        run: cargo fmt --check
-
-      - name: Lint
-        run: cargo clippy --locked --all-targets -- -D warnings
-
-      - name: Build
-        run: cargo build --locked
-
-      # Every test, in a release build as clinicians run the app. That includes the encrypted store's tests
-      # (TC-UC7-06, NFR-06), the offline chart timing (TC-UC7-05, NFR-02), which is skipped in debug builds, and the
-      # other UC 7 and UC 8 test cases (TC-UC7-01 to 04, TC-UC8-01, 02, 04 and 06); --show-output prints its times.
-      - name: Test
-        run: cargo test --locked --release -- --show-output
-
-      # The installers, unsigned (the expansion plan's step 20, docs/desktop-install.md): the .dmg on macOS, sealed ad
-      # hoc, and the NSIS setup on Windows. Built on every run, so both platforms are known to bundle; nothing signs an
-      # update here, and no key is ever given to CI. The CLI is cached with the toolchain after its first install.
-      - name: Install the Tauri CLI
-        run: cargo install tauri-cli --version 2.12.0 --locked
-
-      # A run started by hand may build them as another version, to test an update to it; the update's signature is
-      # made on the owner's Mac (docs/desktop-install.md), never here.
-      - name: Build the installer
-        shell: bash
-        env:
-          DESKTOP_VERSION: ${{ inputs.desktop_version }}
-        run: |
-          if [ -n "$DESKTOP_VERSION" ]; then
-            cargo tauri build --ci --config "{\"version\":\"$DESKTOP_VERSION\"}" -- --locked
-          else
-            cargo tauri build --ci -- --locked
-          fi
-
-      - name: Keep the installer
-        if: github.event_name == 'workflow_dispatch' && inputs.upload_installers
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: SwiftChart-${{ runner.os }}
-          path: |
-            ${{ github.workspace }}/target/release/bundle/dmg/*.dmg
-            ${{ github.workspace }}/target/release/bundle/nsis/*-setup.exe
-          if-no-files-found: error
-          retention-days: 7
+    name: Desktop
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ inputs.desktop_version || '' }}
+      keep: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_installers }}
 
   dictation:
     name: Dictation
@@ -525,39 +452,31 @@ jobs:
             *" failure "* | *" cancelled "*) exit 1 ;;
           esac
 
-  # Main only: the web image for both server architectures, tagged with the commit it came from.
+  # Main only: the four images the server stack runs (images.yml), for both server architectures, tagged with the commit
+  # they came from and `edge`, the newest commit on main.
   publish:
-    name: Publish image
+    name: Publish images
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
     permissions:
       contents: read # checkout
-      packages: write # push the image to ghcr.io
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      packages: write # push the images to ghcr.io
+    uses: ./.github/workflows/images.yml
+    with:
+      tags: ${{ github.sha }} edge
+      version: ${{ github.sha }}
+      push: true
 
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # The Dockerfile compiles on the runner's own architecture for each target, so no emulation.
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: src/Ehr.Web/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/ehr-web:${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=ehr-web
-          cache-to: type=gha,mode=max,scope=ehr-web
+  # A run started by hand with release_dry_run rehearses the release from this branch, which release.yml can't be
+  # started from until it is on main: everything built, nothing pushed, tagged or released (release.yml).
+  release-dry-run:
+    name: Release (dry run)
+    if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run
+    # GitHub checks a called workflow's permissions before it runs: these are the most release.yml's jobs ask for. A
+    # dry run skips the jobs that would use them.
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/release.yml
+    with:
+      dry_run: true

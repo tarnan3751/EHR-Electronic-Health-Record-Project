@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- The simulated lab (the expansion plan's step 12, UC 20): a lab's system that asks the on-prem app for the lab
-       orders waiting for results and files synthetic results for them, over HTTP only, as a real lab would (README.md,
-       "Simulated lab"). It references no project of the app's and no package: it shares only the contract's one
-       file. -->
+       orders waiting for results and files synthetic results for them, over HTTP only, as a real lab would
+       (docs/apis.md, "Simulated lab"). It references no project of the app's and no package: it shares only the
+       contract's one file. -->
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>

@@ -1,0 +1,122 @@
+# The desktop app (src/Ehr.Desktop) on each platform it's packaged for: formatted, linted, built, tested in a release
+# build, and bundled as its installers. Called by ci.yml on every push and pull request, and by release.yml, which
+# keeps the installers for the release. See "Continuous integration" in README.md and docs/desktop-install.md.
+name: Desktop
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Build the installers as this version (such as 1.0.1, to test an update); empty for Cargo.toml's
+        type: string
+        default: ""
+      keep:
+        description: Keep the installers as the run's artifacts, for 7 days (anyone signed in to GitHub can download them)
+        type: boolean
+        default: false
+      artifact:
+        description: The kept installers' artifact name, before the operating system's ("SwiftChart" makes SwiftChart-macOS)
+        type: string
+        default: SwiftChart
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The team's machines: Apple Silicon Macs and x64 Windows PCs. Running the desktop sync tests on both is
+        # TC-UC8-06, NFR-10. And x64 Linux, the third platform the app is packaged for.
+        os: [macos-latest, windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src/Ehr.Desktop/src-tauri
+    env:
+      # MSVC can't use paths over 260 characters, and OpenSSL's build nests deep under the runner's
+      # long checkout folder, so build at the repository root instead of in src-tauri/target.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Installs the Rust version and components pinned in rust-toolchain.toml.
+      - name: Install Rust
+        run: rustup toolchain install --no-self-update
+
+      # The same folder as CARGO_TARGET_DIR, relative to the crate: rust-cache can't take an absolute path.
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src/Ehr.Desktop/src-tauri -> ../../../target
+
+      # Tauri's libraries on Linux (WebKitGTK 4.1 and GTK 3), libdbus for the Secret Service that keeps the app's key
+      # (key.rs), and what the .deb and AppImage bundlers run. OpenSSL is built from source here too.
+      - name: Install the Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends build-essential pkg-config file xdg-utils \
+            libwebkit2gtk-4.1-dev libdbus-1-dev librsvg2-dev
+
+      # The vendored OpenSSL build rejects Git's Perl, which can come first on PATH.
+      - name: Use Strawberry Perl for OpenSSL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $perl = Get-Command perl -All | Where-Object Source -NotLike '*\Git\*' | Select-Object -First 1 -ExpandProperty Source
+          if (-not $perl) { throw "No Perl other than Git's is on PATH." }
+          Write-Output "Using $perl"
+          "OPENSSL_SRC_PERL=$perl" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --locked
+
+      # Every test, in a release build as clinicians run the app. That includes the encrypted store's tests
+      # (TC-UC7-06, NFR-06), the offline chart timing (TC-UC7-05, NFR-02), which is skipped in debug builds, and the
+      # other UC 7 and UC 8 test cases (TC-UC7-01 to 04, TC-UC8-01, 02, 04 and 06); --show-output prints its times.
+      - name: Test
+        run: cargo test --locked --release -- --show-output
+
+      # The installers, unsigned (the expansion plan's step 20, docs/desktop-install.md): the .dmg on macOS, sealed ad
+      # hoc, the NSIS setup on Windows, and the .deb and AppImage on Linux. Built on every run, so every platform is
+      # known to bundle; nothing signs an update here, and no key is ever given to CI. The CLI is cached with the
+      # toolchain after its first install.
+      - name: Install the Tauri CLI
+        run: cargo install tauri-cli --version 2.12.0 --locked
+
+      # A caller may build them as another version, to test an update to it; the update's signature is made on the
+      # owner's Mac (docs/desktop-install.md), never here.
+      - name: Build the installer
+        shell: bash
+        env:
+          DESKTOP_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$DESKTOP_VERSION" ]; then
+            cargo tauri build --ci --config "{\"version\":\"$DESKTOP_VERSION\"}" -- --locked
+          else
+            cargo tauri build --ci -- --locked
+          fi
+
+      - name: Keep the installer
+        if: inputs.keep
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.artifact }}-${{ runner.os }}
+          path: |
+            ${{ github.workspace }}/target/release/bundle/dmg/*.dmg
+            ${{ github.workspace }}/target/release/bundle/nsis/*-setup.exe
+            ${{ github.workspace }}/target/release/bundle/deb/*.deb
+            ${{ github.workspace }}/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+          retention-days: 7

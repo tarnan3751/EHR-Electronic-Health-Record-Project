@@ -1,7 +1,8 @@
-//! What the app keeps in the OS credential store (the login Keychain on macOS, Credential Manager on Windows): the
-//! local database's key, 32 random bytes from the OS made on first launch, and the session from the last sign-in
-//! (sync.rs). Neither goes to disk beside the database. Both are kept under the app's identifier, as its data folder is
-//! (tauri.conf.json): renaming it starts the app empty (the expansion plan's step 20).
+//! What the app keeps in the OS credential store (the login Keychain on macOS, Credential Manager on Windows, the
+//! Secret Service on Linux, such as GNOME Keyring): the local database's key, 32 random bytes from the OS made on first
+//! launch, and the session from the last sign-in (sync.rs). Neither goes to disk beside the database. Both are kept
+//! under the app's identifier, as its data folder is (tauri.conf.json): renaming it starts the app empty (the expansion
+//! plan's step 20).
 
 use keyring_core::{Entry, Error};
 
@@ -83,10 +84,11 @@ fn use_platform_store() -> keyring_core::Result<()> {
     Ok(())
 }
 
-/// Linux is for development only: the key is kept in memory, so main.rs keeps the database in memory too.
-#[cfg(not(any(target_os = "macos", windows)))]
+/// The Secret Service over the session's D-Bus, in its default (login) collection. With no provider running, such as
+/// GNOME Keyring or KDE Wallet, this fails, and so does opening the database.
+#[cfg(target_os = "linux")]
 fn use_platform_store() -> keyring_core::Result<()> {
-    keyring_core::set_default_store(keyring_core::mock::Store::new()?);
+    keyring_core::set_default_store(dbus_secret_service_keyring_store::Store::new()?);
     Ok(())
 }
 

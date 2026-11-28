@@ -3,8 +3,8 @@ using Ehr.Seed;
 
 namespace Ehr.Bench;
 
-// The synthetic clinic and the render-time benchmark (README.md, "Synthetic data and the benchmark"). From the
-// repository folder:
+// The synthetic clinic and the render-time benchmark (docs/development.md, "Synthetic data and the benchmark"). From
+// the repository folder:
 //
 //   dotnet run -c Release --project bench/Ehr.Bench -- seed [--patients 50000]
 //       loads the synthetic clinic into the database EHR_SEED_CONNECTION names, connecting as ehr_owner (Seeder). The

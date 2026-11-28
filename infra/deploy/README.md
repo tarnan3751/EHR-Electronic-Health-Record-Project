@@ -19,7 +19,7 @@ Each server runs these services of `infra/compose/compose.yaml`, with the settin
 
 ## Sizes and cost
 
-**Clinic server** (the clinic's own hardware). Without dictation: 4 cores, 8 GB of memory, two SSDs mirrored, sized for the database and its WAL (the primary keeps up to 2 GB of WAL for a replica or Barman that falls behind, `max_slot_wal_keep_size`). With dictation: 32 GB of memory (`llama` about 7 GB, `dictation` capped at 10 GB, which with Whisper for Spanish comes to about 18 GB with the rest), and optionally an NVIDIA GPU with 8 GB for K2 Horizon (the root README's "Dictation server hardware").
+**Clinic server** (the clinic's own hardware). Without dictation: 4 cores, 8 GB of memory, two SSDs mirrored, sized for the database and its WAL (the primary keeps up to 2 GB of WAL for a replica or Barman that falls behind, `max_slot_wal_keep_size`). With dictation: 32 GB of memory (`llama` about 7 GB, `dictation` capped at 10 GB, which with Whisper for Spanish comes to about 18 GB with the rest), and optionally an NVIDIA GPU with 8 GB for K2 Horizon (`docs/dictation.md`, "Dictation server hardware").
 
 **Cloud server.** 2 vCPUs, 4 GB of memory and 80 GB of disk is the size the table prices: the replica is a full copy of the database, Barman keeps about a week of base backups and WAL beside it (`infra/compose/README.md`, "Backup and point-in-time restore"), and the monitoring profile needs a few hundred MB more. Measure the database at hosting time and size the disk from it: the replica, seven base backups (compressed) and six days of WAL, with room to restore one copy.
 
@@ -51,9 +51,9 @@ Install Tailscale on both servers and on the staff devices the clinic manages, a
 
 | Image | Where it comes from |
 |---|---|
-| `ghcr.io/tarnan3751/ehr-web:<commit>` | Published by CI for each commit on `main`, for `linux/amd64` and `linux/arm64` (the root README, "Published images"). Both apps run it |
+| `ghcr.io/tarnan3751/ehr-web:<commit>`, `ehr-migrate:<commit>`, `ehr-dictation:<commit>` | Published by CI for each commit on `main`, for `linux/amd64` and `linux/arm64` (`docs/development.md`, "Published images"), and as the version for each release. Both apps run `ehr-web` |
 | `postgres:18`, `prom/*`, `quay.io/prometheuscommunity/postgres-exporter`, `ghcr.io/ggml-org/llama.cpp` | Their public registries, at the versions `infra/compose/compose.yaml` pins |
-| `ehr-migrate`, `ehr-barman`, `ehr-dictation` | **Not published yet.** CI builds them but pushes only `ehr-web`. Publishing them the same way is work before the first deployment (below); images are built in CI, never on a laptop or a server (AGENTS.md) |
+| `ehr-barman` | **Not published yet.** CI builds it in the stack job but pushes it nowhere. Publishing it the same way is work before the first deployment (below); images are built in CI, never on a laptop or a server (AGENTS.md) |
 
 ## Secrets
 
@@ -69,7 +69,7 @@ Each server keeps its settings in one file, `/etc/swiftchart/<server>.env`, owne
 | `EHR_APP_PASSWORD` | yes | | The on-prem app |
 | `EHR_READ_PASSWORD` | yes | yes | The cloud app, on the replica (the migration job sets it on the primary, and the replica takes it from there) |
 | `EHR_CLOUD_AUDIT_KEY` | yes | yes | The same on both: the cloud app ships the audit events of off-site reads with it |
-| `EHR_ENROLLMENT_KEY` | yes | | Portal enrollment codes' key (the root README, "Settings a deployment must give") |
+| `EHR_ENROLLMENT_KEY` | yes | | Portal enrollment codes' key (`docs/configuration.md`, "Settings a deployment must give") |
 | `EHR_BOOTSTRAP_ADMIN_EMAIL`, `EHR_BOOTSTRAP_ADMIN_PASSWORD` | first start only | | The first administrator; delete the password from the file once they have signed in |
 | `LLAMA_API_KEY`, `DICTATION_API_KEY` | with dictation | | The dictation services' keys |
 
@@ -120,7 +120,7 @@ On the cloud server, the monitoring profile as the stack runs it (`infra/compose
 
 ## Dictation
 
-On the clinic server only, as the `ai` profile: `llama` (about 7 GB) and `dictation`, capped at 10 GB (`compose.yaml` says how the cap was measured). The models come from `uv run src/Ehr.Dictation/setup_models.py`, run on the clinic server (MedASR's weights are gated: accept its terms on Hugging Face first), never from the repository. Record the dictation eval's baseline on that machine (the root README, "Dictation").
+On the clinic server only, as the `ai` profile: `llama` (about 7 GB) and `dictation`, capped at 10 GB (`compose.yaml` says how the cap was measured). The models come from `uv run src/Ehr.Dictation/setup_models.py`, run on the clinic server (MedASR's weights are gated: accept its terms on Hugging Face first), never from the repository. Record the dictation eval's baseline on that machine (`docs/dictation.md`, "Dictation server hardware").
 
 ## When the cloud server or the link is down
 
@@ -148,6 +148,6 @@ The owner's, when he chooses to host (accounts and money):
 Work still to do, before a first deployment can follow this guide:
 
 - **Compose files for each server**, from the services and settings above, with the clinic's `pg_hba.conf` naming the cloud server's address. They need two things made settings first: the primary's address that `infra/compose/postgres/replica/bootstrap-standby.sh` clones from and `infra/barman/onprem.conf` connects to, both hard-coded to the stack's `wan` today.
-- **Publishing `ehr-migrate`, `ehr-barman` and `ehr-dictation` from CI**, for both architectures, as `ehr-web` is. CI's publish job runs only on `main`, and `ehr-barman`'s build needs an arm64 runner or emulation.
+- **Publishing `ehr-barman` from CI**, for both architectures, as the other images are (`.github/workflows/images.yml`). Its build needs an arm64 runner or emulation.
 - **A Data Protection certificate** made for that alone, valid for years, held by both apps and kept with the backups' keys (the warning under "Certificates").
 - **The clinic's own certificate authority** for the databases, and the database certificates it signs.

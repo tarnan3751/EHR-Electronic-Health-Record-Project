@@ -25,7 +25,7 @@ mkdir -p desktop-updates
 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --build --wait
 ```
 
-**Get the installer**, version 0.2.0, either way:
+**Get the installer**, version 1.0.0, either way:
 
 - **From CI**, if a run was started by hand to keep it (`docs/desktop-install.md`): download `SwiftChart-macOS` from the
   run's page in Safari and open the zip. Downloaded so, it's marked as from the internet, as a teammate's would be.
@@ -33,7 +33,7 @@ docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --build --w
   macOS checks it as it would a teammate's:
 
   ```
-  xattr -w com.apple.quarantine "0081;$(printf '%x' "$(date +%s)");Safari;" target/release/bundle/dmg/SwiftChart_0.2.0_aarch64.dmg
+  xattr -w com.apple.quarantine "0081;$(printf '%x' "$(date +%s)");Safari;" target/release/bundle/dmg/SwiftChart_1.0.0_aarch64.dmg
   ```
 
   (With `CARGO_TARGET_DIR` set, the `.dmg` is under that folder's `release/bundle/dmg/` instead.)
@@ -41,7 +41,7 @@ docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --build --w
 **M1. Install and the first launch.** Open the `.dmg`, drag SwiftChart to Applications, and open it from Applications.
 Note the dialog's words and buttons; choose **Done**. Then System Settings > Privacy & Security: note what it says about
 SwiftChart, choose **Open Anyway**, then **Open**; note whether it asks for your password. SwiftChart opens on "Sign in
-to sync", with "SwiftChart 0.2.0." in the status line. If macOS said instead that it "is damaged", stop and note it: the
+to sync", with "SwiftChart 1.0.0." in the status line. If macOS said instead that it "is damaged", stop and note it: the
 seal is broken.
 
 **M2. Where the password goes.** Under the form: "Signs in to: ehr.example.com:8443, ehr-remote.example.com:9443". Sign
@@ -58,34 +58,34 @@ EHR_SYNC_SERVERS=https://127.0.0.1:9 /Applications/SwiftChart.app/Contents/MacOS
 It opens on the lock, for your password, as after any start; it doesn't say it was started with other servers, since a
 release build reads no variable. Unlock: the status says Online. Quit it (Cmd+Q).
 
-**M4. An update.** Build 0.2.1, signed with the updater's key, from `src/Ehr.Desktop/src-tauri`:
+**M4. An update.** Build 1.0.1, signed with the updater's key, from `src/Ehr.Desktop/src-tauri`:
 
 ```
 TAURI_SIGNING_PRIVATE_KEY="$HOME/.swiftchart-secrets/swiftchart-updater.key" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" \
-  cargo tauri build --config '{"version":"0.2.1","bundle":{"createUpdaterArtifacts":true}}' -- --locked
+  cargo tauri build --config '{"version":"1.0.1","bundle":{"createUpdaterArtifacts":true}}' -- --locked
 ```
 
 Copy `target/release/bundle/macos/SwiftChart.app.tar.gz` into `infra/compose/desktop-updates/`, and write
-`infra/compose/desktop-updates/latest.json` as `infra/compose/README.md` shows, with `"version": "0.2.1"` and only the
+`infra/compose/desktop-updates/latest.json` as `infra/compose/README.md` shows, with `"version": "1.0.1"` and only the
 `darwin-aarch64` entry, its signature the contents of `SwiftChart.app.tar.gz.sig`. Then:
 
-- Open SwiftChart (the 0.2.0 in Applications) and unlock. Within a few seconds: "Update available. SwiftChart 0.2.1.",
+- Open SwiftChart (the 1.0.0 in Applications) and unlock. Within a few seconds: "Update available. SwiftChart 1.0.1.",
   with **Download update** and **Not now**. Choose **Not now**: it goes. Quit and open it again, and unlock: it's back.
 - Lock it (**Lock now** from the idle warning, or wait): the offer isn't over the lock. Unlock.
-- **Download update**: "Downloading. …", then "Ready to install. SwiftChart 0.2.1. …" with **Restart now**.
-  **Restart now**: SwiftChart opens again on the lock; unlock: "SwiftChart 0.2.1." in the status line, your charts
+- **Download update**: "Downloading. …", then "Ready to install. SwiftChart 1.0.1. …" with **Restart now**.
+  **Restart now**: SwiftChart opens again on the lock; unlock: "SwiftChart 1.0.1." in the status line, your charts
   and drafts as they were. Note any Gatekeeper, Keychain or microphone prompt after the update.
 
-**M5. What it won't take.** Edit `latest.json`'s `version` to `0.2.2`, leaving the 0.2.1 file and its signature: a
+**M5. What it won't take.** Edit `latest.json`'s `version` to `1.0.2`, leaving the 1.0.1 file and its signature: a
 release that says it's newer than what was signed. Quit, open and unlock SwiftChart: "Update available. SwiftChart
-0.2.2."; **Download update**: "Not installed. SwiftChart 0.2.2 couldn't be downloaded, verified or installed (…)", and the status line
-still says 0.2.1. Then, from `infra/compose`, restart the two apps with a minimum above it:
+1.0.2."; **Download update**: "Not installed. SwiftChart 1.0.2 couldn't be downloaded, verified or installed (…)", and the status line
+still says 1.0.1. Then, from `infra/compose`, restart the two apps with a minimum above it:
 
 ```
-EHR_DESKTOP_MINIMUM_VERSION=0.2.2 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait
+EHR_DESKTOP_MINIMUM_VERSION=1.0.2 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait
 ```
 
-Within 10 seconds the sync problem reads "Update needed: the clinic's server syncs only with SwiftChart 0.2.2 or later.
+Within 10 seconds the sync problem reads "Update needed: the clinic's server syncs only with SwiftChart 1.0.2 or later.
 …"; open a chart: it opens; lock and unlock: it works. Delete `latest.json` and the file, and run the same command without
 the variable.
 
@@ -134,8 +134,8 @@ in place of `com.example.ehr`, and remove `~/Library/WebKit/io.github.tarnan3751
 - **Smart App Control not On:** Windows Security > App & browser control > Smart App Control says **Off** or
   **Evaluation**. On, Windows blocks SwiftChart with no way past it for one app; turning it off is for the whole PC, and
   the teammate's decision, not ours.
-- **Two installers, 0.2.0 and 0.2.1.** Tahseen starts two CI runs by hand at the step's head, the second with
-  `-f desktop_version=0.2.1`, each with `upload_installers` (his decision of 2026-11-26: an upload is publishing, so
+- **Two installers, 1.0.0 and 1.0.1.** Tahseen starts two CI runs by hand at the step's head, the second with
+  `-f desktop_version=1.0.1`, each with `upload_installers` (his decision of 2026-11-26: an upload is publishing, so
   only a run started by hand does it, kept 7 days; they are unsigned test builds for a local stack), and the teammate
   downloads `SwiftChart-Windows` from each in Edge, so the PC needs no Rust. The other way is to build both on
   the PC (`docs/desktop-install.md`, "From source"), which needs Rust through rustup, Visual Studio Build Tools with
@@ -145,16 +145,16 @@ in place of `com.example.ehr`, and remove `~/Library/WebKit/io.github.tarnan3751
   ```
   $env:CARGO_TARGET_DIR = "C:\swiftchart-target"
   cargo tauri build -- --locked
-  Copy-Item C:\swiftchart-target\release\bundle\nsis\SwiftChart_0.2.0_x64-setup.exe $HOME\Desktop
-  cargo tauri build --config '{"version":"0.2.1"}' -- --locked
+  Copy-Item C:\swiftchart-target\release\bundle\nsis\SwiftChart_1.0.0_x64-setup.exe $HOME\Desktop
+  cargo tauri build --config '{"version":"1.0.1"}' -- --locked
   ```
 
-  (In PowerShell 7, as the README's setup has it; Windows PowerShell 5 would drop the JSON's quotes.)
+  (In PowerShell 7, as `docs/development.md`'s setup has it; Windows PowerShell 5 would drop the JSON's quotes.)
 
   A build made on the PC isn't marked as downloaded, so SmartScreen won't show for it: W1 then notes only that it
   installed.
-- **0.2.1's signature, made on Tahseen's Mac** the day before: `SwiftChart_0.2.1_x64-setup.exe` copied to the Mac,
-  signed there (`docs/desktop-install.md`, "Making a release", step 2), and `SwiftChart_0.2.1_x64-setup.exe.sig` brought
+- **1.0.1's signature, made on Tahseen's Mac** the day before: `SwiftChart_1.0.1_x64-setup.exe` copied to the Mac,
+  signed there (`docs/desktop-install.md`, "Making a release", step 2), and `SwiftChart_1.0.1_x64-setup.exe.sig` brought
   back. The key never leaves the Mac; the signature isn't secret.
 
 **Time:** about an hour once the stack runs, plus about half an hour for the first build if the installers are built
@@ -164,22 +164,22 @@ and volumes, SwiftChart's own folders and credentials, and the hosts line; every
 **Start the stack with the update server**, from `infra\compose`: `mkdir desktop-updates`, then
 `docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --build --wait`.
 
-**W1. Install 0.2.0.** Downloaded: note what Edge says, and keep it (**…** > **Keep** > **Show more** > **Keep
+**W1. Install 1.0.0.** Downloaded: note what Edge says, and keep it (**…** > **Keep** > **Show more** > **Keep
 anyway**). Run the setup: note SmartScreen's words, choose **More info**, then **Run anyway**. It installs without asking
 for an administrator's password, and SwiftChart is in the Start menu.
 
-**W2. The first launch.** Open SwiftChart: "Sign in", "SwiftChart 0.2.0." in the status line, and under the form
+**W2. The first launch.** Open SwiftChart: "Sign in", "SwiftChart 1.0.0." in the status line, and under the form
 "Signs in to: ehr.example.com:8443, ehr-remote.example.com:9443". Sign in as the clinician, **Download my charts**, open
 a chart, **Record audio** (allow the microphone): "Recording saved."
 
 **W3. Step 19a's Windows section,** its W1 to W5, with this installed build: it locks after its full 15 idle minutes,
 warned at 13.
 
-**W4. An update.** Copy `SwiftChart_0.2.1_x64-setup.exe` and its `.sig` into `infra\compose\desktop-updates\`, and write
-`latest.json` there as `infra/compose/README.md` shows, with `"version": "0.2.1"` and only the `windows-x86_64` entry,
-its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock: "Update available. SwiftChart 0.2.1.".
+**W4. An update.** Copy `SwiftChart_1.0.1_x64-setup.exe` and its `.sig` into `infra\compose\desktop-updates\`, and write
+`latest.json` there as `infra/compose/README.md` shows, with `"version": "1.0.1"` and only the `windows-x86_64` entry,
+its signature the contents of the `.sig` file. Quit SwiftChart, open it, unlock: "Update available. SwiftChart 1.0.1.".
 **Download update**, then **Restart now**: the installer's progress shows, SwiftChart starts again on the lock, and
-after unlocking says "SwiftChart 0.2.1.", with the charts as they were. Note whether SmartScreen or anything else asked.
+after unlocking says "SwiftChart 1.0.1.", with the charts as they were. Note whether SmartScreen or anything else asked.
 
 **W5. Disabled, revoked, and the wipe.** As the Mac's M6 and M7, in Edge as the administrator: stop the two apps, save
 a draft, quit SwiftChart, start the apps, disable the clinician, open SwiftChart (it locks: "Signed out. …"), quit it

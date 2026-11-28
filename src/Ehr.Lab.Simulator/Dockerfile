@@ -1,6 +1,6 @@
 # The simulated lab (the expansion plan's step 12, src/Ehr.Lab.Simulator): the local stack's lab service
-# (infra/compose/compose.yaml), built there and by CI's stack job, never published. Build context is the repository
-# root. Like src/Ehr.Web/Dockerfile, the build stage runs on the builder's own architecture and compiles for the target
+# (infra/compose/compose.yaml), built there and by CI's stack job, and published by CI as ehr-lab
+# (.github/workflows/images.yml). Build context is the repository root. Like src/Ehr.Web/Dockerfile, the build stage runs on the builder's own architecture and compiles for the target
 # one, so an x86-64 machine builds the arm64 image (and the other way round) without emulating the .NET SDK.
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG TARGETARCH

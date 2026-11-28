@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- EF Core migrations for Ehr.Data's context, generated with dotnet ef (see README.md), and the full SQL
+  <!-- EF Core migrations for Ehr.Data's context, generated with dotnet ef (see docs/development.md), and the full SQL
        they produce (schema.sql). Applied by infra/migrate as ehr_owner; the running apps never reference this. -->
 
   <ItemGroup>

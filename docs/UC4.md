@@ -2,7 +2,7 @@
 
 SwiftChart EHR · UC 4 is Diego Valenzuela's · this part (the expansion plan's step 2) by Tahseen Arnan
 
-This page covers what the expansion added to the chart: editing allergies, medications and diagnoses, their standard codes, their history, and sensitive items. The chart itself is described in the README.
+This page covers what the expansion added to the chart: editing allergies, medications and diagnoses, their standard codes, their history, and sensitive items. The chart itself is described in `docs/features.md`.
 
 ## Clinician workflow
 

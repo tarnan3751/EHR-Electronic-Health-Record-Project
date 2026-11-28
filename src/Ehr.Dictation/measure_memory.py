@@ -71,7 +71,7 @@ What it does:
    2026-11-24, when two of six dictations timed out on the Mac's model server and the cap was set from the peak).
 
 The cap itself is set by hand from its result: infra/compose/compose.yaml's mem_limit and its comment, and the memory
-figures in infra/compose/README.md (Docker Desktop memory) and the root README (Dictation models).
+figures in infra/compose/README.md (Docker Desktop memory) and docs/dictation.md (Dictation models).
 """
 
 from __future__ import annotations

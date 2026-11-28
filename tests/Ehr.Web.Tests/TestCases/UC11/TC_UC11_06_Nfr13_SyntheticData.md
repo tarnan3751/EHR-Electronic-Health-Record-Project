@@ -10,7 +10,7 @@ synthetic clinic and the tests' own accounts) is `TC_UC11_06_Nfr13_SyntheticData
 | Type | Non-functional (data: synthetic only) |
 | Requirements | NFR-13, with FR-27 |
 | Use case | UC 11, Sign in with multi-factor authentication |
-| Preconditions | The local stack is running (`infra/compose/README.md`), the synthetic clinic is seeded ("Synthetic data and the benchmark" in the root README), and the example accounts exist (`dotnet run infra/compose/test-accounts.cs -- setup`). |
+| Preconditions | The local stack is running (`infra/compose/README.md`), the synthetic clinic is seeded ("Synthetic data and the benchmark" in `docs/development.md`), and the example accounts exist (`dotnet run infra/compose/test-accounts.cs -- setup`). |
 | Inputs and system conditions | `psql` as the database superuser through `docker compose exec`, run from `infra/compose`, which sees every row whatever row-level security allows. |
 | Test data | The example accounts (`admin@example.com`, `clinician@example.com`, `patient@example.com`) and the example patient, MRN `SYN0000001`. |
 | Expected result | Steps 1 to 3 each return 0 rows (step 3 returns the count 0). Step 4 lists only `@example.com` addresses. |

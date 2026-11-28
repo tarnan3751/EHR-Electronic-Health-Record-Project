@@ -1,6 +1,6 @@
 # Local server stack
 
-The whole server architecture on one machine, with Docker Compose: the on-prem primary, the cloud replica, the isolated backup host, and a simulated WAN between them. Run every command below from this folder (`infra/compose`). CI starts this same stack on every push and checks it (see "Continuous integration" in the root README).
+The whole server architecture on one machine, with Docker Compose: the on-prem primary, the cloud replica, the isolated backup host, and a simulated WAN between them. Run every command below from this folder (`infra/compose`). CI starts this same stack on every push and checks it (see "Continuous integration" in [docs/development.md](../../docs/development.md#continuous-integration)).
 
 ## What runs
 
@@ -25,7 +25,7 @@ Both apps run the same image; `Ehr__Site` and the connection string decide how e
 
 Dictation is on-prem only: the cloud app forwards its requests to the on-prem app, which calls the `dictation` sidecar, which calls `llama`. Listening to a visit (UC 23), which ships switched off, is on in this stack (`Ehr__Ambient__Enabled` in `compose.yaml`), since its data is synthetic.
 
-The lab is on-prem only too: `lab` calls the on-prem app at https://ehr.example.com:8443, its name on the `onprem` network, with the key from `EHR_LAB_KEY`, which the on-prem app is given as `Ehr__Lab__Key` and the migration job stores as a hash. The cloud app has no lab door. With the key set, a lab order signed on either site gets its results within half a minute; `docker compose stop lab` stops it, and results are then entered by hand on the order's results page. If orders are signed and the lab is handed none, a session left open in a transaction on the primary is holding the hand-over back until it ends (one of `ehr_app` or `ehr_read` left idle is ended after a minute; the superuser's or `ehr_owner`'s isn't): `docker compose exec -u postgres onprem-db psql -c "select pid, usename, application_name, state, xact_start from pg_stat_activity where backend_xid is not null order by age(backend_xid) desc"` shows it first. See "Simulated lab" in the root README.
+The lab is on-prem only too: `lab` calls the on-prem app at https://ehr.example.com:8443, its name on the `onprem` network, with the key from `EHR_LAB_KEY`, which the on-prem app is given as `Ehr__Lab__Key` and the migration job stores as a hash. The cloud app has no lab door. With the key set, a lab order signed on either site gets its results within half a minute; `docker compose stop lab` stops it, and results are then entered by hand on the order's results page. If orders are signed and the lab is handed none, a session left open in a transaction on the primary is holding the hand-over back until it ends (one of `ehr_app` or `ehr_read` left idle is ended after a minute; the superuser's or `ehr_owner`'s isn't): `docker compose exec -u postgres onprem-db psql -c "select pid, usename, application_name, state, xact_start from pg_stat_activity where backend_xid is not null order by age(backend_xid) desc"` shows it first. See "Lab interface" and "Simulated lab" in [docs/apis.md](../../docs/apis.md#lab-interface).
 
 **Signing in.** On its first start the on-prem app creates one admin account from `EHR_BOOTSTRAP_ADMIN_EMAIL` and `EHR_BOOTSTRAP_ADMIN_PASSWORD` in `.env`. Sign in with it at https://ehr.example.com:8443: it asks for a new password, then for an authenticator app (any TOTP app; the page shows the key), then shows recovery codes once. From **Staff** it creates the other accounts, each with a one-time setup link. A staff account can add a passkey at **Passkeys** and use it in place of the code at https://ehr.example.com:8443 and https://ehr-remote.example.com:9443 alike (never the portal's address); a browser offers one only if it trusts the stack's certificate, which `mkcert -install` (setup step 3) arranges. `docs/UC11.md` has a by-hand check. Patients register at https://portal.example.com:9443/portal/register with the enrollment code a clinician issues from the chart; the confirmation email lands in Mailpit.
 
@@ -81,7 +81,7 @@ Everything binds to `127.0.0.1`. For a superuser shell, use `docker compose exec
 
 ## Test accounts
 
-`test-accounts.cs` sets up example accounts through the web app's own pages, as a person would: the bootstrap admin from `.env` (its new password and authenticator), a clinician it invites at **Staff** (setup link, password, authenticator), and a patient that clinician adds to their panel and issues an enrollment code to, registered at the portal and confirmed from Mailpit. The patient comes from the synthetic clinic, so seed it first ("Synthetic data and the benchmark" in the root README). Opening that patient's chart records an emergency access with the reason "Setting up a test portal account on the local stack", and adds the patient to the clinician's panel; both appear in the audit log.
+`test-accounts.cs` sets up example accounts through the web app's own pages, as a person would: the bootstrap admin from `.env` (its new password and authenticator), a clinician it invites at **Staff** (setup link, password, authenticator), and a patient that clinician adds to their panel and issues an enrollment code to, registered at the portal and confirmed from Mailpit. The patient comes from the synthetic clinic, so seed it first ("Synthetic data and the benchmark" in [docs/development.md](../../docs/development.md#synthetic-data-and-the-benchmark)). Opening that patient's chart records an emergency access with the reason "Setting up a test portal account on the local stack", and adds the patient to the clinician's panel; both appear in the audit log.
 
 Run `setup` before anyone signs in as the bootstrap admin by hand: once the admin has been set up by hand, `setup` can't take it over.
 
@@ -201,12 +201,12 @@ Not watched: how far the replica is behind while it streams, how many audit even
 
 ## AI profile
 
-1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in the root README). It puts K2 Horizon in `infra/compose/models/`, MedASR in `infra/compose/models/medasr/`, the speaker model in `infra/compose/models/speaker/`, and prints the `LLAMA_MODEL_FILE` value. Set that, `LLAMA_API_KEY` and `DICTATION_API_KEY` in `.env`. For dictation in Spanish, also `uv run src/Ehr.Dictation/setup_models.py --only whisper`, which puts Whisper in `infra/compose/models/whisper/`; without it `dictation` starts and refuses Spanish. The models folder is gitignored; `llama` refuses to start without its key, and `dictation` without both keys or with a MedASR, a Whisper or a speaker model that isn't the one `models-manifest.json` records. Without the speaker model, or with recorded weights it can't load, dictation works and listening to a visit is refused.
+1. Download the models once, from the repository folder: `uv run src/Ehr.Dictation/setup_models.py` (see "Dictation models" in [docs/dictation.md](../../docs/dictation.md#dictation-models)). It puts K2 Horizon in `infra/compose/models/`, MedASR in `infra/compose/models/medasr/`, the speaker model in `infra/compose/models/speaker/`, and prints the `LLAMA_MODEL_FILE` value. Set that, `LLAMA_API_KEY` and `DICTATION_API_KEY` in `.env`. For dictation in Spanish, also `uv run src/Ehr.Dictation/setup_models.py --only whisper`, which puts Whisper in `infra/compose/models/whisper/`; without it `dictation` starts and refuses Spanish. The models folder is gitignored; `llama` refuses to start without its key, and `dictation` without both keys or with a MedASR, a Whisper or a speaker model that isn't the one `models-manifest.json` records. Without the speaker model, or with recorded weights it can't load, dictation works and listening to a visit is refused.
 2. Start with `docker compose --profile ai up -d --build`. `dictation` is healthy once MedASR, and Whisper if it is installed, have loaded; the on-prem app's dictation API answers that dictation is unavailable until then, and whenever the profile isn't running.
 3. On a machine with an NVIDIA GPU, add the override file:
    `docker compose -f compose.yaml -f compose.nvidia.yaml --profile ai up -d --build`
 
-Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. The root README's "Dictation server hardware" section covers the faster native options. MedASR runs on the CPU in every case; it's small. Whisper does too in Docker, in fp32, which is slower: it transcribes finished passages only, between pauses.
+Docker can't use an Apple Silicon or AMD GPU, so there `llama` runs on the CPU. "Dictation server hardware" in [docs/dictation.md](../../docs/dictation.md#dictation-server-hardware) covers the faster native options. MedASR runs on the CPU in every case; it's small. Whisper does too in Docker, in fp32, which is slower: it transcribes finished passages only, between pauses.
 
 ## Desktop updates
 
@@ -223,12 +223,12 @@ folder:
 
 ```
 {
-  "version": "0.2.1",
+  "version": "1.0.1",
   "notes": "What changed, in a sentence.",
   "pub_date": "2026-11-25T12:00:00Z",
   "platforms": {
     "darwin-aarch64": { "signature": "<the contents of SwiftChart.app.tar.gz.sig>", "url": "SwiftChart.app.tar.gz" },
-    "windows-x86_64": { "signature": "<the contents of the setup's .sig>", "url": "SwiftChart_0.2.1_x64-setup.exe" }
+    "windows-x86_64": { "signature": "<the contents of the setup's .sig>", "url": "SwiftChart_1.0.1_x64-setup.exe" }
   }
 }
 ```
@@ -238,8 +238,8 @@ are made on the owner's Mac with the updater's private key, never here or in CI 
 `EHR_DESKTOP_MINIMUM_VERSION`, set when starting the stack, makes both apps refuse to sync with an older desktop build,
 which then offers the update; its lock and offline charts still work. A build named EHR, from before step 20, says no
 version and is refused too. On macOS:
-`EHR_DESKTOP_MINIMUM_VERSION=0.2.1 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait`; in
-PowerShell: `$env:EHR_DESKTOP_MINIMUM_VERSION = "0.2.1"; docker compose -f compose.yaml -f compose.desktop-updates.yaml
+`EHR_DESKTOP_MINIMUM_VERSION=1.0.1 docker compose -f compose.yaml -f compose.desktop-updates.yaml up -d --wait`; in
+PowerShell: `$env:EHR_DESKTOP_MINIMUM_VERSION = "1.0.1"; docker compose -f compose.yaml -f compose.desktop-updates.yaml
 up -d --wait; Remove-Item Env:EHR_DESKTOP_MINIMUM_VERSION`.
 
 ## Encryption
