@@ -1629,9 +1629,12 @@ FAMILY = (
 )
 # Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
 # Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing,
-# unless a relative clause says what they have: "seen with her mother(,) who has diabetes" (WHO_HAS).
+# unless a relative clause says what they have: "seen with her mother(,) who has diabetes", "who also has diabetes",
+# "whose diabetes is poorly controlled" (WHO_HAS).
 NOT_EXPERIENCER_AFTER = frozenset("with by to from for at about".split())
-WHO_HAS = re.compile(r"\s*,?\s+(?:who|that)\s+(?=(?:has|had|is|was)\b)", re.IGNORECASE)
+WHO_HAS = re.compile(
+    r"\s*,?\s+(?:(?:who|that)\s+(?:(?:also|too|now|still)\s+)?(?=(?:has|had|is|was)\b)|whose\s+)", re.IGNORECASE
+)
 EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE

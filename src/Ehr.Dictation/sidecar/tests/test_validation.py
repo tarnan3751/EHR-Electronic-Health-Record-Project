@@ -472,6 +472,12 @@ def test_a_family_member_who_tells_is_not_who_has_it():
     ("Seen with her mother. That was a hard year for her.", "That was a hard year for her."),
     ("Seen today with her father, fever for 2 days.", "Fever for 2 days."),
     ("History of present illness 45-year-old man with a cough for 3 days.", "45-year-old man with a cough for 3 days."),
+    # Issue 24's controls: a relative clause that says what they do, or whose clause ends before the patient's finding.
+    ("Seen with her mother, who also wonders if the rash is spreading.", "The rash is spreading."),
+    ("Seen today with her son, who also brought her medication list, for a cough for 3 days.", "Cough for 3 days."),
+    ("Seen with her mother, whose English is limited, for a cough for 3 days.", "Cough for 3 days."),
+    ("Lives with her husband, whose work keeps him away, and has had a cough for 3 days.",
+     "Has had a cough for 3 days."),
 ])
 def test_ordinary_words_are_not_qualifiers(said, value):
     assert own(said, value, value.rstrip(".")).pending
@@ -483,6 +489,13 @@ def test_ordinary_words_are_not_qualifiers(said, value):
     ("Her father who had a stroke is well.", "Had a stroke."),
     ("Lives with her sister that is diabetic.", "Is diabetic."),
     ("Seen with his brother who was treated for gout.", "Was treated for gout."),
+    # Issue 24's: a word between "who" and the verb, and "whose".
+    ("Seen with her mother, who also has diabetes.", "Has diabetes."),
+    ("Seen with her mother, who also has diabetes.", "Also has diabetes."),
+    ("Her father, who also had a stroke, is well.", "Had a stroke."),
+    ("Lives with her husband who now has dementia.", "Has dementia."),
+    ("Seen with her mother, whose diabetes is poorly controlled.", "Diabetes is poorly controlled."),
+    ("Her brother, whose asthma is severe, is visiting.", "Asthma is severe."),
 ])
 def test_a_family_members_relative_clause_is_about_them(said, value):
     assert own(said, value).reasons == ["experiencer_dropped"]
