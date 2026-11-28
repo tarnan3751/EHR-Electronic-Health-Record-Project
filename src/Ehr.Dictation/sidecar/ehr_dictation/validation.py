@@ -940,11 +940,12 @@ _ALLERGY_ADDITIONS = [
     # word the allergy only qualifies ("her allergy medication is cetirizine, please add it to her list", "seasonal
     # allergies are worse this spring") or a diagnosis ("allergic rhinitis").
     re.compile(
+        r"(?<!\bno )(?<!\bno new )(?<!\bno known )(?<!\bno known drug )(?<!\bdenies )(?<!\bdenies any )"
         r"\ballerg(?:y|ies)\b(?:\s+(?:to|with)\s+[\w-]+(?:\s+(?:and|or)\s+[\w-]+)?)?"
         r"(?:\s+(?:noted|reported|confirmed|documented))?(?:[,.]\s*|\s+(?=(?:please|let's|lets)\b))"
         r"(?P<at>(?:(?:please|also|let's|lets|can\s+you|could\s+you|we\s+should|we\s+need\s+to|go\s+ahead\s+and)\s+)*"
         r"(?:add\s+(?:it|that|this|them)\s+to|put\s+(?:it|that|this|them)\s+on)\s+"
-        rf"(?:{_DET}\s+|the\s+patient['’]s\s+)?list)\b",
+        rf"(?:{_DET}\s+|the\s+patient['’]s\s+)?list)\b(?!\s+(?:of|for)\b)",
         re.IGNORECASE,
     ),
 ]
@@ -981,7 +982,7 @@ _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
 # "of" and a medicine follow ("two weeks of amoxicillin", "a ten day course of amoxicillin", "a month's worth of
 # metformin", "200 mL of amoxicillin suspension"); not "a week's worth of readings" or "a week with her sugars".
 _AN_AMOUNT = re.compile(
-    rf"\s+(?:an?|\d+|{'|'.join(sorted({*UNITS, *TENS}, key=len, reverse=True))})[\s-]+(?:[\w-]+[\s-]+)?"
+    rf"\s+(?:an?|\d+|{'|'.join(sorted({*UNITS, *TENS}, key=len, reverse=True))})[\s-]+(?:\w[\w-]*[\s-]+)?"
     r"(?:(?:day|week|month)s?['’]?s?\s+)?"
     r"(?:(?P<form>supply|tablets?|tabs|pills?|capsules?)|days?|weeks?|months?|course|worth|doses?|ml|mls)\b",
     re.IGNORECASE,
@@ -994,7 +995,7 @@ _NOT_AN_ORDER = re.compile(
 # What the call is about is the refill or the prescription itself, not its cost: it closes the clause, or "for" or "of"
 # names what it is for, or a trailer follows.
 _ABOUT_A_PRESCRIPTION = re.compile(
-    r"\s+(?:(?:today|tomorrow|later)\s+)?about\b[^.,;!?\n]{0,60}?\b(?:refill|prescription|script|rx)s?\b"
+    r"\s+(?:(?:today|tomorrow|later)\s+)?about(?:\s+(?!(?:of|for|with|why|on|cheaper)\b)[\w'’-]+){0,6}?\s+(?:refill|prescription|script|rx)s?\b"
     r"(?=\s*(?:[.,;!?\n]|$)|\s+(?:for|of|today|tomorrow|now|please|too)\b)",
     re.IGNORECASE,
 )
@@ -1039,13 +1040,26 @@ _NOTING = frozenset({"i", "we"})
 def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
     excuse = _NOT_AN_ORDER.match(text, match.end())
     if excuse and not (
-        excuse.group("about") and _an_amount_of_a_medicine(text, excuse.end())
-        or _ABOUT_A_PRESCRIPTION.match(text, match.end()) and _the_speakers_call(text, match, clause)
+        (excuse.group("about") and _an_amount_of_a_medicine(text, excuse.end())
+         or _ABOUT_A_PRESCRIPTION.match(text, match.end())) and _the_speakers_call(text, match, clause)
     ):
         return False
     before = text[clause : match.start()]
     someone_else_did = _SOMEONE_ELSE_DID.search(before) and not any(token.text in _SPEAKER for token in tokens(before))
-    return not someone_else_did or bool(_NOW.match(text, match.end()))
+    return not someone_else_did or _a_medicine_called_in_now(text, match.end())
+
+
+_PRESCRIBED = frozenset("refill refills prescription prescriptions script scripts rx".split())
+
+
+def _a_medicine_called_in_now(text: str, at: int) -> bool:
+    """Whether a medicine, a refill or a prescription is being called in now from `at` (_NOW): not readings, a result or
+    a question ("the lab was calling in a critical potassium"), and not "just now", which is the past."""
+    now = _NOW.match(text, at)
+    if not now or re.search(r"\bjust\s+now\b", now.group(0), re.IGNORECASE):
+        return False
+    said = [token.text for token in tokens(now.group(0))]
+    return any(word in _PRESCRIBED or word in drugnames.NAMES or _is_drug(word) for word in said)
 
 
 def _an_amount_of_a_medicine(text: str, at: int) -> bool:
@@ -1303,8 +1317,8 @@ ASIDE_BEFORE = re.compile(r",[^,.;:!?\n]{1,80},\s*$")
 NEVER_BEFORE = re.compile(r"\b(?:under|in|on|by)\s+no\s+(?:circumstances|case|account|means)\s*,\s*$", re.IGNORECASE)
 _NO_REASON = r"\bno (?:(?:good|real|medical|clinical)\s+)?reason(?:\s+(?:at\s+all|whatsoever|in\s+my\s+(?:mind|view|opinion)))?"
 NO_REASON = re.compile(
-    rf"{_NO_REASON}\s+(?:(?!(?:so|and|but|because|then|while)\b)\w+\s+){{0,3}}(?:should|would|could|can)\s+$"
-    rf"|{_NO_REASON}(?:\s+for\s+\w+)?\s+$",
+    rf"{_NO_REASON}\s+(?:(?:that|why)\s+)?(?:(?:we|i|she|he|they|you|the\s+patient|the\s+team)\s+)?(?:should|would|could|can)\s+$"
+    rf"|{_NO_REASON}(?:\s+for\s+(?:us|me|her|him|them|the\s+patient))?\s+$",
     re.IGNORECASE,
 )
 # Words that start another clause, which ends an instruction's span.
@@ -1682,21 +1696,26 @@ FAMILY = (
 # Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
 # Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing,
 # unless a relative clause says what they have (WHO_HAS): "seen with her mother(,) who has diabetes", "who also has
-# diabetes", "her parents, who both have diabetes", "who's diabetic", "who recently had a stroke", "who also takes
-# metformin", "who himself has diabetes", "whose diabetes is poorly controlled"; not what they do ("who also wonders
-# if", "who brought her", "who drives her"). Its reach ends at the patient named again, at what it is about and at what
-# the visit is for (RELATIVE_ENDS): "brought in by her daughter, whose main concern is her memory loss", "seen with her
-# husband, who also has questions about her diabetes", "accompanied by her mother, who has noticed her rash", "seen with
-# her mother who still has the referral letter for knee pain" are the patient's. A family word that says who the
-# patient is is no one else (_describes_the_patient(): "she is a 34-year-old mother, whose asthma is poorly
-# controlled").
+# diabetes", "her parents, who both have diabetes", "who recently had a stroke", "who himself has diabetes", "whose
+# diabetes is poorly controlled"; not what they do or take ("who also wonders if", "who took a photo of the rash", "who
+# takes her to dialysis"). The clause is the relative's to its end, through their own "his", "her" and "for" ("who had
+# his stroke last year", "who was treated for breast cancer"): it is about the patient only when it says at once what
+# the relative noticed, asks or worries about (RELATIVE_ENDS: "whose main concern is her memory loss", "who also has
+# questions about her diabetes", "who has noticed her rash"), and such a word later ends the reach where it stands. A
+# family word that says who the patient is is no one else (_describes_the_patient(): "she is a 34-year-old mother,
+# whose asthma is poorly controlled", "a 70-year-old grandmother who also has diabetes presents with chest pain"), but
+# only with the patient as the subject ("she is a 52-year-old woman whose mother had breast cancer" is the mother's).
 NOT_EXPERIENCER_AFTER = frozenset("with by to from for at about".split())
 WHO_HAS = re.compile(
     r"\s*,?\s+(?:(?:who|that)\s+(?:(?:also|too|now|still|both|all|recently|likewise|himself|herself|themselves)\s+){0,2}"
-    r"(?=(?:has|had|have|is|was|are|were|takes|took|take|suffers|suffered|suffer)\b)|who['’]s\s+|whose\s+)",
+    r"(?=(?:has|had|have|is|was|are|suffers|suffered|suffer)\b)|whose\s+)",
     re.IGNORECASE,
 )
-RELATIVE_ENDS = frozenset("her his their him about for".split())
+RELATIVE_ENDS = frozenset(
+    """about noticed noted observed seen concern concerns concerned worry worries worried questions here there present
+    when reports reported says said states stated""".split()
+)
+_BEFORE_WHAT_THEY_NOTICED = frozenset("has had have is was are been also both still now main only own chief primary biggest".split())
 EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
@@ -1802,6 +1821,19 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
             edge = cue.end()
         cue_words |= {i for i, token in enumerate(words) if cue.start() <= token.start < edge}
         ahead = [i for i, token in enumerate(words) if token.start >= edge]
+        # A relative's clause that says what they noticed, asked or worry about is about the patient: it reaches nothing.
+        # Only when it says so at once, with nothing they have before it and before any comma: a later one ends the
+        # reach where it stands, after what the relative has ("who also has diabetes, about her rash", "who still has
+        # lupus when seen today").
+        if relative:
+            for i in ahead[:4]:
+                if any(mark in text[edge : words[i].start] for mark in ".,;:?!\n"):
+                    break
+                if words[i].text in RELATIVE_ENDS:
+                    ahead = []
+                    break
+                if words[i].text not in _BEFORE_WHAT_THEY_NOTICED:  # something they have comes first: it is theirs
+                    break
         crossed = False  # a comma, into more of the list
         for k, i in enumerate(ahead[: LIST_SCOPE if listing else NEGATION_SCOPE]):
             next_clause = k and words[i].text in NEXT_CLAUSE and words[i - 1].text != "to"
@@ -1868,14 +1900,21 @@ _SUBJECTS = frozenset("i we you he she they patient which who he's she's they're
 # A family word that says who the patient is: after "is a" ("she is a 34-year-old mother", "the patient is a father of
 # three"), or before "of" and a number ("34-year-old mother of two"). Not "a sister" said alone ("family history: a
 # sister, who has lupus" is the sister's).
-_IS_A = re.compile(r"\b(?:is|was|am|she['’]s|he['’]s|i['’]m)\s+an?\s+(?:[\w'’-]+\s+){0,3}$", re.IGNORECASE)
+_NOT_RELATIVE = r"(?:(?!(?:whose|who|that|with|and|of)\b)[\w'’-]+\s+){0,3}$"
+_IS_A = re.compile(
+    rf"(?:^|\b(?:she|he|patient|i)\s+)(?:is|was|am)\s+an?\s+{_NOT_RELATIVE}|\b(?:she['’]s|he['’]s|i['’]m)\s+an?\s+{_NOT_RELATIVE}",
+    re.IGNORECASE,
+)
+# The sentence opens by saying who the patient is: "a 70-year-old grandmother who takes warfarin presents after a fall".
+_AN_AGED = re.compile(r"^\s*an?\s+\d+[\s-]*(?:year|month|week|day)s?[\s-]*old\s+$", re.IGNORECASE)
 _OF_A_NUMBER = re.compile(rf"\s+of\s+(?:\d+|{'|'.join(sorted({*UNITS, *TENS}, key=len, reverse=True))})\b", re.IGNORECASE)
 
 
 def _describes_the_patient(text: str, start: int, end: int) -> bool:
     """Whether the family word from `start` to `end` says who the patient is (_IS_A, _OF_A_NUMBER)."""
     clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
-    return bool(_IS_A.search(text[clause:start]) or _OF_A_NUMBER.match(text, end))
+    before = text[clause:start]
+    return bool(_IS_A.search(before) or _AN_AGED.match(before) or _OF_A_NUMBER.match(text, end))
 
 
 def _object_of_a_preposition(text: str, start: int) -> bool:

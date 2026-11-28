@@ -692,11 +692,16 @@ HAVING = frozenset(
 NOT_EXPERIENCER_AFTER = frozenset("con por a al de para junto".split())
 POSSESSIVES = frozenset("su sus el la los las mi".split())
 WHO_HAS = re.compile(
-    r"\s*,?\s+(?:(?:que|quien|quienes)\s+(?:(?:tambien|ahora|aun|todavia|ambos|ambas|recientemente|igualmente)\s+){0,2}"
-    r"(?=(?:tiene|tienen|tuvo|tuvieron|tenia|tenian|padece|padecen|padecio|es|son|era|eran|fue|fueron|toma|toman|"
-    r"sufre|sufren)\b)|(?P<whose>cuy[ao]s?)\s+)"
+    r"\s*,?\s+(?:(?:que|quien|quienes)\s+(?:(?:tambien|ahora|aun|todavia|ambos|ambas|recientemente|hace\s+poco|igualmente)\s+){0,2}"
+    r"(?=(?:tiene|tienen|tuvo|tuvieron|tenia|tenian|padece|padecen|padecio|es|son|era|eran|fue|fueron|"
+    r"sufre|sufren|sufrio|sufrieron)\b)|(?P<whose>cuy[ao]s?)\s+)"
 )
-RELATIVE_ENDS = frozenset("su sus le lo sobre acerca por para".split())
+BEFORE_WHAT_THEY_NOTICED = frozenset(
+    "tiene tienen tenia tuvo es son era esta estan ha han tambien ambos ambas aun todavia ahora principal mayor unica unico".split()
+)
+RELATIVE_ENDS = frozenset(
+    "sobre acerca notado observado visto preocupacion preocupaciones preocupada preocupado preguntas aqui presente cuando".split()
+)
 # Someone telling, not having: "la madre refiere tos nocturna" is the patient's cough.
 REPORTING = frozenset(
     """dice dijo refiere refirio comenta comento cuenta conto informa informo reporta reporto menciona menciono explica
@@ -760,7 +765,20 @@ def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: l
         cues |= set(range(first, last + 1))
         edge = toks[last].end
         cue_ends = ends | RELATIVE_ENDS if first in clauses else ends
-        for k, i in enumerate(range(last + 1, min(len(toks), last + 1 + SCOPE))):
+        ahead = range(last + 1, min(len(toks), last + 1 + SCOPE))
+        # A relative's clause that says what they noticed, asked or worry about is about the patient, as in English.
+        about_the_patient = False
+        for i in list(ahead)[:4] if first in clauses else ():
+            if any(mark in text[toks[last].end : toks[i].start] for mark in ".,;:?!\n"):
+                break
+            if toks[i].key in RELATIVE_ENDS:
+                about_the_patient = True
+                break
+            if toks[i].key not in BEFORE_WHAT_THEY_NOTICED:  # something they have comes first: it is theirs
+                break
+        if about_the_patient:
+            continue
+        for k, i in enumerate(ahead):
             if _stops(text, toks, i, edge, k, cue_ends):
                 break
             reached.add(i)

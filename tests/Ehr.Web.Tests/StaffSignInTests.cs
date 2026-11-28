@@ -108,7 +108,8 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
 
     // Step 19.1, the final review's probe: the same passkey answer sent twice at once, from one password step, signs in
     // once. The second is checked against the count the first has just stored, and refused as an answer used again is
-    // (decision 2). Before, both read the count before they held the account, and both signed in, in 24 of 24 runs.
+    // (decision 2), or, once the first has signed in, refused by its form token. Before, both read the count before
+    // they held the account, and both signed in, in 24 of 24 runs.
     [Fact]
     public async Task The_same_passkey_answer_sent_twice_at_once_signs_in_once()
     {
