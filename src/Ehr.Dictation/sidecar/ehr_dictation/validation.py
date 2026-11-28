@@ -974,14 +974,19 @@ _ALLERGY_CHANGES = [
 #   penicillin allergy in her chart" are documentation), and never the statement alone ("she is allergic to
 #   penicillin").
 _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
-# An amount of a medicine: "a week's supply", "a 30-day supply", "30 tablets". Not "worth", which readings have too ("she
-# will call in about a week's worth of readings").
-_AN_AMOUNT = (
-    rf"(?:an?|\d+|{'|'.join(sorted({*UNITS, *TENS}, key=len, reverse=True))})[\s-]+(?:[\w-]+\s+)?"
-    r"(?:(?:day|week|month)s?['’]?s?\s+)?(?:supply|tablets?|pills?|capsules?)\b"
+# An amount of a medicine after "about" (_an_amount_of_a_medicine()): a number or "a" with a dose form ("a week's
+# supply", "a 30-day supply", "30 tablets", "20 tabs"), or with a time, a course, a worth, doses or millilitres when
+# "of" and a medicine follow ("two weeks of amoxicillin", "a ten day course of amoxicillin", "a month's worth of
+# metformin", "200 mL of amoxicillin suspension"); not "a week's worth of readings" or "a week with her sugars".
+_AN_AMOUNT = re.compile(
+    rf"\s+(?:an?|\d+|{'|'.join(sorted({*UNITS, *TENS}, key=len, reverse=True))})[\s-]+(?:[\w-]+[\s-]+)?"
+    r"(?:(?:day|week|month)s?['’]?s?\s+)?"
+    r"(?:(?P<form>supply|tablets?|tabs|pills?|capsules?)|days?|weeks?|months?|course|worth|doses?|ml|mls)\b",
+    re.IGNORECASE,
 )
+_OF_A_MEDICINE = re.compile(r"\s+of\s+(?:(?:his|her|their|the|this|that)\s+)?([a-z][\w-]*)", re.IGNORECASE)
 _NOT_AN_ORDER = re.compile(
-    rf"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|about(?!\s+{_AN_AMOUNT})|yesterday|to say|for an? appointment)\b",
+    r"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|(?P<about>about)|yesterday|to say|for an? appointment)\b",
     re.IGNORECASE,
 )
 # What the call is about is the refill or the prescription itself, not its cost: it closes the clause, or "for" or "of"
@@ -992,13 +997,14 @@ _ABOUT_A_PRESCRIPTION = re.compile(
     re.IGNORECASE,
 )
 _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|was|were|had been)\s+$", re.IGNORECASE)
-# Something called in now: a word after "calling in" that isn't where from, to or how often, and "now" closing the same
+# Something called in now: a word after "calling in" that isn't where from, to or how often, and "now" ("currently", "as
+# we speak") closing the same
 # clause, with no new subject and no "and", "but", "or", "so", "then", "because" or "while" before it ("her husband was
 # calling in daily and things are calmer now" is the past).
 _NOW = re.compile(
     r"\s+(?!\s|(?:from|to|for|about|at|with|on|in|every|again|now|and|but|or)\b)"
     rf"(?:(?!\b(?:and|but|or|so|then|because|while)\b){_NO_NEW_SUBJECT}[^.,;!?\n])*?"
-    r"(?<!until )(?<!till )(?<!since )(?<!by )\bnow\s*(?=[.,;!?\n]|$)",
+    r"(?:(?<!until )(?<!till )(?<!since )(?<!by )\bnow|\bcurrently|\bas\s+we\s+speak)\s*(?=[.,;!?\n]|$)",
     re.IGNORECASE,
 )
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
@@ -1029,13 +1035,34 @@ _NOTING = frozenset({"i", "we"})
 
 
 def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
-    if _NOT_AN_ORDER.match(text, match.end()) and not (
-        _ABOUT_A_PRESCRIPTION.match(text, match.end()) and _at_clause_start(text, match, clause)
+    excuse = _NOT_AN_ORDER.match(text, match.end())
+    if excuse and not (
+        excuse.group("about") and _an_amount_of_a_medicine(text, excuse.end())
+        or _ABOUT_A_PRESCRIPTION.match(text, match.end()) and _the_speakers_call(text, match, clause)
     ):
         return False
     before = text[clause : match.start()]
     someone_else_did = _SOMEONE_ELSE_DID.search(before) and not any(token.text in _SPEAKER for token in tokens(before))
     return not someone_else_did or bool(_NOW.match(text, match.end()))
+
+
+def _an_amount_of_a_medicine(text: str, at: int) -> bool:
+    """Whether an amount of a medicine is said from `at` (_AN_AMOUNT)."""
+    amount = _AN_AMOUNT.match(text, at)
+    if not amount:
+        return False
+    medicine = None if amount.group("form") else _OF_A_MEDICINE.match(text, amount.end())
+    return bool(amount.group("form") or medicine and (medicine.group(1).lower() in drugnames.NAMES
+                                                       or _is_drug(medicine.group(1).lower())))
+
+
+def _the_speakers_call(text: str, match: re.Match, clause: int) -> bool:
+    """Whether a call in is the speaker's own: from the start of its clause, its lead-in maybe with "should" or "must"
+    ("we should call in about her refill"), and not the patient's ("you can call in about your refill")."""
+    before = [token.text for token in tokens(_ASKING.sub(" ", text[clause : match.start()]))]
+    said = [token.text for token in tokens(text[clause : _sentence_end(text, match.end())])]
+    return (not (before and before[0] == "you") and "your" not in said
+            and all(word in LEAD_IN or word in {"should", "must"} for word in before))
 
 
 def _at_clause_start(text: str, match: re.Match, clause: int) -> bool:

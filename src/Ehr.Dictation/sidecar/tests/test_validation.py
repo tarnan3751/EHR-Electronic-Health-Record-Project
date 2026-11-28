@@ -980,6 +980,15 @@ DIRECTIVES = [
     "Call in about 30 tablets of amoxicillin.",
     "The nurse was calling in amoxicillin to her pharmacy now.",
     "The nurse was calling in her amoxicillin right now.",
+    # The review of issue 24's series: an amount said otherwise, of a medicine, and calling in "currently".
+    "Call in about two weeks of amoxicillin.",
+    "Call in about a ten day course of amoxicillin.",
+    "Could you call in about 20 tabs of amoxicillin.",
+    "Please call in about 90 days of lisinopril.",
+    "Let's call in about a month's worth of metformin.",
+    "Please call in about 200 mL of amoxicillin suspension.",
+    "The nurse was calling in amoxicillin to her pharmacy as we speak.",
+    "The MA was calling in the amoxicillin currently.",
     # Issue 24's: an allergy just named, added to "her list".
     "I note her new latex allergy, please add it to her list.",
     "Latex allergy noted, please add that to his list.",
@@ -1041,6 +1050,19 @@ DOCUMENTATION = [
     "Her son had been calling in every week until now.",
     "Her daughter was calling in from work now.",
     "Her husband was calling in from work, and she is better now.",
+    # The review of issue 24's series: an amount of no medicine, the patient's own call, and calling in from somewhere.
+    "She will call in about two weeks of readings.",
+    "Mom will call in about a month's worth of test results.",
+    "Mom will call in about 2 doses she missed.",
+    "Call in about a week if the swelling persists.",
+    "Call in about two weeks from now with her sugars.",
+    "You can call in about your refill.",
+    "If you run out, just call in about your refill.",
+    "The patient will call in about her refill.",
+    "Patient to call in about her refill.",
+    "She can call in about her prescription.",
+    "Her son was calling in from work as we speak.",
+    "Her daughter was calling in daily and is calmer currently.",
     # The review of issue 24's series: "now" said of a clause joined by "and", "but" or the like.
     "Her husband was calling in daily and things are calmer now.",
     "Her daughter was calling in the mornings and the pain is better now.",
@@ -1238,6 +1260,15 @@ def test_calling_it_into_the_pharmacy_is_cut_and_reported():
 ])
 def test_calling_in_about_a_refill_is_listed_whole(said):
     assert said_instructions(said) == [said.rstrip(".")]
+    assert own(said, said).reasons == ["order_or_allergy_change"]
+
+
+# The review of issue 24's series: "we should" before the speaker's own call ("should" is no lead-in, so the listing
+# starts at the call, and nothing of the sentence is left in the field).
+def test_we_should_call_in_about_a_refill_is_cut_whole():
+    said = "We should call in about her amoxicillin refill."
+
+    assert said_instructions(said) == ["call in about her amoxicillin refill"]
     assert own(said, said).reasons == ["order_or_allergy_change"]
 
 
