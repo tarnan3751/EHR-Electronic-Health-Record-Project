@@ -41,6 +41,9 @@ windows-native-keyring-store = "1"
 # The Secret Service over D-Bus (GNOME Keyring, KDE Wallet), through the system's libdbus, which tao links already. It
 # always encrypts what it sends over the bus, here with pure-Rust crypto.
 dbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rust"] }
+# The web view itself, at the version wry builds against: to turn on media capture and answer its permission requests
+# (capture.rs).
+webkit2gtk = "=2.0.2"
 
 # The hash takes about 1.6 s unoptimized: optimized, development builds and `cargo test` unlock as quickly as a release.
 [profile.dev.package.argon2]

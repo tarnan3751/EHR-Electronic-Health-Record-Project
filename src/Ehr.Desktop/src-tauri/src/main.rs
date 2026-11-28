@@ -17,6 +17,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod api;
+mod capture;
 mod key;
 mod rules;
 mod store;
@@ -1020,6 +1021,11 @@ fn main() {
                 version,
                 updates: updates::Updates::default(),
             });
+            // Recording needs the microphone, which WebKitGTK refuses unless the app allows it (capture.rs).
+            #[cfg(target_os = "linux")]
+            if let Some(window) = app.get_webview_window("main") {
+                capture::enable(&window)?;
+            }
             tauri::async_runtime::spawn(sync_in_background(app.handle().clone()));
             tauri::async_runtime::spawn(lock_in_background(app.handle().clone()));
             tauri::async_runtime::spawn(updates_in_background(app.handle().clone()));

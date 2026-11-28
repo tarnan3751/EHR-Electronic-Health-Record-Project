@@ -142,7 +142,9 @@ Then:
 - The keyring: GNOME Keyring may ask to unlock the login keyring, or to make one with a password if the session has
   none, the first time SwiftChart stores its key.
 - **Recording**, a dictation or a visit: WebKitGTK gives a page the microphone only when the app turns its media
-  capture on and grants the request, and this build does neither, so expect recording to fail on Linux.
+  capture on and grants the request. SwiftChart does both for its own page and for the microphone alone, and refuses
+  every other request (`capture.rs`), so there is no prompt. Whether a recording is then made has not been tried: it
+  also needs the GStreamer plugins WebKitGTK records with and a working PipeWire or PulseAudio session.
 - Updates: no server offers one to a Linux copy (`latest.json` has no Linux entry, and "Making a release" signs none),
   so a newer version is installed by hand over the old one, the same way as the first time.
 
