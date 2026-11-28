@@ -129,11 +129,15 @@ public partial class StaffSignInTests(WebApps apps) : IClassFixture<WebApps>
             var answers = await Task.WhenAll(Enumerable.Range(0, 2).Select(async _ =>
             {
                 using var response = await PasskeyAsync(client, codePage, credential, state);
-                return (Path: PathOf(response), Words: Words(await ReadAsync(response)));
+                return (Path: PathOf(response), response.StatusCode, Words: Words(await response.Content.ReadAsStringAsync(Cancel)));
             }));
 
             Assert.True(answers.Count(a => a.Path == "/patients") == 1, $"Run {run}: signed in {answers.Count(a => a.Path == "/patients")} times.");
-            Assert.Single(answers, a => a.Words.Contains("Passkey not accepted.", StringComparison.Ordinal));
+            // The other is refused one of two ways, by which of them the server reaches first: its passkey answer as one
+            // used again, or, when the first has already signed in, its form, whose token no longer matches the session.
+            Assert.Single(answers, a =>
+                (a.StatusCode == HttpStatusCode.OK && a.Words.Contains("Passkey not accepted.", StringComparison.Ordinal))
+                || (a.StatusCode == HttpStatusCode.BadRequest && a.Words.Contains("Not sent", StringComparison.Ordinal)));
             // The add's sign-in, with the code, and one with the passkey.
             Assert.Equal(2, await apps.AuditEventsAsync(AuditActions.SignIn, actorId: account.Id));
             Assert.Equal(1u, (await StoredPasskeyAsync(account)).SignCount);
