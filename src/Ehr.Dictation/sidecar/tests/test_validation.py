@@ -906,6 +906,10 @@ DIRECTIVES = [
     "Call in about 30 tablets of amoxicillin.",
     "The nurse was calling in amoxicillin to her pharmacy now.",
     "The nurse was calling in her amoxicillin right now.",
+    # Issue 24's: an allergy just named, added to "her list".
+    "I note her new latex allergy, please add it to her list.",
+    "Latex allergy noted, please add that to his list.",
+    "i note her new latex allergy please add it to her list",  # as speech recognition writes it
 ]
 
 DOCUMENTATION = [
@@ -961,6 +965,11 @@ DOCUMENTATION = [
     "Her son had been calling in every week until now.",
     "Her daughter was calling in from work now.",
     "Her husband was calling in from work, and she is better now.",
+    # Issue 24's controls: an allergy named, and something else added to another list.
+    "Her latex allergy causes eczema, please add it to her problem list.",
+    "She brought her allergy medicines, add them to her medication list.",
+    "No known allergies, she has a new rash, add it to her list.",
+    "no known allergies she has a new rash add it to her list",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",
@@ -994,6 +1003,16 @@ def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_document
 
     assert said_instructions(said) == ["please update that"]
     assert own(said, said).value == "She is not allergic to sulfa after all."
+
+
+# Issue 24's: adding it to her list is the instruction, and the allergy noted before it documentation; "it" names no
+# allergen, so nothing is proposed.
+def test_adding_an_allergy_just_named_to_her_list_is_the_instruction():
+    said = "I note her new latex allergy, please add it to her list."
+
+    assert said_instructions(said) == ["please add it to her list"]
+    assert own(said, said).value == "I note her new latex allergy."
+    assert proposals(transcript(said)) == []
 
 
 # Listed whole: what comes before the instruction says nothing once it is cut.

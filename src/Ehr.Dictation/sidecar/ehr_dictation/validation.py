@@ -931,6 +931,15 @@ _ALLERGY_ADDITIONS = [
         rf"\b(?:make sure|ensure|confirm|check that)\b{_SAME_SENTENCE}{{0,40}}?\bon\s+(?:{_DET}\s+)?(?:drug\s+)?allerg\w*\s+list",
         re.IGNORECASE,
     ),
+    # An allergy just named, in the clause right before, added to "her list": "I note her new latex allergy, please add
+    # it to her list". The instruction is the adding, not what precedes it; not another list ("add it to her problem
+    # list"), nor something named after the allergy, past a comma or a new subject ("no known allergies, she has a new
+    # rash, add it to her list", as speech recognition writes it without the commas too).
+    re.compile(
+        rf"\ballerg\w*\b(?:{_NO_NEW_SUBJECT}[^.,;!?\n]){{0,60}}?(?:,\s*|\s+)(?:please\s+)?"
+        rf"(?P<at>add\s+(?:it|that|this|them)\s+to\s+(?:{_DET}\s+)?list)\b",
+        re.IGNORECASE,
+    ),
 ]
 _ALLERGY_CHANGES = [
     re.compile(rf"\b(?:remove|delete|take)\b{_SAME_SENTENCE}{{0,40}}?\b(?:from|off)\s+(?:{_DET}\s+)?(?:drug\s+)?allerg", re.I),
