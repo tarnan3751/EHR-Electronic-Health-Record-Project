@@ -899,6 +899,13 @@ DIRECTIVES = [
     "The nurse was asked to call in amoxicillin to her pharmacy.",
     "The nurse is to call in amoxicillin.",
     "Her daughter has been told to call in amoxicillin.",
+    # Issue 24's: "about" an amount, and someone else calling in now.
+    "Please call in about a week's supply of amoxicillin.",
+    "Call in about a 30-day supply of lisinopril.",
+    "Please call in about a month's supply of metformin.",
+    "Call in about 30 tablets of amoxicillin.",
+    "The nurse was calling in amoxicillin to her pharmacy now.",
+    "The nurse was calling in her amoxicillin right now.",
 ]
 
 DOCUMENTATION = [
@@ -941,6 +948,19 @@ DOCUMENTATION = [
     "Calling in yesterday, mom said the rash was worse.",
     "Her son will call in later to say how she is.",
     "She may call in today for an appointment.",
+    # Issue 24's controls: "about" a time or a supply that is no amount, about a refill on someone else's call, and
+    # calling in that isn't now.
+    "She will call in about a week with her sugars.",
+    "She will call in about a week's worth of readings.",
+    "Mom will call in about her supply of test strips.",
+    "Mom will call in tomorrow about her refill.",
+    "Please call in about the rash if it gets worse.",
+    "Call in tomorrow about her amoxicillin side effects.",
+    "Please call in about her prescription costs if the pharmacy charges too much.",
+    "The nurse was calling in amoxicillin to her pharmacy when she arrived.",
+    "Her son had been calling in every week until now.",
+    "Her daughter was calling in from work now.",
+    "Her husband was calling in from work, and she is better now.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",
@@ -1086,6 +1106,18 @@ def test_calling_it_into_the_pharmacy_is_cut_and_reported():
 
     assert said_instructions(said) == ["and call that into his usual pharmacy"]
     assert own(said, said).value == "Add ivabradine 5 mg twice daily. Recheck in 2 weeks."
+
+
+# Issue 24's: the speaker's own call about a refill or a prescription is the instruction, not only the refill it names,
+# so nothing of it is left in the field ("Call in tomorrow about her amoxicillin.").
+@pytest.mark.parametrize("said", [
+    "Call in tomorrow about her amoxicillin refill.",
+    "Please call in about her prescription for amoxicillin.",
+    "Can you call in later about his metformin refills.",
+])
+def test_calling_in_about_a_refill_is_listed_whole(said):
+    assert said_instructions(said) == [said.rstrip(".")]
+    assert own(said, said).reasons == ["order_or_allergy_change"]
 
 
 def test_an_instruction_can_not_reach_the_note_through_another_field():

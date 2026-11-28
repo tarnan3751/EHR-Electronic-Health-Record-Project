@@ -949,18 +949,41 @@ _ALLERGY_CHANGES = [
 #   something, to say something or for an appointment, nor yesterday, said right after "call in", or after a word for
 #   when ("she will call in sick", "mom will call in tomorrow about the rash"); nor someone else calling in, in the past
 #   ("her husband did call in", "she was calling in from work"), though someone asked to is an instruction ("the nurse
-#   was asked to call in amoxicillin");
+#   was asked to call in amoxicillin"). "About" an amount of a medicine is no excuse ("call in about a week's supply of
+#   amoxicillin"), nor is the speaker's own call about a refill or a prescription ("call in tomorrow about her
+#   amoxicillin refill", not "mom will call in tomorrow about her refill"), nor the past when someone else is calling
+#   something in now ("the nurse was calling in amoxicillin to her pharmacy now", not "until now", nor "her daughter
+#   was calling in from work now");
 # - "note" or "record" an allergy, or note, record, document or flag (or make a note) that the patient is allergic or
 #   reacts to something, as an instruction: at the start of its clause, or after asking for it ("we need to record",
 #   "make sure to note"); not after a subject that does the noting ("her records note a sulfa allergy", "I note a
 #   penicillin allergy in her chart" are documentation), and never the statement alone ("she is allergic to
 #   penicillin").
 _CALL_IN = re.compile(r"\b(?:call|calling|phone|phoning)\s+in\b", re.IGNORECASE)
+# An amount of a medicine: "a week's supply", "a 30-day supply", "30 tablets". Not "worth", which readings have too ("she
+# will call in about a week's worth of readings").
+_AN_AMOUNT = (
+    rf"(?:an?|\d+|{'|'.join(sorted({*UNITS, *TENS}, key=len, reverse=True))})[\s-]+(?:[\w-]+\s+)?"
+    r"(?:(?:day|week|month)s?['’]?s?\s+)?(?:supply|tablets?|pills?|capsules?)\b"
+)
 _NOT_AN_ORDER = re.compile(
-    r"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|about|yesterday|to say|for an? appointment)\b",
+    rf"\s+(?:(?:today|tomorrow|later)\s+)?(?:sick|about(?!\s+{_AN_AMOUNT})|yesterday|to say|for an? appointment)\b",
+    re.IGNORECASE,
+)
+# What the call is about is the refill or the prescription itself, not its cost: it closes the clause, or "for" or "of"
+# names what it is for, or a trailer follows.
+_ABOUT_A_PRESCRIPTION = re.compile(
+    r"\s+(?:(?:today|tomorrow|later)\s+)?about\b[^.,;!?\n]{0,60}?\b(?:refill|prescription|script|rx)s?\b"
+    r"(?=\s*(?:[.,;!?\n]|$)|\s+(?:for|of|today|tomorrow|now|please|too)\b)",
     re.IGNORECASE,
 )
 _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|was|were|had been)\s+$", re.IGNORECASE)
+# Something called in now: a word after "calling in" that isn't where from, to or how often, and "now" closing its clause.
+_NOW = re.compile(
+    r"\s+(?!\s|(?:from|to|for|about|at|with|on|in|every|again|now|and|but|or)\b)"
+    rf"(?:{_NO_NEW_SUBJECT}[^.,;!?\n])*?(?<!until )(?<!till )(?<!since )(?<!by )\bnow\s*(?=[.,;!?\n]|$)",
+    re.IGNORECASE,
+)
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
 # "Note" or "record" an allergy, not "note that" (a conjunction, not a determiner: "note that her allergic rhinitis...").
 _NOTE_ALLERGY = re.compile(rf"\b(?:record|note)\s+(?!that\b)(?:{_DET}\s+)?(?:new\s+)?(?:\w+\s+)?allerg", re.IGNORECASE)
@@ -989,10 +1012,13 @@ _NOTING = frozenset({"i", "we"})
 
 
 def _calls_in_an_order(text: str, match: re.Match, clause: int) -> bool:
-    if _NOT_AN_ORDER.match(text, match.end()):
+    if _NOT_AN_ORDER.match(text, match.end()) and not (
+        _ABOUT_A_PRESCRIPTION.match(text, match.end()) and _at_clause_start(text, match, clause)
+    ):
         return False
     before = text[clause : match.start()]
-    return not (_SOMEONE_ELSE_DID.search(before) and not any(token.text in _SPEAKER for token in tokens(before)))
+    someone_else_did = _SOMEONE_ELSE_DID.search(before) and not any(token.text in _SPEAKER for token in tokens(before))
+    return not someone_else_did or bool(_NOW.match(text, match.end()))
 
 
 def _at_clause_start(text: str, match: re.Match, clause: int) -> bool:
