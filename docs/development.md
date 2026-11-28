@@ -82,7 +82,7 @@ The first build takes several minutes because it downloads the pinned Rust and c
 
 At first launch it asks you to sign in, with the email, password and authenticator code of a clinician account. The account must have finished its setup in the web app first (an admin creates it at **Staff**; its setup link sets the password, and its first sign-in there enrolls the authenticator app), or come from the stack's example accounts (see "Test accounts" in [infra/compose/README.md](../infra/compose/README.md#test-accounts)). Until you sign in, and after you sign out, the list can be read but not changed.
 
-The local database is `ehr.db` in the app's data folder, named by its identifier, `io.github.tarnan3751.swiftchart` (`tauri.conf.json`): `~/Library/Application Support/io.github.tarnan3751.swiftchart` on macOS, `%APPDATA%\io.github.tarnan3751.swiftchart` on Windows. Its key, and the session from the last sign-in, are in the login Keychain or Credential Manager, under the same name. Builds from before the app was named SwiftChart (the plan's step 20) kept theirs under `com.example.ehr`: a SwiftChart build starts empty beside them, and [docs/desktop-install.md](desktop-install.md) says how to send what an old copy holds and then remove it. On macOS, after a rebuild the Keychain may ask whether the app can use them, since to macOS a rebuilt app is a different program: choose **Always Allow** each time. If the key is missing or can't open the database, the app reports an error and leaves the encrypted file and unsent changes in place. It needs the original key to open that file. On Linux, which is for development only, the key, the session and the database live in memory, so each launch starts empty, asks you to sign in, and fills from the server.
+The local database is `ehr.db` in the app's data folder, named by its identifier, `io.github.tarnan3751.swiftchart` (`tauri.conf.json`): `~/Library/Application Support/io.github.tarnan3751.swiftchart` on macOS, `%APPDATA%\io.github.tarnan3751.swiftchart` on Windows, `~/.local/share/io.github.tarnan3751.swiftchart` on Linux. Its key, and the session from the last sign-in, are in the login Keychain, Credential Manager or the Secret Service's default collection, under the same name. Builds from before the app was named SwiftChart (the plan's step 20) kept theirs under `com.example.ehr`: a SwiftChart build starts empty beside them, and [docs/desktop-install.md](desktop-install.md) says how to send what an old copy holds and then remove it. On macOS, after a rebuild the Keychain may ask whether the app can use them, since to macOS a rebuilt app is a different program: choose **Always Allow** each time. If the key is missing or can't open the database, the app reports an error and leaves the encrypted file and unsent changes in place. It needs the original key to open that file. On Linux, with no Secret Service running (GNOME Keyring or KDE Wallet), the app can't keep its key, and reports an error instead of opening the database.
 
 **Web app:** it uses the server stack's primary database, so start the stack first (see [infra/compose/README.md](../infra/compose/README.md)). Once, tell the app how to connect, with the `EHR_APP_PASSWORD` from `infra/compose/.env`. This stores it in your user profile, outside the repository:
 
@@ -199,13 +199,13 @@ If you changed the desktop app, also run `cargo fmt` and `cargo test` from `src/
 
 ### Published images
 
-Each commit on `main` that passes `ci` publishes `ghcr.io/tarnan3751/ehr-web:<full commit ID>`, for `linux/amd64` and `linux/arm64`. The package is public, so pulling it needs no login:
+Each commit on `main` that passes `ci` publishes the four images the stack runs, `ghcr.io/tarnan3751/ehr-web`, `ehr-dictation`, `ehr-migrate` and `ehr-lab`, tagged with the full commit ID and `edge`, for `linux/amd64` and `linux/arm64` (`.github/workflows/images.yml`). Each release, the first being `v1.0.0`, tags them with its version and `latest` (`.github/workflows/release.yml`; how to make one is in `docs/release-notes/README.md`). `ehr-web` is public, so pulling it needs no login; the other three are public once the owner has changed their visibility (Package settings, Change visibility):
 
 ```
 docker pull ghcr.io/tarnan3751/ehr-web:<full commit ID>
 ```
 
-There is no `latest` tag: a deployment names the exact commit it runs.
+A deployment names the exact commit or version it runs; `edge` and `latest` move.
 
 ### Repository security settings
 

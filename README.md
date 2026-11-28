@@ -115,7 +115,7 @@ CI (`.github/workflows/ci.yml`) runs on every push. It builds and tests the web 
 
 ## Desktop app
 
-The desktop app (`src/Ehr.Desktop`) is a Tauri 2 app. It keeps quick text, offline charts and unsent work in a SQLCipher database whose key is in the macOS Keychain or Windows Credential Manager. It syncs with the on-prem app, or with the cloud app when the clinic can't be reached, and makes every network call from Rust. With the stack running:
+The desktop app (`src/Ehr.Desktop`) is a Tauri 2 app. It keeps quick text, offline charts and unsent work in a SQLCipher database whose key is in the macOS Keychain, Windows Credential Manager or, on Linux, the Secret Service (GNOME Keyring or KDE Wallet). It syncs with the on-prem app, or with the cloud app when the clinic can't be reached, and makes every network call from Rust. With the stack running:
 
 ```
 cd src/Ehr.Desktop/src-tauri
@@ -145,16 +145,18 @@ A deployment is two machines joined by Tailscale: a clinic server that owns ever
 
 ## Releases and container images
 
-<!-- RELEASE: link to the release page, such as https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/releases/tag/v1.0.0 -->
-Release `v1.0.0` has desktop installers for macOS, Windows and Linux.
-<!-- RELEASE: the installer file names, one per platform -->
+[Release v1.0.0](https://github.com/tarnan3751/EHR-Electronic-Health-Record-Project/releases/tag/v1.0.0) has desktop installers for macOS, Windows and Linux, with their checksums in `SHA256SUMS.txt`:
 
-The installers are unsigned test builds. They connect only to the local stack's addresses, https://ehr.example.com:8443 and https://ehr-remote.example.com:9443, so they need the stack from the quick start. [docs/desktop-install.md](docs/desktop-install.md) says how to open an unsigned build on a Mac and on Windows.
-<!-- RELEASE: what the Linux build keeps between launches (at d1206c7e, on Linux the key, the session and the database live in memory) and how to install it -->
+| Platform | File |
+|---|---|
+| macOS, Apple Silicon | `SwiftChart_1.0.0_aarch64.dmg` |
+| Windows, x64 | `SwiftChart_1.0.0_x64-setup.exe` |
+| Linux, x86-64 | `SwiftChart_1.0.0_amd64.deb` or `SwiftChart_1.0.0_amd64.AppImage` |
+
+The installers are unsigned test builds. They connect only to the local stack's addresses, https://ehr.example.com:8443 and https://ehr-remote.example.com:9443, so they need the stack from the quick start. [docs/desktop-install.md](docs/desktop-install.md) says how to open an unsigned build on a Mac and on Windows, and how to install on Linux. The Linux app is built and tested in CI. Nobody has run it in a desktop session yet, so its keyring prompts and recording are unverified.
 
 The release also has four container images in the GitHub Container Registry:
 
-<!-- RELEASE: the four image names as published, and the tag they carry for v1.0.0 (the defaults below follow the local stack's image names) -->
 | Image | What it is |
 |---|---|
 | `ghcr.io/tarnan3751/ehr-web` | The web app. The on-prem and cloud sites both run it |
@@ -162,8 +164,7 @@ The release also has four container images in the GitHub Container Registry:
 | `ghcr.io/tarnan3751/ehr-migrate` | The migration job |
 | `ghcr.io/tarnan3751/ehr-lab` | The simulated lab |
 
-<!-- RELEASE: check this sentence still holds once the release workflow is in -->
-Each commit on `main` that passes CI also publishes `ghcr.io/tarnan3751/ehr-web:<full commit ID>` ([Published images](docs/development.md#published-images)).
+Each is built for `linux/amd64` and `linux/arm64` and tagged `1.0.0` and `latest`, for example `docker pull ghcr.io/tarnan3751/ehr-web:1.0.0`. Each commit on `main` that passes CI also publishes all four, tagged with the full commit ID and `edge` ([Published images](docs/development.md#published-images)).
 
 ## Documentation
 
