@@ -497,9 +497,41 @@ def test_ordinary_words_are_not_qualifiers(said, value):
     ("She is a 34-year-old mother, whose asthma is poorly controlled.", "Asthma is poorly controlled."),
     ("She is a 34-year-old mother, who also has asthma.", "Asthma."),
     ("She is a 34-year-old mother, who has asthma.", "Asthma."),
+    ("Seen with her husband, who is concerned about her weight loss.", "Weight loss."),
+    ("34-year-old mother of two whose asthma is poorly controlled.", "Asthma is poorly controlled."),
+    ("The patient is a father of three, whose blood pressure is controlled.", "Blood pressure is controlled."),
+    ("The patient, whose diabetes is poorly controlled, is here for follow-up.", "Diabetes is poorly controlled."),
+    ("Seen with her son, whose car broke down, for a cough for 3 days.", "Cough for 3 days."),
+    ("Seen with her mother, who now is her caregiver, for chest pain.", "Chest pain."),
+    ("Seen with his wife, who now has his medication list, for hypertension follow-up.", "Hypertension follow-up."),
+    ("seen with her husband who also has noticed her cough is worse", "Cough is worse."),
+    ("Seen with her daughter, whose husband has diabetes, for chest pain.", "Chest pain."),
+    ("Brought in by her son, whose wife reports she has had chest pain.", "Chest pain."),
+    # What the relative does, not what they have.
+    ("Seen with her mother, who also wonders if the rash is spreading.", "The rash is spreading."),
+    ("Seen with her husband, who drives her to visits, for a cough of 3 days.", "Cough of 3 days."),
+    ("Seen with her husband, who takes her to appointments, and has a cough.", "Has a cough."),
+    ("Seen with her parents, who are here today, for a cough.", "Cough."),
 ])
 def test_a_relative_clause_does_not_reach_the_patients_own_finding(said, value):
     assert own(said, value).pending
+
+
+# A relative's worry is a doubt, not a finding of theirs: the patient's chest pain the doubt reaches is refused for the
+# doubt (as before the series), never as the relative's.
+@pytest.mark.parametrize("said", [
+    "Brought in by his wife, whose main worry is his chest pain.",
+    "Here with her husband who is also worried about her chest pain.",
+])
+def test_a_relatives_worry_is_a_doubt_not_theirs(said):
+    assert own(said, "Chest pain.").reasons == ["certainty_dropped"]
+
+
+# A known limit: an aside between commas before the relative clause's verb isn't read, so the relative's condition after
+# it is offered as the patient's ("who, like her, has diabetes"); the clinician's review against the transcript is the
+# net (issue 24).
+def test_a_limit_a_relatives_clause_with_an_aside_before_its_verb_is_not_read():
+    assert own("Seen with her mother, who, like her, has diabetes.", "Diabetes.").pending
 
 
 @pytest.mark.parametrize(("said", "value"), [
@@ -515,6 +547,16 @@ def test_a_relative_clause_does_not_reach_the_patients_own_finding(said, value):
     ("Lives with her husband who now has dementia.", "Has dementia."),
     ("Seen with her mother, whose diabetes is poorly controlled.", "Diabetes is poorly controlled."),
     ("Her brother, whose asthma is severe, is visiting.", "Asthma is severe."),
+    # The review of issue 24's series: plurals, other verbs, and words before the verb.
+    ("Seen with her parents, who have diabetes.", "Diabetes."),
+    ("Seen with his parents, who both have diabetes.", "Diabetes."),
+    ("Seen with her mother, who's diabetic.", "Diabetic."),
+    ("Seen with her mother, who recently had a stroke.", "Stroke."),
+    ("Seen with her mother, who also takes metformin.", "Metformin."),
+    ("Seen with her mother, who also suffers from diabetes.", "Diabetes."),
+    ("Accompanied by her father, who himself has diabetes.", "Diabetes."),
+    ("Seen with her sister, who likewise has asthma.", "Asthma."),
+    ("Family history: a sister, who has lupus.", "Lupus."),
 ])
 def test_a_family_members_relative_clause_is_about_them(said, value):
     assert own(said, value).reasons == ["experiencer_dropped"]

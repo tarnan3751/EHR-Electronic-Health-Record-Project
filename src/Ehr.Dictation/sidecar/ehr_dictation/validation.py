@@ -1641,15 +1641,20 @@ FAMILY = (
 )
 # Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
 # Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing,
-# unless a relative clause says what they have: "seen with her mother(,) who has diabetes", "who also has diabetes",
-# "whose diabetes is poorly controlled" (WHO_HAS). Its reach ends at the patient named again, at what it is about and
-# at what the visit is for (RELATIVE_ENDS): "brought in by her daughter, whose main concern is her memory loss", "seen
-# with her husband, who also has questions about her diabetes", "seen with her mother who still has the referral letter
-# for knee pain" are the patient's. A family word after "a" or "an" says who the patient is, and no relative clause is
-# read after it: "she is a 34-year-old mother, whose asthma is poorly controlled".
+# unless a relative clause says what they have (WHO_HAS): "seen with her mother(,) who has diabetes", "who also has
+# diabetes", "her parents, who both have diabetes", "who's diabetic", "who recently had a stroke", "who also takes
+# metformin", "who himself has diabetes", "whose diabetes is poorly controlled"; not what they do ("who also wonders
+# if", "who brought her", "who drives her"). Its reach ends at the patient named again, at what it is about and at what
+# the visit is for (RELATIVE_ENDS): "brought in by her daughter, whose main concern is her memory loss", "seen with her
+# husband, who also has questions about her diabetes", "accompanied by her mother, who has noticed her rash", "seen with
+# her mother who still has the referral letter for knee pain" are the patient's. A family word that says who the
+# patient is is no one else (_describes_the_patient(): "she is a 34-year-old mother, whose asthma is poorly
+# controlled").
 NOT_EXPERIENCER_AFTER = frozenset("with by to from for at about".split())
 WHO_HAS = re.compile(
-    r"\s*,?\s+(?:(?:who|that)\s+(?:(?:also|too|now|still)\s+)?(?=(?:has|had|is|was)\b)|whose\s+)", re.IGNORECASE
+    r"\s*,?\s+(?:(?:who|that)\s+(?:(?:also|too|now|still|both|all|recently|likewise|himself|herself|themselves)\s+){0,2}"
+    r"(?=(?:has|had|have|is|was|are|were|takes|took|take|suffers|suffered|suffer)\b)|who['’]s\s+|whose\s+)",
+    re.IGNORECASE,
 )
 RELATIVE_ENDS = frozenset("her his their him about for".split())
 EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
@@ -1745,8 +1750,9 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
         # ends it ("... but reports weight loss"), and not into a clause that says something else ("no fever, the cough
         # is better", "no fever, reports a cough").
         listing = before is NEGATION
-        relative = (WHO_HAS.match(text, cue.end())
-                    if before is EXPERIENCER and not _describes_the_patient(text, cue.start()) else None)
+        if before is EXPERIENCER and _describes_the_patient(text, cue.start(), cue.end()):
+            continue
+        relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
         relative = None if relative and "\n" in relative.group() else relative
         cue_ends = ends | RELATIVE_ENDS if relative else ends
         if before is EXPERIENCER and not relative and _object_of_a_preposition(text, cue.start()):
@@ -1819,16 +1825,17 @@ def _more_of_the_list(text: str, words: list[Token], first: int, ends: frozenset
 _SUBJECTS = frozenset("i we you he she they patient which who he's she's they're i'm we're i've let's i'll we'll".split())
 
 
-def _describes_the_patient(text: str, start: int) -> bool:
-    """Whether the family word at `start` says who the patient is: the nearest article or possessive before it in its
-    clause is "a" or "an" ("she is a 34-year-old mother", not "seen with her mother")."""
+# A family word that says who the patient is: after "is a" ("she is a 34-year-old mother", "the patient is a father of
+# three"), or before "of" and a number ("34-year-old mother of two"). Not "a sister" said alone ("family history: a
+# sister, who has lupus" is the sister's).
+_IS_A = re.compile(r"\b(?:is|was|am|she['’]s|he['’]s|i['’]m)\s+an?\s+(?:[\w'’-]+\s+){0,3}$", re.IGNORECASE)
+_OF_A_NUMBER = re.compile(rf"\s+of\s+(?:\d+|{'|'.join(sorted({*UNITS, *TENS}, key=len, reverse=True))})\b", re.IGNORECASE)
+
+
+def _describes_the_patient(text: str, start: int, end: int) -> bool:
+    """Whether the family word from `start` to `end` says who the patient is (_IS_A, _OF_A_NUMBER)."""
     clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
-    for token in reversed(tokens(text[clause:start])):
-        if token.text in {"a", "an"}:
-            return True
-        if token.text in {"her", "his", "their", "my", "your", "our", "the", "its"}:
-            return False
-    return False
+    return bool(_IS_A.search(text[clause:start]) or _OF_A_NUMBER.match(text, end))
 
 
 def _object_of_a_preposition(text: str, start: int) -> bool:
