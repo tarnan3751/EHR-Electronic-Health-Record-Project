@@ -989,6 +989,8 @@ DIRECTIVES = [
     "Please call in about 200 mL of amoxicillin suspension.",
     "The nurse was calling in amoxicillin to her pharmacy as we speak.",
     "The MA was calling in the amoxicillin currently.",
+    "There is no reason in my mind that we should not order an MRI.",
+    "There is no clinical reason in my mind that we would not order labs.",
     # Issue 24's: an allergy just named, added to "her list".
     "I note her new latex allergy, please add it to her list.",
     "Latex allergy noted, please add that to his list.",
@@ -1175,6 +1177,7 @@ def test_a_limit_an_allergy_added_to_her_list_after_a_reaction_or_by_name_is_not
     "There's no reason at all not to order an MRI.",
     "I see no reason at all not to order an MRI.",
     "No reason at all for us not to order an MRI.",
+    "There is no medical reason that we should not order an MRI.",
 ])
 def test_two_negations_make_an_instruction_again(said):
     assert said_instructions(said) == [said.rstrip(".")]
@@ -1191,10 +1194,22 @@ def test_two_negations_make_an_instruction_again(said):
     "She had no reason at all to stop it and we should not order a refill.",
     "No reason at all to repeat it, would not order a CT.",
     "No reason at all to worry so would not order an MRI.",
+    "There is no medical reason to worry so we should not order an MRI.",
+    "No reason in my mind to repeat it, would not order a CT.",
 ])
 def test_a_negation_of_something_else_does_not_undo_an_instruction_not_to(said):
     assert said_instructions(said) == []
     assert own(said, said).value == said
+
+
+# A single "no reason" before an order isn't read as negating it, as before issue 24's series: the order is listed and
+# cut, unchanged.
+@pytest.mark.parametrize(("said", "listed"), [
+    ("There is no reason at all to order an MRI.", "order an MRI"),
+    ("There is no reason in my view to order a CT.", "order a CT"),
+])
+def test_a_single_no_reason_before_an_order_is_read_as_before(said, listed):
+    assert said_instructions(said) == [listed]
 
 
 def test_an_instruction_not_to_must_keep_its_negation():
