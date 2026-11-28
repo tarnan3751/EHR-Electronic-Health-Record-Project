@@ -370,6 +370,9 @@ def test_a_relative_told_something_has_nothing(text, english, expected):
      ["experiencer_dropped"]),
     ("Acude con su hija, cuya preocupación principal es su pérdida de memoria.",
      "Comes with her daughter, whose main concern is her memory loss.", []),
+    ("Acude con sus padres, que tienen diabetes.", "Comes with her parents, who have diabetes.", []),
+    ("Acude con sus padres, que tienen diabetes.", "Comes with her parents; has diabetes.", ["experiencer_dropped"]),
+    ("Acude con su madre, que toma metformina.", "Comes with her mother, who takes metformin.", []),
     # A relative named with whose relative they are: someone telling it isn't someone having it.
     ("La madre del niño refiere que tose por las noches.", "Mother coughs at night.", ["experiencer_added"]),
     ("La madre del niño refiere que tose por las noches.", "The mother reports that he coughs at night.", []),

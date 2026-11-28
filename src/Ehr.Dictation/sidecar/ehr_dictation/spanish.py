@@ -685,14 +685,16 @@ HAVING = frozenset(
 # "acude con su madre, que tiene diabetes", which the relative reaches from the clause's verb on, past its comma. A
 # relative named with whose relative they are ("la madre del niño") reaches past that: "la madre del niño tiene asma" is
 # the mother's, "la madre del niño refiere que tose" the child's, since someone telling it (REPORTING) ends the reach.
-# As validation.py's WHO_HAS reads the English: "que también tiene diabetes", and "cuya diabetes está mal controlada"
-# from what follows "cuya" on; and the clause's reach ends at the patient named again, at what it is about and at what
-# the visit is for (RELATIVE_ENDS: "acude con su hija, cuya preocupación principal es su pérdida de memoria").
+# As validation.py's WHO_HAS reads the English: "que también tiene diabetes", "sus padres, que tienen diabetes", "que
+# toma metformina", and "cuya diabetes está mal controlada" from what follows "cuya" on; and the clause's reach ends at
+# the patient named again, at what it is about and at what the visit is for (RELATIVE_ENDS: "acude con su hija, cuya
+# preocupación principal es su pérdida de memoria").
 NOT_EXPERIENCER_AFTER = frozenset("con por a al de para junto".split())
 POSSESSIVES = frozenset("su sus el la los las mi".split())
 WHO_HAS = re.compile(
-    r"\s*,?\s+(?:(?:que|quien)\s+(?:(?:tambien|ahora|aun|todavia)\s+)?"
-    r"(?=(?:tiene|tuvo|tenia|padece|padecio|es|era|fue)\b)|(?P<whose>cuy[ao]s?)\s+)"
+    r"\s*,?\s+(?:(?:que|quien|quienes)\s+(?:(?:tambien|ahora|aun|todavia|ambos|ambas|recientemente|igualmente)\s+){0,2}"
+    r"(?=(?:tiene|tienen|tuvo|tuvieron|tenia|tenian|padece|padecen|padecio|es|son|era|eran|fue|fueron|toma|toman|"
+    r"sufre|sufren)\b)|(?P<whose>cuy[ao]s?)\s+)"
 )
 RELATIVE_ENDS = frozenset("su sus le lo sobre acerca por para".split())
 # Someone telling, not having: "la madre refiere tos nocturna" is the patient's cough.
