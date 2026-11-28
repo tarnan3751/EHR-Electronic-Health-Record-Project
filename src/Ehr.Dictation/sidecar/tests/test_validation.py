@@ -942,6 +942,8 @@ DIRECTIVES = [
     "I note her new latex allergy, please add it to her list.",
     "Latex allergy noted, please add that to his list.",
     "i note her new latex allergy please add it to her list",  # as speech recognition writes it
+    "New allergies to latex and sulfa, please add them to their list.",
+    "I note his new codeine allergy, could you add it to his list.",
 ]
 
 DOCUMENTATION = [
@@ -1008,6 +1010,12 @@ DOCUMENTATION = [
     "She brought her allergy medicines, add them to her medication list.",
     "No known allergies, she has a new rash, add it to her list.",
     "no known allergies she has a new rash add it to her list",
+    # The review of issue 24's series: someone else adding it, a word the allergy only qualifies, and a diagnosis.
+    "Mom knows about the egg allergy and will add it to her list.",
+    "She keeps an allergy card and wants to add it to her list.",
+    "Allergic rhinitis, please add it to her list.",
+    "Her allergy medication is cetirizine, please add it to her list.",
+    "Seasonal allergies are worse this spring, add it to the list.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",

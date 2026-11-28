@@ -931,12 +931,17 @@ _ALLERGY_ADDITIONS = [
         rf"\b(?:make sure|ensure|confirm|check that)\b{_SAME_SENTENCE}{{0,40}}?\bon\s+(?:{_DET}\s+)?(?:drug\s+)?allerg\w*\s+list",
         re.IGNORECASE,
     ),
-    # An allergy just named, in the clause right before, added to "her list": "I note her new latex allergy, please add
-    # it to her list". The instruction is the adding, not what precedes it; not another list ("add it to her problem
-    # list"), nor something named after the allergy, past a comma or a new subject ("no known allergies, she has a new
-    # rash, add it to her list", as speech recognition writes it without the commas too).
+    # An allergy just named, right before, added to "her list": "I note her new latex allergy, please add it to her
+    # list", "latex allergy noted, could you add that to his list". The instruction is the adding, not what precedes it.
+    # Nothing comes between the allergy and the adding but what it is to or with, or "noted", and then a comma or
+    # "please": not another list ("add it to her problem list"), something named after the allergy ("no known
+    # allergies, she has a new rash, add it to her list"), someone else adding it ("mom knows about the egg allergy and
+    # will add it to her list"), a word the allergy only qualifies ("her allergy medication is cetirizine, please add it
+    # to her list", "seasonal allergies are worse this spring") or a diagnosis ("allergic rhinitis").
     re.compile(
-        rf"\ballerg\w*\b(?:{_NO_NEW_SUBJECT}[^.,;!?\n]){{0,60}}?(?:,\s*|\s+)(?:please\s+)?"
+        r"\ballerg(?:y|ies)\b(?:\s+(?:to|with)\s+[\w-]+(?:\s+(?:and|or)\s+[\w-]+)?)?"
+        r"(?:\s+(?:noted|reported|confirmed|documented))?"
+        r"(?:,\s*(?:(?:please|also|let's|lets|can\s+you|could\s+you)\s+)*|\s+(?:please|let's|lets)\s+)"
         rf"(?P<at>add\s+(?:it|that|this|them)\s+to\s+(?:{_DET}\s+)?list)\b",
         re.IGNORECASE,
     ),
