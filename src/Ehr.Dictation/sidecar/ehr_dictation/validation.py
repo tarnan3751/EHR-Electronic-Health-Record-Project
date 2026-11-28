@@ -1247,8 +1247,9 @@ def _directives(text: str) -> list[tuple[int, int, str, int]]:
 # be added", "do not, under any circumstances, order a CT", "under no circumstances, order a CT". It is not an instruction, so nothing is cut or reported; the negation rule keeps it in the value. Unless
 # another negation comes right before it, within UNDOES_REACH words, which makes it one again: "no reason not to order
 # an MRI", "I can't not order an MRI" (ANY_NEGATION), or "no reason" with whoever should do it ("there's no reason we
-# should not order an MRI", NO_REASON); not one further back that negates something else ("she has no chest pain so no
-# need to order a troponin").
+# should not order an MRI", NO_REASON, "at all" or "whatsoever" after it not counted: "there is no reason at all that we
+# should not order an MRI"); not one further back that negates something else ("she has no chest pain so no need to
+# order a troponin").
 NEGATED_INSTRUCTION = re.compile(
     r"\b(?:not|don't|dont|never|won't|no need(?: to| for)?|hold off(?: on)?|no)\s+(?:(?:be|to|on|going|any|further|yet)\s+)"
     r"{0,3}$",
@@ -1261,7 +1262,8 @@ ASIDE_BEFORE = re.compile(r",[^,.;:!?\n]{1,80},\s*$")
 # A clause of its own before it that says never: "under no circumstances, order a CT".
 NEVER_BEFORE = re.compile(r"\b(?:under|in|on|by)\s+no\s+(?:circumstances|case|account|means)\s*,\s*$", re.IGNORECASE)
 NO_REASON = re.compile(
-    r"\bno (?:good |real )?reason\s+(?:\w+\s+){0,3}(?:should|would|could|can)\s+$", re.IGNORECASE
+    r"\bno (?:good |real )?reason(?:\s+(?:at\s+all|whatsoever))?\s+(?:\w+\s+){0,3}(?:should|would|could|can)\s+$",
+    re.IGNORECASE,
 )
 # Words that start another clause, which ends an instruction's span.
 CLAUSE_STARTS = frozenset("then but so because although though while whereas also".split())
