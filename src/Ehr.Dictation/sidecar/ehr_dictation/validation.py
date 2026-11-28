@@ -1630,11 +1630,16 @@ FAMILY = (
 # Someone other than the patient: "family history of breast cancer", "mother had a stroke", "diabetes in her father".
 # Not a family member someone is with or speaks to ("lives with her husband and has had a cough"), who has nothing,
 # unless a relative clause says what they have: "seen with her mother(,) who has diabetes", "who also has diabetes",
-# "whose diabetes is poorly controlled" (WHO_HAS).
+# "whose diabetes is poorly controlled" (WHO_HAS). Its reach ends at the patient named again, at what it is about and
+# at what the visit is for (RELATIVE_ENDS): "brought in by her daughter, whose main concern is her memory loss", "seen
+# with her husband, who also has questions about her diabetes", "seen with her mother who still has the referral letter
+# for knee pain" are the patient's. A family word after "a" or "an" says who the patient is, and no relative clause is
+# read after it: "she is a 34-year-old mother, whose asthma is poorly controlled".
 NOT_EXPERIENCER_AFTER = frozenset("with by to from for at about".split())
 WHO_HAS = re.compile(
     r"\s*,?\s+(?:(?:who|that)\s+(?:(?:also|too|now|still)\s+)?(?=(?:has|had|is|was)\b)|whose\s+)", re.IGNORECASE
 )
+RELATIVE_ENDS = frozenset("her his their him about for".split())
 EXPERIENCER = re.compile(rf"\b(?:family (?:history|hx)(?: of)?|maternal|paternal|{FAMILY})\b", re.IGNORECASE)
 POST_EXPERIENCER = re.compile(
     rf"\b(?:in|on)\s+(?:her|his|their|the|a|both)\s+(?:maternal\s+|paternal\s+)?(?:{FAMILY})\b", re.IGNORECASE
@@ -1720,7 +1725,7 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
     reached: set[int] = set()
     cue_words: set[int] = set()
 
-    def stops(between: str, word: str, marks: str = ".,;:?!\n") -> bool:
+    def stops(between: str, word: str, marks: str = ".,;:?!\n", ends: frozenset[str] = ends) -> bool:
         return word in ends or any(mark in between for mark in marks)
 
     for cue in before.finditer(text):
@@ -1728,8 +1733,10 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
         # ends it ("... but reports weight loss"), and not into a clause that says something else ("no fever, the cough
         # is better", "no fever, reports a cough").
         listing = before is NEGATION
-        relative = WHO_HAS.match(text, cue.end()) if before is EXPERIENCER else None
+        relative = (WHO_HAS.match(text, cue.end())
+                    if before is EXPERIENCER and not _describes_the_patient(text, cue.start()) else None)
         relative = None if relative and "\n" in relative.group() else relative
+        cue_ends = ends | RELATIVE_ENDS if relative else ends
         if before is EXPERIENCER and not relative and _object_of_a_preposition(text, cue.start()):
             continue
         edge = relative.end() if relative else TO_THE_FINDING.match(text, cue.end()).end() if qualifier.past_the_subject else cue.end()
@@ -1748,7 +1755,7 @@ def _reach(text: str, words: list[Token], qualifier: Qualifier) -> tuple[set[int
                 ):
                     break
                 crossed = True
-            elif stops(between, words[i].text) or next_clause or (crossed and words[i].text in LIST_ENDS | CLAUSE_STARTS) or (
+            elif stops(between, words[i].text, ends=cue_ends) or next_clause or (crossed and words[i].text in LIST_ENDS | CLAUSE_STARTS) or (
                     listing and k >= NEGATION_SCOPE and "," not in text[cue.end() : words[i].start]):
                 break
             reached.add(i)
@@ -1798,6 +1805,18 @@ def _more_of_the_list(text: str, words: list[Token], first: int, ends: frozenset
 
 # The words a new subject starts with, which end a negation's list only after "and" or "or": "chills and she ...".
 _SUBJECTS = frozenset("i we you he she they patient which who he's she's they're i'm we're i've let's i'll we'll".split())
+
+
+def _describes_the_patient(text: str, start: int) -> bool:
+    """Whether the family word at `start` says who the patient is: the nearest article or possessive before it in its
+    clause is "a" or "an" ("she is a 34-year-old mother", not "seen with her mother")."""
+    clause = max((mark.end() for mark in CLAUSE_MARK.finditer(text, 0, start)), default=0)
+    for token in reversed(tokens(text[clause:start])):
+        if token.text in {"a", "an"}:
+            return True
+        if token.text in {"her", "his", "their", "my", "your", "our", "the", "its"}:
+            return False
+    return False
 
 
 def _object_of_a_preposition(text: str, start: int) -> bool:

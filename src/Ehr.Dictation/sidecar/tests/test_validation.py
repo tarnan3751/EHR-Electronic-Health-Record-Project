@@ -483,6 +483,25 @@ def test_ordinary_words_are_not_qualifiers(said, value):
     assert own(said, value, value.rstrip(".")).pending
 
 
+# The review of issue 24's series: a relative clause's reach ends at the patient named again, at what it is about and at
+# what the visit is for, so the patient's own finding after it is theirs; and a family word after "a" says who the
+# patient is, so no relative clause is read after it.
+@pytest.mark.parametrize(("said", "value"), [
+    ("Brought in by her daughter, whose main concern is her memory loss.", "Memory loss."),
+    ("Seen with her husband, who also has questions about her diabetes.", "Diabetes."),
+    ("Accompanied by her mother, who also has noticed her rash.", "Rash."),
+    ("Seen with her husband, who also is concerned about her weight loss.", "Weight loss."),
+    ("Accompanied by her daughter whose English is limited for chest pain for 3 days.", "Chest pain for 3 days."),
+    ("Seen with her mother who still has the referral letter for knee pain.", "Knee pain."),
+    ("Accompanied by her mother, who has noticed her rash.", "Rash."),
+    ("She is a 34-year-old mother, whose asthma is poorly controlled.", "Asthma is poorly controlled."),
+    ("She is a 34-year-old mother, who also has asthma.", "Asthma."),
+    ("She is a 34-year-old mother, who has asthma.", "Asthma."),
+])
+def test_a_relative_clause_does_not_reach_the_patients_own_finding(said, value):
+    assert own(said, value).pending
+
+
 @pytest.mark.parametrize(("said", "value"), [
     ("Seen with her mother who has diabetes.", "Has diabetes."),
     ("Seen with her mother, who has diabetes.", "Has diabetes."),
