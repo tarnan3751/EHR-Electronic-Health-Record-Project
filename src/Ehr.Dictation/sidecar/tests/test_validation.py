@@ -997,6 +997,12 @@ DOCUMENTATION = [
     "Her son had been calling in every week until now.",
     "Her daughter was calling in from work now.",
     "Her husband was calling in from work, and she is better now.",
+    # The review of issue 24's series: "now" said of a clause joined by "and", "but" or the like.
+    "Her husband was calling in daily and things are calmer now.",
+    "Her daughter was calling in the mornings and the pain is better now.",
+    "Mom was calling in often but is reassured now.",
+    "She was calling in tears and her pain is controlled now.",
+    "her husband was calling in a lot last month and is fine now",
     # Issue 24's controls: an allergy named, and something else added to another list.
     "Her latex allergy causes eczema, please add it to her problem list.",
     "She brought her allergy medicines, add them to her medication list.",

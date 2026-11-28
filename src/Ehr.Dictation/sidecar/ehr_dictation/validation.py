@@ -987,10 +987,13 @@ _ABOUT_A_PRESCRIPTION = re.compile(
     re.IGNORECASE,
 )
 _SOMEONE_ELSE_DID = re.compile(r"\b(?:did|was|were|had been)\s+$", re.IGNORECASE)
-# Something called in now: a word after "calling in" that isn't where from, to or how often, and "now" closing its clause.
+# Something called in now: a word after "calling in" that isn't where from, to or how often, and "now" closing the same
+# clause, with no new subject and no "and", "but", "or", "so", "then", "because" or "while" before it ("her husband was
+# calling in daily and things are calmer now" is the past).
 _NOW = re.compile(
     r"\s+(?!\s|(?:from|to|for|about|at|with|on|in|every|again|now|and|but|or)\b)"
-    rf"(?:{_NO_NEW_SUBJECT}[^.,;!?\n])*?(?<!until )(?<!till )(?<!since )(?<!by )\bnow\s*(?=[.,;!?\n]|$)",
+    rf"(?:(?!\b(?:and|but|or|so|then|because|while)\b){_NO_NEW_SUBJECT}[^.,;!?\n])*?"
+    r"(?<!until )(?<!till )(?<!since )(?<!by )\bnow\s*(?=[.,;!?\n]|$)",
     re.IGNORECASE,
 )
 _SPEAKER = frozenset("i we you i'll we'll i'm we're i've we've you'll let's".split())
