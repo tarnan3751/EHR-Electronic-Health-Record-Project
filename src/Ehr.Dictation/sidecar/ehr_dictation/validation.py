@@ -932,17 +932,19 @@ _ALLERGY_ADDITIONS = [
         re.IGNORECASE,
     ),
     # An allergy just named, right before, added to "her list": "I note her new latex allergy, please add it to her
-    # list", "latex allergy noted, could you add that to his list". The instruction is the adding, not what precedes it.
-    # Nothing comes between the allergy and the adding but what it is to or with, or "noted", and then a comma or
-    # "please": not another list ("add it to her problem list"), something named after the allergy ("no known
-    # allergies, she has a new rash, add it to her list"), someone else adding it ("mom knows about the egg allergy and
-    # will add it to her list"), a word the allergy only qualifies ("her allergy medication is cetirizine, please add it
-    # to her list", "seasonal allergies are worse this spring") or a diagnosis ("allergic rhinitis").
+    # list", "latex allergy noted, could you add that to his list", "new latex allergy. Please put it on her list". The
+    # instruction is the adding, with what asks for it, not what precedes it. Nothing comes between the allergy and the
+    # adding but what it is to or with, or "noted", and then a comma, a full stop, or "please" or "let's": not another
+    # list ("add it to her problem list"), something named after the allergy ("no known allergies, she has a new rash,
+    # add it to her list"), someone else adding it ("mom knows about the egg allergy and will add it to her list"), a
+    # word the allergy only qualifies ("her allergy medication is cetirizine, please add it to her list", "seasonal
+    # allergies are worse this spring") or a diagnosis ("allergic rhinitis").
     re.compile(
         r"\ballerg(?:y|ies)\b(?:\s+(?:to|with)\s+[\w-]+(?:\s+(?:and|or)\s+[\w-]+)?)?"
-        r"(?:\s+(?:noted|reported|confirmed|documented))?"
-        r"(?:,\s*(?:(?:please|also|let's|lets|can\s+you|could\s+you)\s+)*|\s+(?:please|let's|lets)\s+)"
-        rf"(?P<at>add\s+(?:it|that|this|them)\s+to\s+(?:{_DET}\s+)?list)\b",
+        r"(?:\s+(?:noted|reported|confirmed|documented))?(?:[,.]\s*|\s+(?=(?:please|let's|lets)\b))"
+        r"(?P<at>(?:(?:please|also|let's|lets|can\s+you|could\s+you|we\s+should|we\s+need\s+to|go\s+ahead\s+and)\s+)*"
+        r"(?:add\s+(?:it|that|this|them)\s+to|put\s+(?:it|that|this|them)\s+on)\s+"
+        rf"(?:{_DET}\s+|the\s+patient['’]s\s+)?list)\b",
         re.IGNORECASE,
     ),
 ]
@@ -1423,8 +1425,9 @@ def _without_instructions(value: str, text: str, listed: list[tuple[int, int]], 
     own, as its source is, but a condition before it stays with what follows ("If her ferritin is low, order an iron
     panel and continue omeprazole." keeps "If her ferritin is low, continue omeprazole."). Once something is cut, what
     starts the value or follows a full stop starts with a capital ("Order a CBC; if it is low, start iron." keeps "If it
-    is low, start iron."), and what follows a semicolon keeps its case ("Continue apixaban; do not stop it."). Also how
-    many were cut."""
+    is low, start iron."), and what follows a semicolon keeps its case ("Continue apixaban; do not stop it."). A
+    sentence that is all of an instruction the transcript lists, read there with what came before it, goes whole ("New
+    latex allergy. Please add it to her list." keeps "New latex allergy."). Also how many were cut."""
     said = tokens(text)
     kept: list[str] = []
     cut = 0
@@ -1433,6 +1436,9 @@ def _without_instructions(value: str, text: str, listed: list[tuple[int, int]], 
             (start, end, kind) for start, end, kind in (find or directives)(sentence)
             if not _said_outside(tokens(sentence[start:end]), said, listed)
         ]
+        if not found and _listed_whole(tokens(sentence), text, listed):
+            cut += 1
+            continue
         if not found:
             kept.append(sentence)
             continue
@@ -1460,6 +1466,12 @@ def _without_instructions(value: str, text: str, listed: list[tuple[int, int]], 
             for i, piece in enumerate(kept)
         ]
     return " ".join(kept).strip(), cut
+
+
+def _listed_whole(words: list[Token], text: str, listed: list[tuple[int, int]]) -> bool:
+    """Whether the words are, word for word, all of an instruction the transcript lists."""
+    run = [word.text for word in words]
+    return bool(run) and any(run == [word.text for word in tokens(text[start:end])] for start, end in listed)
 
 
 def _said_outside(words: list[Token], said: list[Token], listed: list[tuple[int, int]]) -> bool:

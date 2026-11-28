@@ -995,6 +995,15 @@ DIRECTIVES = [
     "i note her new latex allergy please add it to her list",  # as speech recognition writes it
     "New allergies to latex and sulfa, please add them to their list.",
     "I note his new codeine allergy, could you add it to his list.",
+    # The review of issue 24's series: a sentence of its own, what asks for it, "put it on" and the patient's list.
+    "New latex allergy. Please add it to her list.",
+    "Penicillin allergy noted, we should add it to her list.",
+    "Penicillin allergy noted, let's add it to her list.",
+    "Latex allergy, please also add it to her list.",
+    "Latex allergy, can you add it to her list.",
+    "Latex allergy, we need to add it to her list.",
+    "New latex allergy, please put it on her list.",
+    "New latex allergy, please add it to the patient's list.",
 ]
 
 DOCUMENTATION = [
@@ -1080,6 +1089,10 @@ DOCUMENTATION = [
     "Allergic rhinitis, please add it to her list.",
     "Her allergy medication is cetirizine, please add it to her list.",
     "Seasonal allergies are worse this spring, add it to the list.",
+    "Latex allergy. She will add it to her list.",
+    "Her allergy medicine ran out. Please add it to her list.",
+    "Her new allergy card, please put it on the fridge.",
+    "Latex allergy, please add it to the patient's problem list.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",
@@ -1123,6 +1136,26 @@ def test_adding_an_allergy_just_named_to_her_list_is_the_instruction():
     assert said_instructions(said) == ["please add it to her list"]
     assert own(said, said).value == "I note her new latex allergy."
     assert proposals(transcript(said)) == []
+
+
+# The review of issue 24's series: said as a sentence of its own, the adding is listed and cut whole, and the allergy
+# noted before it stays.
+def test_adding_an_allergy_named_in_the_sentence_before_is_cut_whole():
+    said = "New latex allergy. Please add it to her list."
+
+    assert said_instructions(said) == ["Please add it to her list"]
+    assert own(said, said).value == "New latex allergy."
+
+
+# Known limits (issue 24): a reaction named between the allergy and the adding, after another comma, and the allergen
+# named again in place of "it", aren't read, so the instruction is shown; the clinician's review against the transcript
+# is the net.
+@pytest.mark.parametrize("said", [
+    "She has a new sulfa allergy, hives, please add it to her list.",
+    "New latex allergy, please add latex to her list.",
+])
+def test_a_limit_an_allergy_added_to_her_list_after_a_reaction_or_by_name_is_not_read(said):
+    assert said_instructions(said) == []
 
 
 # Listed whole: what comes before the instruction says nothing once it is cut.
