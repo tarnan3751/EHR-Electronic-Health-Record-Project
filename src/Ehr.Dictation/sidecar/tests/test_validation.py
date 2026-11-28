@@ -472,9 +472,64 @@ def test_a_family_member_who_tells_is_not_who_has_it():
     ("Seen with her mother. That was a hard year for her.", "That was a hard year for her."),
     ("Seen today with her father, fever for 2 days.", "Fever for 2 days."),
     ("History of present illness 45-year-old man with a cough for 3 days.", "45-year-old man with a cough for 3 days."),
+    # Issue 24's controls: a relative clause that says what they do, or whose clause ends before the patient's finding.
+    ("Seen with her mother, who also wonders if the rash is spreading.", "The rash is spreading."),
+    ("Seen today with her son, who also brought her medication list, for a cough for 3 days.", "Cough for 3 days."),
+    ("Seen with her mother, whose English is limited, for a cough for 3 days.", "Cough for 3 days."),
+    ("Lives with her husband, whose work keeps him away, and has had a cough for 3 days.",
+     "Has had a cough for 3 days."),
 ])
 def test_ordinary_words_are_not_qualifiers(said, value):
     assert own(said, value, value.rstrip(".")).pending
+
+
+# The review of issue 24's series: a relative clause's reach ends at the patient named again, at what it is about and at
+# what the visit is for, so the patient's own finding after it is theirs; and a family word after "a" says who the
+# patient is, so no relative clause is read after it.
+@pytest.mark.parametrize(("said", "value"), [
+    ("Brought in by her daughter, whose main concern is her memory loss.", "Memory loss."),
+    ("Seen with her husband, who also has questions about her diabetes.", "Diabetes."),
+    ("Accompanied by her mother, who also has noticed her rash.", "Rash."),
+    ("Seen with her husband, who also is concerned about her weight loss.", "Weight loss."),
+    ("Accompanied by her mother, who has noticed her rash.", "Rash."),
+    ("She is a 34-year-old mother, whose asthma is poorly controlled.", "Asthma is poorly controlled."),
+    ("She is a 34-year-old mother, who also has asthma.", "Asthma."),
+    ("She is a 34-year-old mother, who has asthma.", "Asthma."),
+    ("Seen with her husband, who is concerned about her weight loss.", "Weight loss."),
+    ("34-year-old mother of two whose asthma is poorly controlled.", "Asthma is poorly controlled."),
+    ("The patient is a father of three, whose blood pressure is controlled.", "Blood pressure is controlled."),
+    ("The patient, whose diabetes is poorly controlled, is here for follow-up.", "Diabetes is poorly controlled."),
+    ("Seen with her son, whose car broke down, for a cough for 3 days.", "Cough for 3 days."),
+    ("Seen with her mother, who now is her caregiver, for chest pain.", "Chest pain."),
+    ("Seen with his wife, who now has his medication list, for hypertension follow-up.", "Hypertension follow-up."),
+    ("seen with her husband who also has noticed her cough is worse", "Cough is worse."),
+    ("Seen with her daughter, whose husband has diabetes, for chest pain.", "Chest pain."),
+    ("Brought in by her son, whose wife reports she has had chest pain.", "Chest pain."),
+    # What the relative does, not what they have.
+    ("Seen with her mother, who also wonders if the rash is spreading.", "The rash is spreading."),
+    ("Seen with her husband, who drives her to visits, for a cough of 3 days.", "Cough of 3 days."),
+    ("Seen with her husband, who takes her to appointments, and has a cough.", "Has a cough."),
+    ("Seen with her parents, who are here today, for a cough.", "Cough."),
+])
+def test_a_relative_clause_does_not_reach_the_patients_own_finding(said, value):
+    assert own(said, value).pending
+
+
+# A relative's worry is a doubt, not a finding of theirs: the patient's chest pain the doubt reaches is refused for the
+# doubt (as before the series), never as the relative's.
+@pytest.mark.parametrize("said", [
+    "Brought in by his wife, whose main worry is his chest pain.",
+    "Here with her husband who is also worried about her chest pain.",
+])
+def test_a_relatives_worry_is_a_doubt_not_theirs(said):
+    assert own(said, "Chest pain.").reasons == ["certainty_dropped"]
+
+
+# A known limit: an aside between commas before the relative clause's verb isn't read, so the relative's condition after
+# it is offered as the patient's ("who, like her, has diabetes"); the clinician's review against the transcript is the
+# net (issue 24).
+def test_a_limit_a_relatives_clause_with_an_aside_before_its_verb_is_not_read():
+    assert own("Seen with her mother, who, like her, has diabetes.", "Diabetes.").pending
 
 
 @pytest.mark.parametrize(("said", "value"), [
@@ -483,10 +538,85 @@ def test_ordinary_words_are_not_qualifiers(said, value):
     ("Her father who had a stroke is well.", "Had a stroke."),
     ("Lives with her sister that is diabetic.", "Is diabetic."),
     ("Seen with his brother who was treated for gout.", "Was treated for gout."),
+    # Issue 24's: a word between "who" and the verb, and "whose".
+    ("Seen with her mother, who also has diabetes.", "Has diabetes."),
+    ("Seen with her mother, who also has diabetes.", "Also has diabetes."),
+    ("Her father, who also had a stroke, is well.", "Had a stroke."),
+    ("Lives with her husband who now has dementia.", "Has dementia."),
+    ("Seen with her mother, whose diabetes is poorly controlled.", "Diabetes is poorly controlled."),
+    ("Her brother, whose asthma is severe, is visiting.", "Asthma is severe."),
+    # The review of issue 24's series: plurals, other verbs, and words before the verb.
+    ("Seen with her parents, who have diabetes.", "Diabetes."),
+    ("Seen with his parents, who both have diabetes.", "Diabetes."),
+    ("Seen with her mother, who recently had a stroke.", "Stroke."),
+    ("Seen with her mother, who also suffers from diabetes.", "Diabetes."),
+    ("Accompanied by her father, who himself has diabetes.", "Diabetes."),
+    ("Seen with her sister, who likewise has asthma.", "Asthma."),
+    ("Family history: a sister, who has lupus.", "Lupus."),
 ])
 def test_a_family_members_relative_clause_is_about_them(said, value):
     assert own(said, value).reasons == ["experiencer_dropped"]
     assert own(said, said).pending
+
+
+# The second review of issue 24's series: a relative's own condition is never offered as the patient's. A family word
+# after "is a" is the patient only when the patient is the subject and nothing relative comes between; and a relative's
+# clause doesn't end at a possessive or at "for", which may be the relative's own.
+@pytest.mark.parametrize(("said", "value"), [
+    ("She is a 52-year-old woman whose mother had breast cancer at 45.", "Breast cancer at 45."),
+    ("He is a 45-year-old man whose father died of an MI at 50.", "MI at 50."),
+    ("She is an only child whose mother has dementia.", "Dementia."),
+    ("She is a 34-year-old mother whose son has asthma.", "Asthma."),
+    ("Her main support is a sister who has multiple sclerosis.", "Multiple sclerosis."),
+    ("Her health care proxy is a daughter who had a stroke last year.", "Stroke last year."),
+    ("He's a smoker whose father had lung cancer.", "Lung cancer."),
+    ("The patient is a retired teacher whose brother has schizophrenia.", "Schizophrenia."),
+    ("Seen with her father, who had his stroke last year.", "Stroke last year."),
+    ("Brought in by her husband, who had chemotherapy for lymphoma last year.", "Lymphoma."),
+    ("Seen with her mother, who had her hip replaced in March.", "Hip replaced in March."),
+    ("Seen with her father, who has been on dialysis for kidney failure.", "Kidney failure."),
+    ("Seen with her mother, who was treated for breast cancer in 2019.", "Breast cancer in 2019."),
+    ("Seen with his brother who was treated for gout.", "Gout."),
+    ("Seen with her mother, who had surgery for colon cancer at 50.", "Colon cancer at 50."),
+    ("Her father, who had his first heart attack at 52, is here today.", "Heart attack at 52."),
+])
+def test_a_relatives_own_condition_is_never_offered_as_the_patients(said, value):
+    assert not own(said, value).pending
+
+
+# What a relative does, saw or asks about is not what they have; and a family word that opens the sentence with an age
+# is the patient.
+@pytest.mark.parametrize(("said", "value"), [
+    ("Brought in by her son, who took a photo of the rash yesterday.", "Rash."),
+    ("Accompanied by her mother, who took a video of the seizure.", "Seizure."),
+    ("Accompanied by her parents, who were there when the seizure started.", "Seizure."),
+    ("Seen with her parents, who are both concerned the asthma is worse.", "Asthma is worse."),
+    ("Accompanied by her son, who also was present when the fall happened.", "Fall."),
+    ("Accompanied by her husband, who also has noticed the patient's memory loss.", "Memory loss."),
+    ("A 70-year-old grandmother who takes warfarin presents after a fall.", "Fall."),
+    ("A 70-year-old grandmother who also has diabetes presents with chest pain.", "Chest pain."),
+])
+def test_what_a_relative_does_or_saw_is_not_theirs(said, value):
+    assert own(said, value).pending
+
+
+# Known limits, both failing closed (the field is refused, nothing is offered): a relative's clause that runs on, with
+# "for", into the patient's reason for the visit; and, as before the series, "who's" and what a relative takes aren't
+# read as theirs (issue 24).
+@pytest.mark.parametrize(("said", "value"), [
+    ("Accompanied by her daughter whose English is limited for chest pain for 3 days.", "Chest pain for 3 days."),
+    ("Seen with her mother who still has the referral letter for knee pain.", "Knee pain."),
+])
+def test_a_limit_a_relatives_clause_running_into_the_visits_reason_is_refused(said, value):
+    assert own(said, value).reasons == ["experiencer_dropped"]
+
+
+@pytest.mark.parametrize(("said", "value"), [
+    ("Seen with her mother, who's diabetic.", "Diabetic."),
+    ("Seen with her mother, who also takes metformin.", "Metformin."),
+])
+def test_a_limit_whos_and_what_a_relative_takes_are_not_read_as_theirs(said, value):
+    assert own(said, value).pending
 
 
 def test_a_family_member_who_is_the_subject_still_has_it():
@@ -899,10 +1029,75 @@ DIRECTIVES = [
     "The nurse was asked to call in amoxicillin to her pharmacy.",
     "The nurse is to call in amoxicillin.",
     "Her daughter has been told to call in amoxicillin.",
+    # Issue 24's: "about" an amount, and someone else calling in now.
+    "Please call in about a week's supply of amoxicillin.",
+    "Call in about a 30-day supply of lisinopril.",
+    "Please call in about a month's supply of metformin.",
+    "Call in about 30 tablets of amoxicillin.",
+    "The nurse was calling in amoxicillin to her pharmacy now.",
+    "The nurse was calling in her amoxicillin right now.",
+    # The review of issue 24's series: an amount said otherwise, of a medicine, and calling in "currently".
+    "Call in about two weeks of amoxicillin.",
+    "Call in about a ten day course of amoxicillin.",
+    "Could you call in about 20 tabs of amoxicillin.",
+    "Please call in about 90 days of lisinopril.",
+    "Let's call in about a month's worth of metformin.",
+    "Please call in about 200 mL of amoxicillin suspension.",
+    "The nurse was calling in amoxicillin to her pharmacy as we speak.",
+    "The MA was calling in the amoxicillin currently.",
+    "There is no reason in my mind that we should not order an MRI.",
+    "There is no clinical reason in my mind that we would not order labs.",
+    # Issue 24's: an allergy just named, added to "her list".
+    "I note her new latex allergy, please add it to her list.",
+    "Latex allergy noted, please add that to his list.",
+    "i note her new latex allergy please add it to her list",  # as speech recognition writes it
+    "New allergies to latex and sulfa, please add them to their list.",
+    "I note his new codeine allergy, could you add it to his list.",
+    # The review of issue 24's series: a sentence of its own, what asks for it, "put it on" and the patient's list.
+    "New latex allergy. Please add it to her list.",
+    "Penicillin allergy noted, we should add it to her list.",
+    "Penicillin allergy noted, let's add it to her list.",
+    "Latex allergy, please also add it to her list.",
+    "Latex allergy, can you add it to her list.",
+    "Latex allergy, we need to add it to her list.",
+    "New latex allergy, please put it on her list.",
+    "New latex allergy, please add it to the patient's list.",
 ]
 
 DOCUMENTATION = [
     "Start lisinopril 10 mg daily.",
+    # The second review of issue 24's series: what the widened rules must leave alone.
+    "Patient to call in about a week of insulin readings.",
+    "Instructed to call in about 2 missed doses of warfarin.",
+    "Told to call in about a week of prednisone side effects.",
+    "She should call in about two weeks of insulin and sugar logs.",
+    "Patient to call in about a week of aspirin bruising.",
+    "Patient to call in about two weeks of cedar pollen symptoms.",
+    "We should call in about the cost of her prescription.",
+    "I'll call in about the prior authorization for her prescription.",
+    "We need to call in about why the pharmacy lost her prescription.",
+    "Let's call in about the insurance denial of her refill.",
+    "I will call in about the delay with her refill.",
+    "We should call in about a cheaper prescription.",
+    "The lab was calling in a critical potassium just now.",
+    "Home health was calling in her wound measurements currently.",
+    "Her husband was calling in her blood sugar readings as we speak.",
+    "Her daughter was calling in more often now.",
+    "Mom was calling in twice a day now.",
+    "Peanut allergy, please add it to the list of things to discuss with the allergist.",
+    "Allergy to cats, we need to add it to the list of reasons she cannot foster.",
+    "Seasonal allergy, let's put it on the list of topics for next visit.",
+    "Food allergy, could you put that on the list for the dietitian.",
+    "Penicillin allergy. We should put it on her list of questions for the pharmacist.",
+    "Reviewed her allergies. Please put it on her list for the school nurse.",
+    "Started metoprolol, no new allergies. Please add it to her list.",
+    "No medical reason was found we should not order an MRI.",
+    "No clinical reason for pain we would not order an MRI.",
+    "No reason whatsoever to image we should not order a CT.",
+    "There is no reason in my mind to doubt we should not order labs.",
+    "No medical reason found we would not order imaging.",
+    "There is no reason for concern not ordering a CT today.",
+    "No clinical reason to admit we would not order telemetry.",
     "Continue metformin and increase atorvastatin to 40 mg.",
     "Stop ibuprofen.",
     "No known drug allergies.",
@@ -941,6 +1136,53 @@ DOCUMENTATION = [
     "Calling in yesterday, mom said the rash was worse.",
     "Her son will call in later to say how she is.",
     "She may call in today for an appointment.",
+    # Issue 24's controls: "about" a time or a supply that is no amount, about a refill on someone else's call, and
+    # calling in that isn't now.
+    "She will call in about a week with her sugars.",
+    "She will call in about a week's worth of readings.",
+    "Mom will call in about her supply of test strips.",
+    "Mom will call in tomorrow about her refill.",
+    "Please call in about the rash if it gets worse.",
+    "Call in tomorrow about her amoxicillin side effects.",
+    "Please call in about her prescription costs if the pharmacy charges too much.",
+    "The nurse was calling in amoxicillin to her pharmacy when she arrived.",
+    "Her son had been calling in every week until now.",
+    "Her daughter was calling in from work now.",
+    "Her husband was calling in from work, and she is better now.",
+    # The review of issue 24's series: an amount of no medicine, the patient's own call, and calling in from somewhere.
+    "She will call in about two weeks of readings.",
+    "Mom will call in about a month's worth of test results.",
+    "Mom will call in about 2 doses she missed.",
+    "Call in about a week if the swelling persists.",
+    "Call in about two weeks from now with her sugars.",
+    "You can call in about your refill.",
+    "If you run out, just call in about your refill.",
+    "The patient will call in about her refill.",
+    "Patient to call in about her refill.",
+    "She can call in about her prescription.",
+    "Her son was calling in from work as we speak.",
+    "Her daughter was calling in daily and is calmer currently.",
+    # The review of issue 24's series: "now" said of a clause joined by "and", "but" or the like.
+    "Her husband was calling in daily and things are calmer now.",
+    "Her daughter was calling in the mornings and the pain is better now.",
+    "Mom was calling in often but is reassured now.",
+    "She was calling in tears and her pain is controlled now.",
+    "her husband was calling in a lot last month and is fine now",
+    # Issue 24's controls: an allergy named, and something else added to another list.
+    "Her latex allergy causes eczema, please add it to her problem list.",
+    "She brought her allergy medicines, add them to her medication list.",
+    "No known allergies, she has a new rash, add it to her list.",
+    "no known allergies she has a new rash add it to her list",
+    # The review of issue 24's series: someone else adding it, a word the allergy only qualifies, and a diagnosis.
+    "Mom knows about the egg allergy and will add it to her list.",
+    "She keeps an allergy card and wants to add it to her list.",
+    "Allergic rhinitis, please add it to her list.",
+    "Her allergy medication is cetirizine, please add it to her list.",
+    "Seasonal allergies are worse this spring, add it to the list.",
+    "Latex allergy. She will add it to her list.",
+    "Her allergy medicine ran out. Please add it to her list.",
+    "Her new allergy card, please put it on the fridge.",
+    "Latex allergy, please add it to the patient's problem list.",
     # Instructions not to.
     "Start metformin and don't order an A1c.",
     "Do not order an MRI.",
@@ -976,6 +1218,36 @@ def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_document
     assert own(said, said).value == "She is not allergic to sulfa after all."
 
 
+# Issue 24's: adding it to her list is the instruction, and the allergy noted before it documentation; "it" names no
+# allergen, so nothing is proposed.
+def test_adding_an_allergy_just_named_to_her_list_is_the_instruction():
+    said = "I note her new latex allergy, please add it to her list."
+
+    assert said_instructions(said) == ["please add it to her list"]
+    assert own(said, said).value == "I note her new latex allergy."
+    assert proposals(transcript(said)) == []
+
+
+# The review of issue 24's series: said as a sentence of its own, the adding is listed and cut whole, and the allergy
+# noted before it stays.
+def test_adding_an_allergy_named_in_the_sentence_before_is_cut_whole():
+    said = "New latex allergy. Please add it to her list."
+
+    assert said_instructions(said) == ["Please add it to her list"]
+    assert own(said, said).value == "New latex allergy."
+
+
+# Known limits (issue 24): a reaction named between the allergy and the adding, after another comma, and the allergen
+# named again in place of "it", aren't read, so the instruction is shown; the clinician's review against the transcript
+# is the net.
+@pytest.mark.parametrize("said", [
+    "She has a new sulfa allergy, hives, please add it to her list.",
+    "New latex allergy, please add latex to her list.",
+])
+def test_a_limit_an_allergy_added_to_her_list_after_a_reaction_or_by_name_is_not_read(said):
+    assert said_instructions(said) == []
+
+
 # Listed whole: what comes before the instruction says nothing once it is cut.
 @pytest.mark.parametrize("said", [
     "There's no reason not to order an MRI of the knee.",
@@ -985,6 +1257,15 @@ def test_please_update_that_is_the_instruction_and_what_it_refers_to_is_document
     "There is no good reason that we can not order a CT today.",
     "No real reason why the team would not order labs.",
     "There's no reason she could not order a lipid panel.",
+    # Issue 24's: "at all" or "whatsoever" after "no reason" isn't counted.
+    "There is no reason at all that we should not order an MRI.",
+    "There's no reason whatsoever that the team would not order labs.",
+    "There is no reason at all why we can not order a CT today.",
+    # The review of issue 24's series: "no reason at all" or "for us" right before the negation.
+    "There's no reason at all not to order an MRI.",
+    "I see no reason at all not to order an MRI.",
+    "No reason at all for us not to order an MRI.",
+    "There is no medical reason that we should not order an MRI.",
 ])
 def test_two_negations_make_an_instruction_again(said):
     assert said_instructions(said) == [said.rstrip(".")]
@@ -995,10 +1276,42 @@ def test_two_negations_make_an_instruction_again(said):
     "She has no chest pain so no need to order a troponin.",
     "There is no reason she should worry so do not order an MRI.",
     "No reason for concern since the scan was normal and we should not order an MRI.",
+    # Issue 24's controls: "no reason at all" or "whatsoever" negating something else.
+    "There is no reason at all to worry so we should not order an MRI.",
+    "No reason whatsoever for her to be worried so we should not order a CT.",
+    "She had no reason at all to stop it and we should not order a refill.",
+    "No reason at all to repeat it, would not order a CT.",
+    "No reason at all to worry so would not order an MRI.",
+    "There is no medical reason to worry so we should not order an MRI.",
+    "No reason in my mind to repeat it, would not order a CT.",
 ])
 def test_a_negation_of_something_else_does_not_undo_an_instruction_not_to(said):
     assert said_instructions(said) == []
     assert own(said, said).value == said
+
+
+# Known limits: the review of issue 24's series found these neighbours still shown, and no rule reads them without
+# reaching documentation: a call about a medicine with no refill or amount named (the patient may be calling about side
+# effects), a refill on a condition, "now" before where the call goes, and an order in the passive. The clinician's
+# review against the transcript is the net.
+@pytest.mark.parametrize("said", [
+    "Call in tomorrow about his amoxicillin.",
+    "Call in about her refill if she runs out.",
+    "The nurse was calling in amoxicillin now to her pharmacy.",
+    "There is no reason at all why the patient should not be ordered an MRI.",
+])
+def test_a_limit_the_reviews_neighbours_not_read_as_instructions(said):
+    assert said_instructions(said) == []
+
+
+# A single "no reason" before an order isn't read as negating it, as before issue 24's series: the order is listed and
+# cut, unchanged.
+@pytest.mark.parametrize(("said", "listed"), [
+    ("There is no reason at all to order an MRI.", "order an MRI"),
+    ("There is no reason in my view to order a CT.", "order a CT"),
+])
+def test_a_single_no_reason_before_an_order_is_read_as_before(said, listed):
+    assert said_instructions(said) == [listed]
 
 
 def test_an_instruction_not_to_must_keep_its_negation():
@@ -1086,6 +1399,27 @@ def test_calling_it_into_the_pharmacy_is_cut_and_reported():
 
     assert said_instructions(said) == ["and call that into his usual pharmacy"]
     assert own(said, said).value == "Add ivabradine 5 mg twice daily. Recheck in 2 weeks."
+
+
+# Issue 24's: the speaker's own call about a refill or a prescription is the instruction, not only the refill it names,
+# so nothing of it is left in the field ("Call in tomorrow about her amoxicillin.").
+@pytest.mark.parametrize("said", [
+    "Call in tomorrow about her amoxicillin refill.",
+    "Please call in about her prescription for amoxicillin.",
+    "Can you call in later about his metformin refills.",
+])
+def test_calling_in_about_a_refill_is_listed_whole(said):
+    assert said_instructions(said) == [said.rstrip(".")]
+    assert own(said, said).reasons == ["order_or_allergy_change"]
+
+
+# The review of issue 24's series: "we should" before the speaker's own call ("should" is no lead-in, so the listing
+# starts at the call, and nothing of the sentence is left in the field).
+def test_we_should_call_in_about_a_refill_is_cut_whole():
+    said = "We should call in about her amoxicillin refill."
+
+    assert said_instructions(said) == ["call in about her amoxicillin refill"]
+    assert own(said, said).reasons == ["order_or_allergy_change"]
 
 
 def test_an_instruction_can_not_reach_the_note_through_another_field():

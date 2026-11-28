@@ -685,9 +685,23 @@ HAVING = frozenset(
 # "acude con su madre, que tiene diabetes", which the relative reaches from the clause's verb on, past its comma. A
 # relative named with whose relative they are ("la madre del niño") reaches past that: "la madre del niño tiene asma" is
 # the mother's, "la madre del niño refiere que tose" the child's, since someone telling it (REPORTING) ends the reach.
+# As validation.py's WHO_HAS reads the English: "que también tiene diabetes", "sus padres, que tienen diabetes", "que
+# toma metformina", and "cuya diabetes está mal controlada" from what follows "cuya" on; and the clause's reach ends at
+# the patient named again, at what it is about and at what the visit is for (RELATIVE_ENDS: "acude con su hija, cuya
+# preocupación principal es su pérdida de memoria").
 NOT_EXPERIENCER_AFTER = frozenset("con por a al de para junto".split())
 POSSESSIVES = frozenset("su sus el la los las mi".split())
-WHO_HAS = re.compile(r"\s*,?\s+(?:que|quien)\s+(?=(?:tiene|tuvo|tenia|padece|padecio|es|era|fue)\b)")
+WHO_HAS = re.compile(
+    r"\s*,?\s+(?:(?:que|quien|quienes)\s+(?:(?:tambien|ahora|aun|todavia|ambos|ambas|recientemente|hace\s+poco|igualmente)\s+){0,2}"
+    r"(?=(?:tiene|tienen|tuvo|tuvieron|tenia|tenian|padece|padecen|padecio|es|son|era|eran|fue|fueron|"
+    r"sufre|sufren|sufrio|sufrieron)\b)|(?P<whose>cuy[ao]s?)\s+)"
+)
+BEFORE_WHAT_THEY_NOTICED = frozenset(
+    "tiene tienen tenia tuvo es son era esta estan ha han tambien ambos ambas aun todavia ahora principal mayor unica unico".split()
+)
+RELATIVE_ENDS = frozenset(
+    "sobre acerca notado observado visto preocupacion preocupaciones preocupada preocupado preguntas aqui presente cuando".split()
+)
 # Someone telling, not having: "la madre refiere tos nocturna" is the patient's cough.
 REPORTING = frozenset(
     """dice dijo refiere refirio comenta comento cuenta conto informa informo reporta reporto menciona menciono explica
@@ -736,11 +750,12 @@ def _stops(text: str, toks: list[Token], i: int, edge: int, k: int, ends: frozen
 
 def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: list[tuple[int, int]],
            ends: frozenset[str] = TERMINATORS, closing: list[tuple[int, int]] = (),
-           past_the_subject: bool = False) -> tuple[set[int], set[int]]:
+           past_the_subject: bool = False, clauses: frozenset[int] = frozenset()) -> tuple[set[int], set[int]]:
     """The words the cues reach, and the cues' own words: SCOPE words on from a cue before what it qualifies (past a
     subject and its verb, if past_the_subject: _to_the_finding()), POST_SCOPE back from one after it, each stopping at
     its clause; and back from a closing cue over all of its sentence, its commas included, as validation.py reads a
-    closing doubt."""
+    closing doubt. A cue that starts at one of `clauses` is a relative clause's, whose reach also ends at
+    RELATIVE_ENDS."""
     reached: set[int] = set()
     cues: set[int] = set()
     for first, last in before:
@@ -749,8 +764,22 @@ def _reach(text: str, toks: list[Token], before: list[tuple[int, int]], after: l
         last = passed if "\n" not in text[toks[last].end : toks[passed].end] else last
         cues |= set(range(first, last + 1))
         edge = toks[last].end
-        for k, i in enumerate(range(last + 1, min(len(toks), last + 1 + SCOPE))):
-            if _stops(text, toks, i, edge, k, ends):
+        cue_ends = ends | RELATIVE_ENDS if first in clauses else ends
+        ahead = range(last + 1, min(len(toks), last + 1 + SCOPE))
+        # A relative's clause that says what they noticed, asked or worry about is about the patient, as in English.
+        about_the_patient = False
+        for i in list(ahead)[:4] if first in clauses else ():
+            if any(mark in text[toks[last].end : toks[i].start] for mark in ".,;:?!\n"):
+                break
+            if toks[i].key in RELATIVE_ENDS:
+                about_the_patient = True
+                break
+            if toks[i].key not in BEFORE_WHAT_THEY_NOTICED:  # something they have comes first: it is theirs
+                break
+        if about_the_patient:
+            continue
+        for k, i in enumerate(ahead):
+            if _stops(text, toks, i, edge, k, cue_ends):
                 break
             reached.add(i)
             edge = toks[i].end
@@ -897,7 +926,7 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
 
     history = [(f, l) for f, l in _matches(keys, HISTORY_BEFORE)
                if tuple(keys[f : f + len(HISTORY_HEADING)]) != HISTORY_HEADING]
-    relatives, relatives_after = [], []
+    relatives, relatives_after, clauses = [], [], set()
     folded = fold(text)
     for i, token in enumerate(toks):
         if token.text not in RELATIVES:
@@ -914,9 +943,12 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
             continue
         if not relative and j >= 0 and toks[j].key in NOT_EXPERIENCER_AFTER:
             continue
-        # A relative clause says what they have, reached from its verb on: "su madre, que tiene diabetes".
+        # A relative clause says what they have, reached from its verb on: "su madre, que tiene diabetes"; or from
+        # what follows "cuya": "su madre, cuya diabetes está mal controlada".
         if relative:
-            last = next(k for k, t in enumerate(toks) if t.start >= relative.end())
+            following = next(k for k, t in enumerate(toks) if t.start >= relative.end())
+            last = following - 1 if relative.group("whose") else following
+            clauses.add(i)
         relatives.append((i, last))
     closing = {"certainty": _closing(text, toks, CERTAINTY_CLOSING)}
     headed = DOUBT_HEADING.sub(lambda m: m.group()[:-1] + " ", text)  # the same length: toks' places hold
@@ -930,7 +962,8 @@ def _qualified(text: str, toks: list[Token]) -> tuple[dict[str, set[int]], dict[
         ("experiencer", sorted(_matches(keys, EXPERIENCER_BEFORE) + relatives), relatives_after, TERMINATORS | REPORTING),
     ):
         reached, cues = _reach(headed if kind == "certainty" else text, toks, before, after, ends,
-                               closing.get(kind, []), past_the_subject=kind in ("negation", "certainty"))
+                               closing.get(kind, []), past_the_subject=kind in ("negation", "certainty"),
+                               clauses=frozenset(clauses) if kind == "experiencer" else frozenset())
         if kind == "certainty":
             reached |= _questions(text, toks) - cues
         reached = carry_over_list(text, toks, [t.key for t in toks], reached - cues,
